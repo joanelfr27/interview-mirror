@@ -1,0 +1,159 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { createClient } from "@/lib/supabase/server";
+import type { CvAnalysis, SessionRecord } from "@/types";
+
+export default async function AnalysisPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: session } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (!session) notFound();
+
+  const record = session as SessionRecord;
+  const analysis = record.cv_analysis as CvAnalysis | null;
+
+  if (!analysis) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 text-center">
+        <h1 className="font-display text-2xl font-semibold">
+          Analysis not ready
+        </h1>
+        <p className="text-muted-foreground">
+          Run an AI analysis from the prepare page first.
+        </p>
+        <Button asChild>
+          <Link href={`/prepare?session=${id}`}>Go to prepare</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <Badge className="mb-2">CV analysis</Badge>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">
+            {record.title}
+          </h1>
+          <p className="mt-2 text-muted-foreground">{analysis.summary}</p>
+        </div>
+        <Button asChild>
+          <Link href={`/interview/${id}`}>
+            Start interview
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Role alignment score</CardDescription>
+          <CardTitle className="flex items-end gap-2 text-4xl">
+            {analysis.matchScore}
+            <span className="pb-1 text-base font-normal text-muted-foreground">
+              / 100
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Progress value={analysis.matchScore} className="h-3" />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              Strengths
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {analysis.strengths.map((item) => (
+                <li
+                  key={item}
+                  className="rounded-lg border bg-emerald-50/50 px-3 py-2 text-sm text-slate-700"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Gaps to address
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-3">
+              {analysis.gaps.map((item) => (
+                <li
+                  key={item}
+                  className="rounded-lg border bg-amber-50/50 px-3 py-2 text-sm text-slate-700"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Keyword alignment</CardTitle>
+          <CardDescription>
+            Themes present in both your CV and the job description.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {analysis.keywordAlignment.map((kw) => (
+            <Badge key={kw} variant="secondary">
+              {kw}
+            </Badge>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Suggested focus areas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
+            {analysis.suggestedFocusAreas.map((area) => (
+              <li key={area}>{area}</li>
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
