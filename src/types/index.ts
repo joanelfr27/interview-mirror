@@ -12,9 +12,24 @@ export type SessionRecord = {
   cv_text: string;
   job_description: string;
   cv_analysis: CvAnalysis | null;
+  interview_strategy: InterviewStrategy | null;
   status: "draft" | "analyzed" | "in_progress" | "completed";
   created_at: string;
   updated_at: string;
+};
+
+export type InterviewStrategy = {
+  candidatePositioning: string;
+  strongestValueProposition: string;
+  strengthsToLeverage: string[];
+  gapsOrRisks: string[];
+  gapDefenseStrategy: string[];
+  interviewPriorities: string[];
+  likelyDifficultQuestions: string[];
+  storiesToPrepare: string[];
+  communicationPriorities: string;
+  interviewPlan: string;
+  personalization: string;
 };
 
 export type CvAnalysis = {

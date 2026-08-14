@@ -1,0 +1,186 @@
+import { NextResponse } from "next/server";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { createClient } from "@/lib/supabase/server";
+import type { InterviewStrategy, SessionRecord } from "@/types";
+
+type StrategyInput = Record<string, unknown>;
+
+function isValidStrategy(strategy: unknown): strategy is InterviewStrategy {
+  if (!strategy || typeof strategy !== "object") return false;
+  const candidatePositioning = (strategy as any).candidatePositioning;
+  const strongestValueProposition = (strategy as any).strongestValueProposition;
+  const strengthsToLeverage = (strategy as any).strengthsToLeverage;
+  const gapsOrRisks = (strategy as any).gapsOrRisks;
+  const gapDefenseStrategy = (strategy as any).gapDefenseStrategy;
+  const interviewPriorities = (strategy as any).interviewPriorities;
+  const likelyDifficultQuestions = (strategy as any).likelyDifficultQuestions;
+  const storiesToPrepare = (strategy as any).storiesToPrepare;
+  const communicationPriorities = (strategy as any).communicationPriorities;
+  const interviewPlan = (strategy as any).interviewPlan;
+  const personalization = (strategy as any).personalization;
+
+  return (
+    typeof candidatePositioning === "string" &&
+    typeof strongestValueProposition === "string" &&
+    Array.isArray(strengthsToLeverage) &&
+    Array.isArray(gapsOrRisks) &&
+    Array.isArray(gapDefenseStrategy) &&
+    Array.isArray(interviewPriorities) &&
+    Array.isArray(likelyDifficultQuestions) &&
+    Array.isArray(storiesToPrepare) &&
+    typeof communicationPriorities === "string" &&
+    typeof interviewPlan === "string" &&
+    typeof personalization === "string"
+  );
+}
+
+function fallbackStrategy(session: SessionRecord): InterviewStrategy {
+  const strengths = session.cv_analysis?.strengths ?? [];
+  const gaps = session.cv_analysis?.gaps ?? [];
+  const keywords = session.cv_analysis?.keywordAlignment ?? [];
+  const focusAreas = session.cv_analysis?.suggestedFocusAreas ?? [];
+  const topStrength = strengths[0] ?? "relevant experience";
+  const topGap = gaps[0] ?? "areas where evidence is less explicit";
+  const topFocus = focusAreas.slice(0, 3).join(", ") || "role-relevant skills";
+
+  return {
+    candidatePositioning: `Position yourself as a candidate who combines ${topStrength} with a strong focus on ${topFocus}, framing your background around the role's key outcomes and the most relevant evidence in your CV.`,
+    strongestValueProposition: `Highlight your ability to deliver impact through ${topStrength} while connecting your experience to the role's main priorities.`,
+    strengthsToLeverage: strengths.slice(0, 5),
+    gapsOrRisks: gaps.slice(0, 5),
+    gapDefenseStrategy: gaps.slice(0, 5).map((gap) =>
+      `If asked about ${gap.toLowerCase()}, emphasize transferable skills and a clear plan for how you would bridge this gap through evidence-based examples.`
+    ),
+    interviewPriorities: [
+      `Demonstrate evidence for ${topStrength}.`,
+      `Address ${topGap} proactively with concrete examples.`,
+      `Show alignment with ${keywords.join(", ")} where relevant.`,
+    ].filter(Boolean),
+    likelyDifficultQuestions: [
+      `Why is ${topGap.toLowerCase()} not fully represented in your CV?`,
+      `Describe a time you overcame a challenge related to ${topFocus}.`,
+    ],
+    storiesToPrepare: focusAreas.map(
+      (area) => `Prepare a STAR story that highlights ${area}.`
+    ),
+    communicationPriorities: "Be structured, concise, and evidence-driven. Lead with your strongest results and avoid drifting into generic descriptions.",
+    interviewPlan: `Start with a clear positioning statement, emphasize your strongest evidence, acknowledge risks briefly, and finish with how you will contribute to the role's key priorities.`,
+    personalization: `Base every response on the CV and job description. Use the job's language and highlight the unique strengths that match the role's requirements.`,
+  };
+}
+
+async function generateStrategy(
+  session: SessionRecord
+): Promise<InterviewStrategy> {
+  try {
+    const openai = getOpenAI();
+    const completion = await openai.chat.completions.create({
+      model: AI_MODEL,
+      response_format: { type: "json_object" },
+      temperature: 0.4,
+      messages: [
+        {
+          role: "system",
+          content: `You are Interview Mirror's interview strategy coach.
+Create a structured, candidate-specific interview strategy from the provided CV, job description, and analysis.
+This must be actionable, not generic.
+Return JSON using exactly these keys:
+- candidatePositioning (string)
+- strongestValueProposition (string)
+- strengthsToLeverage (string[])
+- gapsOrRisks (string[])
+- gapDefenseStrategy (string[])
+- interviewPriorities (string[])
+- likelyDifficultQuestions (string[])
+- storiesToPrepare (string[])
+- communicationPriorities (string)
+- interviewPlan (string)
+- personalization (string)
+Do not invent credentials or employers. Base everything on the CV, job description, and analysis provided.
+`,
+        },
+        {
+          role: "user",
+          content: `Title: ${session.title}
+CV:
+${session.cv_text.slice(0, 12000)}
+
+JOB DESCRIPTION:
+${session.job_description.slice(0, 8000)}
+
+ANALYSIS:
+${JSON.stringify(session.cv_analysis)}
+
+Create an interview strategy for this candidate. Use the analysis strengths, gaps, and focus areas to guide question selection, gap defense, stories, and communication priorities.`,
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty AI response");
+    const parsed = JSON.parse(raw) as InterviewStrategy;
+    if (!isValidStrategy(parsed)) throw new Error("Invalid strategy format");
+    return parsed;
+  } catch {
+    return fallbackStrategy(session);
+  }
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: session, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !session) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  const record = session as SessionRecord;
+
+  if (!record.cv_analysis) {
+    return NextResponse.json(
+      {
+        error:
+          "CV analysis is required before generating an interview strategy.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (isValidStrategy(record.interview_strategy)) {
+    return NextResponse.json({ strategy: record.interview_strategy });
+  }
+
+  const strategy = await generateStrategy(record);
+
+  const { error: updateError } = await supabase
+    .from("sessions")
+    .update({ interview_strategy: strategy })
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: updateError.message },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ strategy });
+}

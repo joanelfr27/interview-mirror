@@ -15,29 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-async function extractPdfText(file: File) {
-  // Dynamically import the pdf.js browser build at runtime to avoid bundler/worker issues
-  const pdfjslib = await import("pdfjs-dist/build/pdf.mjs");
-
-  const arrayBuffer = await file.arrayBuffer();
-  const loadingTask = pdfjslib.getDocument({
-    data: arrayBuffer,
-    disableWorker: true,
-  } as any);
-  const pdf = await loadingTask.promise;
-  const content: string[] = [];
-
-  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-    const page = await pdf.getPage(pageIndex);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item: any) => item.str || "")
-      .join(" ");
-    content.push(pageText.trim());
-  }
-
-  return content.filter(Boolean).join("\n\n");
-}
+// Server-side extraction endpoint is used for PDFs. Keep client lightweight.
 
 export default function PrepareForm() {
   const router = useRouter();
@@ -94,16 +72,34 @@ export default function PrepareForm() {
 
     if (isPdfFile) {
       try {
-        const text = await extractPdfText(file);
+        const form = new FormData();
+        form.append("file", file);
+
+        const res = await fetch("/api/extract-pdf", {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          const msg = data?.error || "PDF extraction failed";
+          toast.error(msg);
+          return;
+        }
+
+        const text = data?.text ?? "";
         if (text.trim().length > 0) {
           setCvText(text);
           toast.success("CV content loaded from PDF");
           return;
         }
-      } catch {
-        toast.message("Paste your CV text below", {
-          description: "PDF text extraction failed. Paste the text content instead.",
-        });
+
+        toast.error("PDF contains no extractable text. Scanned PDFs require OCR.");
+        return;
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("PDF extraction error:", err);
+        toast.error("PDF extraction failed");
         return;
       }
     }

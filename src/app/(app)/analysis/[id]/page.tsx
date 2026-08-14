@@ -32,6 +32,7 @@ export default async function AnalysisPage({
 
   const record = session as SessionRecord;
   const analysis = record.cv_analysis as CvAnalysis | null;
+  const hasStrategy = Boolean(record.interview_strategy);
 
   if (!analysis) {
     return (
@@ -59,12 +60,17 @@ export default async function AnalysisPage({
           </h1>
           <p className="mt-2 text-muted-foreground">{analysis.summary}</p>
         </div>
-        <Button asChild>
-          <Link href={`/interview/${id}`}>
-            Start interview
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        <div className="flex flex-col items-start gap-3 sm:items-end">
+          <Badge variant="secondary">
+            {hasStrategy ? "Strategy ready" : "Strategy pending"}
+          </Badge>
+          <Button asChild>
+            <Link href={`/strategy/${id}`}>
+              {hasStrategy ? "Review strategy" : "Build interview strategy"}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Send } from "lucide-react";
@@ -27,13 +28,21 @@ export default function InterviewSimulator({ sessionId }: Props) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [title, setTitle] = useState("Interview practice");
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setBlockedMessage(null);
     try {
       const res = await fetch(`/api/interview/${sessionId}`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to load interview");
+      if (!res.ok) {
+        const message = data.error || "Failed to load interview";
+        if (!data.questions?.length) {
+          setBlockedMessage(message);
+        }
+        throw new Error(message);
+      }
       setQuestions(data.questions);
       setTitle(data.session?.title || "Interview practice");
       const existing: Record<string, string> = {};
@@ -42,11 +51,13 @@ export default function InterviewSimulator({ sessionId }: Props) {
       }
       setAnswers(existing);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load");
+      if (!blockedMessage) {
+        toast.error(err instanceof Error ? err.message : "Failed to load");
+      }
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, blockedMessage]);
 
   useEffect(() => {
     load();
@@ -109,6 +120,20 @@ export default function InterviewSimulator({ sessionId }: Props) {
       <div className="flex items-center justify-center py-24 text-muted-foreground">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
         Preparing your interview…
+      </div>
+    );
+  }
+
+  if (blockedMessage) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-6 py-20 text-center text-slate-800">
+        <div className="space-y-3 rounded-2xl border border-rose-200 bg-rose-50 p-8">
+          <p className="text-lg font-semibold">Interview Strategy required</p>
+          <p className="text-sm text-slate-700">{blockedMessage}</p>
+          <Button asChild>
+            <Link href={`/strategy/${sessionId}`}>Build interview strategy</Link>
+          </Button>
+        </div>
       </div>
     );
   }

@@ -153,8 +153,17 @@ export default async function DashboardPage() {
                         </Link>
                       </Button>
                     )}
-                    {(session.status === "analyzed" ||
-                      session.status === "in_progress") && (
+                    {session.status === "analyzed" && (
+                      <Button size="sm" asChild>
+                        <Link href={`/strategy/${session.id}`}>
+                          <MessageSquare className="h-4 w-4" />
+                          {session.interview_strategy
+                            ? "Review strategy"
+                            : "Build strategy"}
+                        </Link>
+                      </Button>
+                    )}
+                    {session.status === "in_progress" && (
                       <Button size="sm" asChild>
                         <Link href={`/interview/${session.id}`}>
                           <MessageSquare className="h-4 w-4" />

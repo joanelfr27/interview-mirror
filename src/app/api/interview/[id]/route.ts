@@ -3,6 +3,11 @@ import { AI_MODEL, getOpenAI } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 import type { SessionRecord } from "@/types";
 
+type MessagePayload = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
 type GeneratedQuestion = { question: string; category: string };
 
 function fallbackQuestions(session: SessionRecord): GeneratedQuestion[] {
@@ -41,27 +46,39 @@ async function generateQuestions(
 ): Promise<GeneratedQuestion[]> {
   try {
     const openai = getOpenAI();
+    const systemPrompt = `You are an expert interview coach for Interview Mirror.
+Generate exactly 5 interview questions tailored to the CV, job description, and interview strategy.
+Never invent employer names or credentials not present in the CV.
+Use the strategy to prioritize questions that test strengths, probe gaps, and validate the candidate's positioning.
+Return JSON: { "questions": [ { "question": string, "category": string } ] }
+Categories: behavioral | situational | technical | depth | motivation`;
+
+    const userPrompt = `Title: ${session.title}
+CV:\n${session.cv_text.slice(0, 10000)}
+JOB DESCRIPTION:\n${session.job_description.slice(0, 6000)}
+ANALYSIS:\n${JSON.stringify(session.cv_analysis)}`;
+
+    const messages: MessagePayload[] = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ];
+
+    if (session.interview_strategy) {
+      messages.push({
+        role: "assistant",
+        content: `INTERVIEW STRATEGY:\n${JSON.stringify(session.interview_strategy)}`,
+      });
+      messages.push({
+        role: "assistant",
+        content: `Use this strategy to shape the questions. Focus on the candidate's positioning, the strengths to leverage, the gaps to probe, the stories to prepare, and the communication priorities. Make these questions reflect the strategy in a concrete and role-specific way.`,
+      });
+    }
+
     const completion = await openai.chat.completions.create({
       model: AI_MODEL,
       response_format: { type: "json_object" },
       temperature: 0.5,
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert interview coach for Interview Mirror.
-Generate exactly 5 interview questions tailored to the CV and job description.
-Never invent employer names or credentials not present in the CV.
-Return JSON: { "questions": [ { "question": string, "category": string } ] }
-Categories: behavioral | situational | technical | depth | motivation`,
-        },
-        {
-          role: "user",
-          content: `Title: ${session.title}
-CV:\n${session.cv_text.slice(0, 10000)}
-JOB DESCRIPTION:\n${session.job_description.slice(0, 6000)}
-ANALYSIS:\n${JSON.stringify(session.cv_analysis)}`,
-        },
-      ],
+      messages,
     });
 
     const raw = completion.choices[0]?.message?.content;
@@ -108,6 +125,16 @@ export async function GET(
     .order("order_index", { ascending: true });
 
   if (!questions?.length) {
+    if (!record.interview_strategy) {
+      return NextResponse.json(
+        {
+          error:
+            "Interview Strategy is required before generating questions. Please build your strategy first.",
+        },
+        { status: 400 }
+      );
+    }
+
     const generated = await generateQuestions(record);
     const rows = generated.map((q, i) => ({
       session_id: id,
