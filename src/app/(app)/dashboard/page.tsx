@@ -153,7 +153,7 @@ export default async function DashboardPage() {
                         </Link>
                       </Button>
                     )}
-                    {session.status === "analyzed" && (
+                    {!session.interview_strategy && (
                       <Button size="sm" asChild>
                         <Link href={`/strategy/${session.id}`}>
                           <MessageSquare className="h-4 w-4" />

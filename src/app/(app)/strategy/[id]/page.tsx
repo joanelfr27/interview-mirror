@@ -22,10 +22,7 @@ type StrategyResponse = {
   error?: string;
 };
 
-type SessionResponse = {
-  session?: SessionRecord;
-  error?: string;
-};
+type SessionResponse = SessionRecord;
 
 export default function StrategyPage() {
   const params = useParams();
@@ -46,15 +43,20 @@ export default function StrategyPage() {
       try {
         const sessionRes = await fetch(`/api/sessions/${id}`);
         const sessionData = (await sessionRes.json()) as SessionResponse;
-        if (!sessionRes.ok || !sessionData.session) {
-          throw new Error(sessionData.error || "Could not load session");
+        console.log("SESSION DATA:",sessionData);
+        if (!sessionRes.ok || !sessionData) {
+          throw new Error("Could not load session");
         }
         if (cancelled) return;
-        setSession(sessionData.session);
+        setSession(sessionData);
 
-        if (sessionData.session.interview_strategy) {
-          setStrategy(sessionData.session.interview_strategy);
-        }
+        if 
+      (sessionData.interview_strategy) {
+      setStrategy(sessionData.interview_strategy);
+      setLoading(false);
+        } else {
+            await handleGenerate();
+          }    
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Unable to load session");

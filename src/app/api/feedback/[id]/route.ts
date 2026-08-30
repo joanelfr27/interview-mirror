@@ -48,7 +48,7 @@ function fallbackFeedback(
     confidence: Math.min(90, overall + 1),
     strengths: [
       "Responses are complete and address the questions directly.",
-      "Answers show reference to concrete experience when available.",
+      "+ show reference to concrete experience when available.",
     ],
     improvements: [
       "Make the connection to the target role more explicit in each example.",
@@ -80,13 +80,13 @@ async function generateFeedback(
 Evaluate each answer using these principles:
 1. QUESTION RESPONSIVENESS: Did the candidate answer the question asked?
 2. RELEVANCE: Does the answer directly address the question and the job requirements?
-3. EVIDENCE: Are there concrete examples, actions, outcomes, responsibilities, metrics, or specific experience? Do not reward length by itself.
-4. STRUCTURE: Is the response organized logically? For behavioral questions, recognize STAR-style structure when appropriate without forcing it.
+3. EVIDENCE: Are there concrete examples, actions, outcomes, responsibilities, metrics, or specific experience? Distinguish specific evidence from generic claims.
+4. STRUCTURE: Is the response organized logically? For behavioral questions, recognize STAR-style structure when appropriate without forcing it. Do not reward length by itself.
 5. COMMUNICATION: Is the wording clear, concise, professional, and easy to follow?
-6. ROLE ALIGNMENT: Does the answer demonstrate competencies relevant to the job description?
+6. ROLE ALIGNMENT: Does the answer demonstrate competencies relevant to the job description? Explain the connection to the job requirements when relevant.
 7. CV CONSISTENCY: Is the answer consistent with the CV? If a claim cannot be verified from the CV, note that it should be substantiated rather than inventing or dismissing it.
-8. COACHING VALUE: Provide actionable, specific advice rather than generic statements.
-
+8. COACHING VALUE: Provide actionable, specific advice rather than generic statements. Focus on the single most important improvement first.
+When writing suggestedRewrite, use only information from the candidate's actual answer, CV, or job description. Never use placeholders such as [challenge], [action], [result], [team], or [metric]. Never invent facts, If important information is missing, explain what the candidate should add instead of inventing it.
 Use a 0-100 scale consistently:
 90-100 = exceptional
 80-89 = strong with minor weaknesses
@@ -94,7 +94,7 @@ Use a 0-100 scale consistently:
 60-69 = mixed/average with important weaknesses
 50-59 = weak
 below 50 = poor or off-target
-
+Do not inflate scores. Use the full scale and score based on the actual evidence in the answer.
 For confidence, judge only wording, assertiveness, clarity, and avoidance of hedging. Do not infer actual vocal confidence. True vocal-confidence analysis should be added later when audio is implemented.
 
 Return JSON with keys:
@@ -174,7 +174,7 @@ export async function POST(
     question: q.question as string,
     answer: (answerMap.get(q.id) as string) || "",
   }));
-
+console.log("DEBUG pairs:", pairs);
   if (pairs.some((p) => !p.answer.trim())) {
     return NextResponse.json(
       { error: "Please answer all questions before requesting feedback" },

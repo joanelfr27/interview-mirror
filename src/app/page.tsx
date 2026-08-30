@@ -46,13 +46,13 @@ export default function LandingPage() {
               <span className="block text-primary">Interview with confidence.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-xl animate-fade-up text-lg text-muted-foreground [animation-delay:160ms]">
-              Evidence-first AI coaching that turns your CV and target role into
-              personalized interview practice — without inventing what isn&apos;t there.
+              Evidence-first interview coaching that turns your CV and target role into
+              personalized interview practice — grounded in your real experience.
             </p>
             <div className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 sm:flex-row [animation-delay:240ms]">
               <Button size="lg" asChild>
                 <Link href="/signup">
-                  Start free
+                  Get started 
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -76,12 +76,12 @@ export default function LandingPage() {
                 <div className="space-y-4 border-b p-6 md:border-b-0 md:border-r">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
                     <Sparkles className="h-4 w-4" />
-                    CV × Role match
+                    CV + Role analysis
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Alignment score</span>
-                      <span className="font-semibold text-slate-900">84%</span>
+                      <span className="text-muted-foreground">Interview focus</span>
+                      <span className="font-semibold text-slate-900">Focused</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                       <div className="h-full w-[84%] rounded-full bg-primary" />
@@ -90,15 +90,15 @@ export default function LandingPage() {
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      Strong product delivery narrative
+                      Turn your experience into strong interview stories
                     </li>
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      Stakeholder leadership evidence
+                      Evidence of leadership and influenve
                     </li>
                     <li className="flex gap-2">
                       <span className="text-amber-600">•</span>
-                      Deepen metrics storytelling
+                      Strengthen your use of metrics and results
                     </li>
                   </ul>
                 </div>
@@ -107,14 +107,13 @@ export default function LandingPage() {
                     Interviewer
                   </p>
                   <p className="rounded-lg border bg-white p-4 text-sm leading-relaxed text-slate-700 shadow-sm">
-                    Tell me about a time you influenced a decision without formal
-                    authority. What evidence would you bring?
+                    Tell me about a challenging situation at work. What did you do, and what was the outcome?
                   </p>
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Your coaching tip
                   </p>
                   <p className="text-sm text-slate-600">
-                    Lead with the outcome, then map the stakeholders and the
+                    Sreucture your answer around the situation, your actions, and the measurable outcome Lead with the outcome.
                     specific actions that shifted the decision.
                   </p>
                 </div>

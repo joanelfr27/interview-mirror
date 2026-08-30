@@ -6,7 +6,7 @@ export function BrandMark({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn("h-5 w-5", className)}
+      className={cn("h-8 w-8", className)}
       aria-hidden
     >
       <rect

@@ -150,8 +150,8 @@ export default async function FeedbackPage({
           <CardTitle className="text-base">Per-question notes</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {feedback.questionFeedback.map((q) => (
-            <div key={q.question} className="rounded-lg border p-4">
+          {feedback.questionFeedback.map((q,index) => (
+            <div key={index} className="rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium text-slate-900">{q.question}</p>
                 <Badge variant="secondary">{q.score}/100</Badge>

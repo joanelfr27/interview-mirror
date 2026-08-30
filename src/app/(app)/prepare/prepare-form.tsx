@@ -15,7 +15,50 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// Server-side extraction endpoint is used for PDFs. Keep client lightweight.
+async function extractPdfText(file: File) {
+  // Dynamically import pdf.js at runtime; try legacy build first, then fall back to main build
+  let pdfjslib: any = null;
+  try {
+    const mod = await import("pdfjs-dist/legacy/build/pdf");
+    pdfjslib = (mod && (mod as any).default) ? (mod as any).default : mod;
+  } catch (e) {
+    try {
+      const mod = await import("pdfjs-dist/build/pdf.mjs");
+      pdfjslib = (mod && (mod as any).default) ? (mod as any).default : mod;
+    } catch (err) {
+      throw new Error("Could not load pdfjs-dist module: " + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+
+  try {
+    if (pdfjslib.GlobalWorkerOptions) {
+      (pdfjslib as any).GlobalWorkerOptions.workerSrc = "";
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  if (!pdfjslib || typeof pdfjslib.getDocument !== "function") {
+    throw new Error("Imported pdfjs does not expose getDocument");
+  }
+
+  const loadingTask = pdfjslib.getDocument({ data: arrayBuffer, disableWorker: true } as any);
+  const pdf = await loadingTask.promise;
+  const content: string[] = [];
+
+  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
+    const page = await pdf.getPage(pageIndex);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => item.str || "")
+      .join(" ");
+    content.push(pageText.trim());
+  }
+
+  return content.filter(Boolean).join("\n\n");
+}
 
 export default function PrepareForm() {
   const router = useRouter();
@@ -72,34 +115,19 @@ export default function PrepareForm() {
 
     if (isPdfFile) {
       try {
-        const form = new FormData();
-        form.append("file", file);
-
-        const res = await fetch("/api/extract-pdf", {
-          method: "POST",
-          body: form,
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          const msg = data?.error || "PDF extraction failed";
-          toast.error(msg);
-          return;
-        }
-
-        const text = data?.text ?? "";
+          const text = await extractPdfText(file);
         if (text.trim().length > 0) {
           setCvText(text);
           toast.success("CV content loaded from PDF");
           return;
         }
-
-        toast.error("PDF contains no extractable text. Scanned PDFs require OCR.");
-        return;
       } catch (err) {
+        // surface error to console for easier debugging
         // eslint-disable-next-line no-console
         console.error("PDF extraction error:", err);
-        toast.error("PDF extraction failed");
+        toast.message("Paste your CV text below", {
+          description: "PDF text extraction failed. Paste the text content instead.",
+        });
         return;
       }
     }
