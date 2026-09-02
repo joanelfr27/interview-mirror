@@ -54,7 +54,8 @@ export async function POST(
     const questionRows = questionsData.questions.map((q: string, index: number) => ({
       session_id: session.id,
       question_text: q,
-      question_order: index + 1,
+      category: 'general',
+      order_order: index + 1,
     }))
 
     const { error: questionsError } = await supabase

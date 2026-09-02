@@ -168,7 +168,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
           <div className="flex items-center gap-2">
             <Badge variant="outline">{current.category}</Badge>
           </div>
-          <CardTitle className="text-xl leading-snug">{current.question}</CardTitle>
+          <CardTitle className="text-xl leading-snug">{current.question_text}</CardTitle>
           <CardDescription>
             Answer as you would in a live interview. Use concrete evidence from
             your experience.
