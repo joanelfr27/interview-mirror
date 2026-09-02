@@ -1,130 +1,74 @@
-import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
-import { createClient } from "@/lib/supabase/server";
-import type { SessionRecord } from "@/types";
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { generateInterviewQuestions } from '@/lib/openai'
 
-type MessagePayload = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
-type GeneratedQuestion = { question: string; category: string };
-
-function fallbackQuestions(session: SessionRecord): GeneratedQuestion[] {
-  const focus =
-    session.cv_analysis?.suggestedFocusAreas?.[0] ?? "impact and leadership";
-  return [
-    {
-      category: "behavioral",
-      question:
-        "Tell me about yourself and how your experience maps to this role.",
-    },
-    {
-      category: "behavioral",
-      question:
-        "Describe a project where you delivered measurable impact. What was your role?",
-    },
-    {
-      category: "situational",
-      question:
-        "Walk me through how you would prioritize competing stakeholder needs in the first 90 days.",
-    },
-    {
-      category: "depth",
-      question: `How have you developed strength in ${focus}? Share a concrete example.`,
-    },
-    {
-      category: "motivation",
-      question:
-        "Why this role, and what evidence from your background supports that fit?",
-    },
-  ];
-}
-
-async function generateQuestions(
-  session: SessionRecord
-): Promise<GeneratedQuestion[]> {
-  return fallbackQuestions(session);
-  }
-
-export async function GET(
-  _request: Request,
+export async function POST(
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const { id: strategyId } = await params
+    const supabase = await createClient()
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { data: session, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
-
-  if (error || !session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
-
-  const record = session as SessionRecord;
-
-  let { data: questions } = await supabase
-    .from("questions")
-    .select("*")
-    .eq("session_id", id)
-    .order("order_index", { ascending: true });
-
-  if (!questions?.length) {
-    if (!record.interview_strategy) {
-      return NextResponse.json(
-        {
-          error:
-            "Interview Strategy is required before generating questions. Please build your strategy first.",
-        },
-        { status: 400 }
-      );
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const generated = await generateQuestions(record);
-    const rows = generated.map((q, i) => ({
-      session_id: id,
-      question: q.question,
-      category: q.category,
-      order_index: i,
-    }));
+    const { data: strategy, error: strategyError } = await supabase
+      .from('strategies')
+      .select('*')
+      .eq('id', strategyId)
+      .single()
 
-    const { data: inserted, error: insertError } = await supabase
-      .from("questions")
-      .insert(rows)
-      .select("*")
-      .order("order_index", { ascending: true });
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (strategyError || !strategy) {
+      return NextResponse.json({ error: 'Strategy not found' }, { status: 404 })
     }
-    questions = inserted;
 
-    await supabase
-      .from("sessions")
-      .update({ status: "in_progress" })
-      .eq("id", id)
-      .eq("user_id", user.id);
+    const { data: analysis, error: analysisError } = await supabase
+      .from('analyses')
+      .select('*')
+      .eq('id', strategy.analysis_id)
+      .single()
+
+    if (analysisError || !analysis) {
+      return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
+    }
+
+    const questionsData = await generateInterviewQuestions(analysis, strategy)
+
+    // 1. Create the session
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: user.id,
+        strategy_id: strategy.id,
+        status: 'in_progress',
+      })
+      .select()
+      .single()
+
+    if (sessionError) throw sessionError
+
+    // 2. Insert questions into normalized questions table
+    const questionRows = questionsData.questions.map((q: string, index: number) => ({
+      session_id: session.id,
+      question_text: q,
+      question_order: index + 1,
+    }))
+
+    const { error: questionsError } = await supabase
+      .from('questions')
+      .insert(questionRows)
+
+    if (questionsError) throw questionsError
+
+    return NextResponse.json(session)
+  } catch (error) {
+    console.error('Error generating interview:', error)
+    return NextResponse.json(
+      { error: 'Failed to generate interview questions' },
+      { status: 500 }
+    )
   }
-
-  const { data: answers } = await supabase
-    .from("answers")
-    .select("*")
-    .eq("session_id", id);
-
-  return NextResponse.json({
-    session: record,
-    questions,
-    answers: answers ?? [],
-  });
 }
