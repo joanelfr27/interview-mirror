@@ -34,7 +34,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
     setLoading(true);
     setBlockedMessage(null);
     try {
-      const res = await fetch(`/api/interview/${sessionId}`, { method: "POST" });
+      const res = await fetch(`/api/interview/${sessionId}`);
       const data = await res.json();
       if (!res.ok) {
         const message = data.error || "Failed to load interview";
@@ -51,13 +51,11 @@ export default function InterviewSimulator({ sessionId }: Props) {
       }
       setAnswers(existing);
     } catch (err) {
-      if (!blockedMessage) {
-        toast.error(err instanceof Error ? err.message : "Failed to load");
-      }
+      toast.error(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [sessionId, blockedMessage]);
+  }, [sessionId]);
 
   useEffect(() => {
     load();
@@ -68,7 +66,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
     questions.length === 0 ? 0 : ((index + 1) / questions.length) * 100;
 
   async function saveCurrentAnswer() {
-    if (!current) return;
+    if (!current) return false;
     const text = answers[current.id]?.trim() ?? "";
     if (!text) {
       toast.error("Write an answer before continuing");
@@ -90,9 +88,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
   async function onNext() {
     const ok = await saveCurrentAnswer();
     if (!ok) return;
-    if (index < questions.length - 1) {
-      setIndex((i) => i + 1);
-    }
+    if (index < questions.length - 1) setIndex((i) => i + 1);
   }
 
   async function onSubmitAll() {
@@ -100,9 +96,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
     if (!ok) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/feedback/${sessionId}`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/feedback/${sessionId}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Feedback failed");
       toast.success("Feedback ready");
@@ -139,11 +133,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
   }
 
   if (!current) {
-    return (
-      <div className="py-16 text-center text-muted-foreground">
-        No questions available. Run analysis first.
-      </div>
-    );
+    return <div className="py-16 text-center text-muted-foreground">No questions available. Run analysis first.</div>;
   }
 
   const isLast = index === questions.length - 1;
@@ -151,64 +141,32 @@ export default function InterviewSimulator({ sessionId }: Props) {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Badge variant="secondary" className="mb-2">
-          Interview simulator
-        </Badge>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">
-          {title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Question {index + 1} of {questions.length}
-        </p>
+        <Badge variant="secondary" className="mb-2">Interview simulator</Badge>
+        <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Question {index + 1} of {questions.length}</p>
         <Progress value={progress} className="mt-4 h-2" />
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">{current.category}</Badge>
-          </div>
+          <div className="flex items-center gap-2"><Badge variant="outline">{current.category}</Badge></div>
           <CardTitle className="text-xl leading-snug">{current.question_text}</CardTitle>
-          <CardDescription>
-            Answer as you would in a live interview. Use concrete evidence from
-            your experience.
-          </CardDescription>
+          <CardDescription>Answer as you would in a live interview. Use concrete evidence from your experience.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
             value={answers[current.id] ?? ""}
-            onChange={(e) =>
-              setAnswers((prev) => ({ ...prev, [current.id]: e.target.value }))
-            }
+            onChange={(e) => setAnswers((prev) => ({ ...prev, [current.id]: e.target.value }))}
             placeholder="Type your answer…"
             className="min-h-[200px]"
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={index === 0}
-              onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            >
-              Previous
-            </Button>
+            <Button type="button" variant="outline" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>Previous</Button>
             {isLast ? (
               <Button onClick={onSubmitAll} disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Generating feedback…
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4" />
-                    Submit & get feedback
-                  </>
-                )}
+                {submitting ? <><Loader2 className="h-4 w-4 animate-spin" />Generating feedback…</> : <><Send className="h-4 w-4" />Submit & get feedback</>}
               </Button>
-            ) : (
-              <Button onClick={onNext}>Next question</Button>
-            )}
+            ) : <Button onClick={onNext}>Next question</Button>}
           </div>
         </CardContent>
       </Card>
