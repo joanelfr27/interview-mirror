@@ -73,3 +73,63 @@ export async function POST(
     )
   }
 }
+
+// Load an existing interview session. This preserves the working interview-page
+// behavior from the previous implementation while keeping the new POST
+// generation flow above intact.
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const supabase = await createClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: session, error: sessionError } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
+
+    const { data: questions, error: questionsError } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('session_id', id)
+      .order('order_order', { ascending: true })
+
+    if (questionsError) {
+      return NextResponse.json({ error: questionsError.message }, { status: 500 })
+    }
+
+    const { data: answers, error: answersError } = await supabase
+      .from('answers')
+      .select('*')
+      .eq('session_id', id)
+
+    if (answersError) {
+      return NextResponse.json({ error: answersError.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      session,
+      questions: questions ?? [],
+      answers: answers ?? [],
+    })
+  } catch (error) {
+    console.error('Error loading interview:', error)
+    return NextResponse.json(
+      { error: 'Failed to load interview' },
+      { status: 500 }
+    )
+  }
+}
