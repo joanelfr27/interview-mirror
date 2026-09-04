@@ -34,7 +34,7 @@ async function extractPdfText(file: File) {
 
   try {
     if (pdfjslib.GlobalWorkerOptions) {
-      (pdfjslib as any).GlobalWorkerOptions.workerSrc = "";
+      (pdfjslib as any).GlobalWorkerOptions.workerSrc =`https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjslib as any).version}/pdf.worker.min.mjs`;
     }
   } catch (e) {
     // ignore

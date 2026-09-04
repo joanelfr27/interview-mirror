@@ -34,7 +34,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
     setLoading(true);
     setBlockedMessage(null);
     try {
-      const res = await fetch(`/api/interview/${sessionId}`);
+      const res = await fetch(`/api/interview/${sessionId}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         const message = data.error || "Failed to load interview";
