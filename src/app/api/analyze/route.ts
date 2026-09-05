@@ -40,7 +40,11 @@ function fallbackAnalysis(cvText: string, jobDescription: string): CvAnalysis {
 
 async function runAnalysis(
   cvText: string,
-  jobDescription: string
+  jobDescription: string,
+  priorContext?: {
+    sessions: unknown[];
+    coaching_progress: unknown[];
+  }
 ): Promise<CvAnalysis> {
   try {
     const openai = getOpenAI();
@@ -63,7 +67,15 @@ Base every claim only on the CV and job description provided.`,
         },
         {
           role: "user",
-          content: `CV:\n${cvText.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}`,
+          content: `CV:\n${cvText.slice(0, 12000)}
+
+JOB DESCRIPTION:
+${jobDescription.slice(0, 8000)}
+
+PRIOR PREPARATION CONTEXT:
+${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}
+
+Use prior preparation context only to maintain continuity and identify areas for improvement. Do not treat it as evidence of current CV experience.`,
         },
       ],
     });
@@ -99,7 +111,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const analysis = await runAnalysis(cvText, jobDescription);
+  let priorContext:
+  | { sessions: unknown[]; coaching_progress: unknown[] }
+  | undefined;
+
+if (!sessionId) {
+  const { data, error } = await supabase.rpc(
+    "get_candidate_preparation_context",
+    { p_user_id: user.id }
+  );
+
+  if (!error && data) {
+    priorContext = data;
+  } else if (error) {
+    console.error("Failed to load preparation context:", error);
+  }
+}
+
+const analysis = await runAnalysis(cvText, jobDescription, priorContext);
 
   let id = sessionId ?? null;
 
