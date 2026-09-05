@@ -32,16 +32,43 @@ const statusVariant: Record<
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  data: { user },
+} = await supabase.auth.getUser();
 
-  const { data: sessions } = await supabase
-    .from("sessions")
-    .select("*")
-    .order("updated_at", { ascending: false })
-    .limit(20);
+if (!user) {
+  return null;
+}
 
-  const list = (sessions ?? []) as SessionRecord[];
+const { data: context, error: contextError } = await supabase.rpc(
+  "get_candidate_preparation_context",
+  { p_user_id: user.id }
+);
+if (contextError) {
+  console.error("Failed to load preparation context:", contextError);
+}
+
+const preparationContext = (context ?? {
+  sessions: [],
+  coaching_progress: [],
+}) as {
+  sessions: SessionRecord[];
+  coaching_progress: Array<{
+    id: string;
+    user_id: string;
+    session_id: string | null;
+    focus_area: string;
+    status: "identified" | "in_progress" | "improved";
+    baseline_score: number | null;
+    latest_score: number | null;
+    evidence: Record<string, unknown>;
+    coaching_action: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+};
+
+const list = preparationContext.sessions.slice(0, 20);
+const coachingProgress = preparationContext.coaching_progress;
   const completed = list.filter((s) => s.status === "completed").length;
   const inProgress = list.filter(
     (s) => s.status === "in_progress" || s.status === "analyzed"
