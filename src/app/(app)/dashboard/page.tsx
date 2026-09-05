@@ -118,7 +118,19 @@ const coachingProgress = preparationContext.coaching_progress;
           </CardHeader>
         </Card>
       </div>
-
+{coachingProgress.length > 0 && (
+  <Card>
+    <CardHeader>
+      <CardDescription>Your current focus</CardDescription>
+      <CardTitle>{coachingProgress[0].focus_area}</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <Badge variant="secondary">
+        {coachingProgress[0].status.replace("_", " ")}
+      </Badge>
+    </CardContent>
+  </Card>
+)}
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">

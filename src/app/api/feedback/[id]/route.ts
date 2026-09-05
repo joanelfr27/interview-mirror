@@ -194,7 +194,32 @@ console.log("DEBUG pairs:", pairs);
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+for (const improvementArea of feedback.improvements) {
+  const { error: coachingError } = await supabase.rpc(
+    "upsert_coaching_progress",
+    {
+      p_user_id: user.id,
+      p_session_id: id,
+      p_focus_area: improvementArea,
+      p_status: "identified",
+      p_score: feedback.overallScore,
+      p_evidence: {
+        improvementArea,
+        questionFeedback: feedback.questionFeedback,
+        overallScore: feedback.overallScore,
+      },
+      p_coaching_action: feedback.sampleRewrite,
+    }
+  );
 
+  if (coachingError) {
+  console.error("Failed to save coaching progress:", coachingError);
+  return NextResponse.json(
+    { error: "Failed to save coaching progress" },
+    { status: 500 }
+  );
+}
+}
   await supabase
     .from("sessions")
     .update({ status: "completed" })
