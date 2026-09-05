@@ -36,15 +36,21 @@ export default function InterviewSimulator({ sessionId }: Props) {
     try {
       const res = await fetch(`/api/interview/${sessionId}`);
       const data = await res.json();
-      if (!res.ok) {
-        const message = data.error || "Failed to load interview";
-        if (!data.questions?.length) {
-          setBlockedMessage(message);
-        }
-        throw new Error(message);
-      }
-      setQuestions(data.questions);
-      setTitle(data.session?.title || "Interview practice");
+          if (!res.ok) {
+      const message = data.error || "Failed to load interview";
+      setBlockedMessage(message);
+      throw new Error(message);
+    }
+
+    if (!data.questions || data.questions.length === 0) {
+      setBlockedMessage("No questions available. Run analysis first.");
+      setLoading(false);
+      return;
+    }
+
+    setQuestions(data.questions);
+    setTitle(data.session?.title || "Interview practice");
+
       const existing: Record<string, string> = {};
       for (const a of data.answers ?? []) {
         existing[a.question_id] = a.answer_text;

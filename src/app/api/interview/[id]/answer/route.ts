@@ -1,74 +1,55 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export async function POST(
+export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: sessionId } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const { id: sessionId } = await params;
+    const supabase = await createClient();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    // 1. Fetch Session
+    const { data: session, error: sessionError } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
 
-  const { data: session } = await supabase
-    .from("sessions")
-    .select("id")
-    .eq("id", sessionId)
-    .eq("user_id", user.id)
-    .single();
+    if (sessionError || !session) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
 
-  if (!session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+    // 2. Fetch Questions linked to this session
+    const { data: questions, error: questionsError } = await supabase
+      .from("questions")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("created_at", { ascending: true });
 
-  const body = await request.json();
-  const questionId = String(body.questionId ?? "");
-  const answerText = String(body.answerText ?? "").trim();
+    if (questionsError) {
+      console.error("Questions fetch error:", questionsError);
+      return NextResponse.json({ error: questionsError.message }, { status: 500 });
+    }
 
-  if (!questionId || !answerText) {
-    return NextResponse.json(
-      { error: "questionId and answerText are required" },
-      { status: 400 }
-    );
-  }
-
-  const { data: existing } = await supabase
-    .from("answers")
-    .select("id")
-    .eq("question_id", questionId)
-    .eq("session_id", sessionId)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
+    // 3. Fetch Answers
+    const { data: answers, error: answersError } = await supabase
       .from("answers")
-      .update({ answer_text: answerText })
-      .eq("id", existing.id);
+      .select("*")
+      .eq("session_id", sessionId);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (answersError) {
+      console.error("Answers fetch error:", answersError);
+      return NextResponse.json({ error: answersError.message }, { status: 500 });
     }
-  } else {
-    const { error } = await supabase.from("answers").insert({
-      question_id: questionId,
-      session_id: sessionId,
-      answer_text: answerText,
+
+    return NextResponse.json({
+      session,
+      questions: questions ?? [],
+      answers: answers ?? [],
     });
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+  } catch (error) {
+    console.error("Error loading interview:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
-
-  await supabase
-    .from("sessions")
-    .update({ status: "in_progress" })
-    .eq("id", sessionId);
-
-  return NextResponse.json({ ok: true });
 }

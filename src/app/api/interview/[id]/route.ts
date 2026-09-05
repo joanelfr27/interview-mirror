@@ -53,9 +53,9 @@ export async function POST(
     // 2. Insert questions into normalized questions table
     const questionRows = questionsData.questions.map((q: string, index: number) => ({
       session_id: session.id,
-      question_text: q,
+      question: q,
       category: 'general',
-      order_order: index + 1,
+      order_index: index + 1,
     }))
 
     const { error: questionsError } = await supabase
@@ -105,7 +105,7 @@ export async function GET(
       .from('questions')
       .select('*')
       .eq('session_id', id)
-      .order('order_order', { ascending: true })
+      .order('order_index', { ascending: true })
 
     if (questionsError) {
       return NextResponse.json({ error: questionsError.message }, { status: 500 })

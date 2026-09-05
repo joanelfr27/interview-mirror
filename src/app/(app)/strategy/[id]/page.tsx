@@ -130,14 +130,11 @@ export default function StrategyPage() {
             This strategy is built from your CV, the job description, and your Professional Mirror analysis. It guides which questions you should expect, the stories you should prepare, and how to defend your gaps.
           </p>
         </div>
-        {strategy && (
-          <Button asChild>
-            <Link href={`/interview/${id}`}>
-              Continue to interview
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        )}
+        {strategy && (  <Button    onClick={async () => {      try {        setLoading(true);        setError(null);
+        const res = await fetch(`/api/interview/${id}`, {          method: "POST",        });
+        const data = await res.json();
+        if (!res.ok || !data.id) {          throw new Error(data.error || "Could not start interview");        }
+        router.push(`/interview/${data.id}`);      } catch (err) {        setError(          err instanceof Error            ? err.message            : "Could not start interview"        );        setLoading(false);      }    }}  >    Continue to interview    <ArrowRight className="h-4 w-4" />  </Button>)}
       </div>
 
       {session?.cv_analysis && (

@@ -142,8 +142,37 @@ export async function POST(request: Request) {
     id = data.id;
   }
 
-  // Clear old questions when re-analyzing
-  await supabase.from("questions").delete().eq("session_id", id);
+       // Clear old questions when re-analyzing
+    await supabase.from("questions").delete().eq("session_id", id);
 
-  return NextResponse.json({ sessionId: id, analysis });
+    // Extract questions array dynamically
+    const rawQuestions = 
+      (analysis as any)?.questions || 
+      (analysis as any)?.interviewQuestions || 
+      (analysis as any)?.interview_questions || 
+      [];
+
+    console.log("Raw questions extracted:", rawQuestions);
+
+    const questionsToInsert = rawQuestions.map((q: any) => ({
+      session_id: id,
+      question_text: typeof q === "string" ? q : (q.question || q.question_text || q.text || String(q)),
+      category: typeof q === "object" && q.category ? q.category : "General",
+    }));
+
+    if (questionsToInsert.length > 0) {
+      const { error: questionsError } = await supabase
+        .from("questions")
+        .insert(questionsToInsert);
+
+      if (questionsError) {
+        console.error("Failed to insert questions into Supabase:", questionsError);
+        return NextResponse.json({ error: questionsError.message }, { status: 500 });
+      }
+    } else {
+      console.warn("No questions array found in OpenAI response.");
+    }
+
+    return NextResponse.json({ sessionId: id, analysis });
+  
 }
