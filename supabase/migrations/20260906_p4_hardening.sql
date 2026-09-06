@@ -22,7 +22,6 @@ where focus_key is null;
 alter table public.coaching_progress
   alter column focus_key set not null;
 
-drop index if exists public.coaching_progress_user_focus_unique;
 alter table public.coaching_progress
   drop constraint if exists coaching_progress_user_focus_unique;
 
@@ -39,6 +38,7 @@ where jsonb_typeof(evidence) = 'object'
   and not (evidence ? 'history');
 
 -- Replace the old RPC so every new coaching result appends evidence rather than overwriting it.
+drop function if exists public.upsert_coaching_progress(uuid, uuid, text, text, text, integer, jsonb, text);
 drop function if exists public.upsert_coaching_progress(uuid, uuid, text, text, integer, jsonb, text);
 
 create or replace function public.upsert_coaching_progress(
@@ -92,14 +92,11 @@ begin
     latest_score = excluded.latest_score,
     evidence = jsonb_build_object(
       'history',
-      coalesce(
-        case
-          when jsonb_typeof(public.coaching_progress.evidence -> 'history') = 'array'
-            then public.coaching_progress.evidence -> 'history'
-          else jsonb_build_array(public.coaching_progress.evidence)
-        end,
-        '[]'::jsonb
-      ) || jsonb_build_array(p_evidence),
+      case
+        when jsonb_typeof(public.coaching_progress.evidence -> 'history') = 'array'
+          then public.coaching_progress.evidence -> 'history'
+        else jsonb_build_array(public.coaching_progress.evidence)
+      end || jsonb_build_array(p_evidence),
       'latest', p_evidence
     ),
     coaching_action = excluded.coaching_action
