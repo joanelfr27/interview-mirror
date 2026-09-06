@@ -70,6 +70,7 @@ export default async function FeedbackPage({
   const record = session as SessionRecord;
   const feedback = feedbackRow.feedback as FeedbackResult;
   const priorityFocus = feedback.improvements[0]?.trim() || null;
+  const isTargeted = Boolean(record.coaching_focus);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -109,6 +110,35 @@ export default async function FeedbackPage({
           <ScoreRing label="Confidence" value={feedback.confidence} />
         </CardContent>
       </Card>
+
+      {isTargeted && record.coaching_focus && (
+        <Card>
+          <CardHeader>
+            <Badge variant="secondary" className="w-fit">Targeted coaching</Badge>
+            <CardTitle className="text-base">{record.coaching_focus}</CardTitle>
+            <CardDescription>
+              This score measures how well this practice session demonstrated the selected coaching focus.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {typeof feedback.focusScore === "number" && (
+              <ScoreRing label="Focus score" value={feedback.focusScore} />
+            )}
+            {feedback.focusEvidence && (
+              <div className="rounded-lg border bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
+                <p className="mt-1 text-sm text-slate-700">{feedback.focusEvidence}</p>
+              </div>
+            )}
+            {feedback.focusNextStep && (
+              <div className="rounded-lg border p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next step</p>
+                <p className="mt-1 text-sm text-slate-700">{feedback.focusNextStep}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -171,7 +201,7 @@ export default async function FeedbackPage({
           <CardTitle className="text-base">Per-question notes</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {feedback.questionFeedback.map((q,index) => (
+          {feedback.questionFeedback.map((q, index) => (
             <div key={index} className="rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium text-slate-900">{q.question}</p>
