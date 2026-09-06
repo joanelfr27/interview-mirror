@@ -16,24 +16,24 @@ function fallbackAnalysis(cvText: string, jobDescription: string): CvAnalysis {
   return {
     matchScore: score,
     strengths: [
-      "Clear professional narrative grounded in the provided CV",
-      "Evidence of role-relevant experience present in the document",
+      "Your experience shows a clear professional story based on the CV you provided.",
+      "Your CV contains experience that connects with important parts of this role.",
       matched.length
-        ? `Keyword overlap detected around: ${matched.slice(0, 3).join(", ")}`
-        : "Solid baseline experience to build interview stories from",
+        ? `Your CV directly mentions experience related to: ${matched.slice(0, 3).join(", ")}.`
+        : "You have a solid experience base to build your interview examples from.",
     ],
     gaps: [
-      "Quantified outcomes could be more explicit in answers",
-      "Some job requirements may need stronger story mapping",
-      "Prepare concise STAR examples for leadership and impact",
+      "Your answers should make business results and measurable impact clearer.",
+      "Some requirements in the job description need stronger examples from your experience.",
+      "Prepare simple examples that show the problem, what you did, and what changed as a result.",
     ],
     keywordAlignment: matched.length ? matched : ["leadership", "delivery", "collaboration"],
     summary:
-      "Preliminary alignment based on lexical overlap between your CV and the job description. Connect OpenAI for deeper semantic analysis.",
+      "Your preparation starts from the evidence in your CV and the requirements in this job description. The most important next step is to turn the strongest matches and gaps into clear interview examples.",
     suggestedFocusAreas: [
-      "Impact metrics and business outcomes",
-      "Cross-functional influence examples",
-      "Role-specific technical or domain depth",
+      "Business impact — show the results your work produced and use numbers when they are genuinely available in your experience.",
+      "Working with others — prepare an example showing how you influenced or worked with people outside your immediate team.",
+      "Role-specific knowledge — identify the parts of the job description where your CV gives less direct evidence and prepare an honest way to address them.",
     ],
   };
 }
@@ -55,7 +55,12 @@ async function runAnalysis(
       messages: [
         {
           role: "system",
-          content: `You are Interview Mirror's CV analyst. Evidence-first: never invent experience.
+          content: `You are Interview Mirror's candidate coach. Analyze the CV against the job description using evidence first.
+
+Your output will be read directly by a job candidate. Do not write like an HR analyst, consultant, developer, or AI system.
+Use plain, direct language and speak to the candidate as "you".
+Do not use technical phrases such as "lexical overlap", "semantic similarity", "keyword density", "preliminary alignment", or similar analyst jargon.
+
 Return JSON with keys:
 matchScore (0-100 number),
 strengths (string[]),
@@ -63,17 +68,22 @@ gaps (string[]),
 keywordAlignment (string[]),
 summary (string),
 suggestedFocusAreas (string[]).
-Base every claim only on the CV and job description provided.`,
+
+Every claim must be supported by the supplied CV or job description. Never invent experience.
+For each strength or gap, explain the practical interview meaning when useful.
+For suggestedFocusAreas, give 2-4 specific coaching priorities. Each must follow this simple structure:
+"Focus — why it matters for this role — evidence from the CV/JD that led you here."
+Do not create a focus area unless you can point to evidence in the CV or job description.
+Do not use STAR/CAR terminology unless the candidate already used it; prefer "Problem → What you did → Result".
+The goal is to help the candidate understand what to prepare next, not to impress them with analysis terminology.`,
         },
         {
           role: "user",
           content: `CV:\n${cvText.slice(0, 12000)}
 
-JOB DESCRIPTION:
-${jobDescription.slice(0, 8000)}
+JOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}
 
-PRIOR PREPARATION CONTEXT:
-${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}
+PRIOR PREPARATION CONTEXT:\n${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}
 
 Use prior preparation context only to maintain continuity and identify areas for improvement. Do not treat it as evidence of current CV experience.`,
         },
@@ -115,20 +125,20 @@ export async function POST(request: Request) {
   | { sessions: unknown[]; coaching_progress: unknown[] }
   | undefined;
 
-if (!sessionId) {
-  const { data, error } = await supabase.rpc(
-    "get_candidate_preparation_context",
-    { p_user_id: user.id }
-  );
+  if (!sessionId) {
+    const { data, error } = await supabase.rpc(
+      "get_candidate_preparation_context",
+      { p_user_id: user.id }
+    );
 
-  if (!error && data) {
-    priorContext = data;
-  } else if (error) {
-    console.error("Failed to load preparation context:", error);
+    if (!error && data) {
+      priorContext = data;
+    } else if (error) {
+      console.error("Failed to load preparation context:", error);
+    }
   }
-}
 
-const analysis = await runAnalysis(cvText, jobDescription, priorContext);
+  const analysis = await runAnalysis(cvText, jobDescription, priorContext);
 
   let id = sessionId ?? null;
 
@@ -171,10 +181,8 @@ const analysis = await runAnalysis(cvText, jobDescription, priorContext);
     id = data.id;
   }
 
-  // Clear old questions when re-analyzing.
   await supabase.from("questions").delete().eq("session_id", id);
 
-  // Extract questions array dynamically.
   const rawQuestions =
     (analysis as any)?.questions ||
     (analysis as any)?.interviewQuestions ||
