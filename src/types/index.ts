@@ -58,6 +58,24 @@ export type InterviewAnswer = {
   created_at: string;
 };
 
+export type FeedbackQuestion = {
+  questionId?: string;
+  question: string;
+  questionText?: string;
+  candidateAnswer?: string;
+  score: number;
+  scoreDeductions?: string[];
+  evidenceExtracted?: string[];
+  comment: string;
+  keyStrength?: string;
+  keyImprovement?: string;
+  whatWorked?: string;
+  whatWasMissing?: string;
+  actionableImprovement?: string;
+  suggestedRewrite?: string;
+  evidenceGroundedBetterAnswer?: string;
+};
+
 export type FeedbackResult = {
   overallScore: number;
   communication: number;
@@ -67,14 +85,7 @@ export type FeedbackResult = {
   strengths: string[];
   improvements: string[];
   sampleRewrite: string;
-  questionFeedback: {
-    question: string;
-    score: number;
-    comment: string;
-    keyStrength?: string;
-    keyImprovement?: string;
-    suggestedRewrite?: string;
-  }[];
+  questionFeedback: FeedbackQuestion[];
   summary: string;
   focusScore?: number;
   focusEvidence?: string;
