@@ -40,32 +40,32 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const keywords = session.cv_analysis?.keywordAlignment ?? [];
   const focusAreas = session.cv_analysis?.suggestedFocusAreas ?? [];
   const topStrength = strengths[0] ?? "relevant experience";
-  const topGap = gaps[0] ?? "areas where evidence is less explicit";
-  const topFocus = focusAreas.slice(0, 3).join(", ") || "role-relevant skills";
+  const topGap = gaps[0] ?? "areas where your evidence is less explicit";
+  const topFocus = focusAreas.slice(0, 3).join("; ") || "the role's key requirements";
 
   return {
-    candidatePositioning: `Position yourself as a candidate who combines ${topStrength} with a strong focus on ${topFocus}, framing your background around the role's key outcomes and the most relevant evidence in your CV.`,
-    strongestValueProposition: `Highlight your ability to deliver impact through ${topStrength} while connecting your experience to the role's main priorities.`,
+    candidatePositioning: `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
+    strongestValueProposition: `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
     strengthsToLeverage: strengths.slice(0, 5),
     gapsOrRisks: gaps.slice(0, 5),
     gapDefenseStrategy: gaps.slice(0, 5).map((gap) =>
-      `If asked about ${gap.toLowerCase()}, emphasize transferable skills and a clear plan for how you would bridge this gap through evidence-based examples.`
+      `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`
     ),
     interviewPriorities: [
-      `Demonstrate evidence for ${topStrength}.`,
-      `Address ${topGap} proactively with concrete examples.`,
-      `Show alignment with ${keywords.join(", ")} where relevant.`,
+      `Show clear evidence of ${topStrength}.`,
+      `Prepare an honest example to address ${topGap}.`,
+      `Connect your experience to these role requirements where supported: ${keywords.join(", ")}.`,
     ].filter(Boolean),
     likelyDifficultQuestions: [
-      `Why is ${topGap.toLowerCase()} not fully represented in your CV?`,
-      `Describe a time you overcame a challenge related to ${topFocus}.`,
+      `What experience do you have that addresses ${topGap.toLowerCase()}?`,
+      `Tell me about an example that demonstrates your ability in ${topFocus}.`,
     ],
     storiesToPrepare: focusAreas.map(
-      (area) => `Prepare a STAR story that highlights ${area}.`
+      (area) => `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`
     ),
-    communicationPriorities: "Be structured, concise, and evidence-driven. Lead with your strongest results and avoid drifting into generic descriptions.",
-    interviewPlan: `Start with a clear positioning statement, emphasize your strongest evidence, acknowledge risks briefly, and finish with how you will contribute to the role's key priorities.`,
-    personalization: `Base every response on the CV and job description. Use the job's language and highlight the unique strengths that match the role's requirements.`,
+    communicationPriorities: "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
+    interviewPlan: "Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. Finish by showing how your experience can create value in the role.",
+    personalization: "Keep your answers grounded in your CV and this job description. Use the strongest matching evidence and be transparent where your experience is less direct.",
   };
 }
 
@@ -81,9 +81,18 @@ async function generateStrategy(
       messages: [
         {
           role: "system",
-          content: `You are Interview Mirror's interview strategy coach.
-Create a structured, candidate-specific interview strategy from the provided CV, job description, and analysis.
-This must be actionable, not generic.
+          content: `You are Interview Mirror's interview coach.
+Create a concise, candidate-specific interview game plan from the CV, job description, and analysis.
+
+The candidate must be able to understand and use this plan without knowing HR, consulting, or AI terminology. Write directly to the candidate using "you". Avoid jargon and unnecessary explanation.
+
+The strategy should answer five practical questions:
+1. What should I want the interviewer to remember about me?
+2. What evidence from my experience should I use?
+3. What gaps or risks could the interviewer question?
+4. What examples should I prepare?
+5. How should I communicate these points during the interview?
+
 Return JSON using exactly these keys:
 - candidatePositioning (string)
 - strongestValueProposition (string)
@@ -96,8 +105,15 @@ Return JSON using exactly these keys:
 - communicationPriorities (string)
 - interviewPlan (string)
 - personalization (string)
-Do not invent credentials or employers. Base everything on the CV, job description, and analysis provided.
-`,
+
+Evidence rules:
+- Use only information contained in the CV, job description, and analysis.
+- Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes.
+- Make the connection between each recommendation and the role clear.
+- When evidence is missing, say what the candidate should prepare or clarify rather than creating a story.
+- Do not use STAR/CAR terminology unless necessary; prefer "Problem → What you did → Result".
+
+Keep the strategy scannable. Prioritize the most important actions instead of producing a long report. Each list should contain only the most useful items.`,
         },
         {
           role: "user",
@@ -111,7 +127,7 @@ ${session.job_description.slice(0, 8000)}
 ANALYSIS:
 ${JSON.stringify(session.cv_analysis)}
 
-Create an interview strategy for this candidate. Use the analysis strengths, gaps, and focus areas to guide question selection, gap defense, stories, and communication priorities.`,
+Create an interview game plan for this candidate. Use the evidence in the CV and job description to prioritize what the candidate should do before and during the interview.`,
         },
       ],
     });
