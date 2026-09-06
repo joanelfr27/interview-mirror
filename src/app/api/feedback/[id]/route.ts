@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
-import { createClient } from "@/lib/supabase/server";
 import type { FeedbackResult, SessionRecord } from "@/types";
+import { createClient } from "@/lib/supabase/server";
 
 function normalizeFocusKey(value: string): string {
   return value
@@ -197,7 +197,7 @@ export async function POST(
   );
 
   const pairs = questions.map((q) => ({
-    question: q.question_text as string,
+    question: q.question as string,
     answer: (answerMap.get(q.id) as string) || "",
   }));
 
@@ -221,8 +221,6 @@ export async function POST(
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Never turn heuristic fallback output into durable coaching evidence or scores.
-  // The feedback itself is still returned so the user receives a graceful result.
   if (!usedFallback && session.coaching_focus) {
     const focusScore = feedback.focusScore ?? feedback.overallScore;
     const focusKey = normalizeFocusKey(session.coaching_focus);
