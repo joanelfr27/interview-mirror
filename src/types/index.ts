@@ -59,12 +59,13 @@ export type InterviewAnswer = {
 };
 
 export type FeedbackQuestion = {
-  questionId?: string;
+  questionId: string;
   question: string;
-  questionText?: string;
-  candidateAnswer?: string;
+  questionText: string;
+  candidateAnswer: string;
   score: number;
   scoreDeductions?: string[];
+  scoreJustification?: string;
   evidenceExtracted?: string[];
   comment: string;
   keyStrength?: string;
