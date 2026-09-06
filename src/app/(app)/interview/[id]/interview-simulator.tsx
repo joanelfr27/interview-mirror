@@ -36,20 +36,20 @@ export default function InterviewSimulator({ sessionId }: Props) {
     try {
       const res = await fetch(`/api/interview/${sessionId}`);
       const data = await res.json();
-          if (!res.ok) {
-      const message = data.error || "Failed to load interview";
-      setBlockedMessage(message);
-      throw new Error(message);
-    }
+      if (!res.ok) {
+        const message = data.error || "Failed to load interview";
+        setBlockedMessage(message);
+        throw new Error(message);
+      }
 
-    if (!data.questions || data.questions.length === 0) {
-      setBlockedMessage("No questions available. Run analysis first.");
-      setLoading(false);
-      return;
-    }
+      if (!data.questions || data.questions.length === 0) {
+        setBlockedMessage("No questions available. Run analysis first.");
+        setLoading(false);
+        return;
+      }
 
-    setQuestions(data.questions);
-    setTitle(data.session?.title || "Interview practice");
+      setQuestions(data.questions);
+      setTitle(data.session?.title || "Interview practice");
 
       const existing: Record<string, string> = {};
       for (const a of data.answers ?? []) {
@@ -156,7 +156,7 @@ export default function InterviewSimulator({ sessionId }: Props) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2"><Badge variant="outline">{current.category}</Badge></div>
-          <CardTitle className="text-xl leading-snug">{current.question_text}</CardTitle>
+          <CardTitle className="text-xl leading-snug">{current.question}</CardTitle>
           <CardDescription>Answer as you would in a live interview. Use concrete evidence from your experience.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
