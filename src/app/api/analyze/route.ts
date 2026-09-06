@@ -98,6 +98,41 @@ Use prior preparation context only to maintain continuity and identify areas for
   }
 }
 
+async function tryFetchJobDescription(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "InterviewMirror/1.0 (+job-description-import)",
+      },
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+
+    if (!response.ok) return "";
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/pdf")) return "";
+
+    const html = await response.text();
+    if (!html.trim()) return "";
+
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 16000);
+  } catch {
+    return "";
+  }
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -110,20 +145,41 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const cvText = String(body.cvText ?? "").trim();
-  const jobDescription = String(body.jobDescription ?? "").trim();
+  let jobDescription = String(body.jobDescription ?? "").trim();
+  const jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
   const title = String(body.title ?? "Interview preparation").trim();
   const sessionId = body.sessionId as string | null | undefined;
+  const interviewDate = String(body.interviewDate ?? "").trim();
 
-  if (!cvText || !jobDescription) {
+  if (!cvText || !interviewDate) {
     return NextResponse.json(
-      { error: "CV and job description are required" },
+      { error: "Interview date and CV are required" },
       { status: 400 }
     );
   }
 
+  if (!jobDescription && jobDescriptionUrl) {
+    jobDescription = await tryFetchJobDescription(jobDescriptionUrl);
+  }
+
+  if (!jobDescription) {
+    return NextResponse.json(
+      {
+        error:
+          "Please paste the job description or upload its PDF. We could not reliably read the supplied link.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const parsedInterviewDate = new Date(`${interviewDate}T12:00:00.000Z`);
+  if (Number.isNaN(parsedInterviewDate.getTime())) {
+    return NextResponse.json({ error: "Invalid interview date" }, { status: 400 });
+  }
+
   let priorContext:
-  | { sessions: unknown[]; coaching_progress: unknown[] }
-  | undefined;
+    | { sessions: unknown[]; coaching_progress: unknown[] }
+    | undefined;
 
   if (!sessionId) {
     const { data, error } = await supabase.rpc(
@@ -149,6 +205,8 @@ export async function POST(request: Request) {
         title,
         cv_text: cvText,
         job_description: jobDescription,
+        job_description_url: jobDescriptionUrl,
+        interview_date: parsedInterviewDate.toISOString(),
         cv_analysis: analysis,
         status: "analyzed",
       })
@@ -166,6 +224,8 @@ export async function POST(request: Request) {
         title,
         cv_text: cvText,
         job_description: jobDescription,
+        job_description_url: jobDescriptionUrl,
+        interview_date: parsedInterviewDate.toISOString(),
         cv_analysis: analysis,
         status: "analyzed",
       })
@@ -189,8 +249,6 @@ export async function POST(request: Request) {
     (analysis as any)?.interview_questions ||
     [];
 
-  console.log("Raw questions extracted:", rawQuestions);
-
   const questionsToInsert = rawQuestions.map((q: any, index: number) => ({
     session_id: id,
     question:
@@ -208,8 +266,6 @@ export async function POST(request: Request) {
       console.error("Failed to insert questions into Supabase:", questionsError);
       return NextResponse.json({ error: questionsError.message }, { status: 500 });
     }
-  } else {
-    console.warn("No questions array found in OpenAI response.");
   }
 
   return NextResponse.json({ sessionId: id, analysis });
