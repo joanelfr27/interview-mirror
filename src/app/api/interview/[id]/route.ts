@@ -3,11 +3,16 @@ import { createClient } from '@/lib/supabase/server'
 import { generateInterviewQuestions } from '@/lib/openai'
 
 export async function POST(
-  req: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id: strategyId } = await params
+    const { id: sessionId } = await params
+
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Missing session id' }, { status: 400 })
+    }
+
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -15,45 +20,79 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: strategy, error: strategyError } = await supabase
-      .from('strategies')
-      .select('*')
-      .eq('id', strategyId)
-      .single()
-
-    if (strategyError || !strategy) {
-      return NextResponse.json({ error: 'Strategy not found' }, { status: 404 })
-    }
-
-    const { data: analysis, error: analysisError } = await supabase
-      .from('analyses')
-      .select('*')
-      .eq('id', strategy.analysis_id)
-      .single()
-
-    if (analysisError || !analysis) {
-      return NextResponse.json({ error: 'Analysis not found' }, { status: 404 })
-    }
-
-    const questionsData = await generateInterviewQuestions(analysis, strategy)
-
-    // 1. Create the session
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .insert({
-        user_id: user.id,
-        strategy_id: strategy.id,
-        status: 'in_progress',
-      })
-      .select()
+      .select('*')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
       .single()
 
-    if (sessionError) throw sessionError
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+    }
 
-    // 2. Insert questions into normalized questions table
-    const questionRows = questionsData.questions.map((q: string, index: number) => ({
-      session_id: session.id,
-      question: q,
+    if (!session.cv_analysis || !session.interview_strategy) {
+      return NextResponse.json(
+        { error: 'CV analysis and interview strategy are required' },
+        { status: 400 }
+      )
+    }
+
+    // Reuse the preparation session. Do not create a second competing session.
+    const { data: existingQuestions, error: existingQuestionsError } = await supabase
+      .from('questions')
+      .select('id')
+      .eq('session_id', sessionId)
+      .limit(1)
+
+    if (existingQuestionsError) {
+      return NextResponse.json(
+        { error: existingQuestionsError.message },
+        { status: 500 }
+      )
+    }
+
+    if (existingQuestions && existingQuestions.length > 0) {
+      const { data: updatedSession, error: statusError } = await supabase
+        .from('sessions')
+        .update({ status: 'in_progress' })
+        .eq('id', sessionId)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (statusError) throw statusError
+
+      return NextResponse.json({
+        ...(updatedSession ?? session),
+        id: sessionId,
+        status: 'in_progress',
+      })
+    }
+
+    const questionsData = await generateInterviewQuestions(
+      session.cv_analysis,
+      session.interview_strategy
+    )
+
+    const questions = Array.isArray(questionsData?.questions)
+      ? questionsData.questions
+          .filter((question: unknown): question is string =>
+            typeof question === 'string' && question.trim().length > 0
+          )
+          .map((question: string) => question.trim())
+      : []
+
+    if (questions.length === 0) {
+      return NextResponse.json(
+        { error: 'No interview questions were generated' },
+        { status: 500 }
+      )
+    }
+
+    const questionRows = questions.map((question: string, index: number) => ({
+      session_id: sessionId,
+      question,
       category: 'general',
       order_index: index + 1,
     }))
@@ -62,9 +101,31 @@ export async function POST(
       .from('questions')
       .insert(questionRows)
 
-    if (questionsError) throw questionsError
+    if (questionsError) {
+      // Keep the session clean if question persistence fails.
+      await supabase
+        .from('questions')
+        .delete()
+        .eq('session_id', sessionId)
 
-    return NextResponse.json(session)
+      throw questionsError
+    }
+
+    const { data: updatedSession, error: statusError } = await supabase
+      .from('sessions')
+      .update({ status: 'in_progress' })
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .select()
+      .single()
+
+    if (statusError) throw statusError
+
+    return NextResponse.json({
+      ...(updatedSession ?? session),
+      id: sessionId,
+      status: 'in_progress',
+    })
   } catch (error) {
     console.error('Error generating interview:', error)
     return NextResponse.json(
@@ -74,9 +135,6 @@ export async function POST(
   }
 }
 
-// Load an existing interview session. This preserves the working interview-page
-// behavior from the previous implementation while keeping the new POST
-// generation flow above intact.
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
