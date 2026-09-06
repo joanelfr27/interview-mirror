@@ -28,8 +28,7 @@ function fallbackFeedback(
         : "Attempts a direct response to the question.",
       keyImprovement: hasEvidence
         ? "Clarify how the experience aligns with the role and improve answer flow."
-        : "Add a specific result, action, and clear connection to the job."
-      ,
+        : "Add a specific result, action, and clear connection to the job.",
       suggestedRewrite: answer.length < 120
         ? "Start with your role and outcome, then describe what you did and the impact in a concise sequence."
         : "Keep the example focused: state the context, your action, and the measurable result more clearly.",
@@ -69,6 +68,18 @@ async function generateFeedback(
 ): Promise<FeedbackResult> {
   try {
     const openai = getOpenAI();
+    const isCoachingSession = Boolean((session as SessionRecord & { coaching_focus?: string | null }).coaching_focus);
+    const coachingFocus = (session as SessionRecord & { coaching_focus?: string | null }).coaching_focus;
+
+    const coachingInstruction = isCoachingSession
+      ? `
+This is a TARGETED COACHING session.
+The coaching focus is: "${coachingFocus}".
+
+Evaluate the candidate primarily on their demonstrated ability in THIS focus area. Do not let unrelated strengths inflate the focus assessment. Identify the strongest evidence that the candidate addressed the focus and the most important remaining weakness.
+Also return a focusScore from 0-100 representing performance specifically against this coaching focus. Do not compare this score to a previous session yet; a later coaching step will handle progress comparison.`
+      : "";
+
     const completion = await openai.chat.completions.create({
       model: AI_MODEL,
       response_format: { type: "json_object" },
@@ -86,7 +97,7 @@ Evaluate each answer using these principles:
 6. ROLE ALIGNMENT: Does the answer demonstrate competencies relevant to the job description? Explain the connection to the job requirements when relevant.
 7. CV CONSISTENCY: Is the answer consistent with the CV? If a claim cannot be verified from the CV, note that it should be substantiated rather than inventing or dismissing it.
 8. COACHING VALUE: Provide actionable, specific advice rather than generic statements. Focus on the single most important improvement first.
-When writing suggestedRewrite, use only information from the candidate's actual answer, CV, or job description. Never use placeholders such as [challenge], [action], [result], [team], or [metric]. Never invent facts, If important information is missing, explain what the candidate should add instead of inventing it.
+When writing suggestedRewrite, use only information from the candidate's actual answer, CV, or job description. Never use placeholders such as [challenge], [action], [result], [team], or [metric]. Never invent facts. If important information is missing, explain what the candidate should add instead of inventing it.
 Use a 0-100 scale consistently:
 90-100 = exceptional
 80-89 = strong with minor weaknesses
@@ -96,6 +107,7 @@ Use a 0-100 scale consistently:
 below 50 = poor or off-target
 Do not inflate scores. Use the full scale and score based on the actual evidence in the answer.
 For confidence, judge only wording, assertiveness, clarity, and avoidance of hedging. Do not infer actual vocal confidence. True vocal-confidence analysis should be added later when audio is implemented.
+${coachingInstruction}
 
 Return JSON with keys:
 overallScore, communication, relevance, structure, confidence,
@@ -103,11 +115,16 @@ strengths, improvements, sampleRewrite,
 questionFeedback: [{ question, score, comment, keyStrength?, keyImprovement?, suggestedRewrite? }],
 summary.
 
+For a TARGETED COACHING session, also return:
+focusScore: integer 0-100,
+focusEvidence: string,
+focusNextStep: string.
 For each question, ensure the response includes a clear strength, a concrete improvement, and a short suggested approach or rewrite when useful. Keep the sampleRewrite grounded in the candidate's actual experience and avoid inventing facts or new metrics.`,
         },
         {
           role: "user",
           content: `Role/session: ${session.title}
+Coaching focus: ${coachingFocus || "None — standard interview evaluation"}
 CV excerpt:\n${session.cv_text.slice(0, 6000)}
 Job description:\n${session.job_description.slice(0, 4000)}
 Q&A:\n${JSON.stringify(pairs)}`,
@@ -174,7 +191,7 @@ export async function POST(
     question: q.question as string,
     answer: (answerMap.get(q.id) as string) || "",
   }));
-console.log("DEBUG pairs:", pairs);
+
   if (pairs.some((p) => !p.answer.trim())) {
     return NextResponse.json(
       { error: "Please answer all questions before requesting feedback" },
@@ -194,32 +211,34 @@ console.log("DEBUG pairs:", pairs);
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
-for (const improvementArea of feedback.improvements) {
-  const { error: coachingError } = await supabase.rpc(
-    "upsert_coaching_progress",
-    {
-      p_user_id: user.id,
-      p_session_id: id,
-      p_focus_area: improvementArea,
-      p_status: "identified",
-      p_score: feedback.overallScore,
-      p_evidence: {
-        improvementArea,
-        questionFeedback: feedback.questionFeedback,
-        overallScore: feedback.overallScore,
-      },
-      p_coaching_action: feedback.sampleRewrite,
-    }
-  );
 
-  if (coachingError) {
-  console.error("Failed to save coaching progress:", coachingError);
-  return NextResponse.json(
-    { error: "Failed to save coaching progress" },
-    { status: 500 }
-  );
-}
-}
+  for (const improvementArea of feedback.improvements) {
+    const { error: coachingError } = await supabase.rpc(
+      "upsert_coaching_progress",
+      {
+        p_user_id: user.id,
+        p_session_id: id,
+        p_focus_area: improvementArea,
+        p_status: "identified",
+        p_score: feedback.overallScore,
+        p_evidence: {
+          improvementArea,
+          questionFeedback: feedback.questionFeedback,
+          overallScore: feedback.overallScore,
+        },
+        p_coaching_action: feedback.sampleRewrite,
+      }
+    );
+
+    if (coachingError) {
+      console.error("Failed to save coaching progress:", coachingError);
+      return NextResponse.json(
+        { error: "Failed to save coaching progress" },
+        { status: 500 }
+      );
+    }
+  }
+
   await supabase
     .from("sessions")
     .update({ status: "completed" })
