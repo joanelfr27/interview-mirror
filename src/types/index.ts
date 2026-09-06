@@ -45,7 +45,7 @@ export type CvAnalysis = {
 export type InterviewQuestion = {
   id: string;
   session_id: string;
-  question_text: string;
+  question: string;
   category: string;
   order_index: number;
 };
