@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { createClient } from "@/lib/supabase/server";
+import { CoachingPracticeButton } from "@/components/coaching-practice-button";
 import type { FeedbackResult, SessionRecord } from "@/types";
 
 function ScoreRing({ label, value }: { label: string; value: number }) {
@@ -68,6 +69,7 @@ export default async function FeedbackPage({
 
   const record = session as SessionRecord;
   const feedback = feedbackRow.feedback as FeedbackResult;
+  const priorityFocus = feedback.improvements[0]?.trim() || null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -144,6 +146,25 @@ export default async function FeedbackPage({
           </CardContent>
         </Card>
       </div>
+
+      {priorityFocus && (
+        <Card>
+          <CardHeader>
+            <Badge variant="secondary" className="w-fit">Priority coaching focus</Badge>
+            <CardTitle className="text-base">Work on this next</CardTitle>
+            <CardDescription>
+              We identified your first improvement area as the priority. Practice it with two new questions instead of repeating the full interview.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-slate-800">{priorityFocus}</p>
+            <CoachingPracticeButton
+              sourceSessionId={id}
+              focusArea={priorityFocus}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
