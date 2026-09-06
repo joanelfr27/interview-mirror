@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     const { error: questionsError } = await supabase.from("questions").insert(
       questions.map((question, index) => ({
         session_id: practiceSession.id,
-        question_text: question,
+        question: question,
         category: "coaching",
         order_index: index + 1,
       }))
