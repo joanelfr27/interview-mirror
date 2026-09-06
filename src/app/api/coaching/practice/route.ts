@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 
+function normalizeFocusKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -35,6 +44,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Source session not found" }, { status: 404 });
     }
 
+    const focusKey = normalizeFocusKey(focusArea);
+    if (!focusKey) {
+      return NextResponse.json({ error: "Invalid coaching focus" }, { status: 400 });
+    }
+
     const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
       model: AI_MODEL,
@@ -58,13 +72,18 @@ export async function POST(request: Request) {
 
     const parsed = JSON.parse(raw) as { questions?: unknown };
     const questions = Array.isArray(parsed.questions)
-      ? parsed.questions.filter((question): question is string => typeof question === "string" && question.trim().length > 0).slice(0, 2)
+      ? parsed.questions
+          .filter(
+            (question): question is string =>
+              typeof question === "string" && question.trim().length > 0
+          )
+          .slice(0, 2)
       : [];
 
     if (questions.length !== 2) {
       return NextResponse.json(
-        { error: "Could not generate two targeted practice questions" },
-        { status: 500 }
+        { error: "The coaching engine did not return two valid practice questions. Please try again." },
+        { status: 502 }
       );
     }
 
@@ -100,11 +119,19 @@ export async function POST(request: Request) {
     );
 
     if (questionsError) {
-      await supabase.from("sessions").delete().eq("id", practiceSession.id).eq("user_id", user.id);
+      await supabase
+        .from("sessions")
+        .delete()
+        .eq("id", practiceSession.id)
+        .eq("user_id", user.id);
       return NextResponse.json({ error: questionsError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ sessionId: practiceSession.id, coachingFocus: focusArea });
+    return NextResponse.json({
+      sessionId: practiceSession.id,
+      coachingFocus: focusArea,
+      coachingFocusKey: focusKey,
+    });
   } catch (error) {
     console.error("Error creating coaching practice session:", error);
     return NextResponse.json(
