@@ -3,6 +3,15 @@ import { AI_MODEL, getOpenAI } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 import type { FeedbackResult, SessionRecord } from "@/types";
 
+function normalizeFocusKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function fallbackFeedback(
   pairs: { question: string; answer: string }[]
 ): FeedbackResult {
@@ -47,7 +56,7 @@ function fallbackFeedback(
     confidence: Math.min(90, overall + 1),
     strengths: [
       "Responses are complete and address the questions directly.",
-      "+ show reference to concrete experience when available.",
+      "Uses concrete experience or result-oriented detail when available.",
     ],
     improvements: [
       "Make the connection to the target role more explicit in each example.",
@@ -55,7 +64,7 @@ function fallbackFeedback(
       "Organize answers around the question asked with a concise opening statement.",
     ],
     sampleRewrite:
-      "In my previous role, I led [team or initiative] to solve [challenge]. I did this by [action], which produced [outcome]. This experience maps to the role because [relevant connection].",
+      "A stronger answer should state the context, your specific action, the outcome, and why the experience is relevant to the role. Add only details you can substantiate from your own experience.",
     questionFeedback,
     summary:
       "Good practice session. Focus next on stronger role alignment, evidence-based detail, and a clearer answer structure that directly answers each question.",
@@ -65,7 +74,7 @@ function fallbackFeedback(
 async function generateFeedback(
   session: SessionRecord,
   pairs: { question: string; answer: string }[]
-): Promise<FeedbackResult> {
+): Promise<{ feedback: FeedbackResult; usedFallback: boolean }> {
   try {
     const openai = getOpenAI();
     const isCoachingSession = Boolean(session.coaching_focus);
@@ -134,9 +143,9 @@ Q&A:\n${JSON.stringify(pairs)}`,
 
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty AI response");
-    return JSON.parse(raw) as FeedbackResult;
+    return { feedback: JSON.parse(raw) as FeedbackResult, usedFallback: false };
   } catch {
-    return fallbackFeedback(pairs);
+    return { feedback: fallbackFeedback(pairs), usedFallback: true };
   }
 }
 
@@ -199,7 +208,7 @@ export async function POST(
     );
   }
 
-  const feedback = await generateFeedback(session as SessionRecord, pairs);
+  const { feedback, usedFallback } = await generateFeedback(session as SessionRecord, pairs);
 
   await supabase.from("feedback").delete().eq("session_id", id);
 
@@ -212,13 +221,17 @@ export async function POST(
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  if (session.coaching_focus) {
+  // Never turn heuristic fallback output into durable coaching evidence or scores.
+  // The feedback itself is still returned so the user receives a graceful result.
+  if (!usedFallback && session.coaching_focus) {
     const focusScore = feedback.focusScore ?? feedback.overallScore;
+    const focusKey = normalizeFocusKey(session.coaching_focus);
+
     const { data: previousProgress, error: progressReadError } = await supabase
       .from("coaching_progress")
       .select("baseline_score, latest_score, status, evidence")
       .eq("user_id", user.id)
-      .eq("focus_area", session.coaching_focus)
+      .eq("focus_key", focusKey)
       .maybeSingle();
 
     if (progressReadError) {
@@ -229,12 +242,12 @@ export async function POST(
       );
     }
 
-    const previousScore = previousProgress?.latest_score ?? null;
-    const status = previousScore !== null && focusScore > previousScore
-      ? "improved"
-      : previousProgress
-        ? "in_progress"
-        : "identified";
+    const baselineScore = previousProgress?.baseline_score ?? focusScore;
+    const status = previousProgress
+      ? focusScore > baselineScore
+        ? "improved"
+        : "in_progress"
+      : "identified";
 
     const { error: coachingError } = await supabase.rpc(
       "upsert_coaching_progress",
@@ -242,6 +255,7 @@ export async function POST(
         p_user_id: user.id,
         p_session_id: id,
         p_focus_area: session.coaching_focus,
+        p_focus_key: focusKey,
         p_status: status,
         p_score: focusScore,
         p_evidence: {
@@ -249,8 +263,7 @@ export async function POST(
           focusScore,
           focusEvidence: feedback.focusEvidence ?? "",
           focusNextStep: feedback.focusNextStep ?? "",
-          previousScore,
-          previousEvidence: previousProgress?.evidence ?? null,
+          baselineScore,
           questionFeedback: feedback.questionFeedback,
         },
         p_coaching_action: feedback.focusNextStep ?? feedback.sampleRewrite,
@@ -264,14 +277,16 @@ export async function POST(
         { status: 500 }
       );
     }
-  } else {
+  } else if (!usedFallback) {
     for (const improvementArea of feedback.improvements) {
+      const focusKey = normalizeFocusKey(improvementArea);
       const { error: coachingError } = await supabase.rpc(
         "upsert_coaching_progress",
         {
           p_user_id: user.id,
           p_session_id: id,
           p_focus_area: improvementArea,
+          p_focus_key: focusKey,
           p_status: "identified",
           p_score: feedback.overallScore,
           p_evidence: {
