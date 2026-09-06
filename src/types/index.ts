@@ -13,6 +13,7 @@ export type SessionRecord = {
   job_description: string;
   cv_analysis: CvAnalysis | null;
   interview_strategy: InterviewStrategy | null;
+  coaching_focus?: string | null;
   status: "draft" | "analyzed" | "in_progress" | "completed";
   created_at: string;
   updated_at: string;
@@ -75,6 +76,9 @@ export type FeedbackResult = {
     suggestedRewrite?: string;
   }[];
   summary: string;
+  focusScore?: number;
+  focusEvidence?: string;
+  focusNextStep?: string;
 };
 
 export type InterviewFeedback = {
