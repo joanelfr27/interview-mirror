@@ -68,8 +68,8 @@ async function generateFeedback(
 ): Promise<FeedbackResult> {
   try {
     const openai = getOpenAI();
-    const isCoachingSession = Boolean((session as SessionRecord & { coaching_focus?: string | null }).coaching_focus);
-    const coachingFocus = (session as SessionRecord & { coaching_focus?: string | null }).coaching_focus;
+    const isCoachingSession = Boolean(session.coaching_focus);
+    const coachingFocus = session.coaching_focus;
 
     const coachingInstruction = isCoachingSession
       ? `
@@ -188,7 +188,7 @@ export async function POST(
   );
 
   const pairs = questions.map((q) => ({
-    question: q.question as string,
+    question: q.question_text as string,
     answer: (answerMap.get(q.id) as string) || "",
   }));
 
@@ -212,21 +212,48 @@ export async function POST(
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  for (const improvementArea of feedback.improvements) {
+  if (session.coaching_focus) {
+    const focusScore = feedback.focusScore ?? feedback.overallScore;
+    const { data: previousProgress, error: progressReadError } = await supabase
+      .from("coaching_progress")
+      .select("baseline_score, latest_score, status, evidence")
+      .eq("user_id", user.id)
+      .eq("focus_area", session.coaching_focus)
+      .maybeSingle();
+
+    if (progressReadError) {
+      console.error("Failed to read coaching progress:", progressReadError);
+      return NextResponse.json(
+        { error: "Failed to read coaching progress" },
+        { status: 500 }
+      );
+    }
+
+    const previousScore = previousProgress?.latest_score ?? null;
+    const status = previousScore !== null && focusScore > previousScore
+      ? "improved"
+      : previousProgress
+        ? "in_progress"
+        : "identified";
+
     const { error: coachingError } = await supabase.rpc(
       "upsert_coaching_progress",
       {
         p_user_id: user.id,
         p_session_id: id,
-        p_focus_area: improvementArea,
-        p_status: "identified",
-        p_score: feedback.overallScore,
+        p_focus_area: session.coaching_focus,
+        p_status: status,
+        p_score: focusScore,
         p_evidence: {
-          improvementArea,
+          coachingFocus: session.coaching_focus,
+          focusScore,
+          focusEvidence: feedback.focusEvidence ?? "",
+          focusNextStep: feedback.focusNextStep ?? "",
+          previousScore,
+          previousEvidence: previousProgress?.evidence ?? null,
           questionFeedback: feedback.questionFeedback,
-          overallScore: feedback.overallScore,
         },
-        p_coaching_action: feedback.sampleRewrite,
+        p_coaching_action: feedback.focusNextStep ?? feedback.sampleRewrite,
       }
     );
 
@@ -236,6 +263,33 @@ export async function POST(
         { error: "Failed to save coaching progress" },
         { status: 500 }
       );
+    }
+  } else {
+    for (const improvementArea of feedback.improvements) {
+      const { error: coachingError } = await supabase.rpc(
+        "upsert_coaching_progress",
+        {
+          p_user_id: user.id,
+          p_session_id: id,
+          p_focus_area: improvementArea,
+          p_status: "identified",
+          p_score: feedback.overallScore,
+          p_evidence: {
+            improvementArea,
+            questionFeedback: feedback.questionFeedback,
+            overallScore: feedback.overallScore,
+          },
+          p_coaching_action: feedback.sampleRewrite,
+        }
+      );
+
+      if (coachingError) {
+        console.error("Failed to save coaching progress:", coachingError);
+        return NextResponse.json(
+          { error: "Failed to save coaching progress" },
+          { status: 500 }
+        );
+      }
     }
   }
 
