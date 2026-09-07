@@ -22,11 +22,15 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
   const baseline = typeof progress.baseline_score === "number" ? progress.baseline_score : null;
   const latest = typeof progress.latest_score === "number" ? progress.latest_score : null;
   const delta = baseline !== null && latest !== null ? latest - baseline : null;
-  const status = progress.status === "improved" ? "Improved" : "Still needs practice";
+  const status =
+    progress.status === "improved"
+      ? "Improved"
+      : progress.status === "identified"
+        ? "Baseline recorded"
+        : "Still needs practice";
 
   const evidence = progress.evidence;
-  const latestEvidence =
-    evidence && "latest" in evidence ? evidence.latest : evidence;
+  const latestEvidence = evidence && "latest" in evidence ? evidence.latest : evidence;
   const history = evidence && "history" in evidence ? evidence.history ?? [] : [];
   const baselineEvidence = history[0];
 
