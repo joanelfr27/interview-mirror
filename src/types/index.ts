@@ -11,8 +11,10 @@ export type SessionRecord = {
   title: string;
   cv_text: string;
   job_description: string;
+  job_description_url?: string | null;
   cv_analysis: CvAnalysis | null;
   interview_strategy: InterviewStrategy | null;
+  interview_date?: string | null;
   coaching_focus?: string | null;
   status: "draft" | "analyzed" | "in_progress" | "completed";
   created_at: string;

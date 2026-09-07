@@ -42,36 +42,34 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const topStrength = strengths[0] ?? "relevant experience";
   const topGap = gaps[0] ?? "areas where your evidence is less explicit";
   const topFocus = focusAreas.slice(0, 3).join("; ") || "the role's key requirements";
+  const timing = session.interview_date
+    ? `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}, so prioritize the most important preparation items first.`
+    : "Prioritize the most important preparation items first.";
 
   return {
     candidatePositioning: `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
     strongestValueProposition: `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
     strengthsToLeverage: strengths.slice(0, 5),
     gapsOrRisks: gaps.slice(0, 5),
-    gapDefenseStrategy: gaps.slice(0, 5).map((gap) =>
-      `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`
-    ),
+    gapDefenseStrategy: gaps.slice(0, 5).map((gap) => `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`),
     interviewPriorities: [
       `Show clear evidence of ${topStrength}.`,
       `Prepare an honest example to address ${topGap}.`,
       `Connect your experience to these role requirements where supported: ${keywords.join(", ")}.`,
+      timing,
     ].filter(Boolean),
     likelyDifficultQuestions: [
       `What experience do you have that addresses ${topGap.toLowerCase()}?`,
       `Tell me about an example that demonstrates your ability in ${topFocus}.`,
     ],
-    storiesToPrepare: focusAreas.map(
-      (area) => `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`
-    ),
+    storiesToPrepare: focusAreas.map((area) => `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`),
     communicationPriorities: "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
-    interviewPlan: "Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. Finish by showing how your experience can create value in the role.",
+    interviewPlan: `Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. ${timing}`,
     personalization: "Keep your answers grounded in your CV and this job description. Use the strongest matching evidence and be transparent where your experience is less direct.",
   };
 }
 
-async function generateStrategy(
-  session: SessionRecord
-): Promise<InterviewStrategy> {
+async function generateStrategy(session: SessionRecord): Promise<InterviewStrategy> {
   try {
     const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
@@ -82,7 +80,7 @@ async function generateStrategy(
         {
           role: "system",
           content: `You are Interview Mirror's interview coach.
-Create a concise, candidate-specific interview game plan from the CV, job description, and analysis.
+Create a concise, candidate-specific interview game plan from the CV, job description, analysis, and interview date.
 
 The candidate must be able to understand and use this plan without knowing HR, consulting, or AI terminology. Write directly to the candidate using "you". Avoid jargon and unnecessary explanation.
 
@@ -107,17 +105,22 @@ Return JSON using exactly these keys:
 - personalization (string)
 
 Evidence rules:
-- Use only information contained in the CV, job description, and analysis.
+- Use only information contained in the CV, job description, analysis, and interview date.
 - Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes.
 - Make the connection between each recommendation and the role clear.
 - When evidence is missing, say what the candidate should prepare or clarify rather than creating a story.
 - Do not use STAR/CAR terminology unless necessary; prefer "Problem → What you did → Result".
+
+Timing rules:
+- Use the interview date to prioritize preparation when it is provided.
+- Do not invent a date or imply urgency that the date does not support.
 
 Keep the strategy scannable. Prioritize the most important actions instead of producing a long report. Each list should contain only the most useful items.`,
         },
         {
           role: "user",
           content: `Title: ${session.title}
+Interview date: ${session.interview_date ?? "Not provided"}
 CV:
 ${session.cv_text.slice(0, 12000)}
 
@@ -127,7 +130,7 @@ ${session.job_description.slice(0, 8000)}
 ANALYSIS:
 ${JSON.stringify(session.cv_analysis)}
 
-Create an interview game plan for this candidate. Use the evidence in the CV and job description to prioritize what the candidate should do before and during the interview.`,
+Create an interview game plan for this candidate. Use the evidence in the CV and job description and the interview date to prioritize what the candidate should do before and during the interview.`,
         },
       ],
     });
@@ -142,19 +145,12 @@ Create an interview game plan for this candidate. Use the evidence in the CV and
   }
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: session, error } = await supabase
     .from("sessions")
@@ -163,40 +159,24 @@ export async function GET(
     .eq("user_id", user.id)
     .single();
 
-  if (error || !session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
+  if (error || !session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   const record = session as SessionRecord;
 
   if (!record.cv_analysis) {
-    return NextResponse.json(
-      {
-        error:
-          "CV analysis is required before generating an interview strategy.",
-      },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
   }
 
-  if (isValidStrategy(record.interview_strategy)) {
-    return NextResponse.json({ strategy: record.interview_strategy });
-  }
+  if (isValidStrategy(record.interview_strategy)) return NextResponse.json({ strategy: record.interview_strategy });
 
   const strategy = await generateStrategy(record);
-
   const { error: updateError } = await supabase
     .from("sessions")
     .update({ interview_strategy: strategy })
     .eq("id", id)
     .eq("user_id", user.id);
 
-  if (updateError) {
-    return NextResponse.json(
-      { error: updateError.message },
-      { status: 500 }
-    );
-  }
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
   return NextResponse.json({ strategy });
 }
