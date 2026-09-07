@@ -72,7 +72,8 @@ export async function POST(
 
     const questionsData = await generateInterviewQuestions(
       session.cv_analysis,
-      session.interview_strategy
+      session.interview_strategy,
+      session.language === 'fr' ? 'fr' : 'en'
     )
 
     const questions = Array.isArray(questionsData?.questions)

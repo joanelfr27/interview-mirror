@@ -43,6 +43,7 @@ export default function PrepareForm() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
   const [title, setTitle] = useState("");
+  const [language, setLanguage] = useState<"en" | "fr">("en");
   const [purpose, setPurpose] = useState<PreparationPurpose>("upcoming_interview");
   const [hasInterviewDate, setHasInterviewDate] = useState<"yes" | "no">("yes");
   const [interviewDate, setInterviewDate] = useState("");
@@ -92,6 +93,7 @@ export default function PrepareForm() {
         const data = await res.json();
         if (cancelled) return;
         setTitle(data.title ?? "");
+        setLanguage(data.language === "fr" ? "fr" : "en");
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
         setHasInterviewDate(data.interview_date ? "yes" : "no");
@@ -184,6 +186,7 @@ export default function PrepareForm() {
         body: JSON.stringify({
           sessionId,
           title: title || "Interview preparation",
+          language,
           preparationPurpose: purpose,
           interviewDate: purpose === "upcoming_interview" && hasInterviewDate === "yes" ? interviewDate : null,
           cvText,
@@ -216,6 +219,10 @@ export default function PrepareForm() {
             <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="upcoming_interview" checked={purpose === "upcoming_interview"} onChange={() => { setPurpose("upcoming_interview"); if (!interviewDate) setHasInterviewDate("no"); }} className="mt-1" /><span><span className="font-medium">I have an interview coming up</span><span className="block text-sm text-muted-foreground">We will use the interview date to focus your preparation when it is confirmed.</span></span></label>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="improve_skills" checked={purpose === "improve_skills"} onChange={() => setPurpose("improve_skills")} className="mt-1" /><span><span className="font-medium">I want to improve my interview skills</span><span className="block text-sm text-muted-foreground">No interview date is needed.</span></span></label>
           </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Language</CardTitle><CardDescription>Choose the language for your interview preparation and feedback.</CardDescription></CardHeader>
+          <CardContent><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label><label className="flex items-center gap-2"><input type="radio" name="language" value="fr" checked={language === "fr"} onChange={() => setLanguage("fr")} />Français</label></div></CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Interview details</CardTitle><CardDescription>Give this preparation a clear label and, when relevant, tell us when the interview is.</CardDescription></CardHeader>

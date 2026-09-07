@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 
 function normalizeFocusKey(value: string): string {
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     }
 
     const focusKey = normalizeFocusKey(focusArea);
+    const language = normalizeLanguage(sourceSession.language);
     if (!focusKey) {
       return NextResponse.json({ error: "Invalid coaching focus" }, { status: 400 });
     }
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "You are Interview Mirror's coaching practice generator. Create exactly 2 NEW interview questions that specifically test the candidate's ability to improve the stated coaching focus. Do not repeat questions from the source interview. Questions must be realistic, concise, and answerable from the candidate's genuine experience. Return JSON with a questions key containing exactly 2 strings.",
+            `${languageInstruction(language)} You are Interview Mirror's coaching practice generator. Create exactly 2 NEW interview questions that specifically test the candidate's ability to improve the stated coaching focus. Do not repeat questions from the source interview. Questions must be realistic, concise, and answerable from the candidate's genuine experience. Return JSON with a questions key containing exactly 2 strings.`,
         },
         {
           role: "user",
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
         job_description: sourceSession.job_description,
         cv_analysis: sourceSession.cv_analysis,
         interview_strategy: sourceSession.interview_strategy,
+        language,
         coaching_focus: focusArea,
         status: "in_progress",
       })

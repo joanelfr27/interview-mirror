@@ -5,6 +5,8 @@ export type Profile = {
   created_at: string;
 };
 
+export type SessionLanguage = "en" | "fr";
+
 export type SessionRecord = {
   id: string;
   user_id: string;
@@ -14,6 +16,7 @@ export type SessionRecord = {
   job_description_url?: string | null;
   cv_analysis: CvAnalysis | null;
   interview_strategy: InterviewStrategy | null;
+  language?: SessionLanguage | null;
   interview_date?: string | null;
   coaching_focus?: string | null;
   status: "draft" | "analyzed" | "in_progress" | "completed";

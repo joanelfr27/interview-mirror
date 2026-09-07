@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { FeedbackQuestion, FeedbackResult, SessionRecord } from "@/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,8 +13,10 @@ function normalizeFocusKey(value: string): string {
 }
 
 function fallbackFeedback(
-  pairs: { questionId: string; question: string; answer: string }[]
+  pairs: { questionId: string; question: string; answer: string }[],
+  language: "en" | "fr"
 ): FeedbackResult {
+  const isFrench = language === "fr";
   const evidenceHint = new RegExp(
     "\\b(result|improved|led|managed|increased|reduced|delivered|launched|implemented|designed|owned|success|metric|percentage|customers|impact|outcome)\\b",
     "i"
@@ -33,31 +35,31 @@ function fallbackFeedback(
       candidateAnswer: answer,
       score,
       scoreDeductions: hasEvidence
-        ? ["The answer could make the result and role relevance more explicit."]
-        : ["The answer does not provide enough concrete evidence or outcome detail."],
+        ? [isFrench ? "La réponse pourrait rendre le résultat et le lien avec le poste plus explicites." : "The answer could make the result and role relevance more explicit."]
+        : [isFrench ? "La réponse ne fournit pas assez de preuves concrètes ni de détails sur le résultat." : "The answer does not provide enough concrete evidence or outcome detail."],
       evidenceExtracted: hasEvidence ? [answer] : [],
       comment: hasEvidence
-        ? "The answer includes concrete detail, but would be stronger by tightening the structure and making the role relevance explicit."
-        : "The response needs more specific examples and outcome-focused evidence tied directly to the question.",
+        ? isFrench ? "La réponse contient des éléments concrets, mais gagnerait à être plus structurée et à expliciter le lien avec le poste." : "The answer includes concrete detail, but would be stronger by tightening the structure and making the role relevance explicit."
+        : isFrench ? "La réponse a besoin d'exemples plus précis et de preuves axées sur les résultats, directement liées à la question." : "The response needs more specific examples and outcome-focused evidence tied directly to the question.",
       keyStrength: hasEvidence
-        ? "Includes concrete detail or result-oriented language."
-        : "Attempts a direct response to the question.",
+        ? isFrench ? "Contient des détails concrets ou un langage axé sur les résultats." : "Includes concrete detail or result-oriented language."
+        : isFrench ? "Tente de répondre directement à la question." : "Attempts a direct response to the question.",
       keyImprovement: hasEvidence
-        ? "Clarify how the experience aligns with the role and improve answer flow."
-        : "Add a specific result, action, and clear connection to the job.",
+        ? isFrench ? "Précisez le lien entre cette expérience et le poste, et améliorez la fluidité de la réponse." : "Clarify how the experience aligns with the role and improve answer flow."
+        : isFrench ? "Ajoutez un résultat précis, une action et un lien clair avec le poste." : "Add a specific result, action, and clear connection to the job.",
       whatWorked: hasEvidence
-        ? "You included concrete detail or a result-oriented point."
-        : "You made an attempt to answer the question directly.",
+        ? isFrench ? "Vous avez inclus un détail concret ou un élément axé sur les résultats." : "You included concrete detail or a result-oriented point."
+        : isFrench ? "Vous avez tenté de répondre directement à la question." : "You made an attempt to answer the question directly.",
       whatWasMissing: hasEvidence
-        ? "The answer needs a clearer result and connection to the role."
-        : "A specific example, action, and outcome are missing.",
+        ? isFrench ? "La réponse a besoin d'un résultat plus clair et d'un lien avec le poste." : "The answer needs a clearer result and connection to the role."
+        : isFrench ? "Il manque un exemple précis, une action et un résultat." : "A specific example, action, and outcome are missing.",
       actionableImprovement: hasEvidence
-        ? "State the situation briefly, explain what you did, then finish with the result and why it matters for this role."
-        : "Choose one real example and explain what you did and what changed because of your actions.",
+        ? isFrench ? "Présentez brièvement la situation, expliquez ce que vous avez fait, puis terminez par le résultat et son importance pour ce poste." : "State the situation briefly, explain what you did, then finish with the result and why it matters for this role."
+        : isFrench ? "Choisissez un exemple réel et expliquez ce que vous avez fait et ce qui a changé grâce à vos actions." : "Choose one real example and explain what you did and what changed because of your actions.",
       suggestedRewrite: answer.length < 120
-        ? "Start with your role and outcome, then describe what you did and the impact in a concise sequence."
-        : "Keep the example focused: state the context, your action, and the measurable result more clearly.",
-      evidenceGroundedBetterAnswer: "Build the stronger answer only from facts you can substantiate from your answer and CV; do not add a new metric or achievement.",
+        ? isFrench ? "Commencez par votre rôle et le résultat, puis décrivez brièvement ce que vous avez fait et l'impact." : "Start with your role and outcome, then describe what you did and the impact in a concise sequence."
+        : isFrench ? "Restez centré sur l'exemple : présentez plus clairement le contexte, votre action et le résultat mesurable." : "Keep the example focused: state the context, your action, and the measurable result more clearly.",
+      evidenceGroundedBetterAnswer: isFrench ? "Construisez une réponse plus solide uniquement à partir de faits que votre réponse et votre CV permettent d'étayer; n'ajoutez aucun nouvel indicateur ni réussite." : "Build the stronger answer only from facts you can substantiate from your answer and CV; do not add a new metric or achievement.",
     };
   });
 
@@ -71,20 +73,29 @@ function fallbackFeedback(
     relevance: Math.max(50, overall - 4),
     structure: Math.min(88, overall - 1),
     confidence: Math.min(90, overall + 1),
-    strengths: [
+    strengths: isFrench ? [
+      "Les réponses sont complètes et répondent directement aux questions.",
+      "Utilise une expérience concrète ou des détails axés sur les résultats lorsqu'ils sont disponibles.",
+    ] : [
       "Responses are complete and address the questions directly.",
       "Uses concrete experience or result-oriented detail when available.",
     ],
-    improvements: [
+    improvements: isFrench ? [
+      "Rendez le lien avec le poste visé plus explicite dans chaque exemple.",
+      "Utilisez un langage clair centré sur l'action et le résultat, en évitant les formulations vagues.",
+      "Organisez les réponses autour de la question posée avec une introduction concise.",
+    ] : [
       "Make the connection to the target role more explicit in each example.",
       "Use clear action-outcome language and avoid vague phrasing.",
       "Organize answers around the question asked with a concise opening statement.",
     ],
-    sampleRewrite:
-      "A stronger answer should state the context, your specific action, the outcome, and why the experience is relevant to the role. Add only details you can substantiate from your own experience.",
+    sampleRewrite: isFrench
+      ? "Une réponse plus solide doit présenter le contexte, votre action précise, le résultat et la pertinence de l'expérience pour le poste. Ajoutez uniquement des détails que votre expérience permet d'étayer."
+      : "A stronger answer should state the context, your specific action, the outcome, and why the experience is relevant to the role. Add only details you can substantiate from your own experience.",
     questionFeedback,
-    summary:
-      "Good practice session. Focus next on stronger role alignment, evidence-based detail, and a clearer answer structure that directly answers each question.",
+    summary: isFrench
+      ? "Bonne session d'entraînement. Concentrez-vous ensuite sur un meilleur lien avec le poste, des détails étayés par des preuves et une structure plus claire qui répond directement à chaque question."
+      : "Good practice session. Focus next on stronger role alignment, evidence-based detail, and a clearer answer structure that directly answers each question.",
   };
 }
 
@@ -163,6 +174,7 @@ async function generateFeedback(
     const openai = getOpenAI();
     const isCoachingSession = Boolean(session.coaching_focus);
     const coachingFocus = session.coaching_focus;
+    const language = normalizeLanguage(session.language);
 
     const coachingInstruction = isCoachingSession
       ? `
@@ -179,7 +191,9 @@ Return focusScore, focusEvidence, and focusNextStep. Focus evidence must come fr
       messages: [
         {
           role: "system",
-          content: `You are Interview Mirror's coaching engine. Your job is to help the candidate improve, not simply judge them.
+          content: `${languageInstruction(language)}
+
+You are Interview Mirror's coaching engine. Your job is to help the candidate improve, not simply judge them.
 
 EVIDENCE AND ANTI-FABRICATION RULES:
 - Use only facts contained in the provided CV, job description, and candidate answers.
@@ -239,7 +253,7 @@ Q&A:\n${JSON.stringify(pairs)}`,
       usedFallback: false,
     };
   } catch {
-    return { feedback: fallbackFeedback(pairs), usedFallback: true };
+    return { feedback: fallbackFeedback(pairs, normalizeLanguage(session.language)), usedFallback: true };
   }
 }
 

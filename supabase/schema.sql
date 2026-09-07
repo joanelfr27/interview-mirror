@@ -56,6 +56,8 @@ create table if not exists public.sessions (
   job_description text not null default '',
   cv_analysis jsonb,
   interview_strategy jsonb,
+  language text not null default 'en'
+    check (language in ('en', 'fr')),
   status text not null default 'draft'
     check (status in ('draft', 'analyzed', 'in_progress', 'completed')),
   created_at timestamptz not null default now(),

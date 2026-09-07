@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord } from "@/types";
 
@@ -35,6 +35,7 @@ function isValidStrategy(strategy: unknown): strategy is InterviewStrategy {
 }
 
 function fallbackStrategy(session: SessionRecord): InterviewStrategy {
+  const language = normalizeLanguage(session.language);
   const strengths = session.cv_analysis?.strengths ?? [];
   const gaps = session.cv_analysis?.gaps ?? [];
   const keywords = session.cv_analysis?.keywordAlignment ?? [];
@@ -42,30 +43,31 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const topStrength = strengths[0] ?? "relevant experience";
   const topGap = gaps[0] ?? "areas where your evidence is less explicit";
   const topFocus = focusAreas.slice(0, 3).join("; ") || "the role's key requirements";
+  const isFrench = language === "fr";
   const timing = session.interview_date
-    ? `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}, so prioritize the most important preparation items first.`
-    : "Prioritize the most important preparation items first.";
+    ? isFrench ? `Votre entretien est prévu le ${new Date(session.interview_date).toLocaleDateString("fr-FR")}; commencez par les éléments de préparation les plus importants.` : `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}, so prioritize the most important preparation items first.`
+    : isFrench ? "Commencez par les éléments de préparation les plus importants." : "Prioritize the most important preparation items first.";
 
   return {
-    candidatePositioning: `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
-    strongestValueProposition: `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
+    candidatePositioning: isFrench ? `Présentez-vous comme une personne qui apporte ${topStrength}. Concentrez votre discours sur les preuves de votre CV et leur utilité pour les priorités du poste : ${topFocus}.` : `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
+    strongestValueProposition: isFrench ? `Votre message le plus fort est l'association de ${topStrength} et des résultats que vous pouvez démontrer. Reliez directement cette expérience aux besoins du poste.` : `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
     strengthsToLeverage: strengths.slice(0, 5),
     gapsOrRisks: gaps.slice(0, 5),
-    gapDefenseStrategy: gaps.slice(0, 5).map((gap) => `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`),
+    gapDefenseStrategy: gaps.slice(0, 5).map((gap) => isFrench ? `Si l'on vous interroge sur ${gap.toLowerCase()}, soyez honnête sur cet écart, puis expliquez l'expérience la plus proche que vous avez et comment vous combleriez le reste.` : `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`),
     interviewPriorities: [
-      `Show clear evidence of ${topStrength}.`,
-      `Prepare an honest example to address ${topGap}.`,
-      `Connect your experience to these role requirements where supported: ${keywords.join(", ")}.`,
+      isFrench ? `Montrez des preuves claires de ${topStrength}.` : `Show clear evidence of ${topStrength}.`,
+      isFrench ? `Préparez un exemple honnête pour répondre à ${topGap}.` : `Prepare an honest example to address ${topGap}.`,
+      isFrench ? `Reliez votre expérience à ces exigences du poste lorsque les preuves le permettent : ${keywords.join(", ")}.` : `Connect your experience to these role requirements where supported: ${keywords.join(", ")}.`,
       timing,
     ].filter(Boolean),
     likelyDifficultQuestions: [
-      `What experience do you have that addresses ${topGap.toLowerCase()}?`,
-      `Tell me about an example that demonstrates your ability in ${topFocus}.`,
+      isFrench ? `Quelle expérience avez-vous pour répondre à ${topGap.toLowerCase()} ?` : `What experience do you have that addresses ${topGap.toLowerCase()}?`,
+      isFrench ? `Parlez-moi d'un exemple qui démontre votre capacité en ${topFocus}.` : `Tell me about an example that demonstrates your ability in ${topFocus}.`,
     ],
-    storiesToPrepare: focusAreas.map((area) => `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`),
-    communicationPriorities: "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
-    interviewPlan: `Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. ${timing}`,
-    personalization: "Keep your answers grounded in your CV and this job description. Use the strongest matching evidence and be transparent where your experience is less direct.",
+    storiesToPrepare: focusAreas.map((area) => isFrench ? `Préparez un exemple réel sur ${area}. Expliquez le problème, vos actions et le résultat.` : `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`),
+    communicationPriorities: isFrench ? "Soyez clair et concis. Commencez par l'idée principale, expliquez ce que vous avez fait personnellement et terminez par le résultat. Utilisez uniquement des exemples que votre expérience permet d'étayer." : "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
+    interviewPlan: isFrench ? `Commencez par une courte présentation, appuyez-vous sur vos preuves les plus fortes, abordez honnêtement les écarts importants et reliez vos exemples aux priorités du poste. ${timing}` : `Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. ${timing}`,
+    personalization: isFrench ? "Ancrez vos réponses dans votre CV et cette offre. Utilisez les preuves les plus pertinentes et soyez transparent lorsque votre expérience est moins directe." : "Keep your answers grounded in your CV and this job description. Use the strongest matching evidence and be transparent where your experience is less direct.",
   };
 }
 
@@ -79,7 +81,9 @@ async function generateStrategy(session: SessionRecord): Promise<InterviewStrate
       messages: [
         {
           role: "system",
-          content: `You are Interview Mirror's interview coach.
+          content: `${languageInstruction(normalizeLanguage(session.language))}
+
+You are Interview Mirror's interview coach.
 Create a concise, candidate-specific interview game plan from the CV, job description, analysis, and interview date.
 
 The candidate must be able to understand and use this plan without knowing HR, consulting, or AI terminology. Write directly to the candidate using "you". Avoid jargon and unnecessary explanation.
