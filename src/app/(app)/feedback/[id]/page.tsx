@@ -13,7 +13,17 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { createClient } from "@/lib/supabase/server";
 import { CoachingPracticeButton } from "@/components/coaching-practice-button";
+import { CoachingProgressCard } from "@/components/coaching-progress-card";
 import type { FeedbackResult, SessionRecord } from "@/types";
+
+function normalizeFocusKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
 
 function ScoreRing({ label, value }: { label: string; value: number }) {
   return (
@@ -72,6 +82,18 @@ export default async function FeedbackPage({
   const priorityFocus = feedback.improvements[0]?.trim() || null;
   const isTargeted = Boolean(record.coaching_focus);
 
+  let coachingProgress = null;
+  if (isTargeted && record.coaching_focus) {
+    const focusKey = normalizeFocusKey(record.coaching_focus);
+    const { data } = await supabase
+      .from("coaching_progress")
+      .select("baseline_score, latest_score, status, evidence")
+      .eq("user_id", record.user_id)
+      .eq("focus_key", focusKey)
+      .maybeSingle();
+    coachingProgress = data;
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -112,32 +134,36 @@ export default async function FeedbackPage({
       </Card>
 
       {isTargeted && record.coaching_focus && (
-        <Card>
-          <CardHeader>
-            <Badge variant="secondary" className="w-fit">Targeted coaching</Badge>
-            <CardTitle className="text-base">{record.coaching_focus}</CardTitle>
-            <CardDescription>
-              This score measures how well this practice session demonstrated the selected coaching focus.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {typeof feedback.focusScore === "number" && (
-              <ScoreRing label="Focus score" value={feedback.focusScore} />
-            )}
-            {feedback.focusEvidence && (
-              <div className="rounded-lg border bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
-                <p className="mt-1 text-sm text-slate-700">{feedback.focusEvidence}</p>
-              </div>
-            )}
-            {feedback.focusNextStep && (
-              <div className="rounded-lg border p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next step</p>
-                <p className="mt-1 text-sm text-slate-700">{feedback.focusNextStep}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <Badge variant="secondary" className="w-fit">Targeted coaching</Badge>
+              <CardTitle className="text-base">{record.coaching_focus}</CardTitle>
+              <CardDescription>
+                This score measures how well this practice session demonstrated the selected coaching focus.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {typeof feedback.focusScore === "number" && (
+                <ScoreRing label="Focus score" value={feedback.focusScore} />
+              )}
+              {feedback.focusEvidence && (
+                <div className="rounded-lg border bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
+                  <p className="mt-1 text-sm text-slate-700">{feedback.focusEvidence}</p>
+                </div>
+              )}
+              {feedback.focusNextStep && (
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next step</p>
+                  <p className="mt-1 text-sm text-slate-700">{feedback.focusNextStep}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <CoachingProgressCard progress={coachingProgress} />
+        </>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -148,10 +174,7 @@ export default async function FeedbackPage({
           <CardContent>
             <ul className="space-y-2 text-sm text-slate-700">
               {feedback.strengths.map((s) => (
-                <li
-                  key={s}
-                  className="rounded-lg border bg-emerald-50/50 px-3 py-2"
-                >
+                <li key={s} className="rounded-lg border bg-emerald-50/50 px-3 py-2">
                   {s}
                 </li>
               ))}
@@ -165,10 +188,7 @@ export default async function FeedbackPage({
           <CardContent>
             <ul className="space-y-2 text-sm text-slate-700">
               {feedback.improvements.map((s) => (
-                <li
-                  key={s}
-                  className="rounded-lg border bg-amber-50/50 px-3 py-2"
-                >
+                <li key={s} className="rounded-lg border bg-amber-50/50 px-3 py-2">
                   {s}
                 </li>
               ))}
@@ -188,10 +208,7 @@ export default async function FeedbackPage({
           </CardHeader>
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-medium text-slate-800">{priorityFocus}</p>
-            <CoachingPracticeButton
-              sourceSessionId={id}
-              focusArea={priorityFocus}
-            />
+            <CoachingPracticeButton sourceSessionId={id} focusArea={priorityFocus} />
           </CardContent>
         </Card>
       )}
