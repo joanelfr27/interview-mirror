@@ -67,9 +67,10 @@ export async function POST(request: Request) {
 
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
   if (preparationPurpose === "upcoming_interview" && !interviewDate) return NextResponse.json({ error: "Interview date is required for an upcoming interview" }, { status: 400 });
+  if (preparationPurpose === "improve_skills" && interviewDate) return NextResponse.json({ error: "Interview date must be empty when improving interview skills" }, { status: 400 });
 
   if (!jobDescription && jobDescriptionUrl) jobDescription = await tryFetchJobDescription(jobDescriptionUrl);
-  if (!jobDescription) return NextResponse.json({ error: "Please paste the job description or upload its PDF. We could not reliably read the supplied link." }, { status: 400 });
+  if (!jobDescription && preparationPurpose === "upcoming_interview") return NextResponse.json({ error: "Please paste the job description or upload its PDF. We could not reliably read the supplied link." }, { status: 400 });
 
   const parsedInterviewDate = interviewDate ? new Date(`${interviewDate}T12:00:00.000Z`) : null;
   if (parsedInterviewDate && Number.isNaN(parsedInterviewDate.getTime())) return NextResponse.json({ error: "Invalid interview date" }, { status: 400 });
