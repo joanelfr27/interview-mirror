@@ -30,7 +30,11 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
         : "Still needs practice";
 
   const evidence = progress.evidence;
-  const latestEvidence = evidence && "latest" in evidence ? evidence.latest : evidence;
+  const latestEvidence = evidence && "focusEvidence" in evidence
+    ? evidence
+    : evidence && "latest" in evidence
+      ? evidence.latest
+      : undefined;
   const history = evidence && "history" in evidence ? evidence.history ?? [] : [];
   const baselineEvidence = history[0];
 
@@ -48,7 +52,7 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
           {baseline !== null && <span>Before: <strong>{baseline}/100</strong></span>}
           {latest !== null && <span>Latest: <strong>{latest}/100</strong></span>}
           {delta !== null && delta !== 0 && (
-            <Badge variant={delta > 0 ? "default" : "destructive"}>
+            <Badge variant={delta > 0 ? "default" : "warning"}>
               {delta > 0 ? `+${delta}` : delta} points
             </Badge>
           )}

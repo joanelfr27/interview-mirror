@@ -1,4 +1,15 @@
 import OpenAI from "openai";
+import type { SessionLanguage } from "@/types";
+
+export function normalizeLanguage(value: unknown): SessionLanguage {
+  return value === "fr" ? "fr" : "en";
+}
+
+export function languageInstruction(language: SessionLanguage): string {
+  return language === "fr"
+    ? "Write all candidate-facing text in French (Français). Keep JSON keys, field names, scores, evidence quotes, and structure exactly as specified."
+    : "Write all candidate-facing text in English. Keep JSON keys, field names, scores, evidence quotes, and structure exactly as specified.";
+}
 
 export function getOpenAI() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -10,14 +21,14 @@ export function getOpenAI() {
 
 export const AI_MODEL = "gpt-4o-mini";
 
-export async function generateCandidateAnalysis(cvText: string, jobDescription: string, targetRole: string) {
+export async function generateCandidateAnalysis(cvText: string, jobDescription: string, targetRole: string, language: SessionLanguage = "en") {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: "system",
-        content: "You are an expert HR evaluator. Return a JSON object with alignment_score, summary, strengths, gaps, risks, keywords, and focus_areas.",
+        content: `You are an expert HR evaluator. ${languageInstruction(language)} Return a JSON object with alignment_score, summary, strengths, gaps, risks, keywords, and focus_areas.`,
       },
       {
         role: "user",
@@ -29,14 +40,14 @@ export async function generateCandidateAnalysis(cvText: string, jobDescription: 
   return JSON.parse(response.choices[0].message.content || "{}");
 }
 
-export async function generateInterviewStrategy(analysis: any) {
+export async function generateInterviewStrategy(analysis: any, language: SessionLanguage = "en") {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: "system",
-        content: "You are an interview strategy coach. Return a JSON object with preparation_timeline, key_themes, focus_areas, potential_questions, and preparation_tips.",
+        content: `You are an interview strategy coach. ${languageInstruction(language)} Return a JSON object with preparation_timeline, key_themes, focus_areas, potential_questions, and preparation_tips.`,
       },
       {
         role: "user",
@@ -48,14 +59,14 @@ export async function generateInterviewStrategy(analysis: any) {
   return JSON.parse(response.choices[0].message.content || "{}");
 }
 
-export async function generateInterviewQuestions(analysis: any, strategy: any) {
+export async function generateInterviewQuestions(analysis: any, strategy: any, language: SessionLanguage = "en") {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: "system",
-        content: "Generate 5 interview questions based on candidate analysis and strategy. Return a JSON object with a 'questions' key containing an array of strings.",
+        content: `Generate 5 interview questions based on candidate analysis and strategy. ${languageInstruction(language)} Return a JSON object with a 'questions' key containing an array of strings.`,
       },
       {
         role: "user",
@@ -67,14 +78,14 @@ export async function generateInterviewQuestions(analysis: any, strategy: any) {
   return JSON.parse(response.choices[0].message.content || "{\"questions\":[]}");
 }
 
-export async function evaluateAnswer(questionText: string, transcript: string) {
+export async function evaluateAnswer(questionText: string, transcript: string, language: SessionLanguage = "en") {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: "system",
-        content: "Evaluate the interview candidate's response. Return a JSON object containing score, strengths, and areas_for_improvement.",
+        content: `Evaluate the interview candidate's response. ${languageInstruction(language)} Return a JSON object containing score, strengths, and areas_for_improvement.`,
       },
       {
         role: "user",

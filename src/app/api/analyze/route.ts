@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 import type { CvAnalysis } from "@/types";
 
-function fallbackAnalysis(cvText: string, jobDescription: string): CvAnalysis {
+function fallbackAnalysis(cvText: string, jobDescription: string, language: "en" | "fr"): CvAnalysis {
   const cvLower = cvText.toLowerCase();
   const jdWords = jobDescription.toLowerCase().split(/[^a-z0-9+#.]/).filter((w) => w.length > 4);
   const unique = [...new Set(jdWords)].slice(0, 40);
   const matched = unique.filter((w) => cvLower.includes(w)).slice(0, 8);
   const score = Math.min(92, 40 + matched.length * 6);
+  if (language === "fr") {
+    return {
+      matchScore: score,
+      strengths: ["Votre expérience présente un parcours professionnel clair à partir du CV fourni.", "Votre CV contient une expérience en lien avec des éléments importants de ce poste.", matched.length ? `Votre CV mentionne directement une expérience liée à : ${matched.slice(0, 3).join(", ")}.` : "Vous avez une base d'expérience solide pour construire vos exemples d'entretien."],
+      gaps: ["Vos réponses doivent rendre les résultats et l'impact mesurable plus clairs.", "Certaines exigences de l'offre nécessitent des exemples plus solides tirés de votre expérience.", "Préparez des exemples simples montrant le problème, vos actions et le résultat obtenu."],
+      keywordAlignment: matched.length ? matched : ["leadership", "delivery", "collaboration"],
+      summary: "Votre préparation s'appuie sur les éléments de votre CV et les exigences de cette offre. La prochaine étape consiste à transformer vos correspondances et vos écarts les plus importants en exemples d'entretien clairs.",
+      suggestedFocusAreas: ["Impact — montrez les résultats de votre travail et utilisez des chiffres lorsqu'ils sont réellement présents dans votre expérience.", "Collaboration — préparez un exemple montrant comment vous avez influencé ou travaillé avec des personnes en dehors de votre équipe directe.", "Connaissances liées au poste — repérez les parties de l'offre moins directement couvertes par votre CV et préparez une réponse honnête."],
+    };
+  }
   return {
     matchScore: score,
     strengths: ["Your experience shows a clear professional story based on the CV you provided.", "Your CV contains experience that connects with important parts of this role.", matched.length ? `Your CV directly mentions experience related to: ${matched.slice(0, 3).join(", ")}.` : "You have a solid experience base to build your interview examples from."],
@@ -19,7 +29,7 @@ function fallbackAnalysis(cvText: string, jobDescription: string): CvAnalysis {
   };
 }
 
-async function runAnalysis(cvText: string, jobDescription: string, priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
+async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
   try {
     const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
@@ -27,7 +37,7 @@ async function runAnalysis(cvText: string, jobDescription: string, priorContext?
       response_format: { type: "json_object" },
       temperature: 0.3,
       messages: [
-        { role: "system", content: `You are Interview Mirror's candidate coach. Analyze the CV against the job description using evidence first.\n\nYour output will be read directly by a job candidate. Do not write like an HR analyst, consultant, developer, or AI system.\nUse plain, direct language and speak to the candidate as "you".\nDo not use technical phrases such as "lexical overlap", "semantic similarity", "keyword density", "preliminary alignment", or similar analyst jargon.\n\nReturn JSON with keys:\nmatchScore (0-100 number),\nstrengths (string[]),\ngaps (string[]),\nkeywordAlignment (string[]),\nsummary (string),\nsuggestedFocusAreas (string[]).\n\nEvery claim must be supported by the supplied CV or job description. Never invent experience.\nFor each strength or gap, explain the practical interview meaning when useful.\nFor suggestedFocusAreas, give 2-4 specific coaching priorities. Each must follow this simple structure:\n"Focus — why it matters for this role — evidence from the CV/JD that led you here."\nDo not create a focus area unless you can point to evidence in the CV or job description.\nDo not use STAR/CAR terminology unless the candidate already used it; prefer "Problem → What you did → Result".\nThe goal is to help the candidate understand what to prepare next, not to impress them with analysis terminology.` },
+          { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's candidate coach. Analyze the CV against the job description using evidence first.\n\nYour output will be read directly by a job candidate. Do not write like an HR analyst, consultant, developer, or AI system.\nUse plain, direct language and speak to the candidate as "you".\nDo not use technical phrases such as "lexical overlap", "semantic similarity", "keyword density", "preliminary alignment", or similar analyst jargon.\n\nReturn JSON with keys:\nmatchScore (0-100 number),\nstrengths (string[]),\ngaps (string[]),\nkeywordAlignment (string[]),\nsummary (string),\nsuggestedFocusAreas (string[]).\n\nEvery claim must be supported by the supplied CV or job description. Never invent experience.\nFor each strength or gap, explain the practical interview meaning when useful.\nFor suggestedFocusAreas, give 2-4 specific coaching priorities. Each must follow this simple structure:\n"Focus — why it matters for this role — evidence from the CV/JD that led you here."\nDo not create a focus area unless you can point to evidence in the CV or job description.\nDo not use STAR/CAR terminology unless the candidate already used it; prefer "Problem → What you did → Result".\nThe goal is to help the candidate understand what to prepare next, not to impress them with analysis terminology.` },
         { role: "user", content: `CV:\n${cvText.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}\n\nPRIOR PREPARATION CONTEXT:\n${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}\n\nUse prior preparation context only to maintain continuity and identify areas for improvement. Do not treat it as evidence of current CV experience.` },
       ],
     });
@@ -35,7 +45,7 @@ async function runAnalysis(cvText: string, jobDescription: string, priorContext?
     if (!raw) throw new Error("Empty AI response");
     return JSON.parse(raw) as CvAnalysis;
   } catch {
-    return fallbackAnalysis(cvText, jobDescription);
+    return fallbackAnalysis(cvText, jobDescription, language);
   }
 }
 
@@ -63,6 +73,7 @@ export async function POST(request: Request) {
   const title = String(body.title ?? "Interview preparation").trim();
   const sessionId = body.sessionId as string | null | undefined;
   const preparationPurpose = body.preparationPurpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
+  const language = normalizeLanguage(body.language);
   const interviewDate = String(body.interviewDate ?? "").trim();
 
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
@@ -82,13 +93,14 @@ export async function POST(request: Request) {
     else if (error) console.error("Failed to load preparation context:", error);
   }
 
-  const analysis = await runAnalysis(cvText, jobDescription, priorContext);
+  const analysis = await runAnalysis(cvText, jobDescription, language, priorContext);
   let id = sessionId ?? null;
   const sessionFields = {
     title,
     cv_text: cvText,
     job_description: jobDescription,
     job_description_url: jobDescriptionUrl,
+    language,
     interview_date: parsedInterviewDate?.toISOString() ?? null,
     cv_analysis: analysis,
     status: "analyzed",
