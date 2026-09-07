@@ -1,14 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+type CoachingEvidence = {
+  focusEvidence?: string;
+  focusNextStep?: string;
+};
+
 type CoachingProgress = {
   baseline_score: number | null;
   latest_score: number | null;
   status: string | null;
   evidence: {
-    focusEvidence?: string;
-    focusNextStep?: string;
-  } | null;
+    latest?: CoachingEvidence;
+    history?: CoachingEvidence[];
+  } | CoachingEvidence | null;
 };
 
 export function CoachingProgressCard({ progress }: { progress: CoachingProgress | null }) {
@@ -18,6 +23,12 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
   const latest = typeof progress.latest_score === "number" ? progress.latest_score : null;
   const delta = baseline !== null && latest !== null ? latest - baseline : null;
   const status = progress.status === "improved" ? "Improved" : "Still needs practice";
+
+  const evidence = progress.evidence;
+  const latestEvidence =
+    evidence && "latest" in evidence ? evidence.latest : evidence;
+  const history = evidence && "history" in evidence ? evidence.history ?? [] : [];
+  const baselineEvidence = history[0];
 
   return (
     <Card>
@@ -39,16 +50,31 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
           )}
           <Badge variant="outline">{status}</Badge>
         </div>
-        {progress.evidence?.focusEvidence && (
-          <div className="rounded-lg border bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence from your latest answer</p>
-            <p className="mt-1 text-sm text-slate-700">{progress.evidence.focusEvidence}</p>
+
+        {baselineEvidence?.focusEvidence && latestEvidence?.focusEvidence && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What you showed before</p>
+              <p className="mt-1 text-sm text-slate-700">{baselineEvidence.focusEvidence}</p>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What you showed most recently</p>
+              <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusEvidence}</p>
+            </div>
           </div>
         )}
-        {progress.evidence?.focusNextStep && (
+
+        {latestEvidence?.focusEvidence && !baselineEvidence?.focusEvidence && (
+          <div className="rounded-lg border bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence from your latest answer</p>
+            <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusEvidence}</p>
+          </div>
+        )}
+
+        {latestEvidence?.focusNextStep && (
           <div className="rounded-lg border p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next step</p>
-            <p className="mt-1 text-sm text-slate-700">{progress.evidence.focusNextStep}</p>
+            <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusNextStep}</p>
           </div>
         )}
       </CardContent>
