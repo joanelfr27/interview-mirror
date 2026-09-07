@@ -22,7 +22,34 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ cvs: data ?? [] });
+  if (data && data.length > 0) {
+    return NextResponse.json({ cvs: data });
+  }
+
+  // Preserve continuity for candidates whose CVs were historically stored on sessions
+  // before the reusable user_cvs record was available. Do not fabricate storage_path data.
+  const { data: historicalSessions, error: historicalError } = await supabase
+    .from("sessions")
+    .select("id, title, cv_text, created_at, updated_at")
+    .eq("user_id", user.id)
+    .not("cv_text", "is", null)
+    .neq("cv_text", "")
+    .order("updated_at", { ascending: false })
+    .limit(10);
+
+  if (historicalError) {
+    return NextResponse.json({ error: historicalError.message }, { status: 500 });
+  }
+
+  const fallbackCvs = (historicalSessions ?? []).map((session) => ({
+    id: `historical:${session.id}`,
+    file_name: session.title || "Previous CV",
+    cv_text: session.cv_text ?? "",
+    created_at: session.created_at,
+    updated_at: session.updated_at,
+  }));
+
+  return NextResponse.json({ cvs: fallbackCvs });
 }
 
 export async function POST(request: Request) {

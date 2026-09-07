@@ -93,7 +93,7 @@ export default function PrepareForm() {
         const data = await res.json();
         if (cancelled) return;
         setTitle(data.title ?? "");
-        setLanguage(data.language === "fr" ? "fr" : "en");
+        setLanguage(data.preparation_language === "fr" ? "fr" : "en");
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
         setHasInterviewDate(data.interview_date ? "yes" : "no");
@@ -174,7 +174,7 @@ export default function PrepareForm() {
       toast.error("Please select an existing CV or provide a new CV");
       return;
     }
-    if (!jobDescription.trim() && !jobDescriptionUrl.trim()) {
+    if (purpose === "upcoming_interview" && !jobDescription.trim() && !jobDescriptionUrl.trim()) {
       toast.error("Please paste the job description, upload its PDF, or provide a link");
       return;
     }
