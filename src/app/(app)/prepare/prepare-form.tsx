@@ -44,6 +44,7 @@ export default function PrepareForm() {
   const sessionId = searchParams.get("session");
   const [title, setTitle] = useState("");
   const [purpose, setPurpose] = useState<PreparationPurpose>("upcoming_interview");
+  const [hasInterviewDate, setHasInterviewDate] = useState<"yes" | "no">("yes");
   const [interviewDate, setInterviewDate] = useState("");
   const [cvText, setCvText] = useState("");
   const [savedCvs, setSavedCvs] = useState<SavedCv[]>([]);
@@ -93,6 +94,7 @@ export default function PrepareForm() {
         setTitle(data.title ?? "");
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
+        setHasInterviewDate(data.interview_date ? "yes" : "no");
         setCvText(data.cv_text ?? "");
         setJobDescription(data.job_description ?? "");
         setJobDescriptionUrl(data.job_description_url ?? "");
@@ -162,7 +164,7 @@ export default function PrepareForm() {
 
   async function onAnalyze(e: React.FormEvent) {
     e.preventDefault();
-    if (purpose === "upcoming_interview" && !interviewDate) {
+    if (purpose === "upcoming_interview" && hasInterviewDate === "yes" && !interviewDate) {
       toast.error("Please add your interview date");
       return;
     }
@@ -183,7 +185,7 @@ export default function PrepareForm() {
           sessionId,
           title: title || "Interview preparation",
           preparationPurpose: purpose,
-          interviewDate: purpose === "upcoming_interview" ? interviewDate : null,
+          interviewDate: purpose === "upcoming_interview" && hasInterviewDate === "yes" ? interviewDate : null,
           cvText,
           jobDescription,
           jobDescriptionUrl: jobDescriptionUrl.trim() || null,
@@ -211,7 +213,7 @@ export default function PrepareForm() {
         <Card>
           <CardHeader><CardTitle>What are you preparing for?</CardTitle><CardDescription>We will tailor the preparation to your goal.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="upcoming_interview" checked={purpose === "upcoming_interview"} onChange={() => setPurpose("upcoming_interview")} className="mt-1" /><span><span className="font-medium">I have an interview coming up</span><span className="block text-sm text-muted-foreground">We will use the interview date to focus your preparation.</span></span></label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="upcoming_interview" checked={purpose === "upcoming_interview"} onChange={() => { setPurpose("upcoming_interview"); if (!interviewDate) setHasInterviewDate("no"); }} className="mt-1" /><span><span className="font-medium">I have an interview coming up</span><span className="block text-sm text-muted-foreground">We will use the interview date to focus your preparation when it is confirmed.</span></span></label>
             <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="improve_skills" checked={purpose === "improve_skills"} onChange={() => setPurpose("improve_skills")} className="mt-1" /><span><span className="font-medium">I want to improve my interview skills</span><span className="block text-sm text-muted-foreground">No interview date is needed.</span></span></label>
           </CardContent>
         </Card>
@@ -219,7 +221,7 @@ export default function PrepareForm() {
           <CardHeader><CardTitle>Interview details</CardTitle><CardDescription>Give this preparation a clear label and, when relevant, tell us when the interview is.</CardDescription></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label htmlFor="title">Session title</Label><Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Financial Controller at Acme" /></div>
-            {purpose === "upcoming_interview" && <div className="space-y-2"><Label htmlFor="interview-date">Interview date</Label><Input id="interview-date" type="date" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} required /></div>}
+            {purpose === "upcoming_interview" && <div className="space-y-3"><Label>Do you have an interview date?</Label><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="has-interview-date" value="yes" checked={hasInterviewDate === "yes"} onChange={() => setHasInterviewDate("yes")} />Yes</label><label className="flex items-center gap-2"><input type="radio" name="has-interview-date" value="no" checked={hasInterviewDate === "no"} onChange={() => { setHasInterviewDate("no"); setInterviewDate(""); }} />No, not confirmed yet</label></div>{hasInterviewDate === "yes" && <div className="space-y-2"><Label htmlFor="interview-date">Interview date</Label><Input id="interview-date" type="date" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} required /></div>}</div>}
           </CardContent>
         </Card>
         <Card>
@@ -235,7 +237,7 @@ export default function PrepareForm() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste text</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>Upload PDF</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
             {jobDescriptionMode === "paste" && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the full job description here…" className="min-h-[240px]" />}
-            {jobDescriptionMode === "pdf" && <div className="space-y-3"><Label htmlFor="jd-pdf" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD PDF</Label><Input id="jd-pdf" type="file" accept=".pdf,application/pdf" className="hidden" onChange={onJobDescriptionPdf} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
+            {jobDescriptionMode === "pdf" && <div className="space-y-3"><Label htmlFor="jd-pdf" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD PDF</Label><Input id="jd-pdf" type="file" accept=".pdf,application/pdf" className="hidden" onChange={onJobDescriptionPdf} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
             {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><p className="text-xs text-muted-foreground">We will try to read the page. If it cannot be read reliably, paste the JD or upload its PDF instead.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
           </CardContent>
         </Card>
