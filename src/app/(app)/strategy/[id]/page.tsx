@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowRight, ChevronRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -34,17 +33,16 @@ export default function StrategyPage() {
         if (!sessionRes.ok || !sessionData) throw new Error("Could not load session");
         if (cancelled) return;
         setSession(sessionData);
-        if (sessionData.interview_strategy) {
-          setStrategy(sessionData.interview_strategy);
-          setLoading(false);
-        } else {
-          await handleGenerate();
-        }
+
+        const strategyRes = await fetch(`/api/strategy/${id}`);
+        const strategyData = (await strategyRes.json()) as StrategyResponse;
+        if (!strategyRes.ok || !strategyData.strategy) throw new Error(strategyData.error || "Could not load strategy");
+        if (cancelled) return;
+        setStrategy(strategyData.strategy);
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load session");
-          setLoading(false);
-        }
+        if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load strategy");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
