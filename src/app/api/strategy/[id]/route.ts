@@ -21,6 +21,7 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const gaps = session.cv_analysis?.gaps ?? [];
   const keywords = session.cv_analysis?.keywordAlignment ?? [];
   const focusAreas = session.cv_analysis?.suggestedFocusAreas ?? [];
+  const evidenceChain = session.cv_analysis?.evidenceChain ?? [];
   const topStrength = strengths[0] ?? "relevant experience";
   const topGap = gaps[0] ?? "areas where your evidence is less explicit";
   const topFocus = focusAreas.slice(0, 3).join("; ") || "the role's key requirements";
@@ -28,6 +29,16 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const timing = session.interview_date
     ? isFrench ? `Votre entretien est prévu le ${new Date(session.interview_date).toLocaleDateString("fr-FR")}; commencez par les éléments de préparation les plus importants.` : `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}, so prioritize the most important preparation items first.`
     : isFrench ? "Commencez par les éléments de préparation les plus importants." : "Prioritize the most important preparation items first.";
+  const groundedStories = evidenceChain.slice(0, 5).map((item) => {
+    if (item.cv_evidence && item.cv_evidence !== "NO CV EVIDENCE FOUND") {
+      return isFrench
+        ? `Pour l'exigence « ${item.jd_requirement} », appuyez-vous sur cette preuve de votre CV : ${item.cv_evidence}. Expliquez ensuite votre action et le résultat démontrable.`
+        : `For the requirement “${item.jd_requirement}”, use this CV evidence: ${item.cv_evidence}. Then explain your action and the demonstrable result.`;
+    }
+    return isFrench
+      ? `Pour l'exigence « ${item.jd_requirement} », n'inventez pas d'expérience : préparez une réponse claire sur ce qui vous manque et sur la manière dont vous pourriez combler cet écart.`
+      : `For the requirement “${item.jd_requirement}”, do not invent experience: prepare a clear response about what is missing and how you would close the gap.`;
+  });
   return {
     candidatePositioning: isFrench ? `Présentez-vous comme une personne qui apporte ${topStrength}. Concentrez votre discours sur les preuves de votre CV et leur utilité pour les priorités du poste : ${topFocus}.` : `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
     strongestValueProposition: isFrench ? `Votre message le plus fort est l'association de ${topStrength} et des résultats que vous pouvez démontrer. Reliez directement cette expérience aux besoins du poste.` : `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
@@ -35,7 +46,7 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
     gapDefenseStrategy: gaps.slice(0, 5).map((gap) => isFrench ? `Si l'on vous interroge sur ${gap.toLowerCase()}, soyez honnête sur cet écart, puis expliquez l'expérience la plus proche que vous avez et comment vous combleriez le reste.` : `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`),
     interviewPriorities: [isFrench ? `Montrez des preuves claires de ${topStrength}.` : `Show clear evidence of ${topStrength}.`, isFrench ? `Préparez un exemple honnête pour répondre à ${topGap}.` : `Prepare an honest example to address ${topGap}.`, isFrench ? `Reliez votre expérience aux exigences soutenues par les preuves : ${keywords.join(", ")}.` : `Connect your experience to requirements supported by the evidence: ${keywords.join(", ")}.`, timing],
     likelyDifficultQuestions: [isFrench ? `Quelle expérience avez-vous pour répondre à ${topGap.toLowerCase()} ?` : `What experience do you have that addresses ${topGap.toLowerCase()}?`, isFrench ? `Parlez-moi d'un exemple qui démontre votre capacité en ${topFocus}.` : `Tell me about an example that demonstrates your ability in ${topFocus}.`],
-    storiesToPrepare: focusAreas.map((area) => isFrench ? `Préparez un exemple réel sur ${area}. Expliquez le problème, vos actions et le résultat.` : `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`),
+    storiesToPrepare: groundedStories,
     communicationPriorities: isFrench ? "Soyez clair et concis. Commencez par l'idée principale, expliquez ce que vous avez fait personnellement et terminez par le résultat. Utilisez uniquement des exemples que votre expérience permet d'étayer." : "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
     interviewPlan: isFrench ? `Commencez par une courte présentation, appuyez-vous sur vos preuves les plus fortes, abordez honnêtement les écarts importants et reliez vos exemples aux priorités du poste. ${timing}` : `Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. ${timing}`,
     personalization: isFrench ? "Ancrez vos réponses dans votre CV et cette offre. Utilisez les preuves les plus pertinentes et soyez transparent lorsque votre expérience est moins directe." : "Keep your answers grounded in your CV and this job description. Use the strongest matching evidence and be transparent where your experience is less direct.",
