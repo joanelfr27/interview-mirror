@@ -2,6 +2,29 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateInterviewQuestions } from '@/lib/openai'
 
+function isStrategyGroundedQuestionSet(data: unknown, strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
+  if (!data || typeof data !== 'object' || !strategy || typeof strategy !== 'object') return false
+  const questions = (data as { questions?: unknown }).questions
+  if (!Array.isArray(questions) || questions.length !== 5) return false
+
+  const strategyValues = Object.values(strategy as Record<string, unknown>)
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .map((value) => value.trim())
+
+  const generic = /\b(tell me about yourself|why do you want this job|what are your strengths|what are your weaknesses|where do you see yourself|why should we hire you|team conflict|conflict with a colleague|leadership style|hobbies)\b/i
+
+  return questions.every((item) => {
+    if (!item || typeof item !== 'object') return false
+    const question = (item as { question?: unknown }).question
+    const basis = (item as { strategy_basis?: unknown }).strategy_basis
+    if (typeof question !== 'string' || !question.trim() || typeof basis !== 'string' || !basis.trim()) return false
+    if (!strategyValues.includes(basis.trim())) return false
+    if (generic.test(question)) return false
+    return true
+  })
+}
+
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id: sessionId } = await params
@@ -19,11 +42,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       if (statusError) throw statusError
       return NextResponse.json({ ...(updatedSession ?? session), id: sessionId, status: 'in_progress' })
     }
+
     const language = session.preparation_language === 'fr' ? 'fr' : 'en'
     const questionsData = await generateInterviewQuestions(session.cv_analysis, session.interview_strategy, language)
-    const questions = Array.isArray(questionsData?.questions) ? questionsData.questions.filter((question: unknown): question is string => typeof question === 'string' && question.trim().length > 0).map((question: string) => question.trim()) : []
-    if (!questions.length) return NextResponse.json({ error: 'No interview questions were generated' }, { status: 500 })
-    const questionRows = questions.map((question: string, index: number) => ({ session_id: sessionId, question, category: 'general', order_index: index + 1 }))
+    if (!isStrategyGroundedQuestionSet(questionsData, session.interview_strategy)) {
+      return NextResponse.json({ error: 'The interview questions were not sufficiently grounded in the interview strategy. Please regenerate the strategy and try again.' }, { status: 422 })
+    }
+
+    const questionItems = questionsData.questions.map((item) => item.question.trim())
+    const questionRows = questionItems.map((question: string, index: number) => ({ session_id: sessionId, question, category: 'strategy', order_index: index + 1 }))
     const { error: questionsError } = await supabase.from('questions').insert(questionRows)
     if (questionsError) { await supabase.from('questions').delete().eq('session_id', sessionId); throw questionsError }
     const { data: updatedSession, error: statusError } = await supabase.from('sessions').update({ status: 'in_progress' }).eq('id', sessionId).eq('user_id', user.id).select().single()
