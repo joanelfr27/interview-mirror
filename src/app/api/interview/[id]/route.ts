@@ -35,9 +35,14 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const { data: session, error: sessionError } = await supabase.from('sessions').select('*').eq('id', sessionId).eq('user_id', user.id).single()
     if (sessionError || !session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     if (!session.cv_analysis || !session.interview_strategy) return NextResponse.json({ error: 'CV analysis and interview strategy are required' }, { status: 400 })
-    const { data: existingQuestions, error: existingQuestionsError } = await supabase.from('questions').select('id').eq('session_id', sessionId).limit(1)
+
+    const { data: existingQuestions, error: existingQuestionsError } = await supabase.from('questions').select('id, category').eq('session_id', sessionId).order('order_index', { ascending: true })
     if (existingQuestionsError) return NextResponse.json({ error: existingQuestionsError.message }, { status: 500 })
     if (existingQuestions?.length) {
+      const hasLegacyQuestions = existingQuestions.some((question) => question.category !== 'strategy')
+      if (hasLegacyQuestions) {
+        return NextResponse.json({ error: 'This practice set was created before strategy-grounded interview practice. Start a new interview session to use the current strategy.' }, { status: 409 })
+      }
       const { data: updatedSession, error: statusError } = await supabase.from('sessions').update({ status: 'in_progress' }).eq('id', sessionId).eq('user_id', user.id).select().single()
       if (statusError) throw statusError
       return NextResponse.json({ ...(updatedSession ?? session), id: sessionId, status: 'in_progress' })
