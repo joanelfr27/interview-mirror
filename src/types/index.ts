@@ -7,6 +7,14 @@ export type Profile = {
 
 export type SessionLanguage = "en" | "fr";
 
+export type EvidenceChainItem = {
+  jd_requirement: string;
+  cv_evidence: string | null;
+  gap_identified: string;
+  interview_implication: string;
+  actionable_recommendation: string;
+};
+
 export type SessionRecord = {
   id: string;
   user_id: string;
@@ -16,10 +24,11 @@ export type SessionRecord = {
   job_description_url?: string | null;
   cv_analysis: CvAnalysis | null;
   interview_strategy: InterviewStrategy | null;
-  language?: SessionLanguage | null;
+  preparation_language?: SessionLanguage | null;
+  preparation_purpose?: "upcoming_interview" | "improve_skills" | string | null;
   interview_date?: string | null;
   coaching_focus?: string | null;
-  status: "draft" | "analyzed" | "in_progress" | "completed";
+  status: "draft" | "analyzed" | "in_progress" | "completed" | string;
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +54,7 @@ export type CvAnalysis = {
   keywordAlignment: string[];
   summary: string;
   suggestedFocusAreas: string[];
+  evidenceChain: EvidenceChainItem[];
 };
 
 export type InterviewQuestion = {
