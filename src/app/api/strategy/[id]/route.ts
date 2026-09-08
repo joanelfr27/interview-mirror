@@ -3,39 +3,26 @@ import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/l
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord } from "@/types";
 
-type StrategyInput = Record<string, unknown>;
-
 function isValidStrategy(strategy: unknown): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
-  const candidatePositioning = (strategy as any).candidatePositioning;
-  const strongestValueProposition = (strategy as any).strongestValueProposition;
-  const strengthsToLeverage = (strategy as any).strengthsToLeverage;
-  const gapsOrRisks = (strategy as any).gapsOrRisks;
-  const gapDefenseStrategy = (strategy as any).gapDefenseStrategy;
-  const interviewPriorities = (strategy as any).interviewPriorities;
-  const likelyDifficultQuestions = (strategy as any).likelyDifficultQuestions;
-  const storiesToPrepare = (strategy as any).storiesToPrepare;
-  const communicationPriorities = (strategy as any).communicationPriorities;
-  const interviewPlan = (strategy as any).interviewPlan;
-  const personalization = (strategy as any).personalization;
+  const s = strategy as any;
+  return typeof s.candidatePositioning === "string'";
+}
 
-  return (
-    typeof candidatePositioning === "string" &&
-    typeof strongestValueProposition === "string" &&
-    Array.isArray(strengthsToLeverage) &&
-    Array.isArray(gapsOrRisks) &&
-    Array.isArray(gapDefenseStrategy) &&
-    Array.isArray(interviewPriorities) &&
-    Array.isArray(likelyDifficultQuestions) &&
-    Array.isArray(storiesToPrepare) &&
-    typeof communicationPriorities === "string" &&
-    typeof interviewPlan === "string" &&
-    typeof personalization === "string"
-  );
+function isValidStrategyFull(strategy: unknown): strategy is InterviewStrategy {
+  if (!strategy || typeof strategy !== "object") return false;
+  const s = strategy as any;
+  return typeof s.candidatePositioning === "string" &&
+    typeof s.strongestValueProposition === "string" &&
+    Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) &&
+    Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) &&
+    Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) &&
+    typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" &&
+    typeof s.personalization === "string";
 }
 
 function fallbackStrategy(session: SessionRecord): InterviewStrategy {
-  const language = normalizeLanguage(session.language);
+  const language = normalizeLanguage(session.preparation_language);
   const strengths = session.cv_analysis?.strengths ?? [];
   const gaps = session.cv_analysis?.gaps ?? [];
   const keywords = session.cv_analysis?.keywordAlignment ?? [];
@@ -47,23 +34,13 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const timing = session.interview_date
     ? isFrench ? `Votre entretien est prévu le ${new Date(session.interview_date).toLocaleDateString("fr-FR")}; commencez par les éléments de préparation les plus importants.` : `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}, so prioritize the most important preparation items first.`
     : isFrench ? "Commencez par les éléments de préparation les plus importants." : "Prioritize the most important preparation items first.";
-
   return {
     candidatePositioning: isFrench ? `Présentez-vous comme une personne qui apporte ${topStrength}. Concentrez votre discours sur les preuves de votre CV et leur utilité pour les priorités du poste : ${topFocus}.` : `Present yourself as someone who brings ${topStrength}. Keep your story focused on the evidence in your CV and how it can help with the role's priorities: ${topFocus}.`,
     strongestValueProposition: isFrench ? `Votre message le plus fort est l'association de ${topStrength} et des résultats que vous pouvez démontrer. Reliez directement cette expérience aux besoins du poste.` : `Your strongest message is the combination of ${topStrength} and the results you can demonstrate. Connect that experience directly to what this role needs.`,
-    strengthsToLeverage: strengths.slice(0, 5),
-    gapsOrRisks: gaps.slice(0, 5),
+    strengthsToLeverage: strengths.slice(0, 5), gapsOrRisks: gaps.slice(0, 5),
     gapDefenseStrategy: gaps.slice(0, 5).map((gap) => isFrench ? `Si l'on vous interroge sur ${gap.toLowerCase()}, soyez honnête sur cet écart, puis expliquez l'expérience la plus proche que vous avez et comment vous combleriez le reste.` : `If asked about ${gap.toLowerCase()}, be honest about the gap, then explain the closest experience you do have and how you would close the remaining gap.`),
-    interviewPriorities: [
-      isFrench ? `Montrez des preuves claires de ${topStrength}.` : `Show clear evidence of ${topStrength}.`,
-      isFrench ? `Préparez un exemple honnête pour répondre à ${topGap}.` : `Prepare an honest example to address ${topGap}.`,
-      isFrench ? `Reliez votre expérience à ces exigences du poste lorsque les preuves le permettent : ${keywords.join(", ")}.` : `Connect your experience to these role requirements where supported: ${keywords.join(", ")}.`,
-      timing,
-    ].filter(Boolean),
-    likelyDifficultQuestions: [
-      isFrench ? `Quelle expérience avez-vous pour répondre à ${topGap.toLowerCase()} ?` : `What experience do you have that addresses ${topGap.toLowerCase()}?`,
-      isFrench ? `Parlez-moi d'un exemple qui démontre votre capacité en ${topFocus}.` : `Tell me about an example that demonstrates your ability in ${topFocus}.`,
-    ],
+    interviewPriorities: [isFrench ? `Montrez des preuves claires de ${topStrength}.` : `Show clear evidence of ${topStrength}.`, isFrench ? `Préparez un exemple honnête pour répondre à ${topGap}.` : `Prepare an honest example to address ${topGap}.`, isFrench ? `Reliez votre expérience aux exigences soutenues par les preuves : ${keywords.join(", ")}.` : `Connect your experience to requirements supported by the evidence: ${keywords.join(", ")}.`, timing],
+    likelyDifficultQuestions: [isFrench ? `Quelle expérience avez-vous pour répondre à ${topGap.toLowerCase()} ?` : `What experience do you have that addresses ${topGap.toLowerCase()}?`, isFrench ? `Parlez-moi d'un exemple qui démontre votre capacité en ${topFocus}.` : `Tell me about an example that demonstrates your ability in ${topFocus}.`],
     storiesToPrepare: focusAreas.map((area) => isFrench ? `Préparez un exemple réel sur ${area}. Expliquez le problème, vos actions et le résultat.` : `Prepare one real example about ${area}. Explain the problem, what you did, and the result.`),
     communicationPriorities: isFrench ? "Soyez clair et concis. Commencez par l'idée principale, expliquez ce que vous avez fait personnellement et terminez par le résultat. Utilisez uniquement des exemples que votre expérience permet d'étayer." : "Be clear and concise. Start with the main point, explain what you personally did, and finish with the result. Use only examples you can support with your experience.",
     interviewPlan: isFrench ? `Commencez par une courte présentation, appuyez-vous sur vos preuves les plus fortes, abordez honnêtement les écarts importants et reliez vos exemples aux priorités du poste. ${timing}` : `Start with a short introduction, lead with your strongest evidence, address important gaps honestly, and connect your examples to the role's priorities. ${timing}`,
@@ -74,113 +51,39 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
 async function generateStrategy(session: SessionRecord): Promise<InterviewStrategy> {
   try {
     const openai = getOpenAI();
+    const language = normalizeLanguage(session.preparation_language);
     const completion = await openai.chat.completions.create({
-      model: AI_MODEL,
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-      messages: [
-        {
-          role: "system",
-          content: `${languageInstruction(normalizeLanguage(session.language))}
+      model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.4,
+      messages: [{ role: "system", content: `${languageInstruction(language)}
 
-You are Interview Mirror's interview coach.
-Create a concise, candidate-specific interview game plan from the CV, job description, analysis, and interview date.
+You are Interview Mirror's interview coach. Create a concise, candidate-specific interview game plan from the CV, job description, analysis, and interview date.
+Use only information in the supplied sources. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. Make every recommendation traceable to the CV or JD. When evidence is missing, say what the candidate should clarify rather than creating a story.
 
-The candidate must be able to understand and use this plan without knowing HR, consulting, or AI terminology. Write directly to the candidate using "you". Avoid jargon and unnecessary explanation.
-
-The strategy should answer five practical questions:
-1. What should I want the interviewer to remember about me?
-2. What evidence from my experience should I use?
-3. What gaps or risks could the interviewer question?
-4. What examples should I prepare?
-5. How should I communicate these points during the interview?
-
-Return JSON using exactly these keys:
-- candidatePositioning (string)
-- strongestValueProposition (string)
-- strengthsToLeverage (string[])
-- gapsOrRisks (string[])
-- gapDefenseStrategy (string[])
-- interviewPriorities (string[])
-- likelyDifficultQuestions (string[])
-- storiesToPrepare (string[])
-- communicationPriorities (string)
-- interviewPlan (string)
-- personalization (string)
-
-Evidence rules:
-- Use only information contained in the CV, job description, analysis, and interview date.
-- Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes.
-- Make the connection between each recommendation and the role clear.
-- When evidence is missing, say what the candidate should prepare or clarify rather than creating a story.
-- Do not use STAR/CAR terminology unless necessary; prefer "Problem → What you did → Result".
-
-Timing rules:
-- Use the interview date to prioritize preparation when it is provided.
-- Do not invent a date or imply urgency that the date does not support.
-
-Keep the strategy scannable. Prioritize the most important actions instead of producing a long report. Each list should contain only the most useful items.`,
-        },
-        {
-          role: "user",
-          content: `Title: ${session.title}
+Return exactly these keys: candidatePositioning, strongestValueProposition, strengthsToLeverage, gapsOrRisks, gapDefenseStrategy, interviewPriorities, likelyDifficultQuestions, storiesToPrepare, communicationPriorities, interviewPlan, personalization. Candidate-facing text must be entirely in the selected preparation language.`, },
+        { role: "user", content: `Title: ${session.title}
 Interview date: ${session.interview_date ?? "Not provided"}
-CV:
-${session.cv_text.slice(0, 12000)}
-
-JOB DESCRIPTION:
-${session.job_description.slice(0, 8000)}
-
-ANALYSIS:
-${JSON.stringify(session.cv_analysis)}
-
-Create an interview game plan for this candidate. Use the evidence in the CV and job description and the interview date to prioritize what the candidate should do before and during the interview.`,
-        },
-      ],
+CV:\n${session.cv_text.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${session.job_description.slice(0, 8000)}\n\nANALYSIS:\n${JSON.stringify(session.cv_analysis)}\n\nCreate the interview game plan.` }],
     });
-
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as InterviewStrategy;
-    if (!isValidStrategy(parsed)) throw new Error("Invalid strategy format");
+    if (!isValidStrategyFull(parsed)) throw new Error("Invalid strategy format");
     return parsed;
-  } catch {
-    return fallbackStrategy(session);
-  }
+  } catch { return fallbackStrategy(session); }
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { data: session, error } = await supabase
-    .from("sessions")
-    .select("*")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
-
+  const { data: session, error } = await supabase.from("sessions").select("*").eq("id", id).eq("user_id", user.id).single();
   if (error || !session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
-
   const record = session as SessionRecord;
-
-  if (!record.cv_analysis) {
-    return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
-  }
-
-  if (isValidStrategy(record.interview_strategy)) return NextResponse.json({ strategy: record.interview_strategy });
-
+  if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
+  if (isValidStrategyFull(record.interview_strategy)) return NextResponse.json({ strategy: record.interview_strategy });
   const strategy = await generateStrategy(record);
-  const { error: updateError } = await supabase
-    .from("sessions")
-    .update({ interview_strategy: strategy })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
+  const { error: updateError } = await supabase.from("sessions").update({ interview_strategy: strategy }).eq("id", id).eq("user_id", user.id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-
   return NextResponse.json({ strategy });
 }
