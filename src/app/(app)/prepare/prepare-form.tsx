@@ -166,8 +166,8 @@ export default function PrepareForm() {
 
   async function onAnalyze(e: React.FormEvent) {
     e.preventDefault();
-    if (purpose === "upcoming_interview" && hasInterviewDate === "yes" && !interviewDate) {
-      toast.error("Please add your interview date");
+    if (purpose === "upcoming_interview" && !interviewDate) {
+      toast.error("Please add your interview date, or select 'No, not confirmed yet'.");
       return;
     }
     if (!cvText.trim()) {
@@ -186,9 +186,9 @@ export default function PrepareForm() {
         body: JSON.stringify({
           sessionId,
           title: title || "Interview preparation",
-          language,
+          preparation_language: language,
           preparationPurpose: purpose,
-          interviewDate: purpose === "upcoming_interview" && hasInterviewDate === "yes" ? interviewDate : null,
+          interviewDate: purpose === "upcoming_interview" ? interviewDate : null,
           cvText,
           jobDescription,
           jobDescriptionUrl: jobDescriptionUrl.trim() || null,
