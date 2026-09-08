@@ -6,12 +6,6 @@ import type { InterviewStrategy, SessionRecord } from "@/types";
 function isValidStrategy(strategy: unknown): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any;
-  return typeof s.candidatePositioning === "string'";
-}
-
-function isValidStrategyFull(strategy: unknown): strategy is InterviewStrategy {
-  if (!strategy || typeof strategy !== "object") return false;
-  const s = strategy as any;
   return typeof s.candidatePositioning === "string" &&
     typeof s.strongestValueProposition === "string" &&
     Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) &&
@@ -67,7 +61,7 @@ CV:\n${session.cv_text.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${session.job_descr
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as InterviewStrategy;
-    if (!isValidStrategyFull(parsed)) throw new Error("Invalid strategy format");
+    if (!isValidStrategy(parsed)) throw new Error("Invalid strategy format");
     return parsed;
   } catch { return fallbackStrategy(session); }
 }
@@ -81,7 +75,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (error || !session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   const record = session as SessionRecord;
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
-  if (isValidStrategyFull(record.interview_strategy)) return NextResponse.json({ strategy: record.interview_strategy });
+  if (isValidStrategy(record.interview_strategy)) return NextResponse.json({ strategy: record.interview_strategy });
   const strategy = await generateStrategy(record);
   const { error: updateError } = await supabase.from("sessions").update({ interview_strategy: strategy }).eq("id", id).eq("user_id", user.id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
