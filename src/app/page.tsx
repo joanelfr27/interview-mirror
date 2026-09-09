@@ -52,7 +52,7 @@ export default function LandingPage() {
             <div className="mt-10 flex animate-fade-up flex-col items-center justify-center gap-3 sm:flex-row [animation-delay:240ms]">
               <Button size="lg" asChild>
                 <Link href="/signup">
-                  Get started 
+                  Get started
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -94,7 +94,7 @@ export default function LandingPage() {
                     </li>
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      Evidence of leadership and influenve
+                      Evidence of leadership and influence
                     </li>
                     <li className="flex gap-2">
                       <span className="text-amber-600">•</span>
@@ -113,8 +113,7 @@ export default function LandingPage() {
                     Your coaching tip
                   </p>
                   <p className="text-sm text-slate-600">
-                    Sreucture your answer around the situation, your actions, and the measurable outcome Lead with the outcome.
-                    specific actions that shifted the decision.
+                    Structure your answer around the situation, your actions, and the measurable outcome. Lead with the outcome, then explain the specific actions that shifted the decision.
                   </p>
                 </div>
               </div>
