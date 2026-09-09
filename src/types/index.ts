@@ -7,6 +7,13 @@ export type Profile = {
 
 export type SessionLanguage = "en" | "fr";
 
+export type AnalysisProvenance = {
+  preparation_language: SessionLanguage;
+  jd_content_hash: string;
+  cv_content_hash: string;
+  contract_version: "v5.1";
+};
+
 export type EvidenceChainItem = {
   jd_requirement: string;
   cv_evidence: string | null;
@@ -55,6 +62,7 @@ export type CvAnalysis = {
   summary: string;
   suggestedFocusAreas: string[];
   evidenceChain: EvidenceChainItem[];
+  provenance?: AnalysisProvenance;
 };
 
 export type InterviewQuestion = {
