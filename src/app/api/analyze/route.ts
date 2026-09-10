@@ -36,38 +36,22 @@ function isValidAnalysis(value: unknown): value is CvAnalysis {
   return a.evidenceChain.every((item: any) => item && typeof item.jd_requirement === "string" && item.jd_requirement.trim() && typeof item.cv_evidence === "string" && item.cv_evidence.trim() && typeof item.gap_identified === "string" && item.gap_identified.trim() && typeof item.interview_implication === "string" && item.interview_implication.trim() && typeof item.actionable_recommendation === "string" && item.actionable_recommendation.trim() && !generic.test(item.actionable_recommendation)) && a.strengths.every((x: any) => typeof x === "string" && x.trim()) && a.gaps.every((x: any) => typeof x === "string" && x.trim()) && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
 }
 
-function extractEvidence(cvText: string, jd: string, language: "en" | "fr"): EvidenceChainItem[] {
-  const cv = canonicalize(cvText);
-  const jdSentences = jd.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
-  const cvLower = cv.toLocaleLowerCase();
-  return jdSentences.filter((s) => s.length > 25).slice(0, 8).map((requirement) => {
-    const words = requirement.toLocaleLowerCase().split(/[^\p{L}\p{N}+#.]+/u).filter((w) => w.length > 5).slice(0, 10);
-    const phraseCandidates = words.flatMap((word, index) => words.slice(index + 1, index + 3).map((next) => `${word} ${next}`));
-    const matchedPhrase = phraseCandidates.find((phrase) => cvLower.includes(phrase));
-    const pos = matchedPhrase ? cvLower.indexOf(matchedPhrase) : -1;
-    const cvEvidence = pos >= 0 ? cv.slice(Math.max(0, pos - 100), Math.min(cv.length, pos + matchedPhrase!.length + 180)).trim() : null;
-    const missing = !cvEvidence;
-    return { jd_requirement: requirement, cv_evidence: cvEvidence || NO_EVIDENCE, gap_identified: missing ? (language === "fr" ? "Aucune preuve du CV n'a été trouvée pour cette exigence." : "No CV evidence was found for this requirement.") : (language === "fr" ? "La preuve existe dans le CV; préparez un exemple concret et son résultat." : "Evidence exists in the CV; prepare a concrete example and its outcome."), interview_implication: missing ? (language === "fr" ? "L'intervieweur peut vous demander comment vous répondez à cette exigence. N'attribuez pas à votre expérience ce que votre CV ne permet pas de démontrer." : "The interviewer may ask how you meet this requirement. Do not claim experience that your CV does not demonstrate.") : (language === "fr" ? "L'intervieweur peut demander un exemple précis, votre rôle personnel et le résultat obtenu." : "The interviewer may ask for a specific example, your personal contribution, and the result."), actionable_recommendation: missing ? (language === "fr" ? `Préparez une réponse honnête à « ${requirement} » en expliquant soit l'écart, soit l'expérience la plus proche que vous pouvez réellement démontrer.` : `Prepare an honest answer to “${requirement}” by explaining the gap or the closest experience you can genuinely demonstrate.`) : (language === "fr" ? `Préparez un exemple précis lié à « ${requirement} ». Expliquez le contexte, ce que vous avez fait personnellement et le résultat, en restant fidèle à votre CV.` : `Prepare a specific example linked to “${requirement}”. Explain the context, what you personally did, and the result, staying faithful to your CV.`) };
-  });
-}
-
-function fallbackAnalysis(cvText: string, jobDescription: string, language: "en" | "fr"): CvAnalysis {
-  const jdWords = jobDescription.toLocaleLowerCase().split(/[^\p{L}\p{N}+#.]+/u).filter((w) => w.length > 4); const cvLower = cvText.toLocaleLowerCase(); const keywordPairs = [...new Set(jdWords)].flatMap((word, index, all) => all.slice(index + 1, index + 3).map((next) => `${word} ${next}`)).filter((phrase) => cvLower.includes(phrase)).slice(0, 8); const evidenceChain = extractEvidence(cvText, jobDescription, language); const supported = evidenceChain.filter((x) => x.cv_evidence !== NO_EVIDENCE).length; const score = Math.min(92, 40 + supported * 6); const focus = evidenceChain.slice(0, 4).map((item) => item.actionable_recommendation);
-  return language === "fr" ? { matchScore: score, strengths: evidenceChain.filter((x) => x.cv_evidence !== NO_EVIDENCE).slice(0, 4).map((x) => `Correspondance forte : ${x.jd_requirement} — preuve : ${x.cv_evidence}`), gaps: evidenceChain.filter((x) => x.cv_evidence === NO_EVIDENCE).slice(0, 4).map((x) => `À préparer : ${x.jd_requirement}`), keywordAlignment: keywordPairs, summary: "Votre analyse distingue les exigences que votre CV démontre clairement de celles que vous devrez mieux préparer. Concentrez-vous d'abord sur les écarts les plus susceptibles d'être testés en entretien.", suggestedFocusAreas: focus, evidenceChain } : { matchScore: score, strengths: evidenceChain.filter((x) => x.cv_evidence !== NO_EVIDENCE).slice(0, 4).map((x) => `Strong match: ${x.jd_requirement} — evidence: ${x.cv_evidence}`), gaps: evidenceChain.filter((x) => x.cv_evidence === NO_EVIDENCE).slice(0, 4).map((x) => `Prepare for: ${x.jd_requirement}`), keywordAlignment: keywordPairs, summary: "Your analysis separates requirements your CV clearly demonstrates from those you need to prepare for. Focus first on the gaps most likely to be tested in the interview.", suggestedFocusAreas: focus, evidenceChain };
-}
-
 async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
+  const openai = getOpenAI();
   try {
-    const openai = getOpenAI();
     const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.2, messages: [
       { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's evidence-grounded candidate coach. Your job is to give the candidate a precise diagnostic of how their CV fits this specific job and what the interview is likely to test. The output must feel like expert coaching, not an ATS report or generic AI advice.\n\nCandidate-facing values must be entirely in the selected preparation language. JSON keys remain exactly in English. Return exactly: matchScore, strengths, gaps, keywordAlignment, summary, suggestedFocusAreas, evidenceChain. EvidenceChain objects use exactly: jd_requirement, cv_evidence, gap_identified, interview_implication, actionable_recommendation.\n\nDIAGNOSTIC RULES:\n- Judge each important JD requirement against the CV, not against general knowledge or prior context.\n- Separate direct evidence, transferable/partial evidence, and missing evidence. Never turn a related job title or keyword into proof of a responsibility the CV does not state.\n- Do not inflate the match score. A strong candidate with material industry or responsibility gaps should not receive a near-perfect score.\n- Strengths must say WHAT matches and WHY, using concrete CV evidence.\n- Gaps must identify the specific requirement that is not clearly demonstrated and why it may matter in the interview.\n- KeywordAlignment must contain useful themes or capabilities, never raw filler words such as company, sector, manager, improve, services, or location names.\n- Summary must be 2-3 concise sentences explaining the candidate's strongest fit and most important risks.\n- SuggestedFocusAreas must be 3-5 prioritized preparation actions tied to real CV/JD evidence.\n\nEVIDENCE CHAIN RULES:\n- For every item, identify one concrete JD requirement and one concrete CV passage when evidence exists.\n- When evidence is absent, use exactly "${NO_EVIDENCE}" and say so plainly.\n- State what the interviewer may test because of the evidence or gap.\n- Give one concrete preparation action that references the actual requirement and/or CV evidence.\n- Never invent employers, credentials, responsibilities, metrics, tools, industry experience, dates, stakeholders, or outcomes.\n- Avoid repetitive filler such as 'your CV shows a clear professional story', 'your experience is relevant', 'prepare examples', or 'connect your experience'.` },
       { role: "user", content: `CV:\n${cvText.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}\n\nPRIOR PREPARATION CONTEXT:\n${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}\n\nAnalyze only the current CV and JD as evidence.` }
     ]});
-    const raw = completion.choices[0]?.message?.content; if (!raw) throw new Error("Empty AI response");
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as CvAnalysis;
     if (!isValidAnalysis(parsed)) throw new Error("Invalid evidence-grounded analysis");
     return parsed;
-  } catch { return fallbackAnalysis(cvText, jobDescription, language); }
+  } catch (error) {
+    console.error("[ANALYSIS FAILED]", error instanceof Error ? error.message : "analysis failure");
+    throw new Error("ANALYSIS_GENERATION_FAILED");
+  }
 }
 
 function buildProvenance(language: "en" | "fr", cvText: string, jobDescription: string): AnalysisProvenance { return { preparation_language: language, jd_content_hash: sha256(jobDescription), cv_content_hash: sha256(cvText), contract_version: CONTRACT_VERSION }; }
@@ -99,7 +83,9 @@ export async function POST(request: Request) {
   let priorContext: { sessions: unknown[]; coaching_progress: unknown[] } | undefined;
   if (!sessionId) { const { data, error } = await supabase.rpc("get_candidate_preparation_context", { p_user_id: user.id }); if (!error && data) priorContext = data; }
   const canonicalCv = canonicalize(cvText); const canonicalJd = canonicalize(jobDescription);
-  const analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext);
+  let analysis: CvAnalysis;
+  try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
+  catch { return NextResponse.json({ code: "ANALYSIS_GENERATION_FAILED", error: "We could not produce a reliable Professional Mirror analysis. Please retry." }, { status: 422 }); }
   const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
   const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
   let id = sessionId ?? null;
