@@ -28,27 +28,16 @@ async function tryFetchJobDescription(url: string): Promise<string> { try { cons
 function extractStandaloneUrl(value: string): string | null { const t = value.trim(); if (!/^https?:\/\/\S+$/i.test(t)) return null; try { return new URL(t).toString(); } catch { return null; } }
 function removeUrls(value: string): string { return canonicalize(value.replace(/https?:\/\/\S+/gi, " ")); }
 
-function evidenceTextMatchesCv(evidence: string, cv: string): boolean {
-  if (evidence === NO_EVIDENCE) return true;
-  const e = canonicalize(evidence).toLocaleLowerCase();
-  const c = canonicalize(cv).toLocaleLowerCase();
-  if (!e) return false;
-  if (c.includes(e)) return true;
-  const tokens = [...new Set(e.split(/[^\p{L}\p{N}+#.]+/u).filter((x) => x.length >= 4))];
-  if (tokens.length < 3) return false;
-  return tokens.filter((x) => c.includes(x)).length / tokens.length >= 0.7;
-}
-
 function generic(value: string): boolean { return /\b(prepare examples|prepare simple examples|be ready|show your strengths|connect your experience|based on your cv|prepare for the interview|préparez des exemples|soyez prêt|montrez vos points forts|reliez votre expérience|à partir de votre cv|préparez-vous)\b/i.test(value); }
 
-function isValidAnalysis(value: unknown, cvText: string): value is CvAnalysis {
+function isValidAnalysis(value: unknown): value is CvAnalysis {
   if (!value || typeof value !== "object") return false;
   const a = value as any;
   if (!Number.isInteger(a.matchScore) || a.matchScore < 1 || a.matchScore > 100 || typeof a.summary !== "string" || !a.summary.trim()) return false;
   if (!Array.isArray(a.strengths) || !Array.isArray(a.gaps) || !Array.isArray(a.keywordAlignment) || !Array.isArray(a.suggestedFocusAreas) || !Array.isArray(a.evidenceChain) || !a.evidenceChain.length) return false;
   if (a.strengths.length > 5 || a.gaps.length > 5 || a.keywordAlignment.length > 10 || a.suggestedFocusAreas.length > 5 || a.evidenceChain.length > 8) return false;
   if (![...a.strengths, ...a.gaps, ...a.keywordAlignment, ...a.suggestedFocusAreas].every((x: any) => typeof x === "string" && x.trim())) return false;
-  return a.evidenceChain.every((x: any) => typeof x?.jd_requirement === "string" && x.jd_requirement.trim() && typeof x.cv_evidence === "string" && x.cv_evidence.trim() && typeof x.gap_identified === "string" && x.gap_identified.trim() && typeof x.interview_implication === "string" && x.interview_implication.trim() && typeof x.actionable_recommendation === "string" && x.actionable_recommendation.trim() && evidenceTextMatchesCv(x.cv_evidence, cvText) && !generic(x.actionable_recommendation));
+  return a.evidenceChain.every((x: any) => typeof x?.jd_requirement === "string" && x.jd_requirement.trim() && typeof x.cv_evidence === "string" && x.cv_evidence.trim() && typeof x.gap_identified === "string" && x.gap_identified.trim() && typeof x.interview_implication === "string" && x.interview_implication.trim() && typeof x.actionable_recommendation === "string" && x.actionable_recommendation.trim() && !generic(x.actionable_recommendation));
 }
 
 function extractEvidence(cvText: string, jd: string, language: "en" | "fr"): EvidenceChainItem[] {
@@ -96,7 +85,7 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
     if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as CvAnalysis;
     console.error("[ANALYSIS DEBUG] AI response parsed successfully");
-    const valid = isValidAnalysis(parsed, cvText);
+    const valid = isValidAnalysis(parsed);
     console.error("[ANALYSIS DEBUG] validation result:", valid);
     if (!valid) throw new Error("Invalid evidence-grounded analysis");
     return parsed;
