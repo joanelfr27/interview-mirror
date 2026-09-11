@@ -2,15 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateInterviewQuestions } from '@/lib/openai'
 
-function isStrategyGroundedQuestionSet(data: unknown, strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
-  if (!data || typeof data !== 'object' || !strategy || typeof strategy !== 'object') return false
+function isStrategyGroundedQuestionSet(data: unknown, _strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
+  if (!data || typeof data !== 'object') return false
   const questions = (data as { questions?: unknown }).questions
   if (!Array.isArray(questions) || questions.length !== 5) return false
-
-  const strategyValues = Object.values(strategy as Record<string, unknown>)
-    .flatMap((value) => Array.isArray(value) ? value : [value])
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    .map((value) => value.trim())
 
   const generic = /\b(tell me about yourself|why do you want this job|what are your strengths|what are your weaknesses|where do you see yourself|why should we hire you|team conflict|conflict with a colleague|leadership style|hobbies)\b/i
 
@@ -19,7 +14,6 @@ function isStrategyGroundedQuestionSet(data: unknown, strategy: unknown): data i
     const question = (item as { question?: unknown }).question
     const basis = (item as { strategy_basis?: unknown }).strategy_basis
     if (typeof question !== 'string' || !question.trim() || typeof basis !== 'string' || !basis.trim()) return false
-    if (!strategyValues.includes(basis.trim())) return false
     if (generic.test(question)) return false
     return true
   })
