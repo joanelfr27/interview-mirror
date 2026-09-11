@@ -7,6 +7,19 @@ function normalizeFocusKey(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
 }
 
+function normalizeScore(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value) : null;
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/,/g, ".");
+  const direct = Number(text);
+  if (Number.isFinite(direct) && direct >= 0 && direct <= 100) return Math.round(direct);
+  const match = text.match(/^(\d+(?:\.\d+)?)\s*\/\s*(10|100)$/);
+  if (!match) return null;
+  const numerator = Number(match[1]);
+  const denominator = Number(match[2]);
+  return Number.isFinite(numerator) && numerator >= 0 && numerator <= denominator ? Math.round((numerator / denominator) * 100) : null;
+}
+
 function normalizeAiFeedback(value: unknown, pairs: { questionId: string; question: string; answer: string }[]): FeedbackResult {
   if (!value || typeof value !== "object") throw new Error("Invalid AI feedback object");
   const raw = value as Partial<FeedbackResult> & { questionFeedback?: unknown };
@@ -14,15 +27,14 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
   const rawItems = raw.questionFeedback as Record<string, unknown>[];
   const normalizedItems = pairs.map((pair, index) => {
     const rawItem = rawItems.find((item) => item?.questionId === pair.questionId) ?? rawItems.find((item) => item?.question === pair.question) ?? rawItems[index];
-    const rawScore = rawItem?.score;
-    const score = Number(rawScore);
-    if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("AI feedback contains an invalid per-question score");
+    const score = normalizeScore(rawItem?.score);
+    if (score == null) throw new Error("AI feedback contains an invalid per-question score");
     return {
       questionId: pair.questionId,
       question: pair.question,
       questionText: pair.question,
       candidateAnswer: pair.answer,
-      score: Math.round(score),
+      score,
       scoreDeductions: Array.isArray(rawItem?.scoreDeductions) ? rawItem.scoreDeductions.filter((v): v is string => typeof v === "string").slice(0, 3) : [],
       evidenceExtracted: Array.isArray(rawItem?.evidenceExtracted) ? rawItem.evidenceExtracted.filter((v): v is string => typeof v === "string").slice(0, 3) : [],
       comment: String(rawItem?.comment ?? ""),
@@ -35,8 +47,8 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
       evidenceGroundedBetterAnswer: typeof rawItem?.evidenceGroundedBetterAnswer === "string" ? rawItem.evidenceGroundedBetterAnswer : undefined
     };
   });
-  const numeric = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : fallback; };
-  const overallScore = numeric(raw.overallScore, 0);
+  const numeric = (value: unknown, fallback: number) => normalizeScore(value) ?? fallback;
+  const overallScore = normalizeScore(raw.overallScore) ?? 0;
   if (!overallScore || !raw.summary || !Array.isArray(raw.strengths) || !Array.isArray(raw.improvements)) throw new Error("AI feedback is missing required fields");
   return {
     overallScore,
