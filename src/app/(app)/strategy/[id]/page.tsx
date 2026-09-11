@@ -65,20 +65,18 @@ export default function StrategyPage() {
   const labels = isFrench ? {
     badge: "Votre stratégie",
     title: "Votre plan d'entretien",
-    intro: "Concentrez-vous sur ces quelques points avant de commencer.",
+    intro: "Gardez ces quelques points en tête avant de commencer.",
     start: "Commencer l'entretien",
-    positioning: "Votre angle",
-    value: "Votre message clé",
+    approach: "Comment vous présenter",
     priorities: "Vos priorités",
     gaps: "Points à surveiller",
     empty: "Aucun élément à afficher."
   } : {
     badge: "Your strategy",
     title: "Your interview plan",
-    intro: "Focus on these few points before you start the interview.",
+    intro: "Keep these few points in mind before you start the interview.",
     start: "Start interview",
-    positioning: "Your angle",
-    value: "Your key message",
+    approach: "How to present yourself",
     priorities: "Your priorities",
     gaps: "Points to watch",
     empty: "Nothing to show yet."
@@ -98,10 +96,7 @@ export default function StrategyPage() {
       </div>
 
       {strategy && <div className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card><CardHeader><CardTitle>{labels.positioning}</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-slate-700">{strategy.candidatePositioning}</p></CardContent></Card>
-          <Card><CardHeader><CardTitle>{labels.value}</CardTitle></CardHeader><CardContent><p className="text-sm leading-6 text-slate-700">{strategy.strongestValueProposition}</p></CardContent></Card>
-        </div>
+        <Card><CardHeader><CardTitle>{labels.approach}</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm leading-6 text-slate-700">{strategy.candidatePositioning}</p><p className="text-sm leading-6 text-slate-700">{strategy.strongestValueProposition}</p></CardContent></Card>
         <Card><CardHeader><CardTitle>{labels.priorities}</CardTitle></CardHeader><CardContent>{list(strategy.interviewPriorities)}</CardContent></Card>
         <Card><CardHeader><CardTitle>{labels.gaps}</CardTitle></CardHeader><CardContent>{list(strategy.gapsOrRisks)}</CardContent></Card>
         <div className="flex justify-end pt-2"><Button size="lg" onClick={startInterview}>{labels.start}<ArrowRight className="h-4 w-4" /></Button></div>
