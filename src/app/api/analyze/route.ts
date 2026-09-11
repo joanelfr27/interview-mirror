@@ -32,9 +32,12 @@ function removeUrls(value: string): string { return canonicalize(value.replace(/
 function isValidAnalysis(value: unknown): value is CvAnalysis {
   if (!value || typeof value !== "object") return false;
   const a = value as any;
-  if (!Number.isFinite(Number(a.matchScore)) || !Array.isArray(a.strengths) || !Array.isArray(a.gaps) || !Array.isArray(a.keywordAlignment) || typeof a.summary !== "string" || !Array.isArray(a.suggestedFocusAreas) || !Array.isArray(a.evidenceChain) || !a.evidenceChain.length) return false;
+  if (!Number.isFinite(Number(a.matchScore)) || !Array.isArray(a.strengths) || !Array.isArray(a.gaps) || !Array.isArray(a.keywordAlignment) || typeof a.summary !== "string" || !Array.isArray(a.suggestedFocusAreas) || !Array.isArray(a.evidenceChain)) return false;
   const generic = /\b(prepare examples|be ready|prepare for|show your|improve your|prepare simple examples|préparez des exemples|soyez prêt|améliorez votre|clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|based on the cv|à partir du cv)\b/i;
-  return a.evidenceChain.every((item: any) => item && typeof item.jd_requirement === "string" && item.jd_requirement.trim() && typeof item.cv_evidence === "string" && item.cv_evidence.trim() && typeof item.gap_identified === "string" && item.gap_identified.trim() && typeof item.interview_implication === "string" && item.interview_implication.trim() && typeof item.actionable_recommendation === "string" && item.actionable_recommendation.trim() && !generic.test(item.actionable_recommendation)) && a.strengths.every((x: any) => typeof x === "string" && x.trim()) && a.gaps.every((x: any) => typeof x === "string" && x.trim()) && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
+  const validEvidence = a.evidenceChain.filter((item: any) => item && typeof item.jd_requirement === "string" && item.jd_requirement.trim() && typeof item.cv_evidence === "string" && item.cv_evidence.trim() && typeof item.gap_identified === "string" && item.gap_identified.trim() && typeof item.interview_implication === "string" && item.interview_implication.trim() && typeof item.actionable_recommendation === "string" && item.actionable_recommendation.trim() && !generic.test(item.actionable_recommendation));
+  if (!validEvidence.length) return false;
+  a.evidenceChain = validEvidence;
+  return a.strengths.every((x: any) => typeof x === "string" && x.trim()) && a.gaps.every((x: any) => typeof x === "string" && x.trim()) && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
 }
 
 async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
