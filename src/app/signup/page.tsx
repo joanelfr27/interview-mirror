@@ -39,7 +39,7 @@ export default function SignupPage() {
       });
       if (error) throw error;
       toast.success("Account created — welcome to Interview Mirror");
-      router.push("/onboarding");
+      router.push("/prepare");
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign up failed");
