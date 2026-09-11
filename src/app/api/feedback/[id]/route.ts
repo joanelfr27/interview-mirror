@@ -8,12 +8,19 @@ function normalizeFocusKey(value: string): string {
 }
 
 function normalizeScore(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) && value >= 0 && value <= 100 ? Math.round(value) : null;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0 || value > 100) return null;
+    return Math.round(value <= 10 ? value * 10 : value);
+  }
+  if (typeof value === "object" && value !== null) {
+    const record = value as Record<string, unknown>;
+    return normalizeScore(record.value ?? record.score);
+  }
   if (typeof value !== "string") return null;
   const text = value.trim().replace(/,/g, ".");
   const direct = Number(text);
-  if (Number.isFinite(direct) && direct >= 0 && direct <= 100) return Math.round(direct);
-  const match = text.match(/(\d+(?:\.\d+)?)\s*(?:\/|sur)\s*(10|100)(?:\D|$)/i);
+  if (Number.isFinite(direct) && direct >= 0 && direct <= 100) return Math.round(direct <= 10 ? direct * 10 : direct);
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(?:\/|sur|out of)\s*(10|100)(?:\D|$)/i);
   if (!match) return null;
   const numerator = Number(match[1]);
   const denominator = Number(match[2]);
@@ -75,7 +82,7 @@ async function generateFeedback(session: SessionRecord, pairs: { questionId: str
   const coachingInstruction = isCoachingSession ? `\nThis is a TARGETED COACHING session.\nThe coaching focus is: "${coachingFocus}".\nEvaluate primarily on this focus. Return focusScore, focusEvidence, and focusNextStep. Focus evidence must come from the answer and/or CV.` : "";
   try {
     const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.3, messages: [
-      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. evidenceExtracted must be short exact quotes from the candidate answer only. If evidence is missing, coach the candidate to clarify rather than inventing it.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. Copy questionId, questionText, and candidateAnswer from input. Return exactly one questionFeedback item per Q&A pair in order. scoreDeductions must explain why the score is not higher. evidenceGroundedBetterAnswer must use only supplied facts. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary${isCoachingSession ? ", focusScore, focusEvidence, focusNextStep" : ""}.` },
+      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. evidenceExtracted must be short exact quotes from the candidate answer only. If evidence is missing, coach the candidate to clarify rather than inventing it.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. Copy questionId, questionText, and candidateAnswer from input. Return exactly one questionFeedback item per Q&A pair in order. scoreDeductions must explain why the score is not higher. evidenceGroundedBetterAnswer must use only supplied facts. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n\nIMPORTANT SCORE FORMAT: Return every score field as a JSON number from 0 to 100. Do not return scores as strings, fractions, percentages, objects, or scores out of 10.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary${isCoachingSession ? ", focusScore, focusEvidence, focusNextStep" : ""}.` },
       { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQ&A:\n${JSON.stringify(pairs)}` },
     ]});
     const raw = completion.choices[0]?.message?.content;
