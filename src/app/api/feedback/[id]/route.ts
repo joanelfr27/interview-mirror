@@ -39,7 +39,10 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
   const rawItems = raw.questionFeedback as Record<string, unknown>[];
   const normalizedItems: FeedbackQuestion[] = pairs.map((pair, index) => {
     const rawItem = rawItems.find((item) => item?.questionId === pair.questionId) ?? rawItems.find((item) => item?.question === pair.question) ?? rawItems[index];
-    return { questionId: pair.questionId, question: pair.question, questionText: pair.question, candidateAnswer: pair.answer, score: Number(rawItem?.score ?? 0),
+    const rawScore = rawItem?.score;
+    const score = Number(rawScore);
+    if (!Number.isFinite(score) || score < 0 || score > 100) throw new Error("AI feedback contains an invalid per-question score");
+    return { questionId: pair.questionId, question: pair.question, questionText: pair.question, candidateAnswer: pair.answer, score: Math.round(score),
       scoreDeductions: Array.isArray(rawItem?.scoreDeductions) ? rawItem.scoreDeductions.filter((v): v is string => typeof v === "string").slice(0, 3) : [],
       evidenceExtracted: Array.isArray(rawItem?.evidenceExtracted) ? rawItem.evidenceExtracted.filter((v): v is string => typeof v === "string").slice(0, 3) : [],
       comment: String(rawItem?.comment ?? ""), keyStrength: typeof rawItem?.keyStrength === "string" ? rawItem.keyStrength : undefined, keyImprovement: typeof rawItem?.keyImprovement === "string" ? rawItem.keyImprovement : undefined,
