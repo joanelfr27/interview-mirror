@@ -13,7 +13,7 @@ function normalizeScore(value: unknown): number | null {
   const text = value.trim().replace(/,/g, ".");
   const direct = Number(text);
   if (Number.isFinite(direct) && direct >= 0 && direct <= 100) return Math.round(direct);
-  const match = text.match(/(\d+(?:\.\d+)?)\s*\/\s*(10|100)(?:\D|$)/);
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(?:\/|sur)\s*(10|100)(?:\D|$)/i);
   if (!match) return null;
   const numerator = Number(match[1]);
   const denominator = Number(match[2]);
