@@ -32,6 +32,12 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
   const raw = value as Partial<FeedbackResult> & { questionFeedback?: unknown };
   if (!Array.isArray(raw.questionFeedback) || raw.questionFeedback.length !== pairs.length) throw new Error("AI feedback question count does not match the interview");
   const rawItems = raw.questionFeedback as Record<string, unknown>[];
+  console.error("[FEEDBACK SCORE DEBUG]", rawItems.map((item, index) => ({
+    index,
+    questionId: item?.questionId,
+    score: item?.score,
+    scoreType: typeof item?.score,
+  })));
   const normalizedItems = pairs.map((pair, index) => {
     const rawItem = rawItems.find((item) => item?.questionId === pair.questionId) ?? rawItems.find((item) => item?.question === pair.question) ?? rawItems[index];
     const score = normalizeScore(rawItem?.score);
