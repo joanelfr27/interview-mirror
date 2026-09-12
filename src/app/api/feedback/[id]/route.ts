@@ -81,9 +81,49 @@ async function generateFeedback(session: SessionRecord, pairs: { questionId: str
   try {
     const openai = getOpenAI(); const isCoachingSession = Boolean(session.coaching_focus); const coachingFocus = session.coaching_focus; const language = normalizeLanguage(session.preparation_language);
     const coachingInstruction = isCoachingSession ? `\nThis is a TARGETED COACHING session.\nThe coaching focus is: "${coachingFocus}".\nEvaluate primarily on this focus. Return focusScore, focusEvidence, and focusNextStep. Focus evidence must come from the answer and/or CV.` : "";
-    const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.3, messages: [
-      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. evidenceExtracted must be one or more short exact quotes copied from candidateAnswer when it contains usable evidence; it may be empty only when candidateAnswer contains no usable evidence. scoreDeductions must contain at least one non-empty, question-specific reason why the score is not higher. comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer must all be non-empty and specific to this question and answer. Do not return generic text that could be reused for another question.\n\nFor every questionFeedback item, return exactly these fields: questionId, questionText, candidateAnswer, score, scoreDeductions, evidenceExtracted, comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer. Copy questionId, questionText, and candidateAnswer exactly from input.\n\nevidenceGroundedBetterAnswer and sampleRewrite may use only facts explicitly present in the supplied CV or candidateAnswer. The CV verifies only facts explicitly present in the CV. A claim made only in candidateAnswer remains the candidate's claim, not a CV-verified fact; do not present it as CV-confirmed. Never add an unsupported metric, percentage, result, responsibility, credential, employer, tool, date, or outcome. If no metric is supplied, do not invent one.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. EVERY SCORE MUST BE AN INTEGER FROM 0 TO 100. Do not use a 0-10 scale. Return exactly one questionFeedback item per Q&A pair in order. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary${isCoachingSession ? ", focusScore, focusEvidence, focusNextStep" : ""}.` },
-      { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQ&A:\n${JSON.stringify(pairs)}` },
+    const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_schema", json_schema: { name: "interview_feedback", strict: true, schema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        overallScore: { type: "integer" },
+        communication: { type: "integer" },
+        relevance: { type: "integer" },
+        structure: { type: "integer" },
+        confidence: { type: "integer" },
+        strengths: { type: "array", items: { type: "string" } },
+        improvements: { type: "array", items: { type: "string" } },
+        sampleRewrite: { type: "string" },
+        questionFeedback: { type: "array", items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            questionId: { type: "string" },
+            question: { anyOf: [{ type: "string" }, { type: "null" }] },
+            questionText: { type: "string" },
+            candidateAnswer: { type: "string" },
+            score: { type: "integer" },
+            scoreDeductions: { type: "array", items: { type: "string" } },
+            evidenceExtracted: { type: "array", items: { type: "string" } },
+            comment: { type: "string" },
+            keyStrength: { anyOf: [{ type: "string" }, { type: "null" }] },
+            keyImprovement: { anyOf: [{ type: "string" }, { type: "null" }] },
+            whatWorked: { type: "string" },
+            whatWasMissing: { type: "string" },
+            actionableImprovement: { type: "string" },
+            suggestedRewrite: { anyOf: [{ type: "string" }, { type: "null" }] },
+            evidenceGroundedBetterAnswer: { type: "string" },
+          },
+          required: ["questionId", "question", "questionText", "candidateAnswer", "score", "scoreDeductions", "evidenceExtracted", "comment", "keyStrength", "keyImprovement", "whatWorked", "whatWasMissing", "actionableImprovement", "suggestedRewrite", "evidenceGroundedBetterAnswer"],
+        } },
+        summary: { type: "string" },
+        focusScore: { anyOf: [{ type: "integer" }, { type: "null" }] },
+        focusEvidence: { anyOf: [{ type: "string" }, { type: "null" }] },
+        focusNextStep: { anyOf: [{ type: "string" }, { type: "null" }] },
+      },
+      required: ["overallScore", "communication", "relevance", "structure", "confidence", "strengths", "improvements", "sampleRewrite", "questionFeedback", "summary", "focusScore", "focusEvidence", "focusNextStep"],
+    } } }, temperature: 0.3, messages: [
+      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. evidenceExtracted must be one or more short exact quotes copied from candidateAnswer when it contains usable evidence; it may be empty only when candidateAnswer contains no usable evidence. scoreDeductions must contain at least one non-empty, question-specific reason why the score is not higher. comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer must all be non-empty and specific to this question and answer. Do not return generic text that could be reused for another question.\n\nFor every questionFeedback item, return exactly these fields: questionId, question, questionText, candidateAnswer, score, scoreDeductions, evidenceExtracted, comment, keyStrength, keyImprovement, whatWorked, whatWasMissing, actionableImprovement, suggestedRewrite, and evidenceGroundedBetterAnswer. Copy questionId, questionText, and candidateAnswer exactly from input.\n\nevidenceGroundedBetterAnswer and sampleRewrite may use only facts explicitly present in the supplied CV or candidateAnswer. The CV verifies only facts explicitly present in the CV. A claim made only in candidateAnswer remains the candidate's claim, not a CV-verified fact; do not present it as CV-confirmed. Never add an unsupported metric, percentage, result, responsibility, credential, employer, tool, date, or outcome. If no metric is supplied, do not invent one.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. EVERY SCORE MUST BE AN INTEGER FROM 0 TO 100. Do not use a 0-10 scale. Return exactly one questionFeedback item per Q&A pair in order. For non-coaching sessions, focusScore, focusEvidence, and focusNextStep MUST be returned as null. For coaching sessions, they may contain their corresponding values. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary, focusScore, focusEvidence, focusNextStep.` },
+      { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQ&A:\n${JSON.stringify(pairs.map(({ questionId, question, answer }) => ({ questionId, questionText: question, candidateAnswer: answer })))}` },
     ]});
     const raw = completion.choices[0]?.message?.content; if (!raw) throw new Error("Empty AI response"); return { feedback: normalizeAiFeedback(JSON.parse(raw), pairs), usedFallback: false };
   } catch (error) {
