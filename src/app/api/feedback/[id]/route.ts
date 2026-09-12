@@ -37,7 +37,9 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
     questionId: item?.questionId,
     score: item?.score,
     scoreType: typeof item?.score,
+    keys: Object.keys(item ?? {}),
   })));
+  console.error("[FEEDBACK TOP-LEVEL KEYS]", Object.keys(raw));
   const normalizedItems = pairs.map((pair, index) => {
     const rawItem = rawItems.find((item) => item?.questionId === pair.questionId) ?? rawItems.find((item) => item?.question === pair.question) ?? rawItems[index];
     const score = normalizeScore(rawItem?.score);
