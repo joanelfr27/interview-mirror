@@ -20,7 +20,9 @@ function ScoreRing({ label, value }: { label: string; value: number }) {
 
 export default async function FeedbackPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params; const supabase = await createClient();
-  const { data: session } = await supabase.from("sessions").select("*").eq("id", id).single();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) notFound();
+  const { data: session } = await supabase.from("sessions").select("*").eq("id", id).eq("user_id", user.id).single();
   if (!session) notFound();
   const { data: feedbackRow } = await supabase.from("feedback").select("*").eq("session_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!feedbackRow) return <div className="mx-auto max-w-2xl space-y-4 text-center"><h1 className="font-display text-2xl font-semibold">Feedback not ready</h1><p className="text-muted-foreground">Complete the interview simulator to generate coaching feedback.</p><Button asChild><Link href={`/interview/${id}`}>Go to interview</Link></Button></div>;
