@@ -39,19 +39,13 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
   const rawItems = raw.questionFeedback as Record<string, unknown>[];
   const matchedItems = pairs.map((pair, index) => rawItems.find((item) => item?.questionId === pair.questionId) ?? rawItems.find((item) => item?.question === pair.question) ?? rawItems[index]);
   if (matchedItems.some((item) => !item)) throw new Error("AI feedback is missing question feedback");
-
   const rawQuestionScores = matchedItems.map((item) => Number(item?.score));
   if (rawQuestionScores.some((score) => !Number.isFinite(score) || score < 0 || score > 100)) throw new Error("AI feedback contains an invalid per-question score");
-
   const rawOverall = Number(raw.overallScore);
   if (!Number.isFinite(rawOverall) || rawOverall <= 0 || rawOverall > 100) throw new Error("AI feedback contains an invalid overall score");
-
-  // Some model responses use a 0-10 scale even though the product contract is 0-100.
-  // Detect that representation consistently and convert it once at the boundary.
   const questionUsesTenPointScale = rawOverall <= 10 && rawQuestionScores.every((score) => score <= 10);
   if (rawQuestionScores.every((score) => score === 0) && rawOverall > 0) throw new Error("AI feedback contains zero scores inconsistent with the overall score");
   const toProductScore = (score: number) => Math.round(questionUsesTenPointScale ? score * 10 : score);
-
   const normalizedItems: FeedbackQuestion[] = pairs.map((pair, index) => {
     const rawItem = matchedItems[index] as Record<string, unknown>;
     const scoreDeductions = Array.isArray(rawItem.scoreDeductions) ? rawItem.scoreDeductions.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 3) : [];
@@ -70,14 +64,10 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
     const evidenceGroundedBetterAnswer = typeof rawItem.evidenceGroundedBetterAnswer === "string" ? rawItem.evidenceGroundedBetterAnswer.trim() : "";
     if (!scoreDeductions.length || !comment || !whatWorked || !whatWasMissing || !actionableImprovement || !evidenceGroundedBetterAnswer) throw new Error(`AI feedback is incomplete for question ${pair.questionId}`);
     if (evidenceExtracted.some((quote) => !pair.answer.includes(quote))) throw new Error(`AI feedback contains unsupported evidence for question ${pair.questionId}`);
-    return { questionId: pair.questionId, question: pair.question, questionText: pair.question, candidateAnswer: pair.answer, score: toProductScore(rawQuestionScores[index]),
-      scoreDeductions, evidenceExtracted,
+    return { questionId: pair.questionId, question: pair.question, questionText: pair.question, candidateAnswer: pair.answer, score: toProductScore(rawQuestionScores[index]), scoreDeductions, evidenceExtracted,
       comment, keyStrength: typeof rawItem.keyStrength === "string" ? rawItem.keyStrength : undefined, keyImprovement: typeof rawItem.keyImprovement === "string" ? rawItem.keyImprovement : undefined,
-      whatWorked, whatWasMissing,
-      actionableImprovement, suggestedRewrite: typeof rawItem.suggestedRewrite === "string" ? rawItem.suggestedRewrite : undefined,
-      evidenceGroundedBetterAnswer };
+      whatWorked, whatWasMissing, actionableImprovement, suggestedRewrite: typeof rawItem.suggestedRewrite === "string" ? rawItem.suggestedRewrite : undefined, evidenceGroundedBetterAnswer };
   });
-
   const numeric = (value: unknown, fallback: number) => { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(questionUsesTenPointScale ? n * 10 : n))) : fallback; };
   const overallScore = numeric(raw.overallScore, 0);
   if (!overallScore || !raw.summary || !Array.isArray(raw.strengths) || !Array.isArray(raw.improvements)) throw new Error("AI feedback is missing required fields");
@@ -87,64 +77,22 @@ function normalizeAiFeedback(value: unknown, pairs: { questionId: string; questi
 async function generateFeedback(session: SessionRecord, pairs: { questionId: string; question: string; answer: string }[]): Promise<{ feedback: FeedbackResult; usedFallback: boolean }> {
   try {
     const openai = getOpenAI(); const isCoachingSession = Boolean(session.coaching_focus); const coachingFocus = session.coaching_focus; const language = normalizeLanguage(session.preparation_language);
-    const coachingInstruction = `${isCoachingSession ? `\nThis is a TARGETED COACHING session.\nThe coaching focus is: \"${coachingFocus}\".\nEvaluate primarily on this focus. Return focusScore, focusEvidence, and focusNextStep. Focus evidence must come from the answer and/or CV.` : ""}\n\nBefore returning the JSON, verify EVERY questionFeedback item. The following fields are mandatory and MUST contain substantive, question-specific, non-empty strings: comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer. scoreDeductions MUST contain at least one substantive, question-specific string. NEVER return empty strings, whitespace-only strings, an empty scoreDeductions array, or null for any of these mandatory question-level fields. If the candidate answer contains little or no usable evidence, do not leave a field empty; instead, provide a substantive limitation, explanation, or coaching instruction grounded in the available candidate answer, CV, question, and role context. Every field must address the specific question and candidate answer. Do not reuse generic text across different questions. evidenceSpans must be an array of objects using zero-based JavaScript UTF-16 offsets with an exclusive end index, measured against the corresponding candidateAnswer. Return [] when there is no usable evidence. Never use evidence from the CV, question, role, strategy, or any other context for evidenceSpans. When populated, every span must identify an exact substring of candidateAnswer.`;
+    const coachingInstruction = `${isCoachingSession ? `\nThis is a TARGETED COACHING session.\nThe coaching focus is: \"${coachingFocus}\".\nEvaluate primarily on this focus. Return focusScore, focusEvidence, and focusNextStep. Focus evidence must come from the answer and/or CV.` : ""}\n\nBefore returning the JSON, verify EVERY questionFeedback item. The following fields are mandatory and MUST contain substantive, question-specific, non-empty strings: comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer. scoreDeductions MUST contain at least one substantive, question-specific string. NEVER return empty strings, whitespace-only strings, an empty scoreDeductions array, or null for any of these mandatory question-level fields. If the candidate answer contains little or no usable evidence, do not leave a field empty; instead, provide a substantive limitation, explanation, or coaching instruction grounded in the available candidate answer, CV, question, and role context. Every field must address the specific question and candidate answer. Do not reuse generic text across different questions. evidenceSpans must be an array of objects using zero-based JavaScript UTF-16 offsets with an exclusive end index, measured against the corresponding candidateAnswer. Return [] when there is no usable evidence. Never use evidence from the CV, question, role, strategy, or any other context for evidenceSpans. When populated, every span must identify an exact substring of candidateAnswer.\n\nIMPORTANT: sampleRewrite is NOT a model answer and must NOT be written as a polished script for the candidate to memorize. It must be a short structural blueprint for improving the answer (for example: context → action → evidence/result → role relevance), using only facts explicitly supported by the CV or candidateAnswer. If a candidate-only claim is used, make clear that it is the candidate's stated claim and not CV-verified. Never invent or strengthen a metric, percentage, result, responsibility, credential, employer, tool, date, or outcome. If the candidate did not provide a metric or concrete result, instruct them to add one they can substantiate rather than supplying one. suggestedRewrite must follow the same rule: give concise structural guidance, not a finished fabricated answer. evidenceGroundedBetterAnswer is coaching guidance toward a stronger answer, not permission to create a new story.`;
     const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_schema", json_schema: { name: "interview_feedback", strict: true, schema: {
-      type: "object",
-      additionalProperties: false,
+      type: "object", additionalProperties: false,
       properties: {
-        overallScore: { type: "integer" },
-        communication: { type: "integer" },
-        relevance: { type: "integer" },
-        structure: { type: "integer" },
-        confidence: { type: "integer" },
-        strengths: { type: "array", items: { type: "string" } },
-        improvements: { type: "array", items: { type: "string" } },
-        sampleRewrite: { type: "string" },
-        questionFeedback: { type: "array", items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            questionId: { type: "string" },
-            question: { anyOf: [{ type: "string" }, { type: "null" }] },
-            questionText: { type: "string" },
-            candidateAnswer: { type: "string" },
-            score: { type: "integer" },
-            scoreDeductions: { type: "array", items: { type: "string" } },
-            evidenceSpans: { type: "array", items: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                start: { type: "integer" },
-                end: { type: "integer" },
-              },
-              required: ["start", "end"],
-            } },
-            comment: { type: "string" },
-            keyStrength: { anyOf: [{ type: "string" }, { type: "null" }] },
-            keyImprovement: { anyOf: [{ type: "string" }, { type: "null" }] },
-            whatWorked: { type: "string" },
-            whatWasMissing: { type: "string" },
-            actionableImprovement: { type: "string" },
-            suggestedRewrite: { anyOf: [{ type: "string" }, { type: "null" }] },
-            evidenceGroundedBetterAnswer: { type: "string" },
-          },
-          required: ["questionId", "question", "questionText", "candidateAnswer", "score", "scoreDeductions", "evidenceSpans", "comment", "keyStrength", "keyImprovement", "whatWorked", "whatWasMissing", "actionableImprovement", "suggestedRewrite", "evidenceGroundedBetterAnswer"],
-        } },
-        summary: { type: "string" },
-        focusScore: { anyOf: [{ type: "integer" }, { type: "null" }] },
-        focusEvidence: { anyOf: [{ type: "string" }, { type: "null" }] },
-        focusNextStep: { anyOf: [{ type: "string" }, { type: "null" }] },
-      },
-      required: ["overallScore", "communication", "relevance", "structure", "confidence", "strengths", "improvements", "sampleRewrite", "questionFeedback", "summary", "focusScore", "focusEvidence", "focusNextStep"],
+        overallScore: { type: "integer" }, communication: { type: "integer" }, relevance: { type: "integer" }, structure: { type: "integer" }, confidence: { type: "integer" }, strengths: { type: "array", items: { type: "string" } }, improvements: { type: "array", items: { type: "string" } }, sampleRewrite: { type: "string" },
+        questionFeedback: { type: "array", items: { type: "object", additionalProperties: false, properties: {
+          questionId: { type: "string" }, question: { anyOf: [{ type: "string" }, { type: "null" }] }, questionText: { type: "string" }, candidateAnswer: { type: "string" }, score: { type: "integer" }, scoreDeductions: { type: "array", items: { type: "string" } }, evidenceSpans: { type: "array", items: { type: "object", additionalProperties: false, properties: { start: { type: "integer" }, end: { type: "integer" } }, required: ["start", "end"] } }, comment: { type: "string" }, keyStrength: { anyOf: [{ type: "string" }, { type: "null" }] }, keyImprovement: { anyOf: [{ type: "string" }, { type: "null" }] }, whatWorked: { type: "string" }, whatWasMissing: { type: "string" }, actionableImprovement: { type: "string" }, suggestedRewrite: { anyOf: [{ type: "string" }, { type: "null" }] }, evidenceGroundedBetterAnswer: { type: "string" },
+        }, required: ["questionId", "question", "questionText", "candidateAnswer", "score", "scoreDeductions", "evidenceSpans", "comment", "keyStrength", "keyImprovement", "whatWorked", "whatWasMissing", "actionableImprovement", "suggestedRewrite", "evidenceGroundedBetterAnswer"] } },
+        summary: { type: "string" }, focusScore: { anyOf: [{ type: "integer" }, { type: "null" }] }, focusEvidence: { anyOf: [{ type: "string" }, { type: "null" }] }, focusNextStep: { anyOf: [{ type: "string" }, { type: "null" }] },
+      }, required: ["overallScore", "communication", "relevance", "structure", "confidence", "strengths", "improvements", "sampleRewrite", "questionFeedback", "summary", "focusScore", "focusEvidence", "focusNextStep"],
     } } }, temperature: 0.3, messages: [
-      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. Return evidenceSpans, not evidenceExtracted text. For evidenceSpans, return zero-based JavaScript UTF-16 offsets with an exclusive end index, measured against the corresponding candidateAnswer. Return [] when there is no usable evidence. Never use evidence from the CV, question, role, strategy, or any other context. scoreDeductions must contain at least one non-empty, question-specific reason why the score is not higher. comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer must all be non-empty and specific to this question and answer. Do not return generic text that could be reused for another question.\n\nFor every questionFeedback item, return exactly these fields: questionId, question, questionText, candidateAnswer, score, scoreDeductions, evidenceSpans, comment, keyStrength, keyImprovement, whatWorked, whatWasMissing, actionableImprovement, suggestedRewrite, and evidenceGroundedBetterAnswer. Copy questionId, questionText, and candidateAnswer exactly from input.\n\nevidenceGroundedBetterAnswer and sampleRewrite may use only facts explicitly present in the supplied CV or candidateAnswer. The CV verifies only facts explicitly present in the CV. A claim made only in candidateAnswer remains the candidate's claim, not a CV-verified fact; do not present it as CV-confirmed. Never add an unsupported metric, percentage, result, responsibility, credential, employer, tool, date, or outcome. If no metric is supplied, do not invent one.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. EVERY SCORE MUST BE AN INTEGER FROM 0 TO 100. Do not use a 0-10 scale. Return exactly one questionFeedback item per Q&A pair in order. For non-coaching sessions, focusScore, focusEvidence, and focusNextStep MUST be returned as null. For coaching sessions, they may contain their corresponding values. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary, focusScore, focusEvidence, focusNextStep.` },
+      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Speak directly to the candidate like a demanding but supportive professional interview coach, not like an HR or audit report. Use "you/vous" throughout candidate-facing feedback. Keep feedback concise and easy to scan. Use this coaching sequence for each answer: 1) whatWorked — what the candidate did well, 2) whatWasMissing — the most important missing element, and 3) actionableImprovement — the exact adjustment to make next time. Make actionableImprovement concrete and immediately usable, preferably with an action verb such as quantify, lead, clarify, structure, connect, or give an example. Use keyStrength and keyImprovement only to reinforce the same direct coaching message.\n\nUse only facts in the supplied CV, job description, and candidate answers. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. Return evidenceSpans, not evidenceExtracted text. For evidenceSpans, return zero-based JavaScript UTF-16 offsets with an exclusive end index, measured against the corresponding candidateAnswer. Return [] when there is no usable evidence. Never use evidence from the CV, question, role, strategy, or any other context for evidenceSpans. scoreDeductions must contain at least one non-empty, question-specific reason why the score is not higher. comment, whatWorked, whatWasMissing, actionableImprovement, and evidenceGroundedBetterAnswer must all be non-empty and specific to this question and answer. Do not return generic text that could be reused for another question.\n\nFor every questionFeedback item, return exactly these fields: questionId, question, questionText, candidateAnswer, score, scoreDeductions, evidenceSpans, comment, keyStrength, keyImprovement, whatWorked, whatWasMissing, actionableImprovement, suggestedRewrite, and evidenceGroundedBetterAnswer. Copy questionId, questionText, and candidateAnswer exactly from input.\n\nevidenceGroundedBetterAnswer and sampleRewrite may use only facts explicitly present in the supplied CV or candidateAnswer. The CV verifies only facts explicitly present in the CV. A claim made only in candidateAnswer remains the candidate's claim, not a CV-verified fact; do not present it as CV-confirmed. Never add an unsupported metric, percentage, result, responsibility, credential, employer, tool, date, or outcome. If no metric is supplied, do not invent one.\n\nDo not produce a polished model answer for the candidate to memorize. sampleRewrite and suggestedRewrite are structural coaching aids only. They must tell the candidate what to add, clarify, quantify, substantiate, or connect, using only supported facts. When a candidate-only claim is important but unverified by the CV, label it as a candidate claim and coach the candidate to substantiate it with a real example.\n\nEvaluate responsiveness, role relevance, evidence, structure, communication, and role alignment without inflating scores. EVERY SCORE MUST BE AN INTEGER FROM 0 TO 100. Do not use a 0-10 scale. Return exactly one questionFeedback item per Q&A pair in order. For non-coaching sessions, focusScore, focusEvidence, and focusNextStep MUST be returned as null. For coaching sessions, they may contain their corresponding values. Avoid dense multi-sentence paragraphs when a short direct instruction is clearer.\n${coachingInstruction}\n\nReturn JSON: overallScore, communication, relevance, structure, confidence, strengths, improvements, sampleRewrite, questionFeedback, summary, focusScore, focusEvidence, focusNextStep.` },
       { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQ&A:\n${JSON.stringify(pairs.map(({ questionId, question, answer }) => ({ questionId, questionText: question, candidateAnswer: answer })))}` },
     ]});
     const raw = completion.choices[0]?.message?.content; if (!raw) throw new Error("Empty AI response"); return { feedback: normalizeAiFeedback(JSON.parse(raw), pairs), usedFallback: false };
-  } catch (error) {
-    console.error("[FEEDBACK FAILED]", error);
-    throw new Error("FEEDBACK_GENERATION_FAILED");
-  }
+  } catch (error) { console.error("[FEEDBACK FAILED]", error); throw new Error("FEEDBACK_GENERATION_FAILED"); }
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -158,16 +106,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const answerMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer_text]));
   const pairs = questions.map((q) => ({ questionId: q.id as string, question: q.question as string, answer: (answerMap.get(q.id) as string) || "" }));
   if (pairs.some((p) => !p.answer.trim())) return NextResponse.json({ error: "Please answer all questions before requesting feedback" }, { status: 400 });
-  let feedback: FeedbackResult;
-  let usedFallback: boolean;
-  try {
-    ({ feedback, usedFallback } = await generateFeedback(session as SessionRecord, pairs));
-  } catch (error) {
-    if (error instanceof Error && error.message === "FEEDBACK_GENERATION_FAILED") {
-      return NextResponse.json({ code: "FEEDBACK_GENERATION_FAILED", error: "We could not produce reliable interview feedback. Please retry." }, { status: 422 });
-    }
-    throw error;
-  }
+  let feedback: FeedbackResult; let usedFallback: boolean;
+  try { ({ feedback, usedFallback } = await generateFeedback(session as SessionRecord, pairs)); }
+  catch (error) { if (error instanceof Error && error.message === "FEEDBACK_GENERATION_FAILED") return NextResponse.json({ code: "FEEDBACK_GENERATION_FAILED", error: "We could not produce reliable interview feedback. Please retry." }, { status: 422 }); throw error; }
   await supabase.from("feedback").delete().eq("session_id", id);
   const { error: insertError } = await supabase.from("feedback").insert({ session_id: id, feedback });
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
