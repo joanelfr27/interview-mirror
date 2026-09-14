@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 export function CoachingPracticeButton({
   sourceSessionId,
   focusArea,
+  isFrench,
 }: {
   sourceSessionId: string;
   focusArea: string;
+  isFrench: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -27,12 +29,12 @@ export function CoachingPracticeButton({
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "Could not start practice");
+        throw new Error(data.error || (isFrench ? "Impossible de démarrer la pratique" : "Could not start practice"));
       }
 
       router.push(`/interview/${data.sessionId}`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start practice");
+      toast.error(error instanceof Error ? error.message : (isFrench ? "Impossible de démarrer la pratique" : "Could not start practice"));
       setLoading(false);
     }
   }
@@ -44,7 +46,7 @@ export function CoachingPracticeButton({
       ) : (
         <Target className="h-4 w-4" />
       )}
-      {loading ? "Preparing practice…" : "Practice this skill"}
+      {loading ? (isFrench ? "Préparation…" : "Preparing practice…") : (isFrench ? "Pratiquer ce point" : "Practice this skill")}
     </Button>
   );
 }
