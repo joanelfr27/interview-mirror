@@ -90,6 +90,7 @@ export type FeedbackQuestion = {
   scoreDeductions?: string[];
   scoreJustification?: string;
   evidenceExtracted?: string[];
+  evidenceStatus?: "cv_verified" | "candidate_claim" | "mixed" | "no_material_evidence";
   comment: string;
   keyStrength?: string;
   keyImprovement?: string;
