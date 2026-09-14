@@ -16,7 +16,7 @@ type CoachingProgress = {
   } | CoachingEvidence | null;
 };
 
-export function CoachingProgressCard({ progress }: { progress: CoachingProgress | null }) {
+export function CoachingProgressCard({ progress, isFrench }: { progress: CoachingProgress | null; isFrench: boolean }) {
   if (!progress) return null;
 
   const baseline = typeof progress.baseline_score === "number" ? progress.baseline_score : null;
@@ -24,10 +24,10 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
   const delta = baseline !== null && latest !== null ? latest - baseline : null;
   const status =
     progress.status === "improved"
-      ? "Improved"
+      ? (isFrench ? "Amélioré" : "Improved")
       : progress.status === "identified"
-        ? "Baseline recorded"
-        : "Still needs practice";
+        ? (isFrench ? "Référence enregistrée" : "Baseline recorded")
+        : (isFrench ? "Pratique encore nécessaire" : "Still needs practice");
 
   const evidence = progress.evidence;
   const latestEvidence = evidence && "focusEvidence" in evidence
@@ -41,19 +41,19 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
   return (
     <Card>
       <CardHeader>
-        <Badge variant="secondary" className="w-fit">Your progress</Badge>
-        <CardTitle className="text-base">What changed with this skill?</CardTitle>
+        <Badge variant="secondary" className="w-fit">{isFrench ? "Votre progression" : "Your progress"}</Badge>
+        <CardTitle className="text-base">{isFrench ? "Qu'est-ce qui a changé sur ce point ?" : "What changed with this skill?"}</CardTitle>
         <CardDescription>
-          We compare your first recorded result with your latest targeted practice.
+          {isFrench ? "Nous comparons votre premier résultat enregistré avec votre dernière pratique ciblée." : "We compare your first recorded result with your latest targeted practice."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          {baseline !== null && <span>Before: <strong>{baseline}/100</strong></span>}
-          {latest !== null && <span>Latest: <strong>{latest}/100</strong></span>}
+          {baseline !== null && <span>{isFrench ? "Avant" : "Before"}: <strong>{baseline}/100</strong></span>}
+          {latest !== null && <span>{isFrench ? "Dernier" : "Latest"}: <strong>{latest}/100</strong></span>}
           {delta !== null && delta !== 0 && (
             <Badge variant={delta > 0 ? "default" : "warning"}>
-              {delta > 0 ? `+${delta}` : delta} points
+              {delta > 0 ? `+${delta}` : delta} {isFrench ? "points" : "points"}
             </Badge>
           )}
           <Badge variant="outline">{status}</Badge>
@@ -62,11 +62,11 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
         {baselineEvidence?.focusEvidence && latestEvidence?.focusEvidence && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What you showed before</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isFrench ? "Ce que vous aviez démontré" : "What you showed before"}</p>
               <p className="mt-1 text-sm text-slate-700">{baselineEvidence.focusEvidence}</p>
             </div>
             <div className="rounded-lg border p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What you showed most recently</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isFrench ? "Ce que vous avez démontré récemment" : "What you showed most recently"}</p>
               <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusEvidence}</p>
             </div>
           </div>
@@ -74,14 +74,14 @@ export function CoachingProgressCard({ progress }: { progress: CoachingProgress 
 
         {latestEvidence?.focusEvidence && !baselineEvidence?.focusEvidence && (
           <div className="rounded-lg border bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Evidence from your latest answer</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isFrench ? "Preuve de votre dernière réponse" : "Evidence from your latest answer"}</p>
             <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusEvidence}</p>
           </div>
         )}
 
         {latestEvidence?.focusNextStep && (
           <div className="rounded-lg border p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Next step</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{isFrench ? "Prochaine étape" : "Next step"}</p>
             <p className="mt-1 text-sm text-slate-700">{latestEvidence.focusNextStep}</p>
           </div>
         )}
