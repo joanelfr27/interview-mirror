@@ -134,7 +134,7 @@ The stronger-answer fields are coaching guidance, not a script. suggestedRewrite
 ${coachingInstruction}`;
 
   const evaluations = await Promise.all(pairs.map(async (pair) => {
-    const completion = await openai.chat.completions.create({
+    const requestEvaluation = async () => openai.chat.completions.create({
       model: AI_MODEL,
       response_format: { type: "json_schema", json_schema: { name: "interview_question_feedback", strict: true, schema: questionSchema } },
       temperature: 0.3,
@@ -143,9 +143,24 @@ ${coachingInstruction}`;
         { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQuestion ID: ${pair.questionId}\nQuestion: ${pair.question}\nCandidate answer:\n${pair.answer}` },
       ],
     });
-    const raw = completion.choices[0]?.message?.content;
-    if (!raw) throw new Error(`Empty AI response for question ${pair.questionId}`);
-    return normalizeQuestionFeedback(JSON.parse(raw), pair);
+
+    const parseEvaluation = async () => {
+      const completion = await requestEvaluation();
+      const raw = completion.choices[0]?.message?.content;
+      if (!raw) throw new Error(`Empty AI response for question ${pair.questionId}`);
+      try {
+        return normalizeQuestionFeedback(JSON.parse(raw), pair);
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+        console.warn(`[FEEDBACK RETRY] Malformed JSON for question ${pair.questionId}; retrying once`);
+        const retryCompletion = await requestEvaluation();
+        const retryRaw = retryCompletion.choices[0]?.message?.content;
+        if (!retryRaw) throw new Error(`Empty AI response for question ${pair.questionId} on retry`);
+        return normalizeQuestionFeedback(JSON.parse(retryRaw), pair);
+      }
+    };
+
+    return parseEvaluation();
   }));
 
   const questionFeedback = evaluations.map((evaluation) => evaluation.feedback);
