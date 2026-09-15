@@ -9,7 +9,7 @@ function normalizeFocusKey(value: string): string {
 
 function fallbackFeedback(pairs: { questionId: string; question: string; answer: string }[], language: "en" | "fr"): FeedbackResult {
   const isFrench = language === "fr";
-  const evidenceHint = new RegExp("\\b(result|improved|led|managed|increased|reduced|delivered|launched|implemented|designed|owned|success|metric|percentage|customers|impact|outcome)\\b", "i");
+  const evidenceHint = new RegExp("\\b(result|improved|led|managed|increased|reduced|delivered|launched|implemented|designed|owned|success|metric|percentage|customers|impact|outcome|launched|implemented)\\b", "i");
   const questionFeedback: FeedbackQuestion[] = pairs.map((p) => {
     const answer = p.answer.trim(); const hasEvidence = evidenceHint.test(answer); const baseScore = answer.length > 140 ? 64 : answer.length > 80 ? 58 : 50; const score = Math.min(88, baseScore + (hasEvidence ? 10 : 0));
     return { questionId: p.questionId, question: p.question, questionText: p.question, candidateAnswer: answer,
@@ -90,12 +90,13 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
   const comment = text("comment"); const whatWorked = text("whatWorked"); const whatWasMissing = text("whatWasMissing"); const actionableImprovement = text("actionableImprovement"); const evidenceGroundedBetterAnswer = text("evidenceGroundedBetterAnswer");
   if (!scoreDeductions.length || !comment || !whatWorked || !whatWasMissing || !actionableImprovement || !evidenceGroundedBetterAnswer) throw new Error(`AI feedback is incomplete for question ${pair.questionId}`);
   if (evidenceExtracted.some((quote) => !pair.answer.includes(quote))) throw new Error(`AI feedback contains unsupported evidence for question ${pair.questionId}`);
+  const boundedDimension = (value: number) => Math.max(score - 12, Math.min(score + 12, Math.round(value)));
   return { feedback: {
     questionId: pair.questionId, question: pair.question, questionText: pair.question, candidateAnswer: pair.answer,
     score: Math.round(score), scoreDeductions, evidenceExtracted, evidenceStatus, comment,
     keyStrength: text("keyStrength") || undefined, keyImprovement: text("keyImprovement") || undefined,
     whatWorked, whatWasMissing, actionableImprovement, suggestedRewrite: text("suggestedRewrite") || undefined, evidenceGroundedBetterAnswer,
-  }, communication: Math.round(communication), relevance: Math.round(relevance), structure: Math.round(structure), confidence: Math.round(confidence) };
+  }, communication: boundedDimension(communication), relevance: boundedDimension(relevance), structure: boundedDimension(structure), confidence: boundedDimension(confidence) };
 }
 
 async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): Promise<{ feedback: FeedbackResult; usedFallback: boolean }> {
