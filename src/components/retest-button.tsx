@@ -28,7 +28,7 @@ export function RetestButton({ sessionId, isFrench }: Props) {
   return (
     <Button onClick={handleRetest} disabled={loading}>
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-      {loading ? (isFrench ? "Préparation…" : "Preparing…") : (isFrench ? "Retester les points faibles" : "Retest weak areas")}
+      {loading ? (isFrench ? "Préparation…" : "Preparing…") : (isFrench ? "Réessayer" : "Try again")}
     </Button>
   );
 }
