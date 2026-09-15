@@ -37,7 +37,7 @@ function average(values: number[]): number {
 
 function enforceFeedbackQuality(evaluation: QuestionEvaluation, pair: FeedbackPair, language: "en" | "fr"): QuestionEvaluation {
   const feedback = evaluation.feedback;
-  const anchor = (feedback.evidenceExtracted[0] || pair.answer.trim()).slice(0, 180).trim();
+  const anchor = (feedback.evidenceExtracted?.[0] || pair.answer.trim()).slice(0, 180).trim();
   const isFrench = language === "fr";
   const claimNote = feedback.evidenceStatus === "candidate_claim" || feedback.evidenceStatus === "mixed"
     ? (isFrench ? `Preuve non confirmée par le CV : vous indiquez « ${anchor} ». Cette information doit être présentée comme une déclaration de votre part, pas comme une expérience vérifiée.` : `Evidence not confirmed by the CV: you stated, “${anchor}”. Treat this as your stated claim, not verified experience.`)
