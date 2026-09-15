@@ -31,6 +31,39 @@ function fallbackFeedback(pairs: { questionId: string; question: string; answer:
 type FeedbackPair = { questionId: string; question: string; answer: string };
 type QuestionEvaluation = { feedback: FeedbackQuestion; communication: number; relevance: number; structure: number; confidence: number };
 
+function average(values: number[]): number {
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+}
+
+function enforceFeedbackQuality(evaluation: QuestionEvaluation, pair: FeedbackPair, language: "en" | "fr"): QuestionEvaluation {
+  const feedback = evaluation.feedback;
+  const anchor = (feedback.evidenceExtracted[0] || pair.answer.trim()).slice(0, 180).trim();
+  const isFrench = language === "fr";
+  const claimNote = feedback.evidenceStatus === "candidate_claim" || feedback.evidenceStatus === "mixed"
+    ? (isFrench ? `Preuve non confirmée par le CV : vous indiquez « ${anchor} ». Cette information doit être présentée comme une déclaration de votre part, pas comme une expérience vérifiée.` : `Evidence not confirmed by the CV: you stated, “${anchor}”. Treat this as your stated claim, not verified experience.`)
+    : "";
+  const generic = /\b(add an example|provide an example|be more specific|add more detail|provide evidence|include an example)\b|\b(ajoutez un exemple|ajouter un exemple|ajoutez des exemples|ajouter des exemples|soyez plus précis|précisez davantage|ajoutez plus de détails|fournissez des preuves|incluez un exemple|inclure un exemple)\b/i;
+  const fields = ["comment", "whatWorked", "whatWasMissing", "actionableImprovement", "scoreDeductions", "keyStrength", "keyImprovement", "suggestedRewrite", "evidenceGroundedBetterAnswer"] as const;
+  const next = { ...feedback } as FeedbackQuestion;
+  for (const field of fields) {
+    const value = next[field];
+    if (typeof value === "string" && generic.test(value)) {
+      next[field] = `${value} ${isFrench ? `Dans votre réponse, vous avez indiqué « ${anchor} » ; pour cette question, développez précisément cet élément et montrez comment il répond à la compétence demandée.` : `In your answer, you stated “${anchor}”; for this question, develop that specific point and show how it demonstrates the competency being tested.`}` as never;
+    }
+  }
+  if (claimNote) {
+    next.comment = `${claimNote} ${next.comment}`;
+    next.whatWorked = `${claimNote} ${next.whatWorked}`;
+    next.whatWasMissing = `${claimNote} ${next.whatWasMissing}`;
+    next.actionableImprovement = `${claimNote} ${next.actionableImprovement}`;
+    next.keyStrength = next.keyStrength ? `${claimNote} ${next.keyStrength}` : claimNote;
+    next.keyImprovement = next.keyImprovement ? `${claimNote} ${next.keyImprovement}` : claimNote;
+    next.suggestedRewrite = next.suggestedRewrite ? `${claimNote} ${next.suggestedRewrite}` : claimNote;
+    next.evidenceGroundedBetterAnswer = `${claimNote} ${next.evidenceGroundedBetterAnswer}`;
+  }
+  return { ...evaluation, feedback: next };
+}
+
 function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): QuestionEvaluation {
   if (!value || typeof value !== "object") throw new Error(`Invalid AI feedback for question ${pair.questionId}`);
   const raw = value as Record<string, unknown>;
@@ -65,10 +98,6 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
   }, communication: Math.round(communication), relevance: Math.round(relevance), structure: Math.round(structure), confidence: Math.round(confidence) };
 }
 
-function average(values: number[]): number {
-  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
-}
-
 async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): Promise<{ feedback: FeedbackResult; usedFallback: boolean }> {
   try {
     const openai = getOpenAI();
@@ -92,7 +121,7 @@ async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): 
       required: ["questionId", "question", "questionText", "candidateAnswer", "score", "communication", "relevance", "structure", "confidence", "scoreDeductions", "evidenceSpans", "evidenceStatus", "comment", "keyStrength", "keyImprovement", "whatWorked", "whatWasMissing", "actionableImprovement", "suggestedRewrite", "evidenceGroundedBetterAnswer"],
     };
 
-    const systemPrompt = `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Evaluate ONLY the candidate answer supplied for the specific question. Do not evaluate the whole interview. Speak directly to the candidate using "you/vous". Keep feedback concise and specific.\n\nUse only facts in the supplied CV, job description, and candidate answer. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. Evidence spans must use zero-based JavaScript UTF-16 offsets with an exclusive end index against candidateAnswer only. Return [] when there is no usable evidence.\n\nEVIDENCE STATUS: compare the candidate answer with the CV. Use cv_verified only when the relevant claim is explicitly supported by the CV; candidate_claim when the claim is stated by the candidate but not supported by the CV; mixed when both occur; no_material_evidence when there is no material factual evidence. Candidate claims are not CV facts. For candidate_claim or mixed, candidate-facing feedback MUST explicitly distinguish the candidate's statement from verified CV evidence: use wording equivalent to "you stated..." / "vous indiquez..." and identify what would verify the claim. NEVER describe a candidate-only claim as "your experience", "your background", or an established fact. This applies to every candidate-facing field, including comment, whatWorked, whatWasMissing, actionableImprovement, keyStrength, keyImprovement, suggestedRewrite, evidenceGroundedBetterAnswer, strengths, improvements, and summary.\n\nANSWER-SPECIFICITY: diagnose THIS answer, not the topic generally. Every comment, whatWorked, whatWasMissing, actionableImprovement, and scoreDeductions must name the actual statement, action, limitation, example, or omission that caused the assessment. Do not use generic advice such as "add an example", "be more specific", "add more detail", or "provide evidence" by itself. If an example or evidence is missing, state exactly what example/evidence is missing from THIS answer and why it matters for THIS question. If the answer contains a candidate-only claim, the missing element may be verification of that specific claim. The coaching instruction must tell the candidate the single most useful adjustment to make on the next attempt.\n\nSCORING: score the answer independently from 0-100 using responsiveness, demonstrated evidence, role alignment, structure, credibility, and written communication. Do not score by length or by the strength of the CV. 90-100 strong; 75-89 good with material gaps; 60-74 partial; 40-59 weak; 0-39 largely non-responsive or unsupported. scoreDeductions must state why THIS answer is not higher. The dimension scores communication, relevance, structure, and confidence must also reflect THIS answer only; do not infer vocal or body-language confidence from text.\n\nThe stronger-answer fields are coaching guidance, not a script. suggestedRewrite must be a short structural blueprint using only facts supported by the CV or candidate answer. If no metric/result was supplied, instruct the candidate to add one they can substantiate rather than inventing one.\n${coachingInstruction}`;
+    const systemPrompt = `${languageInstruction(language)}\n\nYou are Interview Mirror's coaching engine. Evaluate ONLY the candidate answer supplied for the specific question. Do not evaluate the whole interview. Speak directly to the candidate using "you/vous". Keep feedback concise and specific.\n\nUse only facts in the supplied CV, job description, and candidate answer. Never invent credentials, employers, achievements, metrics, tools, dates, responsibilities, or outcomes. Evidence spans must use zero-based JavaScript UTF-16 offsets with an exclusive end index against candidateAnswer only. Return [] when there is no usable evidence.\n\nEVIDENCE STATUS: compare the candidate answer with the CV. Use cv_verified only when the relevant claim is explicitly supported by the CV; candidate_claim when the claim is stated by the candidate but not supported by the CV; mixed when both occur; no_material_evidence when there is no material factual evidence. Candidate claims are not CV facts. For candidate_claim or mixed, candidate-facing feedback MUST explicitly distinguish the candidate's statement from verified CV evidence: use wording equivalent to "you stated..." / "vous indiquez..." and identify what would verify the claim. NEVER describe a candidate-only claim as "your experience", "your background", or an established fact.\n\nANSWER-SPECIFICITY: diagnose THIS answer, not the topic generally. Every comment, whatWorked, whatWasMissing, actionableImprovement, and scoreDeductions must name the actual statement, action, limitation, example, or omission that caused the assessment. Do not use generic advice such as "add an example", "be more specific", "add more detail", or "provide evidence" by itself. If an example or evidence is missing, state exactly what example/evidence is missing from THIS answer and why it matters for THIS question. If the answer contains a candidate-only claim, the missing element may be verification of that specific claim. The coaching instruction must tell the candidate the single most useful adjustment to make on the next attempt.\n\nSCORING: score the answer independently from 0-100 using responsiveness, demonstrated evidence, role alignment, structure, credibility, and written communication. Do not score by length or by the strength of the CV. 90-100 strong; 75-89 good with material gaps; 60-74 partial; 40-59 weak; 0-39 largely non-responsive or unsupported. scoreDeductions must state why THIS answer is not higher. The dimension scores communication, relevance, structure, and confidence must also reflect THIS answer only; do not infer vocal or body-language confidence from text.\n\nThe stronger-answer fields are coaching guidance, not a script. suggestedRewrite must be a short structural blueprint using only facts supported by the CV or candidate answer. If no metric/result was supplied, instruct the candidate to add one they can substantiate rather than inventing one.\n${coachingInstruction}`;
 
     const evaluations = await Promise.all(pairs.map(async (pair) => {
       const completion = await openai.chat.completions.create({
@@ -106,7 +135,7 @@ async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): 
       });
       const raw = completion.choices[0]?.message?.content;
       if (!raw) throw new Error(`Empty AI response for question ${pair.questionId}`);
-      return normalizeQuestionFeedback(JSON.parse(raw), pair);
+      return enforceFeedbackQuality(normalizeQuestionFeedback(JSON.parse(raw), pair), pair, language);
     }));
 
     const questionFeedback = evaluations.map((evaluation) => evaluation.feedback);
