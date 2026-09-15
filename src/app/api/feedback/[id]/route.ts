@@ -32,14 +32,13 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
     ? rawItem.scoreDeductions.filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 2)
     : [];
   const evidenceSpans = Array.isArray(rawItem.evidenceSpans) ? rawItem.evidenceSpans : [];
-  const evidenceExtracted = evidenceSpans.map((span) => {
-    if (!span || typeof span !== "object") throw new Error(`AI feedback contains invalid evidence span for question ${pair.questionId}`);
+  const evidenceExtracted = evidenceSpans.flatMap((span) => {
+    if (!span || typeof span !== "object") return [];
     const start = Number((span as Record<string, unknown>).start);
     const end = Number((span as Record<string, unknown>).end);
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > pair.answer.length) {
-      throw new Error(`AI feedback contains invalid evidence span for question ${pair.questionId}`);
-    }
-    return pair.answer.slice(start, end);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > pair.answer.length) return [];
+    const quote = pair.answer.slice(start, end);
+    return quote ? [quote] : [];
   });
   const evidenceStatus = rawItem.evidenceStatus;
   if (evidenceStatus !== "cv_verified" && evidenceStatus !== "candidate_claim" && evidenceStatus !== "mixed" && evidenceStatus !== "no_material_evidence") {
@@ -53,9 +52,6 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
   const evidenceGroundedBetterAnswer = text("evidenceGroundedBetterAnswer");
   if (!scoreDeductions.length || !comment || !whatWorked || !whatWasMissing || !actionableImprovement || !evidenceGroundedBetterAnswer) {
     throw new Error(`AI feedback is incomplete for question ${pair.questionId}`);
-  }
-  if (evidenceExtracted.some((quote) => !pair.answer.includes(quote))) {
-    throw new Error(`AI feedback contains unsupported evidence for question ${pair.questionId}`);
   }
   const boundedDimension = (value: number) => Math.max(score - 12, Math.min(score + 12, Math.round(value)));
   return {
