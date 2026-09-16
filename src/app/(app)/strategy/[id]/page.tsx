@@ -70,6 +70,7 @@ export default function StrategyPage() {
     keyMessage: "Votre message clé",
     keyHint: "Ce que l'intervieweur doit retenir de votre profil.",
     priorities: "Ce que vous devez démontrer durant l'entretien",
+    support: "Pour appuyer ce point",
     risks: "Points d'attention",
     responseLabel: "Comment y répondre",
     profile: "Profil",
@@ -88,6 +89,7 @@ export default function StrategyPage() {
     keyMessage: "Your key message",
     keyHint: "What the interviewer should remember about your profile.",
     priorities: "What you need to demonstrate during the interview",
+    support: "To support this point",
     risks: "Points to watch",
     responseLabel: "How to respond",
     profile: "Profile",
@@ -150,7 +152,26 @@ export default function StrategyPage() {
 
         <Card>
           <CardHeader className="pb-3"><CardTitle>{labels.priorities}</CardTitle></CardHeader>
-          <CardContent>{numberedList(strategy.interviewPriorities, 3)}</CardContent>
+          <CardContent>
+            {strategy.interviewPriorities?.length ? (
+              <ol className="space-y-5">
+                {strategy.interviewPriorities.slice(0, 3).map((item, index) => (
+                  <li key={`${index}-${item}`} className="flex gap-3">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-6 text-slate-700">{item}</p>
+                      {strategy.storiesToPrepare?.[index] && (
+                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
+                          <p className="text-xs font-semibold text-slate-500">{labels.support}</p>
+                          <p className="mt-0.5 text-sm leading-5 text-slate-600">{strategy.storiesToPrepare[index]}</p>
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : <p className="text-sm text-muted-foreground">{labels.empty}</p>}
+          </CardContent>
         </Card>
 
         {strategy.gapsOrRisks.length > 0 && <Card>
