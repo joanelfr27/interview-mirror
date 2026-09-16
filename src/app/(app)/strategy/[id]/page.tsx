@@ -65,17 +65,13 @@ export default function StrategyPage() {
   const labels = isFrench ? {
     badge: "Votre stratégie",
     title: "Votre plan d'entretien",
-    intro: "Le Professional Mirror a analysé votre profil pour ce poste. Voici maintenant ce que vous devez démontrer, les expériences à mobiliser et les points à traiter avec précision.",
+    intro: "Le Professional Mirror a analysé votre profil pour ce poste. Voici ce que vous devez démontrer durant l'entretien et les points qui nécessitent une attention particulière.",
     start: "Commencer l'entretien",
     keyMessage: "Votre message clé",
     keyHint: "Ce que l'intervieweur doit retenir de votre profil.",
-    priorities: "Ce que vous devez prouver",
-    prioritiesHint: "Les 3 éléments que l'entretien doit permettre de démontrer.",
-    examples: "Vos exemples à mobiliser",
-    examplesHint: "Les expériences de votre parcours à utiliser pour démontrer ces points.",
-    risks: "Points à défendre",
-    riskHint: "Les exigences ou écarts qui peuvent nécessiter une réponse précise.",
-    gapLabel: "Point à traiter",
+    priorities: "Ce que vous devez démontrer durant l'entretien",
+    risks: "Points d'attention",
+    gapLabel: "Point d'attention",
     responseLabel: "Comment y répondre",
     profile: "Profil",
     strategy: "Stratégie",
@@ -88,17 +84,13 @@ export default function StrategyPage() {
   } : {
     badge: "Your strategy",
     title: "Your interview game plan",
-    intro: "The Professional Mirror has analysed your profile for this role. Here is what you need to demonstrate, which experiences to use, and which points need a precise answer.",
+    intro: "The Professional Mirror has analysed your profile for this role. Here is what you need to demonstrate during the interview and which points need particular attention.",
     start: "Start interview",
     keyMessage: "Your key message",
     keyHint: "What the interviewer should remember about your profile.",
-    priorities: "What you need to prove",
-    prioritiesHint: "The 3 things the interview should allow you to demonstrate.",
-    examples: "Examples to use",
-    examplesHint: "Experiences from your career that support these points.",
-    risks: "Points to defend",
-    riskHint: "Requirements or gaps that may need a precise response.",
-    gapLabel: "Point to address",
+    priorities: "What you need to demonstrate during the interview",
+    risks: "Points to watch",
+    gapLabel: "Point to watch",
     responseLabel: "How to respond",
     profile: "Profile",
     strategy: "Strategy",
@@ -158,21 +150,14 @@ export default function StrategyPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.priorities}</CardTitle><p className="text-sm text-muted-foreground">{labels.prioritiesHint}</p></CardHeader>
-            <CardContent>{numberedList(strategy.interviewPriorities, 3)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.examples}</CardTitle><p className="text-sm text-muted-foreground">{labels.examplesHint}</p></CardHeader>
-            <CardContent>{numberedList(strategy.storiesToPrepare, 3)}</CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="pb-3"><CardTitle>{labels.priorities}</CardTitle></CardHeader>
+          <CardContent>{numberedList(strategy.interviewPriorities, 3)}</CardContent>
+        </Card>
 
         {strategy.gapsOrRisks.length > 0 && <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5" />{labels.risks}</CardTitle>
-            <p className="text-sm text-muted-foreground">{labels.riskHint}</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {strategy.gapsOrRisks.slice(0, 3).map((gap, index) => (
