@@ -68,7 +68,7 @@ export default function StrategyPage() {
     intro: "Le Professional Mirror a analysé votre profil pour ce poste. Voici ce que vous devez démontrer durant l'entretien et les points qui nécessitent une attention particulière.",
     start: "Commencer l'entretien",
     keyMessage: "Votre message clé",
-    keyHint: "Ce que l'intervieweur doit retenir de votre profil.",
+    keyHint: "L'idée principale que vous devez faire ressortir pendant l'entretien.",
     priorities: "Ce que vous devez démontrer durant l'entretien",
     support: "Pour appuyer ce point",
     risks: "Points d'attention",
@@ -87,7 +87,7 @@ export default function StrategyPage() {
     intro: "The Professional Mirror has analysed your profile for this role. Here is what you need to demonstrate during the interview and which points need particular attention.",
     start: "Start interview",
     keyMessage: "Your key message",
-    keyHint: "What the interviewer should remember about your profile.",
+    keyHint: "The main idea you should make clear during the interview.",
     priorities: "What you need to demonstrate during the interview",
     support: "To support this point",
     risks: "Points to watch",
@@ -105,17 +105,6 @@ export default function StrategyPage() {
   if (loading) return <div className="flex items-center justify-center py-24 text-muted-foreground"><div className="space-y-3 text-center"><div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700"><ShieldCheck className="h-6 w-6" /></div><p className="text-base">{isFrench ? "Préparation de votre stratégie…" : "Building your interview strategy…"}</p></div></div>;
 
   if (error) return <div className="mx-auto max-w-3xl space-y-6 py-20 text-center"><h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">{isFrench ? "Stratégie indisponible" : "Interview strategy unavailable"}</h1><p className="text-sm text-muted-foreground">{error}</p><div className="flex justify-center"><Button variant="outline" onClick={() => router.refresh()}>{isFrench ? "Réessayer" : "Retry"}</Button></div></div>;
-
-  const numberedList = (items: string[] | undefined, limit = 3) => items?.length ? (
-    <ol className="space-y-4">
-      {items.slice(0, limit).map((item, index) => (
-        <li key={`${index}-${item}`} className="flex gap-3 text-sm leading-6 text-slate-700">
-          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
-          <span>{item}</span>
-        </li>
-      ))}
-    </ol>
-  ) : <p className="text-sm text-muted-foreground">{labels.empty}</p>;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
