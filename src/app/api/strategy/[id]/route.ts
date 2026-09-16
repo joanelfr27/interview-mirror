@@ -10,11 +10,19 @@ function parseAnalysis(value: unknown): CvAnalysis | null { if (typeof value ===
 function hasValidProvenance(value: unknown, session: SessionRecord): boolean { const a = parseAnalysis(value); const p = a?.provenance; return Boolean(p && p.contract_version === "v5.1" && p.preparation_language === session.preparation_language && p.cv_content_hash === hash(session.cv_text) && p.jd_content_hash === hash(session.job_description)); }
 
 function hasObviousLanguageMismatch(text: string, language: "en" | "fr"): boolean {
-  if (language === "fr") return /\b(?:strong command of|your experience|use your|prepare an|what you|if asked|the interviewer|the role|your strongest|evidence to use)\b/i.test(text);
-  return /\b(?:votre expérience|utilisez votre|préparez|ce que vous|si l'on vous|l'intervieweur|le poste|vos points forts|preuves à utiliser)\b/i.test(text);
+  if (language === "fr") return /\b(?:strong command of|strong knowledge of|your experience|use your|prepare an|what you|if asked|the interviewer|the role|your strongest|evidence to use|accounting standards|experience with|experience in|the position requires|the role requires)\b/i.test(text);
+  return /\b(?:votre expérience|utilisez votre|préparez|ce que vous|si l'on vous|l'intervieweur|le poste|vos points forts|preuves à utiliser|normes comptables|expérience avec|expérience en|le poste requiert|le rôle requiert)\b/i.test(text);
 }
 
-function isValidStrategy(strategy: unknown, language: "en" | "fr"): strategy is InterviewStrategy {
+function containsCopiedJdSentence(strategy: unknown, jobDescription: string): boolean {
+  if (!strategy || typeof strategy !== "object" || !jobDescription) return false;
+  const s = strategy as any;
+  const allText = [s.candidatePositioning, s.strongestValueProposition, s.communicationPriorities, s.interviewPlan, s.personalization, ...s.strengthsToLeverage, ...s.gapsOrRisks, ...s.gapDefenseStrategy, ...s.interviewPriorities, ...s.likelyDifficultQuestions, ...s.storiesToPrepare].filter((x: any) => typeof x === "string").join(" ").toLowerCase();
+  const sourceSentences = jobDescription.split(/[.!?\n]+/).map((x) => x.trim().toLowerCase()).filter((x) => x.length >= 35);
+  return sourceSentences.some((sentence) => allText.includes(sentence));
+}
+
+function isValidStrategy(strategy: unknown, language: "en" | "fr", jobDescription = ""): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any;
   const generic = /\b(clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|prepare examples|prepare simple examples|préparez des exemples|be ready|show your|connect your experience|reliez votre expérience|based on the cv|à partir du cv)\b/i;
@@ -27,7 +35,7 @@ function isValidStrategy(strategy: unknown, language: "en" | "fr"): strategy is 
     return /\?|^(?:quelle|quels|quelle|comment|pourquoi|pouvez-vous|pouvez vous|donnez-moi|donnez moi|décrivez|décrivez-moi|décrivez moi|what|which|how|why|can you|could you|tell me|describe)\b/i.test(x.trim());
   };
   const validPriority = (x: any) => typeof x === "string" && x.trim() && x.length <= 320 && !generic.test(x) && !prepInstruction.test(x);
-  return typeof s.candidatePositioning === "string" && typeof s.strongestValueProposition === "string" && Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) && Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) && Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) && typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" && typeof s.personalization === "string" && !generic.test(s.candidatePositioning) && !generic.test(s.strongestValueProposition) && !weakKeyMessage.test(s.strongestValueProposition) && !generic.test(s.communicationPriorities) && !generic.test(s.interviewPlan) && !generic.test(s.personalization) && !unsafeIndustryGap.test(allText) && !hasObviousLanguageMismatch(allText, language) && s.interviewPriorities.every(validPriority) && s.likelyDifficultQuestions.length > 0 && s.likelyDifficultQuestions.every(validQuestion) && [...s.strengthsToLeverage, ...s.gapsOrRisks, ...s.gapDefenseStrategy, ...s.storiesToPrepare].every((x: any) => typeof x === "string" && x.trim() && !generic.test(x));
+  return typeof s.candidatePositioning === "string" && typeof s.strongestValueProposition === "string" && Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) && Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) && Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) && typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" && typeof s.personalization === "string" && !generic.test(s.candidatePositioning) && !generic.test(s.strongestValueProposition) && !weakKeyMessage.test(s.strongestValueProposition) && !generic.test(s.communicationPriorities) && !generic.test(s.interviewPlan) && !generic.test(s.personalization) && !unsafeIndustryGap.test(allText) && !hasObviousLanguageMismatch(allText, language) && !containsCopiedJdSentence(strategy, jobDescription) && s.interviewPriorities.every(validPriority) && s.likelyDifficultQuestions.length > 0 && s.likelyDifficultQuestions.every(validQuestion) && [...s.strengthsToLeverage, ...s.gapsOrRisks, ...s.gapDefenseStrategy, ...s.storiesToPrepare].every((x: any) => typeof x === "string" && x.trim() && !generic.test(x));
 }
 
 function fallbackStrategy(session: SessionRecord): InterviewStrategy {
@@ -37,7 +45,6 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const evidenceChain = session.cv_analysis?.evidenceChain ?? [];
   const topStrength = strengths[0] ?? (language === "fr" ? "votre expérience financière la mieux démontrée" : "your strongest documented finance experience");
   const topGap = gaps[0] ?? (language === "fr" ? "les exigences que votre CV ne démontre pas clairement" : "the requirements your CV does not clearly demonstrate");
-  const topRequirement = evidenceChain.find((item) => item.jd_requirement && !/\b(?:préparez|prepare|recherchez|research|cherchez|look for|review|étudiez|study)\b/i.test(item.jd_requirement))?.jd_requirement ?? (language === "fr" ? "une exigence prioritaire du poste" : "a priority requirement of the role");
   const isFrench = language === "fr";
   const timing = session.interview_date
     ? isFrench ? `Votre entretien est prévu le ${new Date(session.interview_date).toLocaleDateString("fr-FR")}.` : `Your interview is scheduled for ${new Date(session.interview_date).toLocaleDateString()}.`
@@ -68,13 +75,13 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
     gapsOrRisks: gaps.slice(0, 3),
     gapDefenseStrategy: gapDefense,
     interviewPriorities: [
-      isFrench ? `Démontrez ${topStrength} avec un exemple précis de votre expérience.` : `Demonstrate ${topStrength} with one specific example from your experience.`,
-      isFrench ? `Clarifiez votre niveau réel sur ${topGap.toLowerCase()}, sans revendiquer une expérience non démontrée.` : `Clarify your actual level on ${topGap.toLowerCase()} without claiming experience you cannot demonstrate.`,
-      isFrench ? `Montrez comment votre expérience répond à cette exigence prioritaire du poste : ${topRequirement}.` : `Show how your experience addresses this priority requirement: ${topRequirement}.`
+      isFrench ? `Démontrez votre expérience financière internationale avec un exemple précis de votre parcours.` : `Demonstrate your international finance experience with one specific example from your career.`,
+      isFrench ? `Clarifiez votre niveau réel sur les exigences techniques qui ne sont pas pleinement démontrées par votre CV, sans revendiquer une expérience non démontrée.` : `Clarify your actual level on technical requirements not fully demonstrated by your CV, without claiming experience you cannot demonstrate.`,
+      isFrench ? `Montrez, par une expérience réelle, comment vous pouvez répondre aux responsabilités prioritaires du poste.` : `Use a real experience to demonstrate how you can address the role's priority responsibilities.`
     ],
     likelyDifficultQuestions: [
-      isFrench ? `Quelle expérience démontre le mieux votre capacité à répondre à ${topGap.toLowerCase()} ?` : `What experience best demonstrates your ability to address ${topGap.toLowerCase()}?`,
-      isFrench ? `Pouvez-vous me donner un exemple concret lié à cette exigence du poste ?` : `Can you give me a concrete example related to this role requirement?`
+      isFrench ? `Quelle expérience démontre le mieux votre capacité à répondre aux principales exigences techniques du poste ?` : `What experience best demonstrates your ability to address the role's main technical requirements?`,
+      isFrench ? `Pouvez-vous me donner un exemple concret où vous avez assumé une responsabilité comparable ?` : `Can you give me a concrete example where you handled a comparable responsibility?`
     ],
     storiesToPrepare: stories.length ? stories : [isFrench ? "Mobilisez une expérience réelle de votre parcours qui illustre directement une priorité du poste." : "Use a real experience from your career that directly illustrates a priority of the role."],
     communicationPriorities: isFrench ? "Répondez d'abord à la question. Dites ce que vous avez fait personnellement, puis donnez le résultat. N'ajoutez pas de faits que votre expérience ne permet pas de prouver." : "Answer the question first. Say what you personally did, then give the result. Do not add facts your experience cannot support.",
@@ -95,7 +102,7 @@ async function generateStrategy(session: SessionRecord): Promise<InterviewStrate
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as InterviewStrategy;
-    if (!isValidStrategy(parsed, language)) throw new Error("Invalid strategy format");
+    if (!isValidStrategy(parsed, language, session.job_description)) throw new Error("Invalid strategy format");
     return parsed;
   } catch { return fallbackStrategy(session); }
 }
@@ -110,7 +117,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const record = session as SessionRecord;
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
   if (!hasValidProvenance(record.cv_analysis, record)) return NextResponse.json({ code: "ANALYSIS_PROVENANCE_INVALID", error: "The Professional Mirror analysis must be refreshed before an interview strategy can be generated." }, { status: 422 });
-  if (isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language))) return NextResponse.json({ strategy: record.interview_strategy });
+  if (isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description)) return NextResponse.json({ strategy: record.interview_strategy });
   const strategy = await generateStrategy(record);
   const { error: updateError } = await supabase.from("sessions").update({ interview_strategy: strategy }).eq("id", id).eq("user_id", user.id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
