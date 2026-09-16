@@ -65,47 +65,35 @@ export default function StrategyPage() {
   const labels = isFrench ? {
     badge: "Votre stratégie",
     title: "Votre plan d'entretien",
-    intro: "Voici ce que l'intervieweur doit comprendre, ce que vous devez démontrer et comment défendre les points sensibles.",
+    intro: "Voici ce que vous devez faire passer, prouver et défendre.",
     start: "Commencer l'entretien",
     core: "Votre message clé",
-    coreHint: "Si l'intervieweur ne devait retenir qu'une chose de vous.",
-    carry: "Comment le démontrer",
-    prove: "Ce que l'intervieweur doit croire",
-    proveHint: "Les points à établir pendant l'entretien — pas une liste de tâches.",
-    evidence: "Vos preuves les plus utiles",
-    evidenceHint: "Les expériences réelles à mobiliser pour rendre vos arguments crédibles.",
-    risks: "Les points à défendre",
-    riskHint: "Soyez précis sur ce que vous pouvez démontrer. Ne transformez pas un écart en expérience que vous n'avez pas.",
-    proofLabel: "Ce que vous devez démontrer",
-    responseLabel: "Comment le défendre",
-    questions: "Questions qui peuvent vous mettre à l'épreuve",
-    questionsHint: "Préparez surtout les questions directement liées au poste et à votre profil.",
-    method: "Votre règle de réponse",
-    communication: "Pendant l'entretien",
-    plan: "Ordre de préparation",
+    coreHint: "Le message que l'intervieweur doit retenir de vous.",
+    prove: "Ce que vous devez prouver",
+    proveHint: "Vos 3 priorités pendant l'entretien.",
+    examples: "Vos exemples à utiliser",
+    examplesHint: "Les expériences réelles à mobiliser pour appuyer vos réponses.",
+    risks: "Points à défendre",
+    riskHint: "Les écarts ou exigences sur lesquels l'intervieweur peut vous challenger.",
+    gapLabel: "Écart à traiter",
+    responseLabel: "Comment y répondre",
     empty: "Aucun élément à afficher.",
     startBottom: "Je suis prêt — commencer l'entretien"
   } : {
     badge: "Your strategy",
     title: "Your interview game plan",
-    intro: "Here is what the interviewer needs to understand, what you need to demonstrate, and how to defend the sensitive points.",
+    intro: "Here is what you need to communicate, prove, and defend.",
     start: "Start interview",
     core: "Your key message",
-    coreHint: "If the interviewer remembers only one thing about you.",
-    carry: "How to demonstrate it",
-    prove: "What the interviewer needs to believe",
-    proveHint: "The points you need to establish during the interview — not a to-do list.",
-    evidence: "Your strongest evidence",
-    evidenceHint: "Real experiences to use to make your arguments credible.",
-    risks: "Points you need to defend",
-    riskHint: "Be precise about what you can demonstrate. Never turn a gap into experience you do not have.",
-    proofLabel: "What you need to demonstrate",
-    responseLabel: "How to defend it",
-    questions: "Questions likely to test you",
-    questionsHint: "Focus on questions directly connected to the role and your profile.",
-    method: "Your answering rule",
-    communication: "During the interview",
-    plan: "Preparation order",
+    coreHint: "The message the interviewer should remember about you.",
+    prove: "What you need to prove",
+    proveHint: "Your 3 priorities for the interview.",
+    examples: "Examples to use",
+    examplesHint: "Real experiences you can use to support your answers.",
+    risks: "Points to defend",
+    riskHint: "Gaps or requirements the interviewer may challenge.",
+    gapLabel: "Gap to address",
+    responseLabel: "How to respond",
     empty: "Nothing to show yet.",
     startBottom: "I'm ready — start interview"
   };
@@ -114,7 +102,16 @@ export default function StrategyPage() {
 
   if (error) return <div className="mx-auto max-w-3xl space-y-6 py-20 text-center"><h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">{isFrench ? "Stratégie indisponible" : "Interview strategy unavailable"}</h1><p className="text-sm text-muted-foreground">{error}</p><div className="flex justify-center"><Button variant="outline" onClick={() => router.refresh()}>{isFrench ? "Réessayer" : "Retry"}</Button></div></div>;
 
-  const list = (items: string[] | undefined, limit = 3) => items?.length ? <ul className="space-y-3">{items.slice(0, limit).map((item, index) => <li key={`${index}-${item}`} className="flex gap-3 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-slate-500" /><span>{item}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">{labels.empty}</p>;
+  const numberedList = (items: string[] | undefined, limit = 3) => items?.length ? (
+    <ol className="space-y-4">
+      {items.slice(0, limit).map((item, index) => (
+        <li key={`${index}-${item}`} className="flex gap-3 text-sm leading-6 text-slate-700">
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ol>
+  ) : <p className="text-sm text-muted-foreground">{labels.empty}</p>;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 pb-10">
@@ -133,23 +130,19 @@ export default function StrategyPage() {
             <CardTitle className="flex items-center gap-2 text-lg"><Target className="h-5 w-5" />{labels.core}</CardTitle>
             <p className="text-sm text-muted-foreground">{labels.coreHint}</p>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <p className="text-xl font-semibold leading-8 text-slate-950">{strategy.strongestValueProposition}</p>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.carry}</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{strategy.candidatePositioning}</p>
-            </div>
           </CardContent>
         </Card>
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Card>
             <CardHeader className="pb-3"><CardTitle>{labels.prove}</CardTitle><p className="text-sm text-muted-foreground">{labels.proveHint}</p></CardHeader>
-            <CardContent>{list(strategy.interviewPriorities, 3)}</CardContent>
+            <CardContent>{numberedList(strategy.interviewPriorities, 3)}</CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.evidence}</CardTitle><p className="text-sm text-muted-foreground">{labels.evidenceHint}</p></CardHeader>
-            <CardContent>{list(strategy.storiesToPrepare, 3)}</CardContent>
+            <CardHeader className="pb-3"><CardTitle>{labels.examples}</CardTitle><p className="text-sm text-muted-foreground">{labels.examplesHint}</p></CardHeader>
+            <CardContent>{numberedList(strategy.storiesToPrepare, 3)}</CardContent>
           </Card>
         </div>
 
@@ -161,27 +154,13 @@ export default function StrategyPage() {
           <CardContent className="grid gap-3 md:grid-cols-2">
             {strategy.gapsOrRisks.slice(0, 3).map((gap, index) => (
               <div key={`${index}-${gap}`} className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.proofLabel}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.gapLabel}</p>
                 <p className="mt-1 text-sm font-medium leading-6 text-slate-900">{gap}</p>
                 {strategy.gapDefenseStrategy[index] && <><p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.responseLabel}</p><p className="mt-1 text-sm leading-6 text-slate-700">{strategy.gapDefenseStrategy[index]}</p></>}
               </div>
             ))}
           </CardContent>
         </Card>}
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.questions}</CardTitle><p className="text-sm text-muted-foreground">{labels.questionsHint}</p></CardHeader>
-            <CardContent>{list(strategy.likelyDifficultQuestions, 3)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.method}</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.communication}</p><p className="mt-2 text-sm leading-6 text-slate-700">{strategy.communicationPriorities}</p></div>
-              <div><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.plan}</p><p className="mt-2 text-sm leading-6 text-slate-700">{strategy.interviewPlan}</p></div>
-            </CardContent>
-          </Card>
-        </div>
 
         <div className="flex justify-end pt-1"><Button size="lg" onClick={startInterview}>{labels.startBottom}<ArrowRight className="h-4 w-4" /></Button></div>
       </div>}
