@@ -65,37 +65,49 @@ export default function StrategyPage() {
   const labels = isFrench ? {
     badge: "Votre stratégie",
     title: "Votre plan d'entretien",
-    intro: "Voici ce que vous devez faire passer, prouver et défendre.",
+    intro: "Le Professional Mirror a identifié votre profil. Cette page transforme ce diagnostic en plan concret pour l'entretien.",
     start: "Commencer l'entretien",
-    core: "Votre message clé",
-    coreHint: "Le message que l'intervieweur doit retenir de vous.",
-    prove: "Ce que vous devez prouver",
-    proveHint: "Vos 3 priorités pendant l'entretien.",
+    keyMessage: "Votre message clé",
+    keyHint: "Le message que l'intervieweur doit retenir de vous.",
+    priorities: "Ce que vous devez prouver",
+    prioritiesHint: "Vos 3 priorités pour l'entretien — dans l'ordre où elles comptent.",
     examples: "Vos exemples à utiliser",
     examplesHint: "Les expériences réelles à mobiliser pour appuyer vos réponses.",
     risks: "Points à défendre",
     riskHint: "Les écarts ou exigences sur lesquels l'intervieweur peut vous challenger.",
     gapLabel: "Écart à traiter",
     responseLabel: "Comment y répondre",
-    empty: "Aucun élément à afficher.",
-    startBottom: "Je suis prêt — commencer l'entretien"
+    profile: "Profil",
+    strategy: "Stratégie",
+    interview: "Entretien",
+    feedback: "Feedback",
+    retest: "Retest",
+    ready: "Votre plan est prêt. L'entretien va maintenant tester ce que vous devez démontrer.",
+    startBottom: "Je suis prêt — commencer l'entretien",
+    empty: "Aucun élément à afficher."
   } : {
     badge: "Your strategy",
     title: "Your interview game plan",
-    intro: "Here is what you need to communicate, prove, and defend.",
+    intro: "The Professional Mirror has identified your profile. This page turns that diagnosis into a concrete interview plan.",
     start: "Start interview",
-    core: "Your key message",
-    coreHint: "The message the interviewer should remember about you.",
-    prove: "What you need to prove",
-    proveHint: "Your 3 priorities for the interview.",
+    keyMessage: "Your key message",
+    keyHint: "The message the interviewer should remember about you.",
+    priorities: "What you need to prove",
+    prioritiesHint: "Your 3 interview priorities — in the order that matters.",
     examples: "Examples to use",
     examplesHint: "Real experiences you can use to support your answers.",
     risks: "Points to defend",
     riskHint: "Gaps or requirements the interviewer may challenge.",
     gapLabel: "Gap to address",
     responseLabel: "How to respond",
-    empty: "Nothing to show yet.",
-    startBottom: "I'm ready — start interview"
+    profile: "Profile",
+    strategy: "Strategy",
+    interview: "Interview",
+    feedback: "Feedback",
+    retest: "Retest",
+    ready: "Your plan is ready. The interview will now test what you need to demonstrate.",
+    startBottom: "I'm ready — start interview",
+    empty: "Nothing to show yet."
   };
 
   if (loading) return <div className="flex items-center justify-center py-24 text-muted-foreground"><div className="space-y-3 text-center"><div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700"><ShieldCheck className="h-6 w-6" /></div><p className="text-base">{isFrench ? "Préparation de votre stratégie…" : "Building your interview strategy…"}</p></div></div>;
@@ -124,20 +136,31 @@ export default function StrategyPage() {
         {strategy && <Button size="lg" onClick={startInterview}>{labels.start}<ArrowRight className="h-4 w-4" /></Button>}
       </div>
 
+      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-medium sm:gap-3">
+          {[labels.profile, labels.strategy, labels.interview, labels.feedback, labels.retest].map((step, index) => (
+            <div key={step} className="flex items-center gap-2">
+              <span className={index === 1 ? "rounded-full bg-slate-900 px-3 py-1.5 text-white" : "rounded-full bg-slate-100 px-3 py-1.5 text-slate-600"}>{step}</span>
+              {index < 4 && <ArrowRight className="h-3.5 w-3.5 text-slate-300" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {strategy && <div className="space-y-5">
         <Card className="overflow-hidden border-slate-200 bg-slate-50/80">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg"><Target className="h-5 w-5" />{labels.core}</CardTitle>
-            <p className="text-sm text-muted-foreground">{labels.coreHint}</p>
+            <CardTitle className="flex items-center gap-2 text-lg"><Target className="h-5 w-5" />{labels.keyMessage}</CardTitle>
+            <p className="text-sm text-muted-foreground">{labels.keyHint}</p>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold leading-8 text-slate-950">{strategy.strongestValueProposition}</p>
+            <p className="text-xl font-semibold leading-8 text-slate-950 sm:text-2xl">{strategy.strongestValueProposition}</p>
           </CardContent>
         </Card>
 
         <div className="grid gap-5 lg:grid-cols-2">
           <Card>
-            <CardHeader className="pb-3"><CardTitle>{labels.prove}</CardTitle><p className="text-sm text-muted-foreground">{labels.proveHint}</p></CardHeader>
+            <CardHeader className="pb-3"><CardTitle>{labels.priorities}</CardTitle><p className="text-sm text-muted-foreground">{labels.prioritiesHint}</p></CardHeader>
             <CardContent>{numberedList(strategy.interviewPriorities, 3)}</CardContent>
           </Card>
           <Card>
@@ -151,18 +174,26 @@ export default function StrategyPage() {
             <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5" />{labels.risks}</CardTitle>
             <p className="text-sm text-muted-foreground">{labels.riskHint}</p>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="space-y-3">
             {strategy.gapsOrRisks.slice(0, 3).map((gap, index) => (
               <div key={`${index}-${gap}`} className="rounded-xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.gapLabel}</p>
-                <p className="mt-1 text-sm font-medium leading-6 text-slate-900">{gap}</p>
-                {strategy.gapDefenseStrategy[index] && <><p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.responseLabel}</p><p className="mt-1 text-sm leading-6 text-slate-700">{strategy.gapDefenseStrategy[index]}</p></>}
+                <div className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.gapLabel}</p>
+                    <p className="mt-1 text-sm font-medium leading-6 text-slate-900">{gap}</p>
+                    {strategy.gapDefenseStrategy[index] && <><p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.responseLabel}</p><p className="mt-1 text-sm leading-6 text-slate-700">{strategy.gapDefenseStrategy[index]}</p></>}
+                  </div>
+                </div>
               </div>
             ))}
           </CardContent>
         </Card>}
 
-        <div className="flex justify-end pt-1"><Button size="lg" onClick={startInterview}>{labels.startBottom}<ArrowRight className="h-4 w-4" /></Button></div>
+        <div className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-5 sm:flex-row">
+          <div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 shrink-0 text-slate-600" /><p className="text-sm leading-6 text-slate-700">{labels.ready}</p></div>
+          <Button size="lg" onClick={startInterview}>{labels.startBottom}<ArrowRight className="h-4 w-4" /></Button>
+        </div>
       </div>}
     </div>
   );
