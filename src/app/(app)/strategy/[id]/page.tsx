@@ -70,7 +70,7 @@ export default function StrategyPage() {
     keyMessage: "Votre message clé",
     keyHint: "L'idée principale que vous devez faire ressortir pendant l'entretien.",
     priorities: "Ce que vous devez démontrer durant l'entretien",
-    support: "Pour appuyer ce point",
+    support: "Expérience pertinente",
     risks: "Points d'attention",
     responseLabel: "Comment y répondre",
     profile: "Profil",
@@ -89,7 +89,7 @@ export default function StrategyPage() {
     keyMessage: "Your key message",
     keyHint: "The main idea you should make clear during the interview.",
     priorities: "What you need to demonstrate during the interview",
-    support: "To support this point",
+    support: "Relevant experience",
     risks: "Points to watch",
     responseLabel: "How to respond",
     profile: "Profile",
@@ -101,6 +101,20 @@ export default function StrategyPage() {
     startBottom: "I'm ready — start interview",
     empty: "Nothing to show yet."
   };
+
+  function displayKeyMessage(value: string) {
+    return value
+      .replace(/\bVotre principal point d'appui est\b/gi, "Votre principal atout est")
+      .replace(/\bYour main point of support is\b/gi, "Your main strength is")
+      .replace(/\bYour strongest proof point is\b/gi, "Your main strength is");
+  }
+
+  function displaySupportingExperience(value: string | undefined, index: number) {
+    if (!value) return null;
+    const generic = /^(?:mobilisez l'expérience professionnelle associée à cette exigence|utilisez l'expérience la plus proche que vous pouvez réellement démontrer pour cette exigence|mobilisez une expérience réelle de votre parcours qui illustre directement une priorité du poste|use the professional experience associated with this requirement|use the closest experience you can genuinely demonstrate for this requirement|use a real experience from your career that directly illustrates a priority of the role)/i;
+    if (generic.test(value.trim())) return strategy?.strengthsToLeverage?.[index] || null;
+    return value;
+  }
 
   if (loading) return <div className="flex items-center justify-center py-24 text-muted-foreground"><div className="space-y-3 text-center"><div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700"><ShieldCheck className="h-6 w-6" /></div><p className="text-base">{isFrench ? "Préparation de votre stratégie…" : "Building your interview strategy…"}</p></div></div>;
 
@@ -135,7 +149,7 @@ export default function StrategyPage() {
             <p className="text-sm text-muted-foreground">{labels.keyHint}</p>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold leading-8 text-slate-950 sm:text-2xl">{strategy.strongestValueProposition}</p>
+            <p className="text-xl font-semibold leading-8 text-slate-950 sm:text-2xl">{displayKeyMessage(strategy.strongestValueProposition)}</p>
           </CardContent>
         </Card>
 
@@ -144,20 +158,23 @@ export default function StrategyPage() {
           <CardContent>
             {strategy.interviewPriorities?.length ? (
               <ol className="space-y-5">
-                {strategy.interviewPriorities.slice(0, 3).map((item, index) => (
-                  <li key={`${index}-${item}`} className="flex gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-6 text-slate-700">{item}</p>
-                      {strategy.storiesToPrepare?.[index] && (
-                        <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-slate-500">{labels.support}</p>
-                          <p className="mt-0.5 text-sm leading-5 text-slate-600">{strategy.storiesToPrepare[index]}</p>
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
+                {strategy.interviewPriorities.slice(0, 3).map((item, index) => {
+                  const supportingExperience = displaySupportingExperience(strategy.storiesToPrepare?.[index], index);
+                  return (
+                    <li key={`${index}-${item}`} className="flex gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm leading-6 text-slate-700">{item}</p>
+                        {supportingExperience && (
+                          <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
+                            <p className="text-xs font-semibold text-slate-500">{labels.support}</p>
+                            <p className="mt-0.5 text-sm leading-5 text-slate-600">{supportingExperience}</p>
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             ) : <p className="text-sm text-muted-foreground">{labels.empty}</p>}
           </CardContent>
