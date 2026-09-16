@@ -71,7 +71,6 @@ export default function StrategyPage() {
     keyHint: "Ce que l'intervieweur doit retenir de votre profil.",
     priorities: "Ce que vous devez démontrer durant l'entretien",
     risks: "Points d'attention",
-    gapLabel: "Point d'attention",
     responseLabel: "Comment y répondre",
     profile: "Profil",
     strategy: "Stratégie",
@@ -90,7 +89,6 @@ export default function StrategyPage() {
     keyHint: "What the interviewer should remember about your profile.",
     priorities: "What you need to demonstrate during the interview",
     risks: "Points to watch",
-    gapLabel: "Point to watch",
     responseLabel: "How to respond",
     profile: "Profile",
     strategy: "Strategy",
@@ -165,8 +163,7 @@ export default function StrategyPage() {
                 <div className="flex gap-3">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">{index + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.gapLabel}</p>
-                    <p className="mt-1 text-sm font-medium leading-6 text-slate-900">{gap}</p>
+                    <p className="text-sm font-medium leading-6 text-slate-900">{gap}</p>
                     {strategy.gapDefenseStrategy[index] && <><p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{labels.responseLabel}</p><p className="mt-1 text-sm leading-6 text-slate-700">{strategy.gapDefenseStrategy[index]}</p></>}
                   </div>
                 </div>
