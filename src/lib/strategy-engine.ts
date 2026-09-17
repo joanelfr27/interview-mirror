@@ -163,10 +163,36 @@ function containsCopiedDiagnosticRequirement(strategy: unknown, analysis: CvAnal
   const candidateText = [...s.strengthsToLeverage ?? [], ...s.storiesToPrepare ?? [], ...s.interviewPriorities ?? []].filter((x: any) => typeof x === "string").join(" ").toLowerCase();
   return analysis.evidenceChain.some((item) => { const requirement = canonicalize(item.jd_requirement ?? "").toLowerCase(); return requirement.length >= 24 && candidateText.includes(requirement); });
 }
-function hasConcreteCvAnchor(text: string, cvText: string): boolean {
-  const normalized = canonicalize(text).toLowerCase(); const cv = canonicalize(cvText).toLowerCase();
-  const anchors = ["syngenta", "mitsubishi", "vfs global", "ey", "epp books", "acca", "monthly closing", "financial reporting", "budget", "forecast", "working capital", "syscohada", "ifrs", "audit", "tax authorities", "internal control"];
-  return anchors.some((anchor) => normalized.includes(anchor) && cv.includes(anchor));
+const STORY_ANCHOR_STOPWORDS = new Set(["experience", "financial", "finance", "responsibility", "reporting", "management", "accounting", "conformity", "compliance", "professional", "strength"]);
+
+/** Returns the evidence node backing a story only if it is a real, provable fact (never QUALIFICATION-as-experience, never UNKNOWN/NOT_DOCUMENTED). */
+function findProvableEvidenceNode(nodeId: string | undefined, evidenceMap: EvidenceMapNode[]): EvidenceMapNode | null {
+  if (!nodeId) return null;
+  const node = evidenceMap.find((n) => n.node_id === nodeId);
+  if (!node) return null;
+  if (node.status !== "PROVEN" && node.status !== "PARTIALLY_PROVEN") return null;
+  return node;
+}
+function hasEvidenceNodeAnchor(text: string, node: EvidenceMapNode): boolean {
+  const anchors = factAnchorWords(node.fact).filter((word) => !STORY_ANCHOR_STOPWORDS.has(word));
+  if (!anchors.length) return false;
+  const normalized = canonicalize(text).toLowerCase();
+  return anchors.some((anchor) => normalized.includes(anchor));
+}
+/**
+ * Deterministic, evidence-map-driven replacement for the old fixed-keyword CV anchor check.
+ * When the Pass 1 proof objectives are available, each story is checked against the exact
+ * primary evidence node assigned to that objective (by index). Otherwise (e.g. re-validating
+ * an already-persisted strategy where Pass 1 reasoning isn't stored), it falls back to
+ * requiring a match against *some* provable (PROVEN/PARTIALLY_PROVEN) evidence node.
+ */
+function storyBackedByEvidence(text: string, index: number, evidenceMap: EvidenceMapNode[], strategicAnalysis: StrategicAnalysis | null): boolean {
+  const primaryNodeId = strategicAnalysis?.proofObjectives?.[index]?.primary_evidence_node_id;
+  if (primaryNodeId) {
+    const node = findProvableEvidenceNode(primaryNodeId, evidenceMap);
+    return Boolean(node && hasEvidenceNodeAnchor(text, node));
+  }
+  return evidenceMap.some((node) => (node.status === "PROVEN" || node.status === "PARTIALLY_PROVEN") && hasEvidenceNodeAnchor(text, node));
 }
 function extractSourceAnchors(source: string): string[] {
   const anchors = new Set<string>(); const normalized = canonicalize(source);
@@ -206,7 +232,7 @@ function hasInternalStrategyInstructions(text: string): boolean {
   return /\b(?:une expérience réelle du parcours doit servir|this experience should serve as an anchor|serve as the corresponding strategic anchor|point stratégique correspondant|_reasoning|proof[_ ]objective|evidence[_ ]node|primary[_ ]evidence)\b/i.test(text);
 }
 
-export function isValidStrategy(strategy: unknown, language: SessionLanguage, jobDescription = "", analysis: CvAnalysis | null = null, cvText = "", evidenceMap: EvidenceMapNode[] = []): strategy is InterviewStrategy {
+export function isValidStrategy(strategy: unknown, language: SessionLanguage, jobDescription = "", analysis: CvAnalysis | null = null, cvText = "", evidenceMap: EvidenceMapNode[] = [], strategicAnalysis: StrategicAnalysis | null = null): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any;
   const generic = /\b(clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|prepare examples|prepare simple examples|préparez des exemples|be ready|show your|connect your experience|reliez votre expérience|based on the cv|à partir du cv)\b/i;
@@ -216,10 +242,78 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, jo
   const weakKeyMessage = /\b(?:point d'appui|point d'appui principal|strongest proof point|strongest foundation)\b|\b(?:montrez concrètement|show specifically)\b/i;
   const allText = [s.candidatePositioning, s.strongestValueProposition, s.communicationPriorities, s.interviewPlan, s.personalization, ...s.strengthsToLeverage ?? [], ...s.gapsOrRisks ?? [], ...s.gapDefenseStrategy ?? [], ...s.interviewPriorities ?? [], ...s.likelyDifficultQuestions ?? [], ...s.storiesToPrepare ?? []].filter((x: any) => typeof x === "string").join(" ");
   const validQuestion = (x: any) => typeof x === "string" && !!x.trim() && x.length <= 320 && !generic.test(x) && !prepInstruction.test(x) && /\?|^(?:quelle|quels|comment|pourquoi|pouvez-vous|pouvez vous|donnez-moi|donnez moi|décrivez|what|which|how|why|can you|could you|tell me|describe)\b/i.test(x.trim());
-  const validPriority = (x: any) => typeof x === "string" && !!x.trim() && x.length <= 420 && !generic.test(x) && !prepInstruction.test(x) && !priorityInstruction.test(x);
+  // interviewPriorities legitimately expresses what the interview must establish using verbs like "démontrer"/"expliquer"/"préparer", so this field skips prepInstruction/priorityInstruction while keeping the generic-phrasing and length guards (evidence/role grounding is enforced separately by alignsWithAnalysis).
+  const validPriority = (x: any) => typeof x === "string" && !!x.trim() && x.length <= 420 && !generic.test(x);
   const validCandidateEvidence = (x: any) => typeof x === "string" && !!x.trim() && !generic.test(x) && !prepInstruction.test(x) && !/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i.test(x);
-  const storiesValid = Array.isArray(s.storiesToPrepare) && s.storiesToPrepare.length === 3 && s.storiesToPrepare.every((x: any) => validCandidateEvidence(x) && hasConcreteCvAnchor(x, cvText));
-  return typeof s.candidatePositioning === "string" && typeof s.strongestValueProposition === "string" && Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) && Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) && Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) && typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" && typeof s.personalization === "string" && !generic.test(s.candidatePositioning) && !generic.test(s.strongestValueProposition) && !weakKeyMessage.test(s.strongestValueProposition) && !generic.test(s.communicationPriorities) && !generic.test(s.interviewPlan) && !generic.test(s.personalization) && !unsafeIndustryGap.test(allText) && !hasObviousLanguageMismatch(allText, language) && !containsCopiedJdSentence(strategy, jobDescription) && !containsCopiedDiagnosticRequirement(strategy, analysis) && !hasCrossSectionDuplication(s) && !hasPresentationArtifacts(allText) && !hasBrokenSentenceConstruction(allText) && !hasInternalStrategyInstructions(allText) && !hasQualificationExperienceMisuse(allText, evidenceMap) && !hasToolClaimMisuse(allText, evidenceMap) && !hasIndustryClaimMisuse(allText, evidenceMap) && hasSpecificPriorityAnchors(s, cvText, jobDescription, evidenceMap) && s.interviewPriorities.length === 3 && s.interviewPriorities.every(validPriority) && s.likelyDifficultQuestions.length > 0 && s.likelyDifficultQuestions.every(validQuestion) && s.strengthsToLeverage.every(validCandidateEvidence) && storiesValid && s.gapsOrRisks.length <= 3 && s.gapsOrRisks.every((x: any) => typeof x === "string" && x.trim() && !generic.test(x));
+  // storiesToPrepare legitimately contains preparation instructions ("Préparez", "Mettez en avant", etc.), so this field skips the prepInstruction check while keeping every other anti-hallucination guard.
+  const validStoryText = (x: any) => typeof x === "string" && !!x.trim() && !generic.test(x) && !/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i.test(x);
+
+  // Named checks (diagnostic-only decomposition; combined result is unchanged).
+  const checks = {
+    requiredShapes: typeof s.candidatePositioning === "string" && typeof s.strongestValueProposition === "string" && Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) && Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) && Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) && typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" && typeof s.personalization === "string",
+    genericPositioningAndValueProp: !generic.test(s.candidatePositioning) && !generic.test(s.strongestValueProposition) && !weakKeyMessage.test(s.strongestValueProposition),
+    commPlanPersonalization: !generic.test(s.communicationPriorities) && !generic.test(s.interviewPlan) && !generic.test(s.personalization),
+    industryGapProtection: !unsafeIndustryGap.test(allText),
+    languageMismatch: !hasObviousLanguageMismatch(allText, language),
+    copiedJd: !containsCopiedJdSentence(strategy, jobDescription),
+    copiedDiagnostic: !containsCopiedDiagnosticRequirement(strategy, analysis),
+    crossSectionDuplication: !hasCrossSectionDuplication(s),
+    presentationArtifacts: !hasPresentationArtifacts(allText),
+    brokenSentenceConstruction: !hasBrokenSentenceConstruction(allText),
+    internalStrategyInstructions: !hasInternalStrategyInstructions(allText),
+    qualificationMisuse: !hasQualificationExperienceMisuse(allText, evidenceMap),
+    toolMisuse: !hasToolClaimMisuse(allText, evidenceMap),
+    industryMisuse: !hasIndustryClaimMisuse(allText, evidenceMap),
+    priorityCount: Array.isArray(s.interviewPriorities) && s.interviewPriorities.length === 3,
+    priorityValidity: Array.isArray(s.interviewPriorities) && s.interviewPriorities.every(validPriority),
+    difficultQuestionValidity: Array.isArray(s.likelyDifficultQuestions) && s.likelyDifficultQuestions.length > 0 && s.likelyDifficultQuestions.every(validQuestion),
+    strengthsValidity: Array.isArray(s.strengthsToLeverage) && s.strengthsToLeverage.every(validCandidateEvidence),
+    storiesValidity: Array.isArray(s.storiesToPrepare) && s.storiesToPrepare.length === 3 && s.storiesToPrepare.every((x: any, i: number) => validStoryText(x) && storyBackedByEvidence(x, i, evidenceMap, strategicAnalysis)),
+    gapsValidity: Array.isArray(s.gapsOrRisks) && s.gapsOrRisks.length <= 3 && s.gapsOrRisks.every((x: any) => typeof x === "string" && x.trim() && !generic.test(x)),
+  };
+  const result = Object.values(checks).every(Boolean);
+  if (!result) {
+    const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    console.log("[Gate2][isValidStrategy] failed checks:", failed);
+
+    if (!checks.priorityValidity && Array.isArray(s.interviewPriorities)) {
+      s.interviewPriorities.forEach((x: any, i: number) => {
+        if (validPriority(x)) return;
+        const isString = typeof x === "string";
+        const trimmedOk = isString && !!x.trim();
+        const lengthOk = isString && x.length <= 420;
+        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
+        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
+        const priorityMatch = isString ? x.match(priorityInstruction)?.[0] ?? null : null;
+        console.log(`[Gate2][isValidStrategy][priorityValidity] index=${i} isString=${isString} trimmedOk=${trimmedOk} lengthOk=${lengthOk} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch} priorityInstructionMatch=${priorityMatch}`);
+      });
+    }
+    if (!checks.strengthsValidity && Array.isArray(s.strengthsToLeverage)) {
+      s.strengthsToLeverage.forEach((x: any, i: number) => {
+        if (validCandidateEvidence(x)) return;
+        const isString = typeof x === "string";
+        const trimmedOk = isString && !!x.trim();
+        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
+        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
+        const jdEchoMatch = isString ? x.match(/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i)?.[0] ?? null : null;
+        console.log(`[Gate2][isValidStrategy][strengthsValidity] index=${i} isString=${isString} trimmedOk=${trimmedOk} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch} jdEchoMatch=${jdEchoMatch}`);
+      });
+    }
+    if (!checks.storiesValidity && Array.isArray(s.storiesToPrepare)) {
+      s.storiesToPrepare.forEach((x: any, i: number) => {
+        const isString = typeof x === "string";
+        const evidenceOk = isString && validStoryText(x);
+        const backedByEvidence = isString && storyBackedByEvidence(x, i, evidenceMap, strategicAnalysis);
+        if (evidenceOk && backedByEvidence) return;
+        const primaryNodeId = strategicAnalysis?.proofObjectives?.[i]?.primary_evidence_node_id ?? null;
+        const node = findProvableEvidenceNode(primaryNodeId ?? undefined, evidenceMap);
+        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
+        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
+        console.log(`[Gate2][isValidStrategy][storiesValidity] index=${i} isString=${isString} evidenceCheckOk=${evidenceOk} evidenceBackedOk=${backedByEvidence} primaryNodeId=${primaryNodeId} nodeFoundAndProvable=${Boolean(node)} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch}`);
+      });
+    }
+  }
+  return result;
 }
 
 function validateObjectiveShape(o: any): o is ProofObjective {
@@ -303,17 +397,29 @@ function factAnchorWords(fact: string): string[] {
 
 /** Deterministic traceability backstop: require each priority/story to reference at least one meaningful token from its assigned evidence fact. */
 function alignsWithAnalysis(strategy: InterviewStrategy, analysis: StrategicAnalysis, evidenceMap: EvidenceMapNode[]): boolean {
-  if (strategy.storiesToPrepare.length !== 3 || strategy.interviewPriorities.length !== 3) return false;
+  if (strategy.storiesToPrepare.length !== 3 || strategy.interviewPriorities.length !== 3) {
+    console.log("[Gate2][alignsWithAnalysis] failed: storiesToPrepare/interviewPriorities length !== 3");
+    return false;
+  }
   const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
   for (let i = 0; i < 3; i++) {
-    const node = byId.get(analysis.proofObjectives[i].primary_evidence_node_id);
-    if (!node) return false;
+    const nodeId = analysis.proofObjectives[i].primary_evidence_node_id;
+    const node = byId.get(nodeId);
+    if (!node) {
+      console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} result=FAIL reason=node-not-found`);
+      return false;
+    }
     const anchors = factAnchorWords(node.fact).filter((word) => !["experience", "financial", "finance", "responsibility", "reporting", "management", "accounting", "conformity", "compliance", "professional", "strength"].includes(word));
-    if (!anchors.length) continue;
+    if (!anchors.length) {
+      console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} anchorCount=0 result=SKIP(no-anchors)`);
+      continue;
+    }
     const storyLower = canonicalize(strategy.storiesToPrepare[i]).toLowerCase();
     const priorityLower = canonicalize(strategy.interviewPriorities[i]).toLowerCase();
-    if (!anchors.some((a) => storyLower.includes(a))) return false;
-    if (!anchors.some((a) => priorityLower.includes(a))) return false;
+    const inStory = anchors.some((a) => storyLower.includes(a));
+    const inPriority = anchors.some((a) => priorityLower.includes(a));
+    console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} anchorCount=${anchors.length} anchorInStory=${inStory} anchorInPriority=${inPriority}`);
+    if (!inStory || !inPriority) return false;
   }
   return true;
 }
@@ -333,7 +439,10 @@ export async function generateExecutiveStrategy(session: SessionRecord, evidence
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const raw = await runPass2(session, evidenceMap, analysis, language);
-      if (isValidStrategy(raw, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap) && alignsWithAnalysis(raw, analysis, evidenceMap)) return raw;
+      const shapeValid = isValidStrategy(raw, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis);
+      const aligned = shapeValid && alignsWithAnalysis(raw as InterviewStrategy, analysis, evidenceMap);
+      console.log(`[Gate2][generateExecutiveStrategy] attempt=${attempt} isValidStrategy=${shapeValid} alignsWithAnalysis=${shapeValid ? aligned : "skipped"}`);
+      if (shapeValid && aligned) return raw as InterviewStrategy;
       lastError = new Error("Pass 2 output failed Gate 2 validation");
     } catch (err) {
       lastError = err;
