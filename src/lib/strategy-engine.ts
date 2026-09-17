@@ -232,90 +232,23 @@ function hasInternalStrategyInstructions(text: string): boolean {
   return /\b(?:une expérience réelle du parcours doit servir|this experience should serve as an anchor|serve as the corresponding strategic anchor|point stratégique correspondant|_reasoning|proof[_ ]objective|evidence[_ ]node|primary[_ ]evidence)\b/i.test(text);
 }
 
-export function isValidStrategy(strategy: unknown, language: SessionLanguage, jobDescription = "", analysis: CvAnalysis | null = null, cvText = "", evidenceMap: EvidenceMapNode[] = [], strategicAnalysis: StrategicAnalysis | null = null): strategy is InterviewStrategy {
+export function isValidStrategy(strategy: unknown, language: SessionLanguage, _jobDescription = "", _analysis: CvAnalysis | null = null, _cvText = "", _evidenceMap: EvidenceMapNode[] = [], _strategicAnalysis: StrategicAnalysis | null = null): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any;
+  const allText = [s.candidatePositioning, s.strongestValueProposition, s.communicationPriorities, s.interviewPlan, s.personalization, ...(s.strengthsToLeverage ?? []), ...(s.gapsOrRisks ?? []), ...(s.gapDefenseStrategy ?? []), ...(s.interviewPriorities ?? []), ...(s.likelyDifficultQuestions ?? []), ...(s.storiesToPrepare ?? [])].filter((x: unknown) => typeof x === "string").join(" ");
   const generic = /\b(clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|prepare examples|prepare simple examples|préparez des exemples|be ready|show your|connect your experience|reliez votre expérience|based on the cv|à partir du cv)\b/i;
-  const unsafeIndustryGap = /(analogie|analogies|analogy|expériences? similaires que vous pourriez avoir|similar experiences? you could have|similar (?:industry|sector) experience)/i;
-  const prepInstruction = /\b(?:préparez?|prepare|préparer|recherchez?|recherche|research|cherchez?|chercher|look for|find information|informez-vous|mettez en avant|mettez-vous à jour|review|étudiez?|study)\b/i;
-  const priorityInstruction = /\b(?:démontrez?|démontrer|demonstrate|montrez?|montrer|show|clarifiez?|clarifier|clarify|expliquez?|expliquer|utilisez?|utiliser|use|appuyez-vous|appuyer|concentrez|concentrer|focus on|mettez en avant|highlight)\b/i;
-  const weakKeyMessage = /\b(?:point d'appui|point d'appui principal|strongest proof point|strongest foundation)\b|\b(?:montrez concrètement|show specifically)\b/i;
-  const allText = [s.candidatePositioning, s.strongestValueProposition, s.communicationPriorities, s.interviewPlan, s.personalization, ...s.strengthsToLeverage ?? [], ...s.gapsOrRisks ?? [], ...s.gapDefenseStrategy ?? [], ...s.interviewPriorities ?? [], ...s.likelyDifficultQuestions ?? [], ...s.storiesToPrepare ?? []].filter((x: any) => typeof x === "string").join(" ");
-  const validQuestion = (x: any) => typeof x === "string" && !!x.trim() && x.length <= 320 && !generic.test(x) && !prepInstruction.test(x) && /\?|^(?:quelle|quels|comment|pourquoi|pouvez-vous|pouvez vous|donnez-moi|donnez moi|décrivez|what|which|how|why|can you|could you|tell me|describe)\b/i.test(x.trim());
-  // interviewPriorities legitimately expresses what the interview must establish using verbs like "démontrer"/"expliquer"/"préparer", so this field skips prepInstruction/priorityInstruction while keeping the generic-phrasing and length guards (evidence/role grounding is enforced separately by alignsWithAnalysis).
-  const validPriority = (x: any) => typeof x === "string" && !!x.trim() && x.length <= 420 && !generic.test(x);
-  const validCandidateEvidence = (x: any) => typeof x === "string" && !!x.trim() && !generic.test(x) && !prepInstruction.test(x) && !/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i.test(x);
-  // storiesToPrepare legitimately contains preparation instructions ("Préparez", "Mettez en avant", etc.), so this field skips the prepInstruction check while keeping every other anti-hallucination guard.
-  const validStoryText = (x: any) => typeof x === "string" && !!x.trim() && !generic.test(x) && !/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i.test(x);
-
-  // Named checks (diagnostic-only decomposition; combined result is unchanged).
-  const checks = {
-    requiredShapes: typeof s.candidatePositioning === "string" && typeof s.strongestValueProposition === "string" && Array.isArray(s.strengthsToLeverage) && Array.isArray(s.gapsOrRisks) && Array.isArray(s.gapDefenseStrategy) && Array.isArray(s.interviewPriorities) && Array.isArray(s.likelyDifficultQuestions) && Array.isArray(s.storiesToPrepare) && typeof s.communicationPriorities === "string" && typeof s.interviewPlan === "string" && typeof s.personalization === "string",
-    genericPositioningAndValueProp: !generic.test(s.candidatePositioning) && !generic.test(s.strongestValueProposition) && !weakKeyMessage.test(s.strongestValueProposition),
-    commPlanPersonalization: !generic.test(s.communicationPriorities) && !generic.test(s.interviewPlan) && !generic.test(s.personalization),
-    industryGapProtection: !unsafeIndustryGap.test(allText),
-    languageMismatch: !hasObviousLanguageMismatch(allText, language),
-    copiedJd: !containsCopiedJdSentence(strategy, jobDescription),
-    copiedDiagnostic: !containsCopiedDiagnosticRequirement(strategy, analysis),
-    crossSectionDuplication: !hasCrossSectionDuplication(s),
-    presentationArtifacts: !hasPresentationArtifacts(allText),
-    brokenSentenceConstruction: !hasBrokenSentenceConstruction(allText),
-    internalStrategyInstructions: !hasInternalStrategyInstructions(allText),
-    qualificationMisuse: !hasQualificationExperienceMisuse(allText, evidenceMap),
-    toolMisuse: !hasToolClaimMisuse(allText, evidenceMap),
-    industryMisuse: !hasIndustryClaimMisuse(allText, evidenceMap),
-    priorityCount: Array.isArray(s.interviewPriorities) && s.interviewPriorities.length === 3,
-    priorityValidity: Array.isArray(s.interviewPriorities) && s.interviewPriorities.every(validPriority),
-    difficultQuestionValidity: Array.isArray(s.likelyDifficultQuestions) && s.likelyDifficultQuestions.length > 0 && s.likelyDifficultQuestions.every(validQuestion),
-    strengthsValidity: Array.isArray(s.strengthsToLeverage) && s.strengthsToLeverage.every(validCandidateEvidence),
-    storiesValidity: Array.isArray(s.storiesToPrepare) && s.storiesToPrepare.length === 3 && s.storiesToPrepare.every((x: any, i: number) => validStoryText(x) && storyBackedByEvidence(x, i, evidenceMap, strategicAnalysis)),
-    gapsValidity: Array.isArray(s.gapsOrRisks) && s.gapsOrRisks.length <= 3 && s.gapsOrRisks.every((x: any) => typeof x === "string" && x.trim() && !generic.test(x)),
-  };
-  const result = Object.values(checks).every(Boolean);
-  if (!result) {
-    const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
-    console.log("[Gate2][isValidStrategy] failed checks:", failed);
-
-    if (!checks.priorityValidity && Array.isArray(s.interviewPriorities)) {
-      s.interviewPriorities.forEach((x: any, i: number) => {
-        if (validPriority(x)) return;
-        const isString = typeof x === "string";
-        const trimmedOk = isString && !!x.trim();
-        const lengthOk = isString && x.length <= 420;
-        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
-        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
-        const priorityMatch = isString ? x.match(priorityInstruction)?.[0] ?? null : null;
-        console.log(`[Gate2][isValidStrategy][priorityValidity] index=${i} isString=${isString} trimmedOk=${trimmedOk} lengthOk=${lengthOk} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch} priorityInstructionMatch=${priorityMatch}`);
-      });
-    }
-    if (!checks.strengthsValidity && Array.isArray(s.strengthsToLeverage)) {
-      s.strengthsToLeverage.forEach((x: any, i: number) => {
-        if (validCandidateEvidence(x)) return;
-        const isString = typeof x === "string";
-        const trimmedOk = isString && !!x.trim();
-        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
-        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
-        const jdEchoMatch = isString ? x.match(/\b(?:strong command of|strong knowledge of|accounting standards|experience with|experience in|the position requires|le poste requiert|normes comptables|expérience avec|expérience en)\b/i)?.[0] ?? null : null;
-        console.log(`[Gate2][isValidStrategy][strengthsValidity] index=${i} isString=${isString} trimmedOk=${trimmedOk} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch} jdEchoMatch=${jdEchoMatch}`);
-      });
-    }
-    if (!checks.storiesValidity && Array.isArray(s.storiesToPrepare)) {
-      s.storiesToPrepare.forEach((x: any, i: number) => {
-        const isString = typeof x === "string";
-        const evidenceOk = isString && validStoryText(x);
-        const backedByEvidence = isString && storyBackedByEvidence(x, i, evidenceMap, strategicAnalysis);
-        if (evidenceOk && backedByEvidence) return;
-        const primaryNodeId = strategicAnalysis?.proofObjectives?.[i]?.primary_evidence_node_id ?? null;
-        const node = findProvableEvidenceNode(primaryNodeId ?? undefined, evidenceMap);
-        const genericMatch = isString ? x.match(generic)?.[0] ?? null : null;
-        const prepMatch = isString ? x.match(prepInstruction)?.[0] ?? null : null;
-        console.log(`[Gate2][isValidStrategy][storiesValidity] index=${i} isString=${isString} evidenceCheckOk=${evidenceOk} evidenceBackedOk=${backedByEvidence} primaryNodeId=${primaryNodeId} nodeFoundAndProvable=${Boolean(node)} genericMatch=${genericMatch} prepInstructionMatch=${prepMatch}`);
-      });
-    }
-  }
-  return result;
+  const internal = /\b(?:evidence_node_id|primary_evidence|proof_objective|evidence map|proof objective|node_id|_reasoning)\b/i;
+  const languageMismatch = language === "fr" ? /\b(?:your experience|the interviewer|the role|your strongest|use this example|what you need to demonstrate|if the topic comes up)\b/i : /\b(?:votre expérience|l'intervieweur|le poste|vos points forts|utilisez cet exemple|ce que vous devez démontrer|si le sujet est abordé)\b/i;
+  const validStrings = (value: unknown) => Array.isArray(value) && value.every((x) => typeof x === "string" && x.trim().length > 0 && !generic.test(x));
+  const priorities = Array.isArray(s.interviewPriorities) ? s.interviewPriorities : [];
+  const stories = Array.isArray(s.storiesToPrepare) ? s.storiesToPrepare : [];
+  const defenses = Array.isArray(s.gapDefenseStrategy) ? s.gapDefenseStrategy : [];
+  if (typeof s.candidatePositioning !== "string" || typeof s.strongestValueProposition !== "string" || typeof s.communicationPriorities !== "string" || typeof s.interviewPlan !== "string" || typeof s.personalization !== "string" || !validStrings(s.strengthsToLeverage) || !validStrings(s.gapsOrRisks) || !validStrings(defenses) || !validStrings(priorities) || !validStrings(s.likelyDifficultQuestions) || !validStrings(stories) || priorities.length !== 3 || stories.length !== 3 || s.gapsOrRisks.length > 3 || s.likelyDifficultQuestions.length === 0) return false;
+  if (generic.test(allText) || internal.test(allText) || languageMismatch.test(allText)) return false;
+  if (hasCrossSectionDuplication(s)) return false;
+  if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
+  return true;
 }
-
 function validateObjectiveShape(o: any): o is ProofObjective {
   return o && typeof o === "object"
     && isNonEmptyString(o.id)
@@ -364,95 +297,210 @@ function validatePass1(raw: any, evidenceMap: EvidenceMapNode[]): raw is Strateg
   return true;
 }
 
-async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], language: SessionLanguage): Promise<unknown> {
+type BoundStrategyText = { text: string; evidence_node_id: string };
+type InternalStrategy = {
+  candidatePositioning: string;
+  strongestValueProposition: BoundStrategyText;
+  strengthsToLeverage: BoundStrategyText[];
+  gapsOrRisks: string[];
+  gapDefenseStrategy: string[];
+  interviewPriorities: BoundStrategyText[];
+  likelyDifficultQuestions: string[];
+  storiesToPrepare: BoundStrategyText[];
+  communicationPriorities: string;
+  interviewPlan: string;
+  personalization: string;
+};
+type FaithfulnessCheck = { claim_id: string; faithful: boolean; unsupported_details: string[] };
+
+const PASS1_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    positioning: { type: "string" },
+    roleMap: { type: "array", items: { type: "object", additionalProperties: false, properties: { theme: { type: "string" }, interviewer_relevance: { type: "string" } }, required: ["theme", "interviewer_relevance"] } },
+    vulnerabilities: { type: "array", items: { type: "string" } },
+    proofObjectives: { type: "array", items: { type: "object", additionalProperties: false, properties: {
+      id: { type: "string" }, interviewer_belief: { type: "string" }, why_it_matters: { type: "string" }, primary_evidence_node_id: { type: "string" },
+      evidence_status: { type: "string", enum: ["PROVEN", "PARTIALLY_PROVEN", "UNKNOWN", "NOT_DOCUMENTED"] },
+      evidence_type: { type: "string", enum: ["EXPERIENCE", "RESPONSIBILITY", "ACHIEVEMENT", "QUALIFICATION", "SKILL", "INDUSTRY_EXPERIENCE", "TOOL_OR_SYSTEM"] },
+      proof_point: { type: "string" }, vulnerability: { type: "string" }, mitigation: { type: "string" }, communication_angle: { type: "string" }, probing_question: { type: "string" }
+    }, required: ["id", "interviewer_belief", "why_it_matters", "primary_evidence_node_id", "evidence_status", "evidence_type", "proof_point", "vulnerability", "mitigation", "communication_angle", "probing_question"] } },
+    likelyQuestions: { type: "array", items: { type: "string" } },
+  },
+  required: ["positioning", "roleMap", "vulnerabilities", "proofObjectives", "likelyQuestions"],
+} as const;
+
+const BOUND_TEXT_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: { text: { type: "string" }, evidence_node_id: { type: "string" } },
+  required: ["text", "evidence_node_id"],
+} as const;
+
+const PASS2_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    candidatePositioning: { type: "string" }, strongestValueProposition: BOUND_TEXT_SCHEMA,
+    strengthsToLeverage: { type: "array", items: BOUND_TEXT_SCHEMA }, gapsOrRisks: { type: "array", items: { type: "string" } }, gapDefenseStrategy: { type: "array", items: { type: "string" } },
+    interviewPriorities: { type: "array", items: BOUND_TEXT_SCHEMA }, likelyDifficultQuestions: { type: "array", items: { type: "string" } },
+    storiesToPrepare: { type: "array", items: BOUND_TEXT_SCHEMA }, communicationPriorities: { type: "string" }, interviewPlan: { type: "string" }, personalization: { type: "string" },
+  },
+  required: ["candidatePositioning", "strongestValueProposition", "strengthsToLeverage", "gapsOrRisks", "gapDefenseStrategy", "interviewPriorities", "likelyDifficultQuestions", "storiesToPrepare", "communicationPriorities", "interviewPlan", "personalization"],
+} as const;
+
+const FAITHFULNESS_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: { checks: { type: "array", items: { type: "object", additionalProperties: false, properties: { claim_id: { type: "string" }, faithful: { type: "boolean" }, unsupported_details: { type: "array", items: { type: "string" } } }, required: ["claim_id", "faithful", "unsupported_details"] } } },
+  required: ["checks"],
+} as const;
+
+function structuredResponseFormat(name: string, schema: unknown) {
+  return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
+}
+
+async function requestStructuredJson(system: string, user: string, name: string, schema: unknown, temperature = 0.2): Promise<any> {
   const openai = getOpenAI();
-  const systemPrompt = `You are Interview Mirror's internal strategic reasoning engine. Your output is NEVER shown to the candidate; it is a structured analysis consumed by another process. Do not write polished prose. Do not write in ${language === "fr" ? "French" : "English"} specifically — keep this JSON in plain analytical English regardless of the candidate's language.\n\nYou are given a fixed, code-generated EVIDENCE MAP. It is the ONLY source of candidate facts. You may reference these node_ids but must NEVER invent a new node, a new fact, a new employer, a new tool, or a new industry.\n\nRULES:\n- A node with status NOT_DOCUMENTED or UNKNOWN can only ever be used as a vulnerability/verification point. It can NEVER be the primary_evidence_node_id of a proof objective and never described as an established capability.\n- A node with type QUALIFICATION (e.g. a professional credential) is not employment experience. Never phrase it as \"experience at X\" or \"worked at X\".\n- A node with type TOOL_OR_SYSTEM that is NOT_DOCUMENTED must not be implied as used by the candidate.\n- A node with type INDUSTRY_EXPERIENCE that is NOT_DOCUMENTED must not be implied as the candidate's own sector experience.\n- Produce EXACTLY 3 proof objectives. Each must represent a genuinely different belief the interviewer must form about the candidate (do not force categories like Technical/Operational/Leadership — derive the real 3 objectives from this CV and this JD). Each objective's primary_evidence_node_id MUST be different from the other two.\n- Each objective must contain: id, interviewer_belief (what the interviewer must believe), why_it_matters (why that belief matters for this exact role), primary_evidence_node_id (must exist in the evidence map, status PROVEN or PARTIALLY_PROVEN only), evidence_status (copy exactly from the map), evidence_type (copy exactly from the map), proof_point (what this evidence actually proves), vulnerability (what could make the interviewer doubt this belief), mitigation (how to honestly address the doubt), communication_angle (how the candidate should talk about it), probing_question (a question the interviewer might realistically ask to test this belief).\n- Avoid generic interview advice. Every field must be traceable to this specific CV and this specific JD.\n\nReturn strict JSON with keys: positioning (string), roleMap (array of { theme, interviewer_relevance }), vulnerabilities (string[]), proofObjectives (array of exactly 3 objects as specified above), likelyQuestions (string[]).`;
-  const userPrompt = `Title: ${session.title}\nInterview date: ${session.interview_date ?? "Not provided"}\n\nEVIDENCE MAP (the only facts you may use):\n${JSON.stringify(evidenceMap, null, 2)}\n\nCV (for context only, do not extract new facts beyond the evidence map):\n${session.cv_text.slice(0, 8000)}\n\nJOB DESCRIPTION:\n${session.job_description.slice(0, 6000)}\n\nProduce the structured strategic reasoning JSON.`;
-  const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.3, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
+  const completion = await openai.chat.completions.create({ model: AI_MODEL, temperature, response_format: structuredResponseFormat(name, schema), messages: [{ role: "system", content: system }, { role: "user", content: user }] });
   const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty Pass 1 AI response");
+  if (!raw) throw new Error("Empty structured response: " + name);
   return JSON.parse(raw);
+}
+
+function pass1Diagnostics(raw: unknown, evidenceMap: EvidenceMapNode[]): string[] {
+  const failures: string[] = [];
+  if (!raw || typeof raw !== "object") return ["Pass 1 did not return an object."];
+  const value = raw as any;
+  if (!Array.isArray(value.proofObjectives)) failures.push("proofObjectives must be an array of exactly 3 objects.");
+  else {
+    if (value.proofObjectives.length !== 3) failures.push("proofObjectives count was " + value.proofObjectives.length + "; it must be exactly 3.");
+    const ids = value.proofObjectives.map((o: any) => o?.primary_evidence_node_id).filter(Boolean);
+    if (new Set(ids).size !== ids.length) failures.push("Each proof objective must use a different primary_evidence_node_id.");
+    const known = new Set(evidenceMap.map((n) => n.node_id));
+    for (const id of ids) if (!known.has(id)) failures.push("Unknown evidence node " + id + ".");
+  }
+  if (!Array.isArray(value.roleMap) || value.roleMap.length === 0) failures.push("roleMap must contain at least one role mapping.");
+  if (!Array.isArray(value.likelyQuestions) || value.likelyQuestions.length === 0) failures.push("likelyQuestions must contain at least one realistic question.");
+  if (Array.isArray(value.proofObjectives)) for (let i = 0; i < value.proofObjectives.length; i++) if (!validateObjectiveShape(value.proofObjectives[i])) failures.push("proofObjectives[" + i + "] has missing or invalid required fields.");
+  if (failures.length === 0 && !validatePass1(value, evidenceMap)) failures.push("Gate 1 rejected strategic reasoning: objective distinctness, evidence status/type consistency, or evidence safety failed.");
+  return [...new Set(failures)];
+}
+
+async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], language: SessionLanguage, diagnostics: string[] = []): Promise<unknown> {
+  const diagnosticBlock = diagnostics.length ? "\n\nPREVIOUS PASS 1 VALIDATION FAILED. Regenerate the COMPLETE schema and correct these diagnostics:\n- " + diagnostics.join("\n- ") : "";
+  const systemPrompt = "You are Interview Mirror's internal strategic reasoning engine. The output is never shown to the candidate. The EVIDENCE MAP is the only authoritative source of candidate facts. Never invent a fact, employer, tool, credential, industry, metric, date, scope, or outcome. NOT_DOCUMENTED and UNKNOWN nodes can only be verification points. QUALIFICATION is not employment experience. Produce EXACTLY 3 genuinely distinct proof objectives, each with a different PROVEN or PARTIALLY_PROVEN primary evidence node. Copy evidence_status and evidence_type exactly. Each objective must explain interviewer belief, why it matters for this exact role, proof point, vulnerability, honest mitigation, communication angle, and realistic probing question. Return the complete schema. Candidate language: " + (language === "fr" ? "French" : "English") + diagnosticBlock;
+  const userPrompt = "Title: " + session.title + "\nInterview date: " + (session.interview_date ?? "Not provided") + "\n\nEVIDENCE MAP:\n" + JSON.stringify(evidenceMap, null, 2) + "\n\nCV context (do not extract facts outside the evidence map):\n" + session.cv_text.slice(0, 8000) + "\n\nJOB DESCRIPTION:\n" + session.job_description.slice(0, 6000) + "\n\nGenerate the strategic foundation.";
+  return requestStructuredJson(systemPrompt, userPrompt, "strategy_pass1", PASS1_SCHEMA, 0.2);
 }
 
 export async function generateStrategicAnalysis(session: SessionRecord): Promise<{ evidenceMap: EvidenceMapNode[]; analysis: StrategicAnalysis }> {
   const language = normalizeLanguage(session.preparation_language);
   const evidenceMap = buildEvidenceMap(session);
-  if (evidenceMap.length < 3) throw new Error("Insufficient evidence to run the strategic reasoning engine");
-  let lastError: unknown;
+  if (evidenceMap.length < 3) throw new Error("INSUFFICIENT_EVIDENCE: at least three evidence nodes are required.");
+  let diagnostics: string[] = []; let lastError: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await runPass1(session, evidenceMap, language);
+      const raw = await runPass1(session, evidenceMap, language, diagnostics);
       if (validatePass1(raw, evidenceMap)) return { evidenceMap, analysis: raw };
-      lastError = new Error("Pass 1 reasoning failed Gate 1 validation");
-    } catch (err) {
-      lastError = err;
-    }
+      diagnostics = pass1Diagnostics(raw, evidenceMap);
+      lastError = new Error("Pass 1 Gate 1 failed: " + diagnostics.join(" | "));
+    } catch (error) { lastError = error; diagnostics = [error instanceof Error ? error.message : "Pass 1 structured generation failed."]; }
   }
-  throw lastError instanceof Error ? lastError : new Error("Strategic analysis failed");
+  throw lastError instanceof Error ? lastError : new Error("Pass 1 failed after repair cap.");
 }
 
-function factAnchorWords(fact: string): string[] {
-  return canonicalize(fact).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((w) => w.length >= 5);
-}
-
-/** Deterministic traceability backstop: require each priority/story to reference at least one meaningful token from its assigned evidence fact. */
-function alignsWithAnalysis(strategy: InterviewStrategy, analysis: StrategicAnalysis, evidenceMap: EvidenceMapNode[]): boolean {
-  if (strategy.storiesToPrepare.length !== 3 || strategy.interviewPriorities.length !== 3) {
-    console.log("[Gate2][alignsWithAnalysis] failed: storiesToPrepare/interviewPriorities length !== 3");
-    return false;
-  }
-  const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
-  for (let i = 0; i < 3; i++) {
-    const nodeId = analysis.proofObjectives[i].primary_evidence_node_id;
-    const node = byId.get(nodeId);
-    if (!node) {
-      console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} result=FAIL reason=node-not-found`);
-      return false;
-    }
-    const anchors = factAnchorWords(node.fact).filter((word) => !["experience", "financial", "finance", "responsibility", "reporting", "management", "accounting", "conformity", "compliance", "professional", "strength"].includes(word));
-    if (!anchors.length) {
-      console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} anchorCount=0 result=SKIP(no-anchors)`);
-      continue;
-    }
-    const storyLower = canonicalize(strategy.storiesToPrepare[i]).toLowerCase();
-    const priorityLower = canonicalize(strategy.interviewPriorities[i]).toLowerCase();
-    const inStory = anchors.some((a) => storyLower.includes(a));
-    const inPriority = anchors.some((a) => priorityLower.includes(a));
-    console.log(`[Gate2][alignsWithAnalysis] index=${i} nodeId=${nodeId} anchorCount=${anchors.length} anchorInStory=${inStory} anchorInPriority=${inPriority}`);
-    if (!inStory || !inPriority) return false;
-  }
+function validateInternalStrategy(strategy: unknown, evidenceMap: EvidenceMapNode[]): strategy is InternalStrategy {
+  if (!strategy || typeof strategy !== "object") return false;
+  const s = strategy as any; const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
+  const isBound = (x: any) => x && typeof x === "object" && isNonEmptyString(x.text) && isNonEmptyString(x.evidence_node_id) && byId.has(x.evidence_node_id) && ["PROVEN", "PARTIALLY_PROVEN"].includes(byId.get(x.evidence_node_id)!.status);
+  if (typeof s.candidatePositioning !== "string" || !isBound(s.strongestValueProposition) || !Array.isArray(s.strengthsToLeverage) || !Array.isArray(s.gapsOrRisks) || !Array.isArray(s.gapDefenseStrategy) || !Array.isArray(s.interviewPriorities) || !Array.isArray(s.likelyDifficultQuestions) || !Array.isArray(s.storiesToPrepare) || typeof s.communicationPriorities !== "string" || typeof s.interviewPlan !== "string" || typeof s.personalization !== "string") return false;
+  if (s.interviewPriorities.length !== 3 || s.storiesToPrepare.length !== 3) return false;
+  if (s.strengthsToLeverage.length > 3 || s.gapsOrRisks.length > 3 || s.gapDefenseStrategy.length > 3 || s.likelyDifficultQuestions.length < 3) return false;
+  if (!s.strengthsToLeverage.every(isBound) || !s.interviewPriorities.every(isBound) || !s.storiesToPrepare.every(isBound)) return false;
+  const priorityIds = s.interviewPriorities.map((x: BoundStrategyText) => x.evidence_node_id);
+  const storyIds = s.storiesToPrepare.map((x: BoundStrategyText) => x.evidence_node_id);
+  if (new Set(priorityIds).size !== 3) return false;
+  for (let i = 0; i < 3; i++) if (priorityIds[i] !== storyIds[i]) return false;
   return true;
 }
 
-async function runPass2(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage): Promise<unknown> {
-  const openai = getOpenAI();
-  const systemPrompt = `${languageInstruction(language)}\n\nYou are Interview Mirror's senior interview coach. You have ALREADY completed a validated strategic analysis (provided below). Your only job now is to convert that VALIDATED reasoning into polished, candidate-facing text inside the existing, frozen Strategy page contract. Do not redo the reasoning, do not add a 4th objective, do not swap the primary evidence assigned to each objective, and do not invent any fact beyond the evidence map.\n\nFIXED SECTION ROLES:\n- candidatePositioning: overall positioning for this role, built from the provided \"positioning\" reasoning. Not a CV summary.\n- strongestValueProposition: the single strategic message behind the candidate's answers.\n- strengthsToLeverage: concrete advantages already established by the CV evidence map (status PROVEN or PARTIALLY_PROVEN only).\n- interviewPriorities: EXACTLY 3 items, in the SAME ORDER as the 3 proof objectives given below. Each must express the interviewer_belief and why_it_matters for that objective, and MUST include an identifiable concrete detail from that objective's primary evidence fact so it stays traceably anchored to real evidence, in natural prose (not a list of fields).\n- storiesToPrepare: EXACTLY 3 items, in the SAME ORDER as the 3 proof objectives. Each MUST be built from that objective's primary evidence fact and must explicitly reference identifiable wording from that fact. Each must explain what it proves and use the objective's communication_angle.\n- gapsOrRisks: build from the given vulnerabilities and from any NOT_DOCUMENTED/UNKNOWN evidence nodes not already used as primary evidence. Never claim these as proven capability.\n- gapDefenseStrategy: the honest mitigation for each risk (use the objectives' mitigation fields and the vulnerabilities list). Must not restate an interviewPriorities item.\n- likelyDifficultQuestions: derive from the objectives' probing_question fields and the likelyQuestions list.\n- communicationPriorities, interviewPlan, personalization: concise, candidate-specific, derived from the reasoning, not generic advice.\n\nCRITICAL RULES (do not violate):\n- A QUALIFICATION (e.g. a professional credential) is never an employer or work experience. Use phrasing like \"qualification\" or \"formation\", never \"experience at/chez X\".\n- Never claim an ERP/tool (SAP, Oracle, Sage, etc.) unless a corresponding evidence node is PROVEN or PARTIALLY_PROVEN.\n- Never claim target-industry experience unless a corresponding evidence node is PROVEN or PARTIALLY_PROVEN; otherwise honestly frame it as a transferability/verification point.\n- Never expose internal field names (node ids, \"primary evidence\", \"proof objective\", etc.) in candidate-facing text.\n- Write natural, idiomatic, professional ${language === "fr" ? "French" : "English"}. Avoid literal translation patterns and fragments.\n\nReturn exactly these JSON keys: candidatePositioning, strongestValueProposition, strengthsToLeverage, gapsOrRisks, gapDefenseStrategy, interviewPriorities, likelyDifficultQuestions, storiesToPrepare, communicationPriorities, interviewPlan, personalization.`;
-  const userPrompt = `VALIDATED STRATEGIC REASONING (do not alter its structure or evidence assignments):\n${JSON.stringify(analysis, null, 2)}\n\nEVIDENCE MAP:\n${JSON.stringify(evidenceMap, null, 2)}\n\nTitle: ${session.title}\nInterview date: ${session.interview_date ?? "Not provided"}\n\nWrite the final candidate-facing interview strategy JSON.`;
-  const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.35, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }] });
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty Pass 2 AI response");
-  return JSON.parse(raw);
+function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): string[] {
+  const failures: string[] = []; const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
+  const checkBound = (label: string, item: BoundStrategyText) => { const node = byId.get(item?.evidence_node_id); if (!node) failures.push(label + ": unknown evidence_node_id " + item?.evidence_node_id); else if (!["PROVEN", "PARTIALLY_PROVEN"].includes(node.status)) failures.push(label + ": evidence node is not provable."); };
+  checkBound("strongestValueProposition", strategy.strongestValueProposition);
+  strategy.strengthsToLeverage.forEach((x, i) => checkBound("strengthsToLeverage[" + i + "]", x));
+  strategy.interviewPriorities.forEach((x, i) => checkBound("interviewPriorities[" + i + "]", x));
+  strategy.storiesToPrepare.forEach((x, i) => checkBound("storiesToPrepare[" + i + "]", x));
+  if (strategy.interviewPriorities.length !== 3) failures.push("interviewPriorities must contain exactly 3 items.");
+  if (strategy.storiesToPrepare.length !== 3) failures.push("storiesToPrepare must contain exactly 3 items.");
+  if (strategy.interviewPriorities.length === 3 && new Set(strategy.interviewPriorities.map((x) => x.evidence_node_id)).size !== 3) failures.push("interviewPriorities must bind to three distinct primary evidence nodes.");
+  return failures;
 }
 
-export async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage): Promise<InterviewStrategy> {
-  let lastError: unknown;
+function collectFaithfulnessClaims(strategy: InternalStrategy): Array<{ claim_id: string; text: string; evidence_node_id: string }> {
+  const claims: Array<{ claim_id: string; text: string; evidence_node_id: string }> = [{ claim_id: "strongestValueProposition", text: strategy.strongestValueProposition.text, evidence_node_id: strategy.strongestValueProposition.evidence_node_id }];
+  strategy.strengthsToLeverage.forEach((x, i) => claims.push({ claim_id: "strengthsToLeverage[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
+  strategy.interviewPriorities.forEach((x, i) => claims.push({ claim_id: "interviewPriorities[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
+  strategy.storiesToPrepare.forEach((x, i) => claims.push({ claim_id: "storiesToPrepare[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
+  return claims;
+}
+
+async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): Promise<{ ok: boolean; diagnostics: string[] }> {
+  const claims = collectFaithfulnessClaims(strategy); const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
+  const invalid = claims.filter((c) => { const node = byId.get(c.evidence_node_id); return !node || !["PROVEN", "PARTIALLY_PROVEN"].includes(node.status); });
+  if (invalid.length) return { ok: false, diagnostics: invalid.map((c) => c.claim_id + ": invalid or non-provable evidence binding.") };
+  const payload = claims.map((c) => ({ claim_id: c.claim_id, claim: c.text, evidence_node_id: c.evidence_node_id, evidence_fact: byId.get(c.evidence_node_id)!.fact }));
+  const system = "You are Interview Mirror's evidence-faithfulness verifier. Check whether each candidate-facing claim is supported by the exact evidence fact it cites. Natural paraphrases and directly supported implications are faithful; literal word overlap is not required. Mark false if the claim adds an unsupported specific employer, tool, metric, date, geography, scope, responsibility, qualification, or outcome. Return exactly one check for every claim_id.";
+  const raw = await requestStructuredJson(system, "Evaluate these claims against their bound evidence facts:\n" + JSON.stringify(payload, null, 2), "evidence_faithfulness", FAITHFULNESS_SCHEMA, 0);
+  const checks = Array.isArray(raw?.checks) ? raw.checks as FaithfulnessCheck[] : []; const byClaim = new Map(checks.map((c) => [c.claim_id, c])); const diagnostics: string[] = [];
+  for (const claim of claims) { const check = byClaim.get(claim.claim_id); if (!check) diagnostics.push(claim.claim_id + ": verifier returned no check."); else if (!check.faithful) diagnostics.push(claim.claim_id + ": unsupported details: " + (check.unsupported_details?.join("; ") || "unspecified")); }
+  if (checks.length !== claims.length) diagnostics.push("Faithfulness verifier did not return exactly one check per bound claim.");
+  return { ok: diagnostics.length === 0, diagnostics };
+}
+
+function publicStrategyFromInternal(strategy: InternalStrategy, status?: "INSUFFICIENT_EVIDENCE"): InterviewStrategy {
+  return {
+    candidatePositioning: strategy.candidatePositioning, strongestValueProposition: strategy.strongestValueProposition.text,
+    strengthsToLeverage: strategy.strengthsToLeverage.map((x) => x.text), gapsOrRisks: strategy.gapsOrRisks, gapDefenseStrategy: strategy.gapDefenseStrategy,
+    interviewPriorities: strategy.interviewPriorities.map((x) => x.text), likelyDifficultQuestions: strategy.likelyDifficultQuestions, storiesToPrepare: strategy.storiesToPrepare.map((x) => x.text),
+    communicationPriorities: strategy.communicationPriorities, interviewPlan: strategy.interviewPlan, personalization: strategy.personalization,
+    ...(status ? { _strategy_status: status } : {}),
+  } as InterviewStrategy;
+}
+
+function safeInsufficientEvidenceStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis | null): InterviewStrategy {
+  const fr = normalizeLanguage(session.preparation_language) === "fr";
+  const provable = evidenceMap.filter((n) => n.status === "PROVEN" || n.status === "PARTIALLY_PROVEN").slice(0, 3);
+  const priorities = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "L'entretien doit établir ce que votre expérience sur « " + n.fact + " » permet réellement de démontrer pour ce poste." : "The interview must establish what your experience with “" + n.fact + "” actually demonstrates for this role.") : (fr ? "Les éléments disponibles ne permettent pas encore de formuler une démonstration suffisamment étayée pour ce point." : "The available evidence is not sufficient to formulate a well-supported demonstration for this point."); });
+  const stories = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "Préparez un exemple précis lié à « " + n.fact + " » et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie." : "Prepare one precise example linked to “" + n.fact + "” and explain your personal role, decision and outcome without adding unsupported information.") : (fr ? "Préparez un exemple concret de votre parcours permettant de vérifier ce point." : "Prepare one concrete example from your background that allows this point to be verified."); });
+  const gaps = fr ? ["Certaines affirmations stratégiques ne peuvent pas être confirmées par les éléments disponibles.", "L'entretien devra vérifier les points pour lesquels le CV ne fournit pas de preuve directe."] : ["Some strategic claims cannot be confirmed from the available evidence.", "The interview should verify points for which the CV provides no direct evidence."];
+  return { candidatePositioning: fr ? "La stratégie reste volontairement prudente lorsque les documents fournis ne permettent pas d'étayer une affirmation." : "The strategy remains deliberately conservative where the supplied evidence cannot support a stronger claim.", strongestValueProposition: fr ? "Votre message doit rester centré sur les responsabilités que votre parcours permet de démontrer directement." : "Your message should remain centred on responsibilities that your background directly supports.", strengthsToLeverage: provable.map((n) => fr ? "Expérience établie : " + n.fact + "." : "Established experience: " + n.fact + "."), gapsOrRisks: gaps, gapDefenseStrategy: fr ? ["Ne complétez pas les informations manquantes par une supposition. Donnez votre expérience réelle et son périmètre.", "Si un point est demandé, distinguez ce que vous avez personnellement fait de ce qui reste à vérifier."] : ["Do not fill evidence gaps with assumptions. Give the experience you actually have and its scope.", "If a point is challenged, distinguish what you personally did from what still needs to be verified."], interviewPriorities: priorities, likelyDifficultQuestions: fr ? ["Quel exemple précis de votre parcours permet de vérifier ce point?", "Quel a été exactement votre rôle personnel?", "Quel résultat pouvez-vous documenter?"] : ["Which specific example from your background verifies this point?", "What exactly was your personal role?", "What outcome can you substantiate?"], storiesToPrepare: stories, communicationPriorities: fr ? "Restez factuel : responsabilité personnelle, décision, périmètre et résultat." : "Stay factual: personal responsibility, decision, scope, and outcome.", interviewPlan: fr ? "Commencez par les faits établis, puis utilisez l'entretien pour vérifier les points encore incertains." : "Start with established facts, then use the interview to verify the points that remain uncertain.", personalization: fr ? "État de sécurité : certaines affirmations n'ont pas passé la vérification d'évidence." : "Safety state: some claims did not pass evidence verification.", _strategy_status: "INSUFFICIENT_EVIDENCE" } as InterviewStrategy;
+}
+
+async function runPass2(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, diagnostics: string[] = []): Promise<InternalStrategy> {
+  const diagnosticBlock = diagnostics.length ? "\n\nPREVIOUS PASS 2 VALIDATION FAILED. Regenerate the COMPLETE schema and correct these diagnostics. Do not return a partial patch:\n- " + diagnostics.join("\n- ") : "";
+  const system = languageInstruction(language) + "\n\nYou are Interview Mirror's senior interview strategy engine. A validated strategic foundation is provided. Convert it into candidate-facing strategy while preserving evidence assignments. Return the complete internal schema.\n\nRules: candidatePositioning is role-specific, not a CV summary. strongestValueProposition is one central message bound to a real evidence node. strengthsToLeverage are established advantages bound to evidence. interviewPriorities are EXACTLY 3 in the same order as proof objectives and bind to their primary evidence. storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes. gapsOrRisks are vulnerabilities/verification points, not proven capability. gapDefenseStrategy must address doubt rather than restate a priority. likelyDifficultQuestions must contain at least 3 realistic questions. Do not expose evidence node IDs. Never invent tools, industry experience, metrics, dates, scope, employers, responsibilities or outcomes. QUALIFICATION is not employment experience. Distinguish what must be demonstrated from what could cause doubt. Natural paraphrase is encouraged.\n\n" + diagnosticBlock;
+  const user = "VALIDATED STRATEGIC FOUNDATION:\n" + JSON.stringify(analysis, null, 2) + "\n\nEVIDENCE MAP:\n" + JSON.stringify(evidenceMap, null, 2) + "\n\nTitle: " + session.title + "\nInterview date: " + (session.interview_date ?? "Not provided") + "\n\nGenerate the complete strategy.";
+  return requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.25) as Promise<InternalStrategy>;
+}
+
+async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage): Promise<InterviewStrategy> {
+  let diagnostics: string[] = [];
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await runPass2(session, evidenceMap, analysis, language);
-      const shapeValid = isValidStrategy(raw, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis);
-      const aligned = shapeValid && alignsWithAnalysis(raw as InterviewStrategy, analysis, evidenceMap);
-      console.log(`[Gate2][generateExecutiveStrategy] attempt=${attempt} isValidStrategy=${shapeValid} alignsWithAnalysis=${shapeValid ? aligned : "skipped"}`);
-      if (shapeValid && aligned) return raw as InterviewStrategy;
-      lastError = new Error("Pass 2 output failed Gate 2 validation");
-    } catch (err) {
-      lastError = err;
-    }
+      const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics);
+      if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); continue; }
+      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
+      if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; continue; }
+      const publicStrategy = publicStrategyFromInternal(internal);
+      if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; continue; }
+      return publicStrategy;
+    } catch (error) { diagnostics = [error instanceof Error ? error.message : "Pass 2 structured generation failed."]; }
   }
-  throw lastError instanceof Error ? lastError : new Error("Executive strategy generation failed");
+  console.warn("[Strategy Engine V2.2] repair cap reached; using safe INSUFFICIENT_EVIDENCE fallback.");
+  return safeInsufficientEvidenceStrategy(session, evidenceMap, analysis);
 }
 
 export async function runStrategyEngineV2(session: SessionRecord): Promise<InterviewStrategy> {
   const language = normalizeLanguage(session.preparation_language);
-  const { evidenceMap, analysis } = await generateStrategicAnalysis(session);
-  return generateExecutiveStrategy(session, evidenceMap, analysis, language);
+  const result = await generateStrategicAnalysis(session);
+  return generateExecutiveStrategy(session, result.evidenceMap, result.analysis, language);
 }
