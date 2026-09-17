@@ -5,6 +5,8 @@ import { buildEvidenceMap, isValidStrategy, runStrategyEngineV2 } from "@/lib/st
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord, CvAnalysis } from "@/types";
 
+const STRATEGY_ENGINE_VERSION = "v2.0";
+
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
 function parseAnalysis(value: unknown): CvAnalysis | null { if (typeof value === "string") { try { return JSON.parse(value) as CvAnalysis; } catch { return null; } } return value && typeof value === "object" ? value as CvAnalysis : null; }
@@ -28,13 +30,11 @@ function cleanEvidence(value: string, maxWords = 28): string {
 }
 function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   const language = normalizeLanguage(session.preparation_language); const fr = language === "fr"; const analysis = session.cv_analysis; const strengths = analysis?.strengths ?? []; const items = evidenceItems(session); const risks = deriveMaterialRisks(session); const cv = session.cv_text.toLowerCase();
-  // ACCA is a qualification, never an employer/experience anchor: keep it separate from the employer anchor.
   const hasAcca = /\bacca\b/i.test(cv);
   const employerMatch = cv.match(/syngenta|vfs global|mitsubishi|epp books/i)?.[0];
   const candidateAnchor = employerMatch ? shortAnchor(employerMatch, 6) : (strengths[0] ? shortAnchor(strengths[0], 6) : (fr ? "votre parcours professionnel" : "your professional background"));
   const first = items[0]; const second = items[1] ?? items[0]; const third = items[2] ?? items[0];
   let firstRole = fallbackRoleAnchor(first?.jd_requirement ?? "", fr); let secondRole = fallbackRoleAnchor(second?.jd_requirement ?? "", fr); let thirdRole = fallbackRoleAnchor(third?.jd_requirement ?? "", fr);
-  // Guard against the same requirement anchor being reused across all three proof objectives.
   const usedRoles = new Set<string>();
   const distinctFallbacks = fr ? ["le pilotage budgétaire et les prévisions", "le reporting financier", "la gestion d'un périmètre régional"] : ["budgeting and forecasting", "financial reporting", "regional scope management"];
   [firstRole, secondRole, thirdRole] = [firstRole, secondRole, thirdRole].map((role) => { if (!usedRoles.has(role)) { usedRoles.add(role); return role; } const alt = distinctFallbacks.find((x) => !usedRoles.has(x)) ?? role; usedRoles.add(alt); return alt; });
@@ -72,6 +72,14 @@ async function generateStrategy(session: SessionRecord): Promise<InterviewStrate
   return runStrategyEngineV2(session);
 }
 
+function hasCurrentEngineVersion(strategy: unknown): boolean {
+  return Boolean(strategy && typeof strategy === "object" && (strategy as any)._strategy_engine_version === STRATEGY_ENGINE_VERSION);
+}
+
+function stampEngineVersion(strategy: InterviewStrategy): InterviewStrategy {
+  return { ...strategy, _strategy_engine_version: STRATEGY_ENGINE_VERSION } as InterviewStrategy;
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params; const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -81,8 +89,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
   if (!hasValidProvenance(record.cv_analysis, record)) return NextResponse.json({ code: "ANALYSIS_PROVENANCE_INVALID", error: "The Professional Mirror analysis must be refreshed before an interview strategy can be generated." }, { status: 422 });
   const evidenceMap = buildEvidenceMap(record);
-  if (isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description, record.cv_analysis, record.cv_text, evidenceMap)) return NextResponse.json({ strategy: record.interview_strategy });
+  if (hasCurrentEngineVersion(record.interview_strategy) && isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description, record.cv_analysis, record.cv_text, evidenceMap)) return NextResponse.json({ strategy: record.interview_strategy });
   let strategy: InterviewStrategy; try { strategy = await generateStrategy(record); } catch { strategy = fallbackStrategy(record); }
+  strategy = stampEngineVersion(strategy);
   const { error: updateError } = await supabase.from("sessions").update({ interview_strategy: strategy }).eq("id", id).eq("user_id", user.id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
   return NextResponse.json({ strategy });
