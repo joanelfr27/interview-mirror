@@ -443,6 +443,15 @@ function collectFaithfulnessClaims(strategy: InternalStrategy): Array<{ claim_id
   return claims;
 }
 
+function shadowLexicalGroundingReport(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): void {
+  const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
+  const claims = collectFaithfulnessClaims(strategy);
+  const report = claims.map((claim) => {
+    const node = byId.get(claim.evidence_node_id);
+    return { claim_id: claim.claim_id, evidence_node_id: claim.evidence_node_id, lexical_overlap: node ? semanticOverlap(claim.text, node.fact) : 0 };
+  });
+  console.log("[Strategy Engine V2.2][shadow][legacy-lexical-grounding]", JSON.stringify(report));
+}
 async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): Promise<{ ok: boolean; diagnostics: string[] }> {
   const claims = collectFaithfulnessClaims(strategy); const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
   const invalid = claims.filter((c) => { const node = byId.get(c.evidence_node_id); return !node || !["PROVEN", "PARTIALLY_PROVEN"].includes(node.status); });
@@ -488,7 +497,7 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics);
       if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); continue; }
-      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
+      shadowLexicalGroundingReport(internal, evidenceMap);\n      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
       if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; continue; }
       const publicStrategy = publicStrategyFromInternal(internal);
       if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; continue; }
