@@ -497,7 +497,8 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics);
       if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); continue; }
-      shadowLexicalGroundingReport(internal, evidenceMap);\n      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
+      shadowLexicalGroundingReport(internal, evidenceMap);
+      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
       if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; continue; }
       const publicStrategy = publicStrategyFromInternal(internal);
       if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; continue; }
