@@ -134,8 +134,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     strategy = await generateStrategy(record);
   } catch (error) {
-    console.error("[Strategy Engine V2] generation failed", error);
-    return NextResponse.json({ code: "STRATEGY_ENGINE_V2_FAILED", error: "The V2 interview strategy engine failed validation. Check the server log for the exact failing stage." }, { status: 503 });
+    console.error("[Strategy Engine V2.2] generation failed", error);
+    return NextResponse.json({ code: "STRATEGY_ENGINE_V2_FAILED", error: "The V2.2 interview strategy engine failed validation. Check the server log for the exact failing stage." }, { status: 503 });
   }
 
   strategy = stampEngineVersion(strategy);
