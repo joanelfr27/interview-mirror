@@ -5,7 +5,7 @@ import { buildEvidenceMap, isValidStrategy, runStrategyEngineV2 } from "@/lib/st
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord, CvAnalysis } from "@/types";
 
-const STRATEGY_ENGINE_VERSION = "v2.0";
+const STRATEGY_ENGINE_VERSION = "v2.2";
 
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
