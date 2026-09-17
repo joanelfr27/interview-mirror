@@ -90,7 +90,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!hasValidProvenance(record.cv_analysis, record)) return NextResponse.json({ code: "ANALYSIS_PROVENANCE_INVALID", error: "The Professional Mirror analysis must be refreshed before an interview strategy can be generated." }, { status: 422 });
   const evidenceMap = buildEvidenceMap(record);
   if (hasCurrentEngineVersion(record.interview_strategy) && isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description, record.cv_analysis, record.cv_text, evidenceMap)) return NextResponse.json({ strategy: record.interview_strategy });
-  let strategy: InterviewStrategy; try { strategy = await generateStrategy(record); } catch { strategy = fallbackStrategy(record); }
+
+  let strategy: InterviewStrategy;
+  try {
+    strategy = await generateStrategy(record);
+  } catch (error) {
+    // In audit-version, never silently replace a failed V2 result with the legacy fallback.
+    // A fallback can hide a broken Pass 1/Gate 1/Pass 2/Gate 2 pipeline and make live testing misleading.
+    console.error("[Strategy Engine V2] generation failed", error);
+    return NextResponse.json({ code: "STRATEGY_ENGINE_V2_FAILED", error: "The V2 interview strategy engine failed validation. Check the server log for the exact failing stage." }, { status: 503 });
+  }
+
   strategy = stampEngineVersion(strategy);
   const { error: updateError } = await supabase.from("sessions").update({ interview_strategy: strategy }).eq("id", id).eq("user_id", user.id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
