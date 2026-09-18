@@ -617,6 +617,10 @@ function alignStrategyToAuthoritativePlan(
     return text;
   };
 
+  const centralValueForTensions = (t: StrategicPlan["tensions"][number]) => fr
+    ? "Votre message central doit relier l'expérience documentée à « " + t.target_requirement + " », en restant strictement dans ce que les faits établissent."
+    : "Your central message should connect the documented experience to “" + t.target_requirement + "”, while staying strictly within what the evidence establishes.";
+
   const fallbackPriority = (t: StrategicPlan["tensions"][number]) => fr
     ? `Démontrer, à partir de l'expérience documentée, ce que vous pouvez personnellement apporter sur « ${t.target_requirement} ».`
     : `Demonstrate, from the documented experience, what you can personally bring to “${t.target_requirement}”.`;
@@ -673,8 +677,22 @@ function alignStrategyToAuthoritativePlan(
       : `To address this doubt, ${actions.join(", ")}. Do not present as established anything the supplied evidence cannot support.`;
   };
 
+  const strongest = strategy.strongestValueProposition;
+  const strongestNode = strongest?.evidence_node_id
+    ? tensions.find((t) => t.primary_evidence_node_id === strongest.evidence_node_id)
+    : null;
+  const strongestText = strongest?.text?.trim() || "";
+  const strongestValid = strongestText
+    && (!strongestNode || semanticOverlap(strongestText, strongestNode.target_requirement) >= 0.16);
   return {
     ...strategy,
+    candidatePositioning: strategy.candidatePositioning?.trim()
+      ? strategy.candidatePositioning
+      : centralValueForTensions(tensions[0]),
+    strongestValueProposition: {
+      text: strongestValid ? strongestText : centralValueForTensions(strongestNode || tensions[0]),
+      evidence_node_id: strongest?.evidence_node_id || tensions[0].primary_evidence_node_id,
+    },
     interviewPriorities: tensions.map((t, index) => {
       const generated = strategy.interviewPriorities?.[index]?.text?.trim() || fallbackPriority(t);
       return {
