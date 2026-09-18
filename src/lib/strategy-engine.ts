@@ -643,6 +643,14 @@ function alignStrategyToAuthoritativePlan(
     return frFocus;
   };
 
+  const communicationFocusForTensions = () => fr
+    ? "Dans chaque réponse, commencez par le fait documenté, explicitez votre rôle et reliez-le à l'exigence visée. Pour les capacités transférables, nommez le lien d'adaptation ; pour les points à vérifier, dites clairement ce qui reste à établir."
+    : "In each answer, start with the documented fact, clarify your role, and connect it to the target requirement. For transferable capabilities, name the adaptation link; for points to verify, state clearly what remains to be established.";
+
+  const interviewPlanForTensions = () => fr
+    ? "Commencez par le positionnement central, puis traitez les trois tensions dans l'ordre. Pour chaque tension : 1) rappelez le fait documenté ; 2) apportez l'exemple préparé ; 3) répondez au doute de l'intervieweur ; 4) terminez par ce que l'entretien doit confirmer ou établir. Ne comblez aucun manque d'information."
+    : "Start with the central positioning, then work through the three tensions in order. For each tension: 1) state the documented fact; 2) give the prepared example; 3) address the interviewer's doubt; 4) finish with what the interview must confirm or establish. Do not fill any evidence gaps with assumptions.";
+
   const difficultQuestionForTension = (t: StrategicPlan["tensions"][number]) => {
     if (fr) {
       return "Pouvez-vous donner un exemple concret qui permette d'établir ce que votre expérience documentée apporte sur « " + t.target_requirement + " », et répondre au point suivant : " + t.interviewer_doubt;
@@ -712,11 +720,23 @@ function alignStrategyToAuthoritativePlan(
       const generatedOverlap = generated ? semanticOverlap(generated, t.interviewer_doubt) : 1;
       return generated && generatedOverlap < 0.72 ? generated : defenseForTension(t);
     }),
-    interviewPlan: strategy.interviewPlan?.trim()
-      ? strategy.interviewPlan
-      : (fr
-        ? "Traitez successivement les trois tensions en distinguant les faits établis, les capacités transférables et les points qui restent à vérifier."
-        : "Work through the three tensions by distinguishing established facts, transferable capabilities, and points that remain to be verified."),
+    communicationPriorities: (() => {
+      const generated = strategy.communicationPriorities?.trim() || "";
+      // Keep candidate-facing wording when it is clearly strategic; otherwise use
+      // a deterministic execution rule that applies the three authoritative modes.
+      const planTerms = tensions.flatMap((t) => [t.target_requirement, t.interviewer_doubt]);
+      const relevance = planTerms.filter((term) => generated && semanticOverlap(generated, term) >= 0.18).length;
+      return generated && relevance >= 2 ? generated : communicationFocusForTensions();
+    })(),
+    interviewPlan: (() => {
+      const generated = strategy.interviewPlan?.trim() || "";
+      const relevance = tensions.filter((t) =>
+        generated
+        && semanticOverlap(generated, t.target_requirement) >= 0.16
+        && semanticOverlap(generated, t.interviewer_doubt) >= 0.16
+      ).length;
+      return relevance >= 2 ? generated : interviewPlanForTensions();
+    })(),
   };
 }
 
