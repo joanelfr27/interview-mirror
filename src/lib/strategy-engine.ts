@@ -575,13 +575,30 @@ function shadowLexicalGroundingReport(strategy: InternalStrategy, evidenceMap: E
   });
   console.log("[Strategy Engine V2.2][shadow][legacy-lexical-grounding]", JSON.stringify(report));
 }
-async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): Promise<{ ok: boolean; diagnostics: string[] }> {
+async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[], authoritativePlan: StrategicPlan | null = null): Promise<{ ok: boolean; diagnostics: string[] }> {
   const claims = collectFaithfulnessClaims(strategy); const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
   const invalid = claims.filter((c) => { const node = byId.get(c.evidence_node_id); return !node || !["PROVEN", "PARTIALLY_PROVEN"].includes(node.status); });
   if (invalid.length) return { ok: false, diagnostics: invalid.map((c) => c.claim_id + ": invalid or non-provable evidence binding.") };
-  const payload = claims.map((c) => ({ claim_id: c.claim_id, claim: c.text, evidence_node_id: c.evidence_node_id, evidence_fact: byId.get(c.evidence_node_id)!.fact }));
-  const system = "You are Interview Mirror's evidence-faithfulness verifier. Check whether each candidate-facing statement is faithful to the exact evidence fact it cites. Natural paraphrases and directly supported implications are faithful; literal word overlap is not required. The bound evidence fact is a hard factual boundary: mark false if the statement adds an unsupported candidate-specific employer, tool/system usage, standards knowledge, mastery/expertise, industry experience, metric, date, geography, scope, ownership, responsibility, qualification, or outcome. A strategic statement may connect the documented evidence to the job requirement without turning that requirement into a candidate fact. A preparation instruction such as “prepare an example” is not itself a factual claim; evaluate any candidate fact asserted inside it. Return exactly one check for every claim_id.";
-  const raw = await requestStructuredJson(system, "Evaluate these claims against their bound evidence facts:\n" + JSON.stringify(payload, null, 2), "evidence_faithfulness", FAITHFULNESS_SCHEMA, 0);
+  const tensionByNode = new Map((authoritativePlan?.tensions ?? []).map((t) => [t.primary_evidence_node_id, t]));
+  const payload = claims.map((c) => {
+    const tension = tensionByNode.get(c.evidence_node_id);
+    return {
+      claim_id: c.claim_id,
+      claim: c.text,
+      evidence_node_id: c.evidence_node_id,
+      evidence_fact: byId.get(c.evidence_node_id)!.fact,
+      strategic_context: tension ? {
+        mode: tension.mode,
+        target_requirement: tension.target_requirement,
+        interviewer_belief: tension.interviewer_belief,
+        interviewer_doubt: tension.interviewer_doubt,
+        allowed_positioning: tension.allowed_positioning,
+        forbidden_inference: tension.forbidden_inference,
+      } : null,
+    };
+  });
+  const system = "You are Interview Mirror's evidence-faithfulness verifier. Check whether each candidate-facing statement is faithful to the exact evidence fact it cites while preserving the authoritative strategic context. The evidence fact is the hard boundary for candidate-specific facts. Natural paraphrases and directly supported implications are faithful; literal word overlap is not required. Mark false only when the statement asserts or clearly implies an unsupported candidate-specific employer, tool/system usage, standards knowledge, mastery/expertise, industry experience, metric, date, geography, scope, ownership, responsibility, qualification, or outcome. IMPORTANT: strategic statements are allowed to mention the target-role requirement, interviewer doubt, or a missing qualification when they are explicitly framed as a requirement, doubt, transferability issue, or verification point. Do NOT treat mention of a job requirement as candidate experience. For TRANSFERABLE, the statement must preserve transfer/adaptation framing and must not claim target-domain experience. For VERIFY_GAP, the statement may explicitly say the requirement remains to be verified/established and must not present it as candidate experience. A preparation instruction such as “prepare an example” is not itself a factual claim; evaluate only candidate facts asserted inside it. Use the strategic_context to distinguish role requirements from candidate facts. Return exactly one check for every claim_id.";
+  const raw = await requestStructuredJson(system, "Evaluate these claims against their bound evidence facts and strategic context:\n" + JSON.stringify(payload, null, 2), "evidence_faithfulness", FAITHFULNESS_SCHEMA, 0);
   const checks = Array.isArray(raw?.checks) ? raw.checks as FaithfulnessCheck[] : []; const byClaim = new Map(checks.map((c) => [c.claim_id, c])); const diagnostics: string[] = [];
   for (const claim of claims) { const check = byClaim.get(claim.claim_id); if (!check) diagnostics.push(claim.claim_id + ": verifier returned no check."); else if (!check.faithful) diagnostics.push(claim.claim_id + ": unsupported details: " + (check.unsupported_details?.join("; ") || "unspecified")); }
   if (checks.length !== claims.length) diagnostics.push("Faithfulness verifier did not return exactly one check per bound claim.");
@@ -674,7 +691,7 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
       shadowLexicalGroundingReport(internal, evidenceMap);
       const modeDiagnostics = strategicModeDiagnostics(internal, authoritativePlan, language);
       if (modeDiagnostics.length) { diagnostics = modeDiagnostics; console.warn("[Strategy Engine V2.3] strategic mode validation failed:", diagnostics); continue; }
-      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
+      const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap, authoritativePlan);
       if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; console.warn("[Strategy Engine V2.2] evidence faithfulness failed:", diagnostics); continue; }
       const publicStrategy = publicStrategyFromInternal(internal);
       if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; console.warn("[Strategy Engine V2.2] Gate 2B failed:", diagnostics); continue; }
