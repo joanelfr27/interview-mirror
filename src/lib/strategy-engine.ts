@@ -236,16 +236,14 @@ function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescriptio
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
 
-    // Validate against the exact evidence node assigned to this priority.
-    // An unrelated fact elsewhere in the CV cannot satisfy candidate specificity.
+    // Candidate specificity must come from the exact evidence node assigned to this priority.
     const node = evidenceMap[index];
     if (!node) return false;
     const boundEvidenceTokens = distinctiveTokens(node.fact);
     const priorityTokens = distinctiveTokens(priority);
     const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
 
-    // Use the JD requirement bound to the same evidence node, preventing a
-    // priority from passing through an unrelated requirement elsewhere in the JD.
+    // Role specificity must come from the JD requirement bound to the same evidence node.
     const requirementTokens = distinctiveTokens(node.jd_requirement);
     const roleOverlap = [...requirementTokens].filter((token) => priorityTokens.has(token));
 
