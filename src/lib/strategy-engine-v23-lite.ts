@@ -7,6 +7,7 @@ type CandidateEvidenceItem = {
   source_text: string;
   facts: Array<{ fact: string; category: string; exact_source_text: string }>;
   relationships: Array<{ from_fact: number; to_fact: number; relationship: string }>;
+  relevant_jd_requirements: string[];
 };
 
 type CandidateEvidencePack = {
@@ -35,6 +36,7 @@ const EVIDENCE_SCHEMA = {
               required: ["fact","category","exact_source_text"]
             }
           },
+          relevant_jd_requirements: { type: "array", items: { type: "string" } },
           relationships: {
             type: "array",
             items: {
@@ -48,7 +50,7 @@ const EVIDENCE_SCHEMA = {
             }
           }
         },
-        required: ["id","source_text","facts","relationships"]
+        required: ["id","source_text","facts","relationships","relevant_jd_requirements"]
       }
     }
   },
@@ -98,6 +100,8 @@ Rules:
 - Keep exact_source_text short and verbatim.
 - Facts should be concise enough for downstream strategic reasoning.
 - The purpose is strategic retrieval, not CV summarization.
+- For each evidence block, identify 1 to 3 JD requirements that this evidence can legitimately inform. This is a retrieval link, not proof that the candidate meets the requirement.
+- Keep missing requirements out of candidate evidence; the downstream strategy engine must handle missing evidence separately.
 - Candidate language: ${language === "fr" ? "French" : "English"}.
 `;
 }
@@ -129,7 +133,7 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
     }).filter(Boolean);
     const factText = facts.join("; ");
     const relationshipText = relationships.length ? " Relationships: " + relationships.join("; ") : "";
-    const requirement = jd.length > 0 ? "Relevant target-role evidence" : "CV-verified evidence";
+    const requirement = block.relevant_jd_requirements.slice(0, 2).map(canonicalize).filter(Boolean).join(" | ") || (jd.length > 0 ? "Relevant target-role evidence" : "CV-verified evidence");
     return {
       jd_requirement: requirement,
       cv_evidence: clampWords(factText + relationshipText, 28),
