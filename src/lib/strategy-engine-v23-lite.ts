@@ -142,12 +142,40 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const raw = await requestStructuredJson(system, user, "candidate_evidence_v23", EVIDENCE_SCHEMA);
   const evidence = Array.isArray(raw?.evidence) ? raw.evidence as CandidateEvidenceItem[] : [];
   if (evidence.length < 6) throw new Error("Candidate evidence extraction returned fewer than 6 evidence blocks.");
+  const normalizeEvidenceText = (value: string) => canonicalize(value).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
+  const normalizedCv = normalizeEvidenceText(session.cv_text);
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.facts) && item.facts.length > 0 &&
     item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim())
   );
   if (!valid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
+
+  // Zero-hallucination boundary: every extracted fact must point back to text
+  // that actually exists in the supplied CV. The model may summarize that source
+  // into "fact", but it cannot invent the source passage itself.
+  for (const item of evidence.slice(0, 10)) {
+    const source = normalizeEvidenceText(item.source_text);
+    if (!source || !normalizedCv.includes(source)) {
+      throw new Error("Candidate evidence extraction produced a source_text not found in the supplied CV.");
+    }
+    for (const fact of item.facts.slice(0, 5)) {
+      const exactSource = normalizeEvidenceText(fact.exact_source_text);
+      if (!exactSource || !normalizedCv.includes(exactSource)) {
+        throw new Error("Candidate evidence extraction produced exact_source_text not found in the supplied CV.");
+      }
+      if (fact.exact_source_text.length > 500) {
+        throw new Error("Candidate evidence extraction produced an excessively long exact_source_text.");
+      }
+    }
+    for (const relationship of item.relationships.slice(0, 5)) {
+      if (!Number.isInteger(relationship.from_fact) || !Number.isInteger(relationship.to_fact)
+        || relationship.from_fact < 0 || relationship.to_fact < 0
+        || relationship.from_fact >= item.facts.length || relationship.to_fact >= item.facts.length) {
+        throw new Error("Candidate evidence extraction returned an invalid fact relationship index.");
+      }
+    }
+  }
   return { evidence: evidence.slice(0, 10) };
 }
 
