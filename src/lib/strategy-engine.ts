@@ -664,7 +664,10 @@ Generate the complete strategy.`;
 
 async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InterviewStrategy> {
   let diagnostics: string[] = [];
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Two attempts are enough because the second call receives the exact deterministic
+  // diagnostics from Gate 2A/2B. A third identical retry only adds latency; failure
+  // still terminates safely through the deterministic insufficient-evidence path.
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics, authoritativeStrategicPlan);
       if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); console.warn("[Strategy Engine V2.2] Pass 2 internal validation failed:", diagnostics); continue; }
