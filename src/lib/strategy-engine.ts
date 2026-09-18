@@ -663,6 +663,10 @@ function alignStrategyToAuthoritativePlan(
     ? "Dans chaque réponse, commencez par le fait documenté, explicitez votre rôle et reliez-le à l'exigence visée. Pour les capacités transférables, nommez le lien d'adaptation ; pour les points à vérifier, dites clairement ce qui reste à établir."
     : "In each answer, start with the documented fact, clarify your role, and connect it to the target requirement. For transferable capabilities, name the adaptation link; for points to verify, state clearly what remains to be established.";
 
+  const personalizationForTensions = () => fr
+    ? "Cette stratégie est construite autour de trois tensions propres à ce poste : ce que votre parcours documenté permet de démontrer, ce qui peut être transféré vers l'exigence cible et ce que l'entretien doit encore confirmer."
+    : "This strategy is built around three tensions specific to this role: what your documented background can demonstrate, what can transfer to the target requirement, and what the interview still needs to confirm.";
+
   const interviewPlanForTensions = () => fr
     ? "Commencez par le positionnement central, puis traitez les trois tensions dans l'ordre. Pour chaque tension : 1) rappelez le fait documenté ; 2) apportez l'exemple préparé ; 3) répondez au doute de l'intervieweur ; 4) terminez par ce que l'entretien doit confirmer ou établir. Ne comblez aucun manque d'information."
     : "Start with the central positioning, then work through the three tensions in order. For each tension: 1) state the documented fact; 2) give the prepared example; 3) address the interviewer's doubt; 4) finish with what the interview must confirm or establish. Do not fill any evidence gaps with assumptions.";
@@ -766,6 +770,15 @@ function alignStrategyToAuthoritativePlan(
         && semanticOverlap(generated, t.interviewer_doubt) >= 0.16
       ).length;
       return relevance >= 2 ? generated : interviewPlanForTensions();
+    })(),
+    personalization: (() => {
+      const generated = strategy.personalization?.trim() || "";
+      const relevance = tensions.filter((t) =>
+        generated
+        && (semanticOverlap(generated, t.target_requirement) >= 0.16
+          || semanticOverlap(generated, t.interviewer_doubt) >= 0.16)
+      ).length;
+      return relevance >= 2 ? generated : personalizationForTensions();
     })(),
   };
 }
