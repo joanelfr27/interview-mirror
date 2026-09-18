@@ -29,6 +29,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     const { data: session, error: sessionError } = await supabase.from('sessions').select('*').eq('id', sessionId).eq('user_id', user.id).single()
     if (sessionError || !session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     if (!session.cv_analysis || !session.interview_strategy) return NextResponse.json({ error: 'CV analysis and interview strategy are required' }, { status: 400 })
+    if ((session.interview_strategy as any)._strategy_engine_version !== 'v2.2') return NextResponse.json({ code: 'STRATEGY_REFRESH_REQUIRED', error: 'This session uses an older interview strategy. Refresh the strategy before starting the interview.' }, { status: 409 })
 
     const { data: existingQuestions, error: existingQuestionsError } = await supabase.from('questions').select('id, category').eq('session_id', sessionId).order('order_index', { ascending: true })
     if (existingQuestionsError) return NextResponse.json({ error: existingQuestionsError.message }, { status: 500 })
