@@ -215,7 +215,7 @@ function hasSpecificityAnchor(text: string, source: string): boolean { const nor
  * an evidence-token anchor plus a role anchor instead of requiring literal
  * CV/JD phrases.
  */
-function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = []): boolean {
+function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = [], strategicAnalysis: StrategicAnalysis | null = null): boolean {
   if (!Array.isArray(strategy?.interviewPriorities) || strategy.interviewPriorities.length !== 3) return false;
   if (!cvText.trim() || !jobDescription.trim() || evidenceMap.length < 3) return false;
 
@@ -233,12 +233,18 @@ function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescriptio
     normalizeForComparison(text).filter((token) => token.length >= 5 && !prioritySpecificityStopwords.has(token))
   );
 
+  const evidenceById = new Map(evidenceMap.map((node) => [node.node_id, node]));
+
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
 
-    // Candidate specificity must come from the exact evidence node assigned to this priority.
-    const node = evidenceMap[index];
+    // The authoritative Pass 1 proof objective identifies the exact evidence node
+    // for this priority. Fall back to positional mapping only when that metadata
+    // is unavailable (e.g. legacy persisted validation).
+    const primaryNodeId = strategicAnalysis?.proofObjectives?.[index]?.primary_evidence_node_id;
+    const node = primaryNodeId ? evidenceById.get(primaryNodeId) : evidenceMap[index];
     if (!node) return false;
+
     const boundEvidenceTokens = distinctiveTokens(node.fact);
     const priorityTokens = distinctiveTokens(priority);
     const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
@@ -275,7 +281,7 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   // candidate's actual evidence and a distinctive target-role requirement.
   // This replaces the old "sounds strategic" test with a deterministic
   // candidate-specificity/reuse check.
-  if (!hasSpecificPriorityAnchors(s, _cvText, _jobDescription, _evidenceMap)) return false;
+  if (!hasSpecificPriorityAnchors(s, _cvText, _jobDescription, _evidenceMap, _strategicAnalysis)) return false;
   return true;
 }
 function validateObjectiveShape(o: any): o is ProofObjective {
