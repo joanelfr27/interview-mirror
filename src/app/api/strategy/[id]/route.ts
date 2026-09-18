@@ -1,11 +1,12 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { normalizeLanguage } from "@/lib/openai";
-import { buildEvidenceMap, isValidStrategy, runStrategyEngineV2 } from "@/lib/strategy-engine";
+import { buildEvidenceMap, isValidStrategy } from "@/lib/strategy-engine";
+import { runStrategyEngineV23Lite } from "@/lib/strategy-engine-v23-lite";
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord, CvAnalysis } from "@/types";
 
-const STRATEGY_ENGINE_VERSION = "v2.2";
+const STRATEGY_ENGINE_VERSION = "v2.3-lite";
 
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
@@ -108,7 +109,7 @@ function enrichEvidenceForStrategy(session: SessionRecord): SessionRecord {
 }
 
 async function generateStrategy(session: SessionRecord): Promise<InterviewStrategy> {
-  return runStrategyEngineV2(enrichEvidenceForStrategy(session));
+  return runStrategyEngineV23Lite(session);
 }
 
 function hasCurrentEngineVersion(strategy: unknown): boolean {
