@@ -33,6 +33,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!sourceSession.cv_analysis || !sourceSession.interview_strategy) {
       return NextResponse.json({ error: "CV analysis and interview strategy are required" }, { status: 400 });
     }
+    if ((sourceSession.interview_strategy as any)._strategy_engine_version !== "v2.2") {
+      return NextResponse.json({ code: "STRATEGY_REFRESH_REQUIRED", error: "Refresh the interview strategy before starting a retest." }, { status: 409 });
+    }
 
     const { data: feedbackRow, error: feedbackError } = await supabase
       .from("feedback")
