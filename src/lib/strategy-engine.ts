@@ -549,53 +549,64 @@ function alignStrategyToAuthoritativePlan(
   const fr = language === "fr";
   const tensions = authoritativePlan.tensions;
 
-  const priorityText = (t: StrategicPlan["tensions"][number]) => {
-    if (t.mode === "TRANSFERABLE") {
+  // The authoritative plan controls evidence binding and strategic mode.
+  // It must not overwrite the strategy writer's candidate-specific wording:
+  // doing so turns a rich priority into a generic template and can make the
+  // final candidate-specificity gate reject an otherwise valid strategy.
+  const modeBoundary = (text: string, tension: StrategicPlan["tensions"][number]) => {
+    const normalized = text.toLowerCase();
+    if (tension.mode === "TRANSFERABLE") {
+      const marker = fr
+        ? /transpos|transfér|applicable|mobilis|peut être adapté|peut être mobilisé/.test(normalized)
+        : /transfer|translat|applicable|adapt|can be applied|can be transferred/.test(normalized);
+      if (marker) return text;
       return fr
-        ? `Montrer comment la capacité documentée peut être transposée au besoin « ${t.target_requirement} », sans la présenter comme une expérience directe dans ce domaine.`
-        : `Show how the documented capability can be transferred to the requirement “${t.target_requirement}”, without presenting it as direct experience in that domain.`;
+        ? `${text} Cette capacité doit être présentée comme transférable vers « ${tension.target_requirement} », sans la présenter comme une expérience directe dans ce domaine.`
+        : `${text} This capability must be presented as transferable to “${tension.target_requirement}”, not as direct experience in that domain.`;
     }
-    if (t.mode === "VERIFY_GAP") {
+    if (tension.mode === "VERIFY_GAP") {
+      const marker = fr
+        ? /vérifi|à confirmer|reste à établir|n'est pas (?:établi|documenté)|absence|ne permet pas d'affirmer/.test(normalized)
+        : /verify|confirm|needs to be established|not established|not documented|absence|cannot establish/.test(normalized);
+      if (marker) return text;
       return fr
-        ? `Préparer à établir pendant l'entretien ce que l'expérience documentée permet réellement de démontrer au regard de « ${t.target_requirement} », et ce qui reste à vérifier.`
-        : `Be ready to establish during the interview what the documented experience actually demonstrates against “${t.target_requirement}”, and what remains to be verified.`;
+        ? `${text} Ce point reste à confirmer pendant l'entretien au regard de « ${tension.target_requirement} ».`
+        : `${text} This point remains to be confirmed in the interview against “${tension.target_requirement}”.`;
     }
-    return fr
-      ? `Démontrer, à partir de l'expérience documentée, ce que vous pouvez personnellement apporter sur « ${t.target_requirement} ».`
-      : `Demonstrate, from the documented experience, what you can personally bring to “${t.target_requirement}”.`;
+    return text;
   };
 
-  const storyText = (t: StrategicPlan["tensions"][number]) => {
-    if (t.mode === "TRANSFERABLE") {
-      return fr
-        ? `Préparez un exemple précis de l'expérience documentée et expliquez comment cette capacité peut être mobilisée dans le nouveau contexte, sans ajouter d'expérience sectorielle non établie.`
-        : `Prepare a precise example from the documented experience and explain how that capability can be applied in the new context, without adding unestablished sector experience.`;
-    }
-    if (t.mode === "VERIFY_GAP") {
-      return fr
-        ? `Préparez l'élément documenté qui permet d'éclairer ce point et indiquez clairement ce qui devra encore être confirmé pendant l'entretien.`
-        : `Prepare the documented evidence that informs this point and clearly state what still needs to be confirmed during the interview.`;
-    }
-    return fr
-      ? `Préparez un exemple précis lié à cette responsabilité et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
-      : `Prepare a precise example related to this responsibility and explain your personal role, the decision and the result without adding unestablished information.`;
-  };
+  const fallbackPriority = (t: StrategicPlan["tensions"][number]) => fr
+    ? `Démontrer, à partir de l'expérience documentée, ce que vous pouvez personnellement apporter sur « ${t.target_requirement} ».`
+    : `Demonstrate, from the documented experience, what you can personally bring to “${t.target_requirement}”.`;
+
+  const fallbackStory = (t: StrategicPlan["tensions"][number]) => fr
+    ? `Préparez un exemple précis lié à l'expérience documentée et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
+    : `Prepare a precise example from the documented experience and explain your personal role, the decision and the result without adding unestablished information.`;
 
   return {
     ...strategy,
-    interviewPriorities: tensions.map((t) => ({
-      text: priorityText(t),
+    interviewPriorities: tensions.map((t, index) => {
+      const generated = strategy.interviewPriorities?.[index]?.text?.trim() || fallbackPriority(t);
+      return {
+        text: modeBoundary(generated, t),
+        evidence_node_id: t.primary_evidence_node_id,
+      };
+    }),
+    storiesToPrepare: tensions.map((t, index) => ({
+      text: strategy.storiesToPrepare?.[index]?.text?.trim() || fallbackStory(t),
       evidence_node_id: t.primary_evidence_node_id,
     })),
-    storiesToPrepare: tensions.map((t) => ({
-      text: storyText(t),
-      evidence_node_id: t.primary_evidence_node_id,
-    })),
-    gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
-    gapDefenseStrategy: tensions.map((t) => t.allowed_positioning),
-    interviewPlan: fr
-      ? "Traitez successivement les trois tensions : établissez d'abord ce que votre expérience prouve, expliquez ensuite comment une capacité transférable s'applique lorsque c'est pertinent, puis traitez explicitement les points qui restent à vérifier."
-      : "Work through the three tensions in sequence: establish what your experience proves, explain how a transferable capability applies where relevant, and explicitly address points that remain to be verified.",
+    // Preserve candidate-facing wording produced by Pass 2. The authoritative
+    // plan remains the constraint source through the prompt, mode diagnostics,
+    // evidence-faithfulness verifier, and evidence-node binding above.
+    gapsOrRisks: strategy.gapsOrRisks?.length ? strategy.gapsOrRisks : tensions.map((t) => t.interviewer_doubt),
+    gapDefenseStrategy: strategy.gapDefenseStrategy?.length ? strategy.gapDefenseStrategy : tensions.map((t) => t.allowed_positioning),
+    interviewPlan: strategy.interviewPlan?.trim()
+      ? strategy.interviewPlan
+      : (fr
+        ? "Traitez successivement les trois tensions en distinguant les faits établis, les capacités transférables et les points qui restent à vérifier."
+        : "Work through the three tensions by distinguishing established facts, transferable capabilities, and points that remain to be verified."),
   };
 }
 
