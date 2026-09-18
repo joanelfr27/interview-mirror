@@ -150,7 +150,18 @@ function hasCrossSectionDuplication(strategy: any): boolean {
   for (let i = 0; i < priorities.length; i++) for (let j = i + 1; j < priorities.length; j++) if (semanticOverlap(priorities[i], priorities[j]) >= 0.78) return true;
   for (let i = 0; i < stories.length; i++) for (let j = i + 1; j < stories.length; j++) if (typeof stories[i] === "string" && typeof stories[j] === "string" && semanticOverlap(stories[i], stories[j]) >= 0.72) return true;
   return false;
-}function hasPriorityRiskDuplication(strategy: any, authoritativeVulnerabilities: string[] = []): boolean {
+}function hasDifficultQuestionDuplication(strategy: any): boolean {
+  const questions = Array.isArray(strategy?.likelyDifficultQuestions) ? strategy.likelyDifficultQuestions : [];
+  if (questions.length < 3) return true;
+  for (let i = 0; i < questions.length; i++) {
+    for (let j = i + 1; j < questions.length; j++) {
+      if (typeof questions[i] !== "string" || typeof questions[j] !== "string") return true;
+      if (semanticOverlap(questions[i], questions[j]) >= 0.76) return true;
+    }
+  }
+  return false;
+}
+function hasPriorityRiskDuplication(strategy: any, authoritativeVulnerabilities: string[] = []): boolean {
   const priorities = Array.isArray(strategy?.interviewPriorities) ? strategy.interviewPriorities : [];
   const risks = Array.isArray(strategy?.gapsOrRisks) ? strategy.gapsOrRisks : [];
   if (priorities.length !== 3 || risks.length !== 3) return true;
@@ -301,6 +312,7 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
     ? _strategicAnalysis.vulnerabilities
     : [];
   if (hasPriorityRiskDuplication(s, authoritativeVulnerabilities)) return false;
+  if (hasDifficultQuestionDuplication(s)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
   // Final quality gate: each proof priority must be anchored to both the
   // candidate's actual evidence and a distinctive target-role requirement.
