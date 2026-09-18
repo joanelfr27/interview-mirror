@@ -500,14 +500,14 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics);
-      if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); continue; }
+      if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); console.warn("[Strategy Engine V2.2] Pass 2 internal validation failed:", diagnostics); continue; }
       shadowLexicalGroundingReport(internal, evidenceMap);
       const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
-      if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; continue; }
+      if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; console.warn("[Strategy Engine V2.2] evidence faithfulness failed:", diagnostics); continue; }
       const publicStrategy = publicStrategyFromInternal(internal);
-      if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; continue; }
+      if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; console.warn("[Strategy Engine V2.2] Gate 2B failed:", diagnostics); continue; }
       return publicStrategy;
-    } catch (error) { diagnostics = [error instanceof Error ? error.message : "Pass 2 structured generation failed."]; }
+    } catch (error) { diagnostics = [error instanceof Error ? error.message : "Pass 2 structured generation failed."]; console.warn("[Strategy Engine V2.2] Pass 2 generation error:", diagnostics); }
   }
   console.warn("[Strategy Engine V2.2] repair cap reached; using safe INSUFFICIENT_EVIDENCE fallback.");
   return safeInsufficientEvidenceStrategy(session, evidenceMap, analysis);
