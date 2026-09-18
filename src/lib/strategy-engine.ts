@@ -150,7 +150,37 @@ function hasCrossSectionDuplication(strategy: any): boolean {
   for (let i = 0; i < priorities.length; i++) for (let j = i + 1; j < priorities.length; j++) if (semanticOverlap(priorities[i], priorities[j]) >= 0.78) return true;
   for (let i = 0; i < stories.length; i++) for (let j = i + 1; j < stories.length; j++) if (typeof stories[i] === "string" && typeof stories[j] === "string" && semanticOverlap(stories[i], stories[j]) >= 0.72) return true;
   return false;
+}function hasPriorityRiskDuplication(strategy: any): boolean {
+  const priorities = Array.isArray(strategy?.interviewPriorities) ? strategy.interviewPriorities : [];
+  const risks = Array.isArray(strategy?.gapsOrRisks) ? strategy.gapsOrRisks : [];
+  if (!priorities.length || !risks.length) return false;
+
+  // A risk may concern the same underlying tension as a priority, but it must
+  // add a distinct interviewer doubt rather than restating what the candidate
+  // needs to demonstrate. Flag shared concrete phrases or high lexical overlap
+  // so Pass 2 is forced to separate "proof to demonstrate" from "reason for doubt".
+  const meaningfulBigrams = (text: string): Set<string> => {
+    const tokens = normalizeForComparison(text).filter((token) => token.length >= 5);
+    const bigrams = new Set<string>();
+    for (let i = 0; i < tokens.length - 1; i++) bigrams.add(tokens[i] + " " + tokens[i + 1]);
+    return bigrams;
+  };
+
+  for (const priority of priorities) {
+    if (typeof priority !== "string") continue;
+    for (const risk of risks) {
+      if (typeof risk !== "string") continue;
+      const overlap = semanticOverlap(priority, risk);
+      const priorityBigrams = meaningfulBigrams(priority);
+      const riskBigrams = meaningfulBigrams(risk);
+      const sharedBigram = [...priorityBigrams].some((bigram) => riskBigrams.has(bigram));
+      if (sharedBigram && overlap >= 0.20) return true;
+      if (overlap >= 0.45) return true;
+    }
+  }
+  return false;
 }
+
 function containsCopiedJdSentence(strategy: unknown, jobDescription: string): boolean {
   if (!strategy || typeof strategy !== "object" || !jobDescription) return false;
   const s = strategy as any;
@@ -276,6 +306,7 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   if (typeof s.candidatePositioning !== "string" || typeof s.strongestValueProposition !== "string" || typeof s.communicationPriorities !== "string" || typeof s.interviewPlan !== "string" || typeof s.personalization !== "string" || !validStrings(s.strengthsToLeverage) || !validStrings(s.gapsOrRisks) || !validStrings(defenses) || !validStrings(priorities) || !validStrings(s.likelyDifficultQuestions) || !validStrings(stories) || priorities.length !== 3 || stories.length !== 3 || s.gapsOrRisks.length > 3 || s.likelyDifficultQuestions.length === 0) return false;
   if (generic.test(allText) || internal.test(allText) || languageMismatch.test(allText)) return false;
   if (hasCrossSectionDuplication(s)) return false;
+  if (hasPriorityRiskDuplication(s)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
   // Final quality gate: each proof priority must be anchored to both the
   // candidate's actual evidence and a distinctive target-role requirement.
@@ -754,6 +785,7 @@ Rules:
 - The priority should explain the strategic tension created by this candidate's evidence and this role requirement, not merely restate the gap or requirement.
 - storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes.
 - gapsOrRisks must express the three distinct doubts/verification issues from the plan; do not simply repeat interview priorities.
+- Each risk is the interviewer's unresolved doubt, not another version of what the candidate must demonstrate. Avoid reusing the priority's concrete evidence phrase or target-requirement wording when stating the risk. Reframe the doubt around a distinct verification dimension such as ownership, scope, scale, recency, depth, industry context, or transferability.
 - gapDefenseStrategy must tell the candidate how to handle each doubt.
 - likelyDifficultQuestions must contain at least 3 realistic questions tied to the plan.
 - Do not expose evidence node IDs.
