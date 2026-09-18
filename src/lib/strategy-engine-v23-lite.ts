@@ -1,7 +1,7 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
 import { buildEvidenceMap, runStrategyEngineV2 } from "@/lib/strategy-engine";
-import type { StrategicPlan, StrategicTension, StrategicTensionMode } from "@/lib/strategy-plan-types";
+import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
 type CandidateEvidenceItem = {
   id: string;
