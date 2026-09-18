@@ -509,6 +509,23 @@ function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMa
   return failures;
 }
 
+function alignStrategyToAuthoritativePlan(strategy: InternalStrategy, authoritativePlan: StrategicPlan | null, language: SessionLanguage): InternalStrategy {
+  if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return strategy;
+  const fr = language === "fr";
+  const tensions = authoritativePlan.tensions;
+  return {
+    ...strategy,
+    // The attention section is a direct expression of interviewer doubt. Keep it
+    // deterministic so it cannot drift into generic CV advice or duplicate the
+    // candidate-facing proof priorities.
+    gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
+    gapDefenseStrategy: tensions.map((t) => t.allowed_positioning),
+    interviewPlan: fr
+      ? "Traitez successivement les trois tensions : établissez d'abord ce que votre expérience prouve, expliquez ensuite comment une capacité transférable s'applique lorsque c'est pertinent, puis traitez explicitement les points qui restent à vérifier."
+      : "Work through the three tensions in sequence: establish what your experience proves, explain how a transferable capability applies where relevant, and explicitly address points that remain to be verified.",
+  };
+}
+
 function strategicModeDiagnostics(strategy: InternalStrategy, authoritativePlan: StrategicPlan | null, language: SessionLanguage): string[] {
   if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return [];
   const failures: string[] = [];
@@ -676,7 +693,8 @@ Title: ${session.title}
 Interview date: ${session.interview_date ?? "Not provided"}
 
 Generate the complete strategy.`;
-  return requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.2) as Promise<InternalStrategy>;
+  const raw = await requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.2) as InternalStrategy;
+  return alignStrategyToAuthoritativePlan(raw, authoritativePlan, language);
 }
 
 async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InterviewStrategy> {
