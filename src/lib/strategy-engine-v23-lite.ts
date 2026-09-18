@@ -247,8 +247,7 @@ Important:
 Return the complete schema.
 `;
 
-  const user = "EVIDENCE MAP:\n" + JSON.stringify(evidenceMap, null, 2) +
-    "\n\nRAW CV (fact context only; do not create facts outside the evidence map):\n" + session.cv_text.slice(0, 9000) +
+  const user = "EVIDENCE MAP (complete candidate-fact boundary):\n" + JSON.stringify(evidenceMap, null, 2) +
     "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +
     "\n\nCreate the authoritative strategic plan.";
 
