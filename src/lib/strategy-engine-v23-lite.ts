@@ -276,11 +276,11 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
       let common = 0; for (const token of a) if (b.has(token)) common++;
       return common / Math.min(a.size, b.size);
     })();
-    const node = byId.get(tension.primary_evidence_node_id);
-    const doubtEvidenceOverlap = node
+    const doubtEvidenceNode = byId.get(tension.primary_evidence_node_id);
+    const doubtEvidenceOverlap = doubtEvidenceNode
       ? (() => {
           const a = new Set(canonicalize(tension.interviewer_doubt).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
-          const b = new Set(canonicalize(node.fact).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+          const b = new Set(canonicalize(doubtEvidenceNode.fact).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
           if (!a.size || !b.size) return 0;
           let common = 0; for (const token of a) if (b.has(token)) common++;
           return common / Math.min(a.size, b.size);
