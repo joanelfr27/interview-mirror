@@ -538,12 +538,56 @@ function safeInsufficientEvidenceStrategy(session: SessionRecord, evidenceMap: E
 
 async function runPass2(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, diagnostics: string[] = [], authoritativeStrategicPlan = ""): Promise<InternalStrategy> {
   const strategicPlanBlock = authoritativeStrategicPlan
-    ? "\n\nAUTHORITATIVE STRATEGIC PLAN — THIS IS THE STRATEGIC SOURCE OF TRUTH:\n" + authoritativeStrategicPlan +
-      "\n\nYou are a strategy writer, not a second strategy-discovery engine. Preserve the three tensions, their modes, their doubts, their allowed positioning and their forbidden inferences. Do not replace them with generic strengths. For each interview priority, make the candidate-facing wording reflect the corresponding tension. DIRECT may describe the documented capability; TRANSFERABLE must explicitly frame the capability as transferable and must not claim target-domain experience; VERIFY_GAP must frame the point as something to verify and must not present it as established experience. The strategic plan is NOT candidate evidence. Candidate facts may come only from the bound EVIDENCE MAP node.\n"
+    ? `
+
+AUTHORITATIVE STRATEGIC PLAN — THIS IS THE STRATEGIC SOURCE OF TRUTH:
+${authoritativeStrategicPlan}
+
+You are a strategy writer, not a second strategy-discovery engine. Preserve the three tensions, their modes, their doubts, their allowed positioning and their forbidden inferences. Do not replace them with generic strengths. For each interview priority, make the candidate-facing wording reflect the corresponding tension. DIRECT may describe the documented capability; TRANSFERABLE must explicitly frame the capability as transferable and must not claim target-domain experience; VERIFY_GAP must frame the point as something to verify and must not present it as established experience. The strategic plan is NOT candidate evidence. Candidate facts may come only from the bound EVIDENCE MAP node.
+`
     : "";
-  const diagnosticBlock = diagnostics.length ? "\n\nPREVIOUS PASS 2 VALIDATION FAILED. Regenerate the COMPLETE schema and correct these diagnostics. Do not return a partial patch:\n- " + diagnostics.join("\n- ") : "";
-  const system = languageInstruction(language) + "\n\nYou are Interview Mirror's senior interview strategy writer. A validated strategic foundation and an AUTHORITATIVE STRATEGIC PLAN are provided. Convert them into candidate-facing strategy while preserving the strategic tensions and evidence assignments. Return the complete internal schema.\n\nRules: candidatePositioning is role-specific, not a CV summary. strongestValueProposition is one central message bound to a real evidence node. strengthsToLeverage are established advantages bound to evidence. interviewPriorities are EXACTLY 3 in the same order as the authoritative plan's three tensions and bind to their primary evidence. storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes. gapsOrRisks must express the three distinct doubts/verification issues from the plan; do not simply repeat interview priorities. gapDefenseStrategy must tell the candidate how to handle each doubt. likelyDifficultQuestions must contain at least 3 realistic questions tied to the plan. Do not expose evidence node IDs. The bound evidence fact is a hard factual boundary: do not upgrade it into mastery, expertise, ownership, usage, scope, scale, industry experience, standards knowledge, tool/system experience, metrics, dates, employers, responsibilities or outcomes unless that exact fact is documented in the bound evidence node. A strategic priority may connect a documented fact to the job requirement, but must not turn the job requirement into a candidate fact. NEVER phrase a TRANSFERABLE tension as "experience in" the target domain; explicitly use transferability language such as "transposer", "applicable", or "mobiliser" and name the target-domain experience as not established when relevant. NEVER phrase a VERIFY_GAP tension as "sufficient experience", "mastery", or "knowledge"; frame it as a point the interviewer will verify or that the interview must establish. A story should be a preparation instruction anchored to the bound fact; it may tell the candidate to explain their actual role, decision or result, but must not assert that role, decision or result unless documented. QUALIFICATION is not employment experience. Distinguish what must be demonstrated from what could cause doubt. Natural paraphrase is encouraged.\n\n" + strategicPlanBlock + diagnosticBlock;
-  const user = "AUTHORITATIVE STRATEGIC PLAN:\n" + authoritativeStrategicPlan + "\n\nVALIDATED STRATEGIC FOUNDATION:\n" + JSON.stringify(analysis, null, 2) + "\n\nEVIDENCE MAP:\n" + JSON.stringify(evidenceMap, null, 2) + "\n\nTitle: " + session.title + "\nInterview date: " + (session.interview_date ?? "Not provided") + "\n\nGenerate the complete strategy.";
+  const diagnosticBlock = diagnostics.length
+    ? `
+
+PREVIOUS PASS 2 VALIDATION FAILED. Regenerate the COMPLETE schema and correct these diagnostics. Do not return a partial patch:
+- ${diagnostics.join("\n- ")}`
+    : "";
+  const system = languageInstruction(language) + `
+
+You are Interview Mirror's senior interview strategy writer. A validated strategic foundation and an AUTHORITATIVE STRATEGIC PLAN are provided. Convert them into candidate-facing strategy while preserving the strategic tensions and evidence assignments. Return the complete internal schema.
+
+Rules:
+- candidatePositioning is role-specific, not a CV summary.
+- strongestValueProposition is one central message bound to a real evidence node.
+- strengthsToLeverage are established advantages bound to evidence.
+- interviewPriorities are EXACTLY 3 in the same order as the authoritative plan's three tensions and bind to their primary evidence.
+- storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes.
+- gapsOrRisks must express the three distinct doubts/verification issues from the plan; do not simply repeat interview priorities.
+- gapDefenseStrategy must tell the candidate how to handle each doubt.
+- likelyDifficultQuestions must contain at least 3 realistic questions tied to the plan.
+- Do not expose evidence node IDs.
+- The bound evidence fact is a hard factual boundary: do not upgrade it into mastery, expertise, ownership, usage, scope, scale, industry experience, standards knowledge, tool/system experience, metrics, dates, employers, responsibilities or outcomes unless that exact fact is documented in the bound evidence node.
+- A strategic priority may connect a documented fact to the job requirement, but must not turn the job requirement into a candidate fact.
+- NEVER phrase a TRANSFERABLE tension as "experience in" the target domain; explicitly use transferability language such as "transposer", "applicable", or "mobiliser" and name the target-domain experience as not established when relevant.
+- NEVER phrase a VERIFY_GAP tension as "sufficient experience", "mastery", or "knowledge"; frame it as a point the interviewer will verify or that the interview must establish.
+- A story should be a preparation instruction anchored to the bound fact; it may tell the candidate to explain their actual role, decision or result, but must not assert that role, decision or result unless documented.
+- QUALIFICATION is not employment experience.
+- Distinguish what must be demonstrated from what could cause doubt.
+- Natural paraphrase is encouraged.
+${strategicPlanBlock}${diagnosticBlock}`;
+  const user = `AUTHORITATIVE STRATEGIC PLAN:
+${authoritativeStrategicPlan}
+
+VALIDATED STRATEGIC FOUNDATION:
+${JSON.stringify(analysis, null, 2)}
+
+EVIDENCE MAP:
+${JSON.stringify(evidenceMap, null, 2)}
+
+Title: ${session.title}
+Interview date: ${session.interview_date ?? "Not provided"}
+
+Generate the complete strategy.`;
   return requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.2) as Promise<InternalStrategy>;
 }
 
