@@ -6,11 +6,22 @@ function isValidQuestionSet(data: unknown, strategy: unknown): data is { questio
   if (!data || typeof data !== "object") return false;
   const questions = (data as { questions?: unknown }).questions;
   if (!Array.isArray(questions) || questions.length !== 5) return false;
+  const s = strategy && typeof strategy === "object" ? strategy as Record<string, unknown> : null;
+  const allowedBases = new Set<string>([
+    ...(Array.isArray(s?.interviewPriorities) ? s.interviewPriorities : []),
+    ...(Array.isArray(s?.storiesToPrepare) ? s.storiesToPrepare : []),
+    ...(Array.isArray(s?.gapsOrRisks) ? s.gapsOrRisks : []),
+    ...(Array.isArray(s?.gapDefenseStrategy) ? s.gapDefenseStrategy : []),
+    ...(typeof s?.strongestValueProposition === "string" ? [s.strongestValueProposition] : []),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0));
+  const generic = /\\b(tell me about yourself|why do you want this job|what are your strengths|what are your weaknesses|where do you see yourself|why should we hire you|team conflict|conflict with a colleague|leadership style|hobbies)\\b/i;
   return questions.every((item) => {
     if (!item || typeof item !== "object") return false;
     const question = (item as { question?: unknown }).question;
     const basis = (item as { strategy_basis?: unknown }).strategy_basis;
-    return typeof question === "string" && question.trim().length > 0 && typeof basis === "string" && basis.trim().length > 0 && allowedBases.has(basis.trim());
+    if (typeof question !== "string" || !question.trim() || typeof basis !== "string" || !basis.trim()) return false;
+    if (generic.test(question)) return false;
+    return allowedBases.has(basis.trim());
   });
 }
 
