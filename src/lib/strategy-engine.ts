@@ -889,6 +889,68 @@ function publicStrategyFromInternal(strategy: InternalStrategy, status?: "INSUFF
   } as InterviewStrategy;
 }
 
+function authoritativePlanFallbackStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], plan: StrategicPlan): InterviewStrategy {
+  const fr = normalizeLanguage(session.preparation_language) === "fr";
+  const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
+  const tensions = (plan.tensions ?? []).slice(0, 3);
+
+  const priorities = tensions.map((tension) => {
+    const node = byId.get(tension.primary_evidence_node_id);
+    const fact = node?.fact ?? "l'élément documenté";
+    return fr
+      ? `Reliez « ${truncate(fact, 18)} » à « ${truncate(tension.target_requirement, 18)} » et démontrez ${tension.interviewer_belief.toLowerCase()}.`
+      : `Connect “${truncate(fact, 18)}” to “${truncate(tension.target_requirement, 18)}” and demonstrate ${tension.interviewer_belief.toLowerCase()}.`;
+  });
+
+  const stories = tensions.map((tension) => {
+    const node = byId.get(tension.primary_evidence_node_id);
+    const fact = node?.fact ?? "l'élément documenté";
+    return fr
+      ? `Récupérez un exemple précis sur « ${truncate(fact, 18)} » qui vous permet de répondre au doute : « ${truncate(tension.interviewer_doubt, 24)} ».`
+      : `Retrieve one precise example around “${truncate(fact, 18)}” that lets you answer the doubt: “${truncate(tension.interviewer_doubt, 24)}”.`;
+  });
+
+  const defenses = tensions.map((tension) => tension.allowed_positioning);
+  const questions = tensions.map((tension) => {
+    const node = byId.get(tension.primary_evidence_node_id);
+    const fact = node?.fact ?? "this documented experience";
+    return fr
+      ? `En quoi « ${truncate(fact, 16)} » vous permet-il de répondre à « ${truncate(tension.target_requirement, 16)} » ?`
+      : `How does “${truncate(fact, 16)}” demonstrate your ability against “${truncate(tension.target_requirement, 16)}”?`;
+  });
+
+  const gaps = tensions.map((tension) => tension.interviewer_doubt);
+  const strengths = tensions.map((tension) => {
+    const node = byId.get(tension.primary_evidence_node_id);
+    return fr
+      ? `Point d'appui : ${truncate(node?.fact ?? tension.allowed_positioning, 24)}.`
+      : `Evidence anchor: ${truncate(node?.fact ?? tension.allowed_positioning, 24)}.`;
+  });
+
+  return {
+    candidatePositioning: plan.candidate_positioning,
+    strongestValueProposition: fr
+      ? `Votre valeur centrale repose sur ${truncate(tensions[0]?.target_requirement ?? "les responsabilités clés du poste", 24)}, en vous appuyant sur des faits documentés et sans dépasser ce que votre parcours établit.`
+      : `Your central value rests on ${truncate(tensions[0]?.target_requirement ?? "the role's key responsibilities", 24)}, supported by documented facts without exceeding what your background establishes.`,
+    strengthsToLeverage: strengths,
+    gapsOrRisks: gaps,
+    gapDefenseStrategy: defenses,
+    interviewPriorities: priorities,
+    likelyDifficultQuestions: questions,
+    storiesToPrepare: stories,
+    communicationPriorities: fr
+      ? "Pour chaque tension, partez du fait documenté, explicitez votre rôle et reliez-le à l'exigence visée. Ne transformez jamais une capacité transférable ou un point à vérifier en expérience directe."
+      : "For each tension, start from the documented fact, make your role explicit, and connect it to the target requirement. Never turn a transferable capability or verification point into direct experience.",
+    interviewPlan: fr
+      ? "Commencez par votre positionnement central, puis traitez les trois tensions. Pour chacune : fait documenté → exemple préparé → réponse au doute → limite ou point à confirmer."
+      : "Start with the central positioning, then address the three tensions. For each: documented fact → prepared example → answer to the doubt → boundary or point to confirm.",
+    personalization: fr
+      ? `Cette stratégie est construite autour de trois tensions propres à ce poste : ${tensions.map((t) => truncate(t.target_requirement, 12)).join(" ; ")}.`
+      : `This strategy is built around three role-specific tensions: ${tensions.map((t) => truncate(t.target_requirement, 12)).join(" ; ")}.`,
+    _strategy_status: "AUTHORITATIVE_PLAN_FALLBACK",
+  } as InterviewStrategy;
+}
+
 function safeInsufficientEvidenceStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis | null): InterviewStrategy {
   const fr = normalizeLanguage(session.preparation_language) === "fr";
   const provable = evidenceMap.filter((n) => n.status === "PROVEN" || n.status === "PARTIALLY_PROVEN").slice(0, 3);
@@ -992,6 +1054,10 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
       if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; console.warn("[Strategy Engine V2.2] Gate 2B failed:", diagnostics); continue; }
       return publicStrategy;
     } catch (error) { diagnostics = [error instanceof Error ? error.message : "Pass 2 structured generation failed."]; console.warn("[Strategy Engine V2.2] Pass 2 generation error:", diagnostics); }
+  }
+  if (authoritativePlan && authoritativePlan.tensions?.length === 3) {
+    console.warn("[Strategy Engine V2.3] Pass 2 repair cap reached; using deterministic authoritative-plan fallback.");
+    return authoritativePlanFallbackStrategy(session, evidenceMap, authoritativePlan);
   }
   console.warn("[Strategy Engine V2.2] repair cap reached; using safe INSUFFICIENT_EVIDENCE fallback.");
   return safeInsufficientEvidenceStrategy(session, evidenceMap, analysis);
