@@ -217,16 +217,51 @@ function hasSpecificityAnchor(text: string, source: string): boolean { const nor
  */
 function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = []): boolean {
   if (!Array.isArray(strategy?.interviewPriorities) || strategy.interviewPriorities.length !== 3) return false;
-  const roleAnchors = extractSourceAnchors(jobDescription);
-  const roleTokens = new Set(roleAnchors.flatMap((anchor) => normalizeForComparison(anchor)));
+  if (!cvText.trim() || !jobDescription.trim() || evidenceMap.length < 3) return false;
+
+  const prioritySpecificityStopwords = new Set([
+    "candidate", "experience", "professional", "finance", "financial", "accounting",
+    "management", "manager", "reporting", "responsibility", "responsibilities",
+    "leadership", "skills", "skill", "role", "position", "poste", "expérience",
+    "professionnel", "finance", "financier", "comptabilité", "gestion",
+    "responsabilité", "responsabilités", "management", "reporting", "compétence",
+    "compétences", "vous", "votre", "your", "the", "this", "that", "with", "from",
+    "pour", "dans", "avec", "sur", "les", "des", "une", "un", "et", "de", "du", "la", "le"
+  ]);
+
+  const distinctiveTokens = (text: string): Set<string> => {
+    return new Set(normalizeForComparison(text).filter((token) =>
+      token.length >= 5 && !prioritySpecificityStopwords.has(token)
+    ));
+  };
+
+  const cvTokens = distinctiveTokens(cvText);
+  const roleTokens = distinctiveTokens(jobDescription);
+
+  // Candidate specificity is deliberately stronger than a keyword/synthesis gate:
+  // every priority must contain either a distinctive candidate anchor (preferably
+  // a named employer, qualification, system, scope, metric, or other concrete CV
+  // detail) OR two independently distinctive tokens from the bound evidence.
+  // It must also connect that candidate anchor to a distinctive role requirement.
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
-    const priorityTokens = new Set(normalizeForComparison(priority));
+    const priorityTokens = distinctiveTokens(priority);
     const node = evidenceMap[index];
-    const evidenceTokens = node ? new Set(normalizeForComparison(node.fact)) : new Set<string>();
-    const evidenceLinked = [...evidenceTokens].some((token) => priorityTokens.has(token));
-    const roleLinked = [...roleTokens].some((token) => priorityTokens.has(token));
-    return evidenceLinked && roleLinked;
+
+    const boundEvidenceTokens = node ? distinctiveTokens(node.fact) : new Set<string>();
+    const candidateEvidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
+    const candidateCvOverlap = [...cvTokens].filter((token) => priorityTokens.has(token));
+    const candidateAnchorCount = new Set([...candidateEvidenceOverlap, ...candidateCvOverlap]).size;
+
+    const roleOverlap = [...roleTokens].filter((token) => priorityTokens.has(token)).length;
+
+    // One concrete candidate anchor is sufficient when it is distinctive;
+    // otherwise require two evidence-derived tokens to prevent generic
+    // "finance experience" language from passing.
+    const candidateSpecific = candidateAnchorCount >= 1;
+    const roleSpecific = roleOverlap >= 1;
+
+    return candidateSpecific && roleSpecific;
   });
 }
 
