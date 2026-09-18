@@ -273,15 +273,39 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
 
   if (plan.tensions.length === 3) {
     const pairs = [[0,1],[0,2],[1,2]] as const;
-    for (const [a,b] of pairs) {
-      const left = canonicalize(plan.tensions[a].interviewer_belief + " " + plan.tensions[a].target_requirement);
-      const right = canonicalize(plan.tensions[b].interviewer_belief + " " + plan.tensions[b].target_requirement);
-      const leftTokens = new Set(left.toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
-      const rightTokens = new Set(right.toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+    const strategicStopwords = new Set([
+      "about","which","where","when","their","there","these","those","requirement","requirements",
+      "expérience","experience","candidat","candidate","poste","role","job","position","interview",
+      "interviewer","intervieweur","capacité","capability","éléments","elements","documenté","documented",
+      "votre","your","vous","you","dans","with","pour","from","avec","this","that"
+    ]);
+    const tokens = (value: string) => new Set(
+      canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/)
+        .filter((x) => x.length >= 5 && !strategicStopwords.has(x))
+    );
+    const overlap = (a: string, b: string) => {
+      const aa = tokens(a); const bb = tokens(b);
+      if (!aa.size || !bb.size) return 0;
       let common = 0;
-      for (const token of leftTokens) if (rightTokens.has(token)) common++;
-      const overlap = common / Math.max(1, Math.min(leftTokens.size, rightTokens.size));
-      if (overlap >= 0.8) errors.push("Strategic tensions " + (a + 1) + " and " + (b + 1) + " are not materially distinct.");
+      for (const token of aa) if (bb.has(token)) common++;
+      return common / Math.min(aa.size, bb.size);
+    };
+
+    for (const [a,b] of pairs) {
+      const leftTarget = plan.tensions[a].target_requirement;
+      const rightTarget = plan.tensions[b].target_requirement;
+      const leftStrategic = plan.tensions[a].interviewer_belief + " " + plan.tensions[a].interviewer_doubt;
+      const rightStrategic = plan.tensions[b].interviewer_belief + " " + plan.tensions[b].interviewer_doubt;
+
+      // Distinct evidence nodes alone are not sufficient: three tensions can
+      // still describe the same interview issue using different evidence.
+      // Require either materially different target requirements OR materially
+      // different interviewer concerns.
+      const targetOverlap = overlap(leftTarget, rightTarget);
+      const concernOverlap = overlap(leftStrategic, rightStrategic);
+      if (targetOverlap >= 0.8 && concernOverlap >= 0.72) {
+        errors.push("Strategic tensions " + (a + 1) + " and " + (b + 1) + " are not materially distinct.");
+      }
     }
   }
 
