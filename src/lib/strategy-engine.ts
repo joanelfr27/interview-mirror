@@ -394,9 +394,9 @@ async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], 
 export async function generateStrategicAnalysis(session: SessionRecord): Promise<{ evidenceMap: EvidenceMapNode[]; analysis: StrategicAnalysis }> {
   const language = normalizeLanguage(session.preparation_language);
   const evidenceMap = buildEvidenceMap(session);
-  if (evidenceMap.length < 3) throw new Error("INSUFFICIENT_EVIDENCE: at least three evidence nodes are required.");
+  
   let diagnostics: string[] = []; let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const raw = await runPass1(session, evidenceMap, language, diagnostics);
       if (validatePass1(raw, evidenceMap)) return { evidenceMap, analysis: raw };
@@ -493,7 +493,7 @@ async function runPass2(session: SessionRecord, evidenceMap: EvidenceMapNode[], 
 
 async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage): Promise<InterviewStrategy> {
   let diagnostics: string[] = [];
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics);
       if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); continue; }
@@ -511,6 +511,16 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
 
 export async function runStrategyEngineV2(session: SessionRecord): Promise<InterviewStrategy> {
   const language = normalizeLanguage(session.preparation_language);
+  const evidenceMap = buildEvidenceMap(session);
+  const provableCount = evidenceMap.filter((node) => node.status === "PROVEN" || node.status === "PARTIALLY_PROVEN").length;
+
+  // Deterministic safe path: never force the AI to manufacture three proof objectives
+  // when the supplied evidence cannot support them.
+  if (evidenceMap.length < 3 || provableCount < 3) {
+    console.warn("[Strategy Engine V2.2] insufficient provable evidence; returning deterministic safe strategy.");
+    return safeInsufficientEvidenceStrategy(session, evidenceMap, null);
+  }
+
   const result = await generateStrategicAnalysis(session);
   return generateExecutiveStrategy(session, result.evidenceMap, result.analysis, language);
 }
