@@ -128,7 +128,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
   if (!hasValidProvenance(record.cv_analysis, record)) return NextResponse.json({ code: "ANALYSIS_PROVENANCE_INVALID", error: "The Professional Mirror analysis must be refreshed before an interview strategy can be generated." }, { status: 422 });
   const evidenceMap = buildEvidenceMap(record);
-  if (hasCurrentEngineVersion(record.interview_strategy) && isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description, record.cv_analysis, record.cv_text, evidenceMap)) return NextResponse.json({ strategy: record.interview_strategy });
+  if (hasCurrentEngineVersion(record.interview_strategy) && (record.interview_strategy as any)?._strategy_status !== "INSUFFICIENT_EVIDENCE" && isValidStrategy(record.interview_strategy, normalizeLanguage(record.preparation_language), record.job_description, record.cv_analysis, record.cv_text, evidenceMap)) return NextResponse.json({ strategy: record.interview_strategy });
 
   let strategy: InterviewStrategy;
   try {
