@@ -215,7 +215,7 @@ function hasSpecificityAnchor(text: string, source: string): boolean { const nor
  * an evidence-token anchor plus a role anchor instead of requiring literal
  * CV/JD phrases.
  */
-function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = []): boolean {
+function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = [], authoritativePlan: StrategicPlan | null = null): boolean {
   if (!Array.isArray(strategy?.interviewPriorities) || strategy.interviewPriorities.length !== 3) return false;
   if (!cvText.trim() || !jobDescription.trim() || evidenceMap.length < 3) return false;
 
@@ -229,42 +229,37 @@ function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescriptio
     "pour", "dans", "avec", "sur", "les", "des", "une", "un", "et", "de", "du", "la", "le"
   ]);
 
-  const distinctiveTokens = (text: string): Set<string> => {
-    return new Set(normalizeForComparison(text).filter((token) =>
-      token.length >= 5 && !prioritySpecificityStopwords.has(token)
-    ));
-  };
+  const distinctiveTokens = (text: string): Set<string> => new Set(
+    normalizeForComparison(text).filter((token) => token.length >= 5 && !prioritySpecificityStopwords.has(token))
+  );
 
-  const cvTokens = distinctiveTokens(cvText);
   const roleTokens = distinctiveTokens(jobDescription);
+  const tensionByNode = new Map(
+    (authoritativePlan?.tensions ?? []).map((t) => [t.primary_evidence_node_id, t])
+  );
 
-  // Candidate specificity is deliberately stronger than a keyword/synthesis gate:
-  // every priority must contain either a distinctive candidate anchor (preferably
-  // a named employer, qualification, system, scope, metric, or other concrete CV
-  // detail) OR two independently distinctive tokens from the bound evidence.
-  // It must also connect that candidate anchor to a distinctive role requirement.
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
-    const priorityTokens = distinctiveTokens(priority);
+
+    // The priority is validated against the exact evidence node assigned to it.
+    // Never use an unrelated fact elsewhere in the CV as a substitute.
     const node = evidenceMap[index];
+    if (!node) return false;
+    const boundEvidenceTokens = distinctiveTokens(node.fact);
+    const priorityTokens = distinctiveTokens(priority);
+    const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
 
-    const boundEvidenceTokens = node ? distinctiveTokens(node.fact) : new Set<string>();
-    const candidateEvidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
-    const candidateCvOverlap = [...cvTokens].filter((token) => priorityTokens.has(token));
-    const candidateAnchorCount = new Set([...candidateEvidenceOverlap, ...candidateCvOverlap]).size;
+    // The corresponding strategic tension provides the authoritative target-role
+    // requirement. If unavailable, fall back to the bound evidence node's JD requirement.
+    const tension = tensionByNode.get(node.node_id);
+    const targetRequirement = tension?.target_requirement ?? node.jd_requirement;
+    const requirementTokens = distinctiveTokens(targetRequirement);
+    const roleOverlap = [...requirementTokens].filter((token) => priorityTokens.has(token));
 
-    const roleOverlap = [...roleTokens].filter((token) => priorityTokens.has(token)).length;
-
-    // One concrete candidate anchor is sufficient when it is distinctive;
-    // otherwise require two evidence-derived tokens to prevent generic
-    // "finance experience" language from passing.
-    const candidateSpecific = candidateAnchorCount >= 1;
-    const roleSpecific = roleOverlap >= 1;
-
-    return candidateSpecific && roleSpecific;
+    // One concrete bound-evidence anchor + one concrete requirement anchor.
+    return evidenceOverlap.length >= 1 && roleOverlap.length >= 1;
   });
 }
-
 function hasPresentationArtifacts(text: string): boolean { return /\b(?:expérience pertinente|point d'ancrage|evidence anchor)\s*:/i.test(text); }
 function hasBrokenSentenceConstruction(text: string): boolean { return /\.\s+[a-zà-ÿ]/.test(text) || /,\s+est\s+(?:votre|un|une|le|la|un point|votre principal)\b/i.test(text); }
 function hasInternalStrategyInstructions(text: string): boolean {
