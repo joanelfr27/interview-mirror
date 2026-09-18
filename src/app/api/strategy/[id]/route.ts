@@ -69,45 +69,6 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   };
 }
 
-function strengthIsGroundedInCv(strength: string, cvText: string): boolean {
-  const s = canonicalize(strength).toLowerCase();
-  const cv = canonicalize(cvText).toLowerCase();
-  if (!s || !cv) return false;
-  if (cv.includes(s)) return true;
-  const tokens = s.split(/[^a-zà-ÿ0-9]+/).filter((word) => word.length >= 4);
-  if (!tokens.length) return false;
-  const matched = tokens.filter((token) => cv.includes(token));
-  return matched.length >= Math.min(2, tokens.length);
-}
-
-function enrichEvidenceForStrategy(session: SessionRecord): SessionRecord {
-  const analysis = session.cv_analysis;
-  if (!analysis) return session;
-  const chain = [...(analysis.evidenceChain ?? [])];
-  if (chain.length >= 3) return session;
-
-  const existingFacts = new Set(chain.map((item) => canonicalize(item.cv_evidence ?? "").toLowerCase()).filter(Boolean));
-  const supplementalStrengths = (analysis.strengths ?? []).filter((strength) => {
-    const normalized = canonicalize(strength).toLowerCase();
-    return normalized && !existingFacts.has(normalized) && strengthIsGroundedInCv(strength, session.cv_text);
-  });
-
-  for (const strength of supplementalStrengths) {
-    if (chain.length >= 3) break;
-    chain.push({
-      jd_requirement: "CV-verified strength",
-      cv_evidence: canonicalize(strength),
-      gap_identified: "none",
-      interview_implication: "Use only the concrete capability established by the CV.",
-      actionable_recommendation: "Connect this established strength to a distinct interviewer belief for the target role."
-    });
-  }
-
-  return chain.length === analysis.evidenceChain.length
-    ? session
-    : { ...session, cv_analysis: { ...analysis, evidenceChain: chain } };
-}
-
 async function generateStrategy(session: SessionRecord): Promise<InterviewStrategy> {
   return runStrategyEngineV23Lite(session);
 }
@@ -135,8 +96,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   try {
     strategy = await generateStrategy(record);
   } catch (error) {
-    console.error("[Strategy Engine V2.2] generation failed", error);
-    return NextResponse.json({ code: "STRATEGY_ENGINE_V2_FAILED", error: "The V2.2 interview strategy engine failed validation. Check the server log for the exact failing stage." }, { status: 503 });
+    console.error("[Strategy Engine V2.3-lite] generation failed", error);
+    return NextResponse.json({ code: "STRATEGY_ENGINE_V23_LITE_FAILED", error: "The V2.3-lite interview strategy engine failed validation. Check the server log for the exact failing stage." }, { status: 503 });
   }
 
   strategy = stampEngineVersion(strategy);
