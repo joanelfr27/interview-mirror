@@ -342,5 +342,8 @@ export async function runStrategyEngineV23Lite(session: SessionRecord): Promise<
   // context and validation; it is never replaced by serialized plan text.
   const evidenceMap = buildEvidenceMap(evidenceSession);
   const plan = await buildStrategicPlan(evidenceSession, evidenceMap);
+  // Keep the typed plan as the canonical strategic input. The serialized form is
+  // only a model-facing representation; validators and downstream code use the
+  // typed object so strategic meaning cannot drift through text parsing.
   return runStrategyEngineV2(evidenceSession, serializeAuthoritativePlan(plan), plan);
 }
