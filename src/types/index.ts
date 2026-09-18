@@ -52,6 +52,14 @@ export type InterviewStrategy = {
   communicationPriorities: string;
   interviewPlan: string;
   personalization: string;
+  _strategy_engine_version?: string;
+  _strategy_status?: "INSUFFICIENT_EVIDENCE";
+  retest_priorities?: Array<{
+    question: string;
+    score: number;
+    missing: string;
+    next: string;
+  }>;
 };
 
 export type CvAnalysis = {
