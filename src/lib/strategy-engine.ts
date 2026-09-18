@@ -584,6 +584,14 @@ function alignStrategyToAuthoritativePlan(
       const marker = fr
         ? /transpos|transfér|applicable|mobilis|peut être adapté|peut être mobilisé/.test(normalized)
         : /transfer|translat|applicable|adapt|can be applied|can be transferred/.test(normalized);
+      const directClaim = fr
+        ? /expérience\s+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|maîtrise\s+(?:des|du)|connaissance\s+(?:des|du) normes/.test(normalized)
+        : /mining experience|experience in (?:mining|project finance|capital-intensive)|project finance experience|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(normalized);
+      if (directClaim) {
+        return fr
+          ? `Présentez les éléments documentés de votre parcours comme une capacité transférable vers « ${tension.target_requirement} », sans les présenter comme une expérience directe ou une maîtrise établie de ce domaine.`
+          : `Present the documented elements of your background as a transferable capability toward “${tension.target_requirement}”, not as direct experience or established mastery of that domain.`;
+      }
       if (marker) return text;
       return fr
         ? `${text} Cette capacité doit être présentée comme transférable vers « ${tension.target_requirement} », sans la présenter comme une expérience directe dans ce domaine.`
@@ -617,6 +625,21 @@ function alignStrategyToAuthoritativePlan(
     ? `Préparez un exemple précis lié à l'expérience documentée et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
     : `Prepare a precise example from the documented experience and explain your personal role, the decision and the result without adding unestablished information.`;
 
+  const defenseForTension = (t: StrategicPlan["tensions"][number]) => {
+    const doubt = t.interviewer_doubt.toLowerCase();
+    const actions: string[] = [];
+    if (/ownership|responsabil|rôle personnel|role personnel|implication/.test(doubt)) actions.push(fr ? "précisez ce que vous faisiez personnellement" : "clarify what you personally did");
+    if (/scope|périmètre|perimeter/.test(doubt)) actions.push(fr ? "délimitez clairement votre périmètre" : "define your scope clearly");
+    if (/scale|échelle|volume|grande envergure|ampleur/.test(doubt)) actions.push(fr ? "donnez le contexte et l'ampleur de votre intervention" : "give the context and scale of your involvement");
+    if (/depth|profondeur|niveau|expertise|maîtrise|mastery|connaissance/.test(doubt)) actions.push(fr ? "distinguez ce que vous avez réellement pratiqué de ce que vous comprenez ou pourriez mobiliser" : "distinguish what you actually practiced from what you understand or could apply");
+    if (/recent|récen|current/.test(doubt)) actions.push(fr ? "situez l'expérience dans le temps" : "place the experience in time");
+    if (/transfer|transpos|transfér|applicable|mobilis|sector|secteur|industry|domaine/.test(doubt)) actions.push(fr ? "expliquez le lien transférable avec l'exigence du poste" : "explain the transferable link to the role requirement");
+    if (!actions.length) actions.push(fr ? "répondez avec les faits documentés et indiquez explicitement ce qui reste à vérifier" : "answer from the documented facts and state explicitly what still needs to be verified");
+    return fr
+      ? `Pour répondre à ce doute, ${actions.join(", ")}. Ne présentez pas comme acquis ce que les éléments fournis ne permettent pas d'établir.`
+      : `To address this doubt, ${actions.join(", ")}. Do not present as established anything the supplied evidence cannot support.`;
+  };
+
   return {
     ...strategy,
     interviewPriorities: tensions.map((t, index) => {
@@ -643,7 +666,8 @@ function alignStrategyToAuthoritativePlan(
     gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
     gapDefenseStrategy: tensions.map((t, index) => {
       const generated = strategy.gapDefenseStrategy?.[index]?.trim();
-      return generated || t.allowed_positioning;
+      const generatedOverlap = generated ? semanticOverlap(generated, t.interviewer_doubt) : 1;
+      return generated && generatedOverlap < 0.72 ? generated : defenseForTension(t);
     }),
     interviewPlan: strategy.interviewPlan?.trim()
       ? strategy.interviewPlan
