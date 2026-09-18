@@ -147,7 +147,10 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.facts) && item.facts.length > 0 &&
-    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim())
+    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim()) &&
+    Array.isArray(item.relevant_jd_requirements) &&
+    item.relevant_jd_requirements.length > 0 &&
+    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
   );
   if (!valid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
 
@@ -177,6 +180,21 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     }
   }
   return { evidence: evidence.slice(0, 10) };
+}
+
+function jdRequirementGrounding(requirement: string, jobDescription: string): boolean {
+  const normalize = (value: string) => canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/)
+    .filter((token) => token.length >= 5 && !["about","which","where","when","their","there","avec","dans","pour","entre","cette","poste","vous","votre","notre","leurs"].includes(token));
+  const requirementTokens = new Set(normalize(requirement));
+  const jdTokens = new Set(normalize(jobDescription));
+  if (!requirementTokens.size || !jdTokens.size) return false;
+  let common = 0;
+  for (const token of requirementTokens) if (jdTokens.has(token)) common++;
+  // A requirement may be a concise paraphrase of the JD, so exact substring
+  // matching is not required. But at least two distinctive JD-grounded terms
+  // (or one for a very short requirement) must survive the normalization.
+  const minimum = requirementTokens.size <= 2 ? 1 : 2;
+  return common >= minimum;
 }
 
 function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
