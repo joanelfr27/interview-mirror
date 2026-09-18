@@ -103,6 +103,12 @@ export type FeedbackQuestion = {
 
 export type FeedbackResult = {
   overallScore: number;
+  strategyEngineVersion?: string;
+  strategySnapshot?: {
+    strongestValueProposition: string;
+    interviewPriorities: string[];
+    gapsOrRisks: string[];
+  };
   communication: number;
   relevance: number;
   structure: number;
