@@ -242,6 +242,30 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   return [...new Set(errors)];
 }
 
+function normalizeStrategicPlanModeLanguage(plan: StrategicPlan): StrategicPlan {
+  // Deterministic wording repair only. This never changes the selected mode,
+  // evidence node, requirement, or factual content; it makes the mode boundary
+  // explicit so downstream validators and the strategy writer cannot miss it.
+  return {
+    ...plan,
+    tensions: (plan.tensions ?? []).map((tension) => {
+      if (tension.mode === "TRANSFERABLE") {
+        const allowed = transferPattern.test(tension.allowed_positioning)
+          ? tension.allowed_positioning
+          : `Cette capacité peut être transposée et mobilisée pour répondre à ${tension.target_requirement}, sans prétendre à une expérience directe dans ce domaine. ${tension.allowed_positioning}`;
+        return { ...tension, allowed_positioning: allowed };
+      }
+      if (tension.mode === "VERIFY_GAP") {
+        const allowed = verifyPattern.test(tension.allowed_positioning)
+          ? tension.allowed_positioning
+          : `Ce point reste à confirmer pendant l'entretien ; appuyez-vous sur l'élément documenté ci-dessous sans le présenter comme une qualification ou une expérience déjà établie. ${tension.allowed_positioning}`;
+        return { ...tension, allowed_positioning: allowed };
+      }
+      return tension;
+    }),
+  };
+}
+
 async function buildStrategicPlan(session: SessionRecord, evidenceMap: ReturnType<typeof buildEvidenceMap>): Promise<StrategicPlan> {
   const language = normalizeLanguage(session.preparation_language);
   const system = languageInstruction(language) + `
@@ -284,7 +308,7 @@ Return the complete schema.
   let lastErrors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     const raw = await requestStructuredJson(system + (lastErrors.length ? "\nPrevious validation errors:\n- " + lastErrors.join("\n- ") : ""), user, "strategic_plan_v23", STRATEGIC_PLAN_SCHEMA);
-    const plan = raw as StrategicPlan;
+    const plan = normalizeStrategicPlanModeLanguage(raw as StrategicPlan);
     lastErrors = validateStrategicPlan(plan, evidenceMap);
     if (!lastErrors.length) return plan;
   }
