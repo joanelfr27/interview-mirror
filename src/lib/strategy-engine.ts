@@ -625,6 +625,24 @@ function alignStrategyToAuthoritativePlan(
     ? `Préparez un exemple précis lié à l'expérience documentée et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
     : `Prepare a precise example from the documented experience and explain your personal role, the decision and the result without adding unestablished information.`;
 
+  const storyRetrievalFocus = (t: StrategicPlan["tensions"][number]) => {
+    const doubt = t.interviewer_doubt.toLowerCase();
+    const frFocus = /ownership|responsabil|rôle personnel|implication/.test(doubt)
+      ? "Avant l'entretien, retrouvez un exemple où votre rôle personnel est identifiable et préparez la séquence situation → action personnelle → résultat."
+      : /scope|périmètre|perimeter/.test(doubt)
+        ? "Avant l'entretien, retrouvez un exemple dont le périmètre est clair et préparez le contexte, votre niveau d'intervention et les interlocuteurs concernés."
+        : /scale|échelle|volume|ampleur/.test(doubt)
+          ? "Avant l'entretien, retrouvez un exemple permettant de situer l'ampleur de votre intervention et préparez les éléments de contexte disponibles."
+          : /depth|profondeur|niveau|expertise|maîtrise|connaissance/.test(doubt)
+            ? "Avant l'entretien, retrouvez un exemple qui montre ce que vous avez réellement pratiqué et préparez ce que vous pouvez démontrer concrètement, sans extrapoler."
+            : /recen|recent|current/.test(doubt)
+              ? "Avant l'entretien, retrouvez l'exemple le plus récent et préparez clairement sa période, son contexte et votre rôle."
+              : /transfer|transpos|transfér|applicable|mobilis|sector|secteur|industry|domaine/.test(doubt)
+                ? "Avant l'entretien, retrouvez un exemple permettant d'expliquer le lien entre votre expérience documentée et l'exigence cible, sans revendiquer l'expérience sectorielle non établie."
+                : "Avant l'entretien, retrouvez un exemple précis et préparez votre rôle, l'action réalisée et le résultat documenté.";
+    return frFocus;
+  };
+
   const defenseForTension = (t: StrategicPlan["tensions"][number]) => {
     const doubt = t.interviewer_doubt.toLowerCase();
     const actions: string[] = [];
@@ -651,8 +669,15 @@ function alignStrategyToAuthoritativePlan(
     }),
     storiesToPrepare: tensions.map((t, index) => {
       const generated = strategy.storiesToPrepare?.[index]?.text?.trim() || fallbackStory(t);
+      const bounded = modeBoundary(generated, t);
+      const priority = strategy.interviewPriorities?.[index]?.text?.trim() || "";
+      // A story must retrieve usable evidence under pressure, not merely repeat
+      // the strategic priority. Add a deterministic retrieval cue when the model
+      // leaves the story too close to the priority.
+      const overlap = priority ? semanticOverlap(bounded, priority) : 0;
+      const retrievalCue = storyRetrievalFocus(t);
       return {
-        text: modeBoundary(generated, t),
+        text: overlap >= 0.72 ? bounded + " " + retrievalCue : bounded,
         evidence_node_id: t.primary_evidence_node_id,
       };
     }),
