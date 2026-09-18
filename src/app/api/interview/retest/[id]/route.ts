@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateInterviewQuestions } from "@/lib/openai";
 
-function isValidQuestionSet(data: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
+function isValidQuestionSet(data: unknown, strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
   if (!data || typeof data !== "object") return false;
   const questions = (data as { questions?: unknown }).questions;
   if (!Array.isArray(questions) || questions.length !== 5) return false;
@@ -10,7 +10,7 @@ function isValidQuestionSet(data: unknown): data is { questions: Array<{ questio
     if (!item || typeof item !== "object") return false;
     const question = (item as { question?: unknown }).question;
     const basis = (item as { strategy_basis?: unknown }).strategy_basis;
-    return typeof question === "string" && question.trim().length > 0 && typeof basis === "string" && basis.trim().length > 0;
+    return typeof question === "string" && question.trim().length > 0 && typeof basis === "string" && basis.trim().length > 0 && allowedBases.has(basis.trim());
   });
 }
 
@@ -66,7 +66,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const language = sourceSession.preparation_language === "fr" ? "fr" : "en";
     const questionsData = await generateInterviewQuestions(sourceSession.cv_analysis, retestStrategy, language);
-    if (!isValidQuestionSet(questionsData)) {
+    if (!isValidQuestionSet(questionsData, retestStrategy)) {
       return NextResponse.json({ error: "The retest questions could not be grounded reliably in the interview strategy." }, { status: 422 });
     }
 
