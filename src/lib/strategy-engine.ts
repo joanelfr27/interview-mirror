@@ -153,30 +153,16 @@ function hasCrossSectionDuplication(strategy: any): boolean {
 }function hasPriorityRiskDuplication(strategy: any): boolean {
   const priorities = Array.isArray(strategy?.interviewPriorities) ? strategy.interviewPriorities : [];
   const risks = Array.isArray(strategy?.gapsOrRisks) ? strategy.gapsOrRisks : [];
-  if (!priorities.length || !risks.length) return false;
+  if (priorities.length !== 3 || risks.length !== 3) return true;
 
-  // A risk may concern the same underlying tension as a priority, but it must
-  // add a distinct interviewer doubt rather than restating what the candidate
-  // needs to demonstrate. Flag shared concrete phrases or high lexical overlap
-  // so Pass 2 is forced to separate "proof to demonstrate" from "reason for doubt".
-  const meaningfulBigrams = (text: string): Set<string> => {
-    const tokens = normalizeForComparison(text).filter((token) => token.length >= 5);
-    const bigrams = new Set<string>();
-    for (let i = 0; i < tokens.length - 1; i++) bigrams.add(tokens[i] + " " + tokens[i + 1]);
-    return bigrams;
-  };
-
-  for (const priority of priorities) {
-    if (typeof priority !== "string") continue;
-    for (const risk of risks) {
-      if (typeof risk !== "string") continue;
-      const overlap = semanticOverlap(priority, risk);
-      const priorityBigrams = meaningfulBigrams(priority);
-      const riskBigrams = meaningfulBigrams(risk);
-      const sharedBigram = [...priorityBigrams].some((bigram) => riskBigrams.has(bigram));
-      if (sharedBigram && overlap >= 0.20) return true;
-      if (overlap >= 0.45) return true;
-    }
+  // Each point of attention belongs to the corresponding priority. Compare only
+  // those aligned pairs; comparing every priority with every risk creates false
+  // positives because different tensions can legitimately share role vocabulary.
+  for (let i = 0; i < 3; i++) {
+    if (typeof priorities[i] !== "string" || typeof risks[i] !== "string") return true;
+    // A true restatement is near-duplicate language. Normal shared words such as
+    // finance, reporting, experience or the target requirement are not enough.
+    if (semanticOverlap(priorities[i], risks[i]) >= 0.78) return true;
   }
   return false;
 }
@@ -752,8 +738,24 @@ function safeInsufficientEvidenceStrategy(session: SessionRecord, evidenceMap: E
   const provable = evidenceMap.filter((n) => n.status === "PROVEN" || n.status === "PARTIALLY_PROVEN").slice(0, 3);
   const priorities = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "L'entretien doit établir ce que votre expérience sur « " + n.fact + " » permet réellement de démontrer pour ce poste." : "The interview must establish what your experience with “" + n.fact + "” actually demonstrates for this role.") : (fr ? "Les éléments disponibles ne permettent pas encore de formuler une démonstration suffisamment étayée pour ce point." : "The available evidence is not sufficient to formulate a well-supported demonstration for this point."); });
   const stories = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "Préparez un exemple précis lié à « " + n.fact + " » et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie." : "Prepare one precise example linked to “" + n.fact + "” and explain your personal role, decision and outcome without adding unsupported information.") : (fr ? "Préparez un exemple concret de votre parcours permettant de vérifier ce point." : "Prepare one concrete example from your background that allows this point to be verified."); });
-  const gaps = fr ? ["Certaines affirmations stratégiques ne peuvent pas être confirmées par les éléments disponibles.", "L'entretien devra vérifier les points pour lesquels le CV ne fournit pas de preuve directe."] : ["Some strategic claims cannot be confirmed from the available evidence.", "The interview should verify points for which the CV provides no direct evidence."];
-  return { candidatePositioning: fr ? "La stratégie reste volontairement prudente lorsque les documents fournis ne permettent pas d'étayer une affirmation." : "The strategy remains deliberately conservative where the supplied evidence cannot support a stronger claim.", strongestValueProposition: fr ? "Votre message doit rester centré sur les responsabilités que votre parcours permet de démontrer directement." : "Your message should remain centred on responsibilities that your background directly supports.", strengthsToLeverage: provable.map((n) => fr ? "Expérience établie : " + n.fact + "." : "Established experience: " + n.fact + "."), gapsOrRisks: gaps, gapDefenseStrategy: fr ? ["Ne complétez pas les informations manquantes par une supposition. Donnez votre expérience réelle et son périmètre.", "Si un point est demandé, distinguez ce que vous avez personnellement fait de ce qui reste à vérifier."] : ["Do not fill evidence gaps with assumptions. Give the experience you actually have and its scope.", "If a point is challenged, distinguish what you personally did from what still needs to be verified."], interviewPriorities: priorities, likelyDifficultQuestions: fr ? ["Quel exemple précis de votre parcours permet de vérifier ce point?", "Quel a été exactement votre rôle personnel?", "Quel résultat pouvez-vous documenter?"] : ["Which specific example from your background verifies this point?", "What exactly was your personal role?", "What outcome can you substantiate?"], storiesToPrepare: stories, communicationPriorities: fr ? "Restez factuel : responsabilité personnelle, décision, périmètre et résultat." : "Stay factual: personal responsibility, decision, scope, and outcome.", interviewPlan: fr ? "Commencez par les faits établis, puis utilisez l'entretien pour vérifier les points encore incertains." : "Start with established facts, then use the interview to verify the points that remain uncertain.", personalization: fr ? "État de sécurité : certaines affirmations n'ont pas passé la vérification d'évidence." : "Safety state: some claims did not pass evidence verification.", _strategy_status: "INSUFFICIENT_EVIDENCE" } as InterviewStrategy;
+  const gapAnchors = provable.map((n) => shortAnchor(n.jd_requirement, 12)).filter(Boolean);
+  const gaps = [0, 1, 2].map((i) => {
+    const anchor = gapAnchors[i] ?? (fr ? "cette exigence du poste" : "this role requirement");
+    return fr
+      ? `Le point à vérifier est le niveau de profondeur, de périmètre ou de contexte démontré sur « ${anchor} », au-delà de la seule présence de cette responsabilité dans le parcours.`
+      : `The point to verify is the depth, scope, or context demonstrated against “${anchor}”, beyond simply having a related responsibility in the background.`;
+  });
+  return { candidatePositioning: fr ? "La stratégie reste volontairement prudente lorsque les documents fournis ne permettent pas d'étayer une affirmation." : "The strategy remains deliberately conservative where the supplied evidence cannot support a stronger claim.", strongestValueProposition: fr ? "Votre message doit rester centré sur les responsabilités que votre parcours permet de démontrer directement." : "Your message should remain centred on responsibilities that your background directly supports.", strengthsToLeverage: provable.map((n) => fr ? "Expérience établie : " + n.fact + "." : "Established experience: " + n.fact + "."), gapsOrRisks: gaps, gapDefenseStrategy: fr
+    ? [
+        "Ne complétez pas les informations manquantes par une supposition. Donnez votre expérience réelle et son périmètre.",
+        "Pour chaque point, distinguez ce que vous avez personnellement pratiqué de ce qui doit encore être vérifié.",
+        "Si le contexte du poste diffère de votre parcours, expliquez la capacité transférable sans transformer cette proximité en expérience directe."
+      ]
+    : [
+        "Do not fill evidence gaps with assumptions. Give the experience you actually have and its scope.",
+        "For each point, distinguish what you personally practiced from what still needs to be verified.",
+        "If the role context differs from your background, explain the transferable capability without turning that proximity into direct experience."
+      ], interviewPriorities: priorities, likelyDifficultQuestions: fr ? ["Quel exemple précis de votre parcours permet de vérifier ce point?", "Quel a été exactement votre rôle personnel?", "Quel résultat pouvez-vous documenter?"] : ["Which specific example from your background verifies this point?", "What exactly was your personal role?", "What outcome can you substantiate?"], storiesToPrepare: stories, communicationPriorities: fr ? "Restez factuel : responsabilité personnelle, décision, périmètre et résultat." : "Stay factual: personal responsibility, decision, scope, and outcome.", interviewPlan: fr ? "Commencez par les faits établis, puis utilisez l'entretien pour vérifier les points encore incertains." : "Start with established facts, then use the interview to verify the points that remain uncertain.", personalization: fr ? "État de sécurité : certaines affirmations n'ont pas passé la vérification d'évidence." : "Safety state: some claims did not pass evidence verification.", _strategy_status: "INSUFFICIENT_EVIDENCE" } as InterviewStrategy;
 }
 
 async function runPass2(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, diagnostics: string[] = [], authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InternalStrategy> {
