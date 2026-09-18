@@ -215,7 +215,7 @@ function hasSpecificityAnchor(text: string, source: string): boolean { const nor
  * an evidence-token anchor plus a role anchor instead of requiring literal
  * CV/JD phrases.
  */
-function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = [], authoritativePlan: StrategicPlan | null = null): boolean {
+function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescription: string, evidenceMap: EvidenceMapNode[] = []): boolean {
   if (!Array.isArray(strategy?.interviewPriorities) || strategy.interviewPriorities.length !== 3) return false;
   if (!cvText.trim() || !jobDescription.trim() || evidenceMap.length < 3) return false;
 
@@ -233,30 +233,22 @@ function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescriptio
     normalizeForComparison(text).filter((token) => token.length >= 5 && !prioritySpecificityStopwords.has(token))
   );
 
-  const roleTokens = distinctiveTokens(jobDescription);
-  const tensionByNode = new Map(
-    (authoritativePlan?.tensions ?? []).map((t) => [t.primary_evidence_node_id, t])
-  );
-
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
 
-    // The priority is validated against the exact evidence node assigned to it.
-    // Never use an unrelated fact elsewhere in the CV as a substitute.
+    // Validate against the exact evidence node assigned to this priority.
+    // An unrelated fact elsewhere in the CV cannot satisfy candidate specificity.
     const node = evidenceMap[index];
     if (!node) return false;
     const boundEvidenceTokens = distinctiveTokens(node.fact);
     const priorityTokens = distinctiveTokens(priority);
     const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
 
-    // The corresponding strategic tension provides the authoritative target-role
-    // requirement. If unavailable, fall back to the bound evidence node's JD requirement.
-    const tension = tensionByNode.get(node.node_id);
-    const targetRequirement = tension?.target_requirement ?? node.jd_requirement;
-    const requirementTokens = distinctiveTokens(targetRequirement);
+    // Use the JD requirement bound to the same evidence node, preventing a
+    // priority from passing through an unrelated requirement elsewhere in the JD.
+    const requirementTokens = distinctiveTokens(node.jd_requirement);
     const roleOverlap = [...requirementTokens].filter((token) => priorityTokens.has(token));
 
-    // One concrete bound-evidence anchor + one concrete requirement anchor.
     return evidenceOverlap.length >= 1 && roleOverlap.length >= 1;
   });
 }
