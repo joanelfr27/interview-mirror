@@ -617,8 +617,15 @@ function alignStrategyToAuthoritativePlan(
     // Preserve candidate-facing wording produced by Pass 2. The authoritative
     // plan remains the constraint source through the prompt, mode diagnostics,
     // evidence-faithfulness verifier, and evidence-node binding above.
-    gapsOrRisks: strategy.gapsOrRisks?.length ? strategy.gapsOrRisks : tensions.map((t) => t.interviewer_doubt),
-    gapDefenseStrategy: strategy.gapDefenseStrategy?.length ? strategy.gapDefenseStrategy : tensions.map((t) => t.allowed_positioning),
+    // The interviewer doubt is part of the authoritative strategic plan. Preserve it
+    // as the point of attention instead of allowing Pass 2 to turn the same priority
+    // into a question. The candidate-facing defense can still be refined by Pass 2,
+    // but the plan remains the source of the underlying doubt.
+    gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
+    gapDefenseStrategy: tensions.map((t, index) => {
+      const generated = strategy.gapDefenseStrategy?.[index]?.trim();
+      return generated || t.allowed_positioning;
+    }),
     interviewPlan: strategy.interviewPlan?.trim()
       ? strategy.interviewPlan
       : (fr
@@ -787,8 +794,9 @@ Rules:
 - The priority should explain the strategic tension created by this candidate's evidence and this role requirement, not merely restate the gap or requirement.
 - storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes.
 - gapsOrRisks must express the three distinct doubts/verification issues from the plan; do not simply repeat interview priorities.
-- Each risk is the interviewer's unresolved doubt, not another version of what the candidate must demonstrate. Avoid reusing the priority's concrete evidence phrase or target-requirement wording when stating the risk. Reframe the doubt around a distinct verification dimension such as ownership, scope, scale, recency, depth, industry context, or transferability.
-- gapDefenseStrategy must tell the candidate how to handle each doubt.
+- Each risk must represent the AUTHORITATIVE PLAN's interviewer_doubt for the corresponding tension. Do not turn the priority into a question. Preserve the underlying doubt even when rewriting it for the candidate.
+- Avoid reusing the priority's concrete evidence phrase as the main content of the risk. The risk should surface what the interviewer still needs to verify: ownership, scope, scale, recency, depth, industry context, or transferability, as specified by the authoritative doubt.
+- gapDefenseStrategy must tell the candidate how to handle that specific doubt and may use the plan's allowed_positioning, but must not simply repeat the priority.
 - likelyDifficultQuestions must contain at least 3 realistic questions tied to the plan.
 - Do not expose evidence node IDs.
 - The bound evidence fact is a hard factual boundary: do not upgrade it into mastery, expertise, ownership, usage, scope, scale, industry experience, standards knowledge, tool/system experience, metrics, dates, employers, responsibilities or outcomes unless that exact fact is documented in the bound evidence node.
