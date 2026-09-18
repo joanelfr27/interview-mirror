@@ -164,6 +164,10 @@ function containsCopiedDiagnosticRequirement(strategy: unknown, analysis: CvAnal
   return analysis.evidenceChain.some((item) => { const requirement = canonicalize(item.jd_requirement ?? "").toLowerCase(); return requirement.length >= 24 && candidateText.includes(requirement); });
 }
 const STORY_ANCHOR_STOPWORDS = new Set(["experience", "financial", "finance", "responsibility", "reporting", "management", "accounting", "conformity", "compliance", "professional", "strength"]);
+function factAnchorWords(fact: string): string[] {
+  const stopwords = new Set(["experience", "financial", "finance", "responsibility", "reporting", "management", "accounting", "conformity", "compliance", "professional", "strength", "the", "and", "with", "from", "your", "this", "that", "for", "dans", "avec", "pour", "votre", "vous", "les", "des", "une", "un", "et", "de", "du", "la", "le"]);
+  return [...new Set(normalizeForComparison(fact))].filter((word) => word.length >= 5 && !stopwords.has(word));
+}
 
 /** Returns the evidence node backing a story only if it is a real, provable fact (never QUALIFICATION-as-experience, never UNKNOWN/NOT_DOCUMENTED). */
 function findProvableEvidenceNode(nodeId: string | undefined, evidenceMap: EvidenceMapNode[]): EvidenceMapNode | null {
