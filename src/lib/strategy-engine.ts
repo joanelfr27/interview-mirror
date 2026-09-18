@@ -643,6 +643,13 @@ function alignStrategyToAuthoritativePlan(
     return frFocus;
   };
 
+  const difficultQuestionForTension = (t: StrategicPlan["tensions"][number]) => {
+    if (fr) {
+      return "Pouvez-vous donner un exemple concret qui permette d'établir ce que votre expérience documentée apporte sur « " + t.target_requirement + " », et répondre au point suivant : " + t.interviewer_doubt;
+    }
+    return "Can you give a concrete example that establishes what your documented experience brings to “" + t.target_requirement + "”, and address the following point: " + t.interviewer_doubt;
+  };
+
   const defenseForTension = (t: StrategicPlan["tensions"][number]) => {
     const doubt = t.interviewer_doubt.toLowerCase();
     const actions: string[] = [];
@@ -689,6 +696,17 @@ function alignStrategyToAuthoritativePlan(
     // into a question. The candidate-facing defense can still be refined by Pass 2,
     // but the plan remains the source of the underlying doubt.
     gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
+    // Difficult questions must operationalize each strategic tension: the interviewer
+    // should probe the exact requirement/doubt, not receive three generic interview questions.
+    // Keep one question per tension and fall back deterministically when Pass 2 returns
+    // a generic or poorly aligned question.
+    likelyDifficultQuestions: tensions.map((t, index) => {
+      const generated = strategy.likelyDifficultQuestions?.[index]?.trim() || "";
+      const aligned = generated
+        && semanticOverlap(generated, t.interviewer_doubt) >= 0.28
+        && semanticOverlap(generated, t.target_requirement) >= 0.18;
+      return aligned ? generated : difficultQuestionForTension(t);
+    }),
     gapDefenseStrategy: tensions.map((t, index) => {
       const generated = strategy.gapDefenseStrategy?.[index]?.trim();
       const generatedOverlap = generated ? semanticOverlap(generated, t.interviewer_doubt) : 1;
