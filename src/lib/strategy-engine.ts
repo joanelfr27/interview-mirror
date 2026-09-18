@@ -585,6 +585,14 @@ function alignStrategyToAuthoritativePlan(
       const marker = fr
         ? /vérifi|à confirmer|reste à établir|n'est pas (?:établi|documenté)|absence|ne permet pas d'affirmer/.test(normalized)
         : /verify|confirm|needs to be established|not established|not documented|absence|cannot establish/.test(normalized);
+      const directClaim = fr
+        ? /expériences+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|expérience suffisante|maîtrises+(?:des|du)|connaissances+(?:des|du) normes/.test(normalized)
+        : /sufficient experience|mining experience|project finance experience|experience in capital-intensive|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(normalized);
+      if (directClaim) {
+        return fr
+          ? `Le point à vérifier pendant l'entretien est ce que les éléments documentés de votre parcours permettent réellement d'établir sur « ${tension.target_requirement} ».`
+          : `The interview should verify what the documented elements of your background actually establish against “${tension.target_requirement}”.`;
+      }
       if (marker) return text;
       return fr
         ? `${text} Ce point reste à confirmer pendant l'entretien au regard de « ${tension.target_requirement} ».`
@@ -745,7 +753,7 @@ function safeInsufficientEvidenceStrategy(session: SessionRecord, evidenceMap: E
   const provable = evidenceMap.filter((n) => n.status === "PROVEN" || n.status === "PARTIALLY_PROVEN").slice(0, 3);
   const priorities = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "L'entretien doit établir ce que votre expérience sur « " + n.fact + " » permet réellement de démontrer pour ce poste." : "The interview must establish what your experience with “" + n.fact + "” actually demonstrates for this role.") : (fr ? "Les éléments disponibles ne permettent pas encore de formuler une démonstration suffisamment étayée pour ce point." : "The available evidence is not sufficient to formulate a well-supported demonstration for this point."); });
   const stories = [0,1,2].map((i) => { const n = provable[i]; return n ? (fr ? "Préparez un exemple précis lié à « " + n.fact + " » et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie." : "Prepare one precise example linked to “" + n.fact + "” and explain your personal role, decision and outcome without adding unsupported information.") : (fr ? "Préparez un exemple concret de votre parcours permettant de vérifier ce point." : "Prepare one concrete example from your background that allows this point to be verified."); });
-  const gapAnchors = provable.map((n) => shortAnchor(n.jd_requirement, 12)).filter(Boolean);
+  const gapAnchors = provable.map((n) => truncate(n.jd_requirement, 12)).filter(Boolean);
   const gaps = [0, 1, 2].map((i) => {
     const anchor = gapAnchors[i] ?? (fr ? "cette exigence du poste" : "this role requirement");
     return fr
