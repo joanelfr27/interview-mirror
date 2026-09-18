@@ -150,7 +150,7 @@ function hasCrossSectionDuplication(strategy: any): boolean {
   for (let i = 0; i < priorities.length; i++) for (let j = i + 1; j < priorities.length; j++) if (semanticOverlap(priorities[i], priorities[j]) >= 0.78) return true;
   for (let i = 0; i < stories.length; i++) for (let j = i + 1; j < stories.length; j++) if (typeof stories[i] === "string" && typeof stories[j] === "string" && semanticOverlap(stories[i], stories[j]) >= 0.72) return true;
   return false;
-}function hasPriorityRiskDuplication(strategy: any): boolean {
+}function hasPriorityRiskDuplication(strategy: any, authoritativeVulnerabilities: string[] = []): boolean {
   const priorities = Array.isArray(strategy?.interviewPriorities) ? strategy.interviewPriorities : [];
   const risks = Array.isArray(strategy?.gapsOrRisks) ? strategy.gapsOrRisks : [];
   if (priorities.length !== 3 || risks.length !== 3) return true;
@@ -160,9 +160,14 @@ function hasCrossSectionDuplication(strategy: any): boolean {
   // positives because different tensions can legitimately share role vocabulary.
   for (let i = 0; i < 3; i++) {
     if (typeof priorities[i] !== "string" || typeof risks[i] !== "string") return true;
-    // A true restatement is near-duplicate language. Normal shared words such as
-    // finance, reporting, experience or the target requirement are not enough.
-    if (semanticOverlap(priorities[i], risks[i]) >= 0.78) return true;
+    // When an authoritative strategic plan supplies the interviewer doubt,
+    // preserve that doubt even if it naturally overlaps with its priority.
+    // The plan is the source of truth for this relationship; the generic
+    // duplication guard remains active for legacy/non-authoritative paths.
+    const authoritativeRisk = typeof authoritativeVulnerabilities[i] === "string"
+      && authoritativeVulnerabilities[i].trim().length > 0
+      && semanticOverlap(risks[i], authoritativeVulnerabilities[i]) >= 0.85;
+    if (!authoritativeRisk && semanticOverlap(priorities[i], risks[i]) >= 0.78) return true;
   }
   return false;
 }
@@ -292,7 +297,10 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   if (typeof s.candidatePositioning !== "string" || typeof s.strongestValueProposition !== "string" || typeof s.communicationPriorities !== "string" || typeof s.interviewPlan !== "string" || typeof s.personalization !== "string" || !validStrings(s.strengthsToLeverage) || !validStrings(s.gapsOrRisks) || !validStrings(defenses) || !validStrings(priorities) || !validStrings(s.likelyDifficultQuestions) || !validStrings(stories) || priorities.length !== 3 || stories.length !== 3 || s.gapsOrRisks.length > 3 || s.likelyDifficultQuestions.length === 0) return false;
   if (generic.test(allText) || internal.test(allText) || languageMismatch.test(allText)) return false;
   if (hasCrossSectionDuplication(s)) return false;
-  if (hasPriorityRiskDuplication(s)) return false;
+  const authoritativeVulnerabilities = Array.isArray(_strategicAnalysis?.vulnerabilities)
+    ? _strategicAnalysis.vulnerabilities
+    : [];
+  if (hasPriorityRiskDuplication(s, authoritativeVulnerabilities)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
   // Final quality gate: each proof priority must be anchored to both the
   // candidate's actual evidence and a distinctive target-role requirement.
