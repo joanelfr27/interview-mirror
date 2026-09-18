@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateInterviewQuestions } from '@/lib/openai'
 
-function isStrategyGroundedQuestionSet(data: unknown, _strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
+function isStrategyGroundedQuestionSet(data: unknown, strategy: unknown): data is { questions: Array<{ question: string; strategy_basis: string }> } {
   if (!data || typeof data !== 'object') return false
   const questions = (data as { questions?: unknown }).questions
   if (!Array.isArray(questions) || questions.length !== 5) return false
