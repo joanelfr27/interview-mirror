@@ -509,15 +509,57 @@ function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMa
   return failures;
 }
 
-function alignStrategyToAuthoritativePlan(strategy: InternalStrategy, authoritativePlan: StrategicPlan | null, language: SessionLanguage): InternalStrategy {
+function alignStrategyToAuthoritativePlan(
+  strategy: InternalStrategy,
+  authoritativePlan: StrategicPlan | null,
+  language: SessionLanguage,
+): InternalStrategy {
   if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return strategy;
   const fr = language === "fr";
   const tensions = authoritativePlan.tensions;
+
+  const priorityText = (t: StrategicPlan["tensions"][number]) => {
+    if (t.mode === "TRANSFERABLE") {
+      return fr
+        ? `Montrer comment la capacité documentée peut être transposée au besoin « ${t.target_requirement} », sans la présenter comme une expérience directe dans ce domaine.`
+        : `Show how the documented capability can be transferred to the requirement “${t.target_requirement}”, without presenting it as direct experience in that domain.`;
+    }
+    if (t.mode === "VERIFY_GAP") {
+      return fr
+        ? `Préparer à établir pendant l'entretien ce que l'expérience documentée permet réellement de démontrer au regard de « ${t.target_requirement} », et ce qui reste à vérifier.`
+        : `Be ready to establish during the interview what the documented experience actually demonstrates against “${t.target_requirement}”, and what remains to be verified.`;
+    }
+    return fr
+      ? `Démontrer, à partir de l'expérience documentée, ce que vous pouvez personnellement apporter sur « ${t.target_requirement} ».`
+      : `Demonstrate, from the documented experience, what you can personally bring to “${t.target_requirement}”.`;
+  };
+
+  const storyText = (t: StrategicPlan["tensions"][number]) => {
+    if (t.mode === "TRANSFERABLE") {
+      return fr
+        ? `Préparez un exemple précis de l'expérience documentée et expliquez comment cette capacité peut être mobilisée dans le nouveau contexte, sans ajouter d'expérience sectorielle non établie.`
+        : `Prepare a precise example from the documented experience and explain how that capability can be applied in the new context, without adding unestablished sector experience.`;
+    }
+    if (t.mode === "VERIFY_GAP") {
+      return fr
+        ? `Préparez l'élément documenté qui permet d'éclairer ce point et indiquez clairement ce qui devra encore être confirmé pendant l'entretien.`
+        : `Prepare the documented evidence that informs this point and clearly state what still needs to be confirmed during the interview.`;
+    }
+    return fr
+      ? `Préparez un exemple précis lié à cette responsabilité et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
+      : `Prepare a precise example related to this responsibility and explain your personal role, the decision and the result without adding unestablished information.`;
+  };
+
   return {
     ...strategy,
-    // The attention section is a direct expression of interviewer doubt. Keep it
-    // deterministic so it cannot drift into generic CV advice or duplicate the
-    // candidate-facing proof priorities.
+    interviewPriorities: tensions.map((t) => ({
+      text: priorityText(t),
+      evidence_node_id: t.primary_evidence_node_id,
+    })),
+    storiesToPrepare: tensions.map((t) => ({
+      text: storyText(t),
+      evidence_node_id: t.primary_evidence_node_id,
+    })),
     gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
     gapDefenseStrategy: tensions.map((t) => t.allowed_positioning),
     interviewPlan: fr
