@@ -248,6 +248,38 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
       tension.forbidden_inference,
     ].filter(Boolean).join(" ");
 
+    // An interviewer doubt must be a concrete, role-grounded question about
+    // the candidate's evidence—not a generic coaching warning. Require it to
+    // connect to both the target requirement and the bound evidence.
+    const doubtRequirementOverlap = (() => {
+      const tokens = (value: string) => new Set(
+        canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/)
+          .filter((x) => x.length >= 5 && !["about","which","where","when","their","there","requirement","requirements","expérience","experience","candidat","candidate","poste","role","interview","interviewer","votre","your","vous","you","dans","pour","avec"].includes(x))
+      );
+      const a = tokens(tension.interviewer_doubt);
+      const b = tokens(tension.target_requirement);
+      if (!a.size || !b.size) return 0;
+      let common = 0; for (const token of a) if (b.has(token)) common++;
+      return common / Math.min(a.size, b.size);
+    })();
+    const node = byId.get(tension.primary_evidence_node_id);
+    const doubtEvidenceOverlap = node
+      ? (() => {
+          const a = new Set(canonicalize(tension.interviewer_doubt).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+          const b = new Set(canonicalize(node.fact).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+          if (!a.size || !b.size) return 0;
+          let common = 0; for (const token of a) if (b.has(token)) common++;
+          return common / Math.min(a.size, b.size);
+        })()
+      : 0;
+    if (doubtRequirementOverlap < 0.25 && doubtEvidenceOverlap < 0.15) {
+      errors.push(tension.id + ": interviewer_doubt is not sufficiently grounded in the target requirement or bound evidence.");
+    }
+    const genericDoubt = /^(?:prepare|préparez|be ready|soyez prêt|show that|démontrez que|explain your|expliquez votre|talk about|parlez de|give an example|donnez un exemple)\b/i;
+    if (genericDoubt.test(canonicalize(tension.interviewer_doubt))) {
+      errors.push(tension.id + ": interviewer_doubt is a generic preparation instruction rather than an interviewer concern.");
+    }
+
     if (tension.mode === "TRANSFERABLE") {
       if (!transferPattern.test(tension.allowed_positioning)) {
         errors.push(tension.id + ": TRANSFERABLE tension must explicitly state how the evidenced capability can transfer to the target requirement.");
