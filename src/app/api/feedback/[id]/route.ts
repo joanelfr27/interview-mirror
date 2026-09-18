@@ -82,6 +82,15 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
 
 async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): Promise<FeedbackResult> {
   const openai = getOpenAI();
+  if (!session.interview_strategy) throw new Error("Interview Strategy is required for strategy-aware feedback");
+  const strategy = session.interview_strategy;
+  const strategyContext = JSON.stringify({
+    strongestValueProposition: strategy.strongestValueProposition,
+    interviewPriorities: strategy.interviewPriorities.slice(0, 3),
+    gapsOrRisks: strategy.gapsOrRisks.slice(0, 3),
+    gapDefenseStrategy: strategy.gapDefenseStrategy.slice(0, 3),
+    communicationPriorities: strategy.communicationPriorities,
+  });
   const language = normalizeLanguage(session.preparation_language);
   const isCoachingSession = Boolean(session.coaching_focus);
   const coachingInstruction = isCoachingSession
@@ -128,7 +137,9 @@ EVIDENCE STATUS: compare the candidate answer with the CV. Use cv_verified only 
 
 ANSWER-SPECIFICITY: diagnose THIS answer, not the topic generally. Every comment, whatWorked, whatWasMissing, actionableImprovement and scoreDeductions must refer to the actual statement, action, limitation, example or omission that caused the assessment. Do not give generic advice. If something is missing, name exactly what is missing from THIS answer and why it matters for THIS question. The next-step guidance should give ONE practical adjustment for the next attempt.
 
-SCORING: score the answer independently from 0-100 using responsiveness, demonstrated evidence, role alignment, structure, credibility and written communication. Do not score by length or by the strength of the CV. 90-100 strong; 75-89 good with material gaps; 60-74 partial; 40-59 weak; 0-39 largely non-responsive or unsupported. scoreDeductions must state why THIS answer is not higher. Dimension scores must reflect THIS answer only; do not infer vocal or body-language confidence from text.
+STRATEGY-AWARE EVALUATION: the current Interview Strategy is the controlling preparation plan for this session. Evaluate whether THIS answer actually addresses the specific strategy priority being tested by the question. Do not reward an answer merely because it sounds generally professional. If the answer misses the relevant priority, explain the concrete missing proof. If the question probes a strategy risk, assess whether the answer handles that risk without inventing experience. Never treat a strategy statement as a CV fact; the strategy is a preparation hypothesis built from the supplied evidence.
+
+SCORING: score the answer independently from 0-100 using responsiveness, demonstrated evidence, alignment with the specific strategy point tested by the question, structure, credibility and written communication. Do not score by length or by the strength of the CV. 90-100 strong; 75-89 good with material gaps; 60-74 partial; 40-59 weak; 0-39 largely non-responsive or unsupported. scoreDeductions must state why THIS answer is not higher. Dimension scores must reflect THIS answer only; do not infer vocal or body-language confidence from text.
 
 The stronger-answer fields are coaching guidance, not a script. suggestedRewrite must be a short structural blueprint using only facts supported by the CV or candidate answer. If no metric/result was supplied, instruct the candidate to add one they can substantiate rather than inventing one.
 ${coachingInstruction}`;
@@ -140,7 +151,7 @@ ${coachingInstruction}`;
       temperature: 0.3,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\nQuestion ID: ${pair.questionId}\nQuestion: ${pair.question}\nCandidate answer:\n${pair.answer}` },
+        { role: "user", content: `Role/session: ${session.title}\nCV:\n${session.cv_text.slice(0, 6000)}\nJob description:\n${session.job_description.slice(0, 4000)}\n\nCURRENT INTERVIEW STRATEGY (use this to judge what the answer needs to demonstrate):\n${strategyContext}\nQuestion ID: ${pair.questionId}\nQuestion: ${pair.question}\nCandidate answer:\n${pair.answer}` },
       ],
     });
 
@@ -178,6 +189,12 @@ ${coachingInstruction}`;
 
   return {
     overallScore,
+    strategyEngineVersion: typeof (strategy as any)._strategy_engine_version === "string" ? (strategy as any)._strategy_engine_version : undefined,
+    strategySnapshot: {
+      strongestValueProposition: strategy.strongestValueProposition,
+      interviewPriorities: strategy.interviewPriorities.slice(0, 3),
+      gapsOrRisks: strategy.gapsOrRisks.slice(0, 3),
+    },
     communication: average(evaluations.map((evaluation) => evaluation.communication)),
     relevance: average(evaluations.map((evaluation) => evaluation.relevance)),
     structure: average(evaluations.map((evaluation) => evaluation.structure)),
@@ -201,11 +218,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   const { data: session } = await supabase.from("sessions").select("*").eq("id", id).eq("user_id", user.id).single();
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  if (!session.interview_strategy) return NextResponse.json({ code: "STRATEGY_REQUIRED", error: "Interview Strategy is required before feedback can be generated." }, { status: 409 });
   const { data: questions } = await supabase.from("questions").select("*").eq("session_id", id).order("order_index", { ascending: true });
   const { data: answers } = await supabase.from("answers").select("*").eq("session_id", id);
   if (!questions?.length) return NextResponse.json({ error: "No interview questions found" }, { status: 400 });
 
   const answerMap = new Map((answers ?? []).map((a) => [a.question_id, a.answer_text]));
+  if (questions.length !== 5 || questions.some((q) => q.category !== "strategy")) return NextResponse.json({ code: "STRATEGY_QUESTION_SET_INVALID", error: "This interview does not contain the current strategy-grounded question set. Start a new interview from the current strategy." }, { status: 409 });
   const pairs = questions.map((q) => ({ questionId: q.id as string, question: q.question as string, answer: (answerMap.get(q.id) as string) || "" }));
   if (pairs.some((p) => !p.answer.trim())) return NextResponse.json({ error: "Please answer all questions before requesting feedback" }, { status: 400 });
 
