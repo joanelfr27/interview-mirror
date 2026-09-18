@@ -219,6 +219,16 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
   });
 }
 
+function semanticOverlapForValidation(a: string, b: string): number {
+  const tokens = (value: string) => new Set(
+    canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5)
+  );
+  const aa = tokens(a); const bb = tokens(b);
+  if (!aa.size || !bb.size) return 0;
+  let common = 0; for (const token of aa) if (bb.has(token)) common++;
+  return common / Math.min(aa.size, bb.size);
+}
+
 function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>): string[] {
   const errors: string[] = [];
   if (!plan.candidate_positioning?.trim()) errors.push("candidate_positioning is required.");
@@ -226,6 +236,10 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   if (!Array.isArray(plan.likely_questions) || plan.likely_questions.length < 3) errors.push("likely_questions must contain at least 3 items.");
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const seen = new Set<string>();
+  if (!Array.isArray(plan.verification_points)) errors.push("verification_points must be an array.");
+  if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
+    errors.push("verification_points must contain only non-empty strings.");
+  }
   const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
   const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
   const directClaimPattern = /(?:expérience|experience)\s+(?:minière|dans le secteur|en project finance|de project finance|mining|in mining|in project finance|in the target sector)|(?:maîtrise|mastery|expertise)\s+(?:du secteur|minière|de project finance|of the sector|of project finance)/i;
@@ -304,6 +318,21 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   }
 
   if (plan.tensions.length === 3) {
+    const verificationPoints = plan.verification_points ?? [];
+    const gapTensions = plan.tensions.filter((t) => t.mode === "VERIFY_GAP");
+    // Verification points are strategic outputs, not free-form notes. Each must
+    // connect to at least one authoritative target requirement or interviewer doubt.
+    for (const point of verificationPoints) {
+      const grounded = plan.tensions.some((t) =>
+        semanticOverlapForValidation(point, t.target_requirement) >= 0.18
+        || semanticOverlapForValidation(point, t.interviewer_doubt) >= 0.18
+      );
+      if (!grounded) errors.push("verification_point is not grounded in any authoritative tension.");
+    }
+    if (gapTensions.length > 0 && verificationPoints.length === 0) {
+      errors.push("VERIFY_GAP tensions require at least one verification_point.");
+    }
+
     const pairs = [[0,1],[0,2],[1,2]] as const;
     const strategicStopwords = new Set([
       "about","which","where","when","their","there","these","those","requirement","requirements",
