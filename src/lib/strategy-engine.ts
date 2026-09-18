@@ -748,6 +748,8 @@ Rules:
 - strongestValueProposition is one central message bound to a real evidence node.
 - strengthsToLeverage are established advantages bound to evidence.
 - interviewPriorities are EXACTLY 3 in the same order as the authoritative plan's three tensions and bind to their primary evidence.
+- Every interview priority must make the candidate-specific bridge explicit: name or clearly paraphrase at least one concrete detail from its bound evidence node and connect that detail to the specific target-role requirement. Do not write a reusable priority such as "highlight your finance experience" or "demonstrate leadership" without the candidate-specific anchor.
+- The priority should explain the strategic tension created by this candidate's evidence and this role requirement, not merely restate the gap or requirement.
 - storiesToPrepare are EXACTLY 3 in the same order and bind to the same nodes.
 - gapsOrRisks must express the three distinct doubts/verification issues from the plan; do not simply repeat interview priorities.
 - gapDefenseStrategy must tell the candidate how to handle each doubt.
