@@ -1,5 +1,6 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
+import type { StrategicPlan } from "@/lib/strategy-engine-v23-lite";
 
 // ---------------------------------------------------------------------------
 // Internal strategic reasoning model (Pass 1 output). Never exposed to the UI
@@ -271,7 +272,7 @@ function validateRoleMapItem(item: any): item is RoleMapItem {
   return item && typeof item === "object" && isNonEmptyString(item.theme) && isNonEmptyString(item.interviewer_relevance);
 }
 
-function validatePass1(raw: any, evidenceMap: EvidenceMapNode[]): raw is StrategicAnalysis {
+function validatePass1(raw: any, evidenceMap: EvidenceMapNode[], authoritativePlan: StrategicPlan | null = null): raw is StrategicAnalysis {
   if (!raw || typeof raw !== "object") return false;
   if (!isNonEmptyString(raw.positioning)) return false;
   if (!Array.isArray(raw.roleMap) || raw.roleMap.length === 0 || !raw.roleMap.every(validateRoleMapItem)) return false;
@@ -283,6 +284,12 @@ function validatePass1(raw: any, evidenceMap: EvidenceMapNode[]): raw is Strateg
   const objectives = raw.proofObjectives as ProofObjective[];
   const primaryIds = objectives.map((o) => o.primary_evidence_node_id);
   if (new Set(primaryIds).size !== 3) return false;
+  if (authoritativePlan) {
+    if (authoritativePlan.tensions.length !== 3) return false;
+    for (let i = 0; i < 3; i++) {
+      if (objectives[i].primary_evidence_node_id !== authoritativePlan.tensions[i].primary_evidence_node_id) return false;
+    }
+  }
   for (const objective of objectives) {
     const node = byId.get(objective.primary_evidence_node_id);
     if (!node) return false;
@@ -367,7 +374,7 @@ async function requestStructuredJson(system: string, user: string, name: string,
   return JSON.parse(raw);
 }
 
-function pass1Diagnostics(raw: unknown, evidenceMap: EvidenceMapNode[]): string[] {
+function pass1Diagnostics(raw: unknown, evidenceMap: EvidenceMapNode[], authoritativePlan: StrategicPlan | null = null): string[] {
   const failures: string[] = [];
   if (!raw || typeof raw !== "object") return ["Pass 1 did not return an object."];
   const value = raw as any;
@@ -382,11 +389,11 @@ function pass1Diagnostics(raw: unknown, evidenceMap: EvidenceMapNode[]): string[
   if (!Array.isArray(value.roleMap) || value.roleMap.length === 0) failures.push("roleMap must contain at least one role mapping.");
   if (!Array.isArray(value.likelyQuestions) || value.likelyQuestions.length === 0) failures.push("likelyQuestions must contain at least one realistic question.");
   if (Array.isArray(value.proofObjectives)) for (let i = 0; i < value.proofObjectives.length; i++) if (!validateObjectiveShape(value.proofObjectives[i])) failures.push("proofObjectives[" + i + "] has missing or invalid required fields.");
-  if (failures.length === 0 && !validatePass1(value, evidenceMap)) failures.push("Gate 1 rejected strategic reasoning: objective distinctness, evidence status/type consistency, or evidence safety failed.");
+  if (failures.length === 0 && !validatePass1(value, evidenceMap, authoritativePlan)) failures.push("Gate 1 rejected strategic reasoning: objective distinctness, evidence status/type consistency, evidence safety, or authoritative-plan binding failed.");
   return [...new Set(failures)];
 }
 
-async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], language: SessionLanguage, diagnostics: string[] = [], authoritativeStrategicPlan = ""): Promise<unknown> {
+async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], language: SessionLanguage, diagnostics: string[] = [], authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<unknown> {
   const strategicPlanBlock = authoritativeStrategicPlan
     ? `\n\nAUTHORITATIVE STRATEGIC PLAN — STRATEGIC INTERPRETATION ONLY:\n${authoritativeStrategicPlan}\n\nThe plan controls the three strategic tensions and positioning logic. It is NOT evidence. Candidate facts may come only from the EVIDENCE MAP. Do not import candidate facts from the plan, JD, or prior reasoning.\n`
     : "";
@@ -410,16 +417,16 @@ async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], 
   return requestStructuredJson(systemPrompt, userPrompt, "strategy_pass1", PASS1_SCHEMA, 0.2);
 }
 
-export async function generateStrategicAnalysis(session: SessionRecord, authoritativeStrategicPlan = ""): Promise<{ evidenceMap: EvidenceMapNode[]; analysis: StrategicAnalysis }> {
+export async function generateStrategicAnalysis(session: SessionRecord, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<{ evidenceMap: EvidenceMapNode[]; analysis: StrategicAnalysis }> {
   const language = normalizeLanguage(session.preparation_language);
   const evidenceMap = buildEvidenceMap(session);
   
   let diagnostics: string[] = []; let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const raw = await runPass1(session, evidenceMap, language, diagnostics, authoritativeStrategicPlan);
-      if (validatePass1(raw, evidenceMap)) return { evidenceMap, analysis: raw };
-      diagnostics = pass1Diagnostics(raw, evidenceMap);
+      const raw = await runPass1(session, evidenceMap, language, diagnostics, authoritativeStrategicPlan, authoritativePlan);
+      if (validatePass1(raw, evidenceMap, authoritativePlan)) return { evidenceMap, analysis: raw };
+      diagnostics = pass1Diagnostics(raw, evidenceMap, authoritativePlan);
       lastError = new Error("Pass 1 Gate 1 failed: " + diagnostics.join(" | "));
     } catch (error) { lastError = error; diagnostics = [error instanceof Error ? error.message : "Pass 1 structured generation failed."]; }
   }
@@ -454,36 +461,52 @@ function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMa
   return failures;
 }
 
-function strategicModeDiagnostics(strategy: InternalStrategy, authoritativeStrategicPlan: string, language: SessionLanguage): string[] {
-  const modes = [...authoritativeStrategicPlan.matchAll(/(?:^|\n)\s*\d+\.\s*\[(DIRECT|TRANSFERABLE|VERIFY_GAP)\]/g)].map((m) => m[1] as StrategicTensionMode);
-  if (modes.length !== 3) return [];
+function strategicModeDiagnostics(strategy: InternalStrategy, authoritativePlan: StrategicPlan | null, language: SessionLanguage): string[] {
+  if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return [];
   const failures: string[] = [];
   const fr = language === "fr";
-  modes.forEach((mode, i) => {
+  const tensionByEvidence = new Map(authoritativePlan.tensions.map((t) => [t.primary_evidence_node_id, t]));
+  for (let i = 0; i < 3; i++) {
+    const tension = authoritativePlan.tensions[i];
     const priority = strategy.interviewPriorities[i]?.text ?? "";
     const story = strategy.storiesToPrepare[i]?.text ?? "";
+    const priorityNodeId = strategy.interviewPriorities[i]?.evidence_node_id;
+    const storyNodeId = strategy.storiesToPrepare[i]?.evidence_node_id;
+    if (priorityNodeId !== tension.primary_evidence_node_id) {
+      failures.push("interviewPriorities[" + i + "] is not bound to the authoritative tension evidence node.");
+      continue;
+    }
+    if (storyNodeId !== tension.primary_evidence_node_id) {
+      failures.push("storiesToPrepare[" + i + "] is not bound to the authoritative tension evidence node.");
+      continue;
+    }
+    const boundTension = tensionByEvidence.get(priorityNodeId);
+    if (!boundTension || boundTension.id !== tension.id) {
+      failures.push("interviewPriorities[" + i + "] does not resolve to the expected authoritative tension.");
+      continue;
+    }
     const combined = (priority + " " + story).toLowerCase();
-    if (mode === "TRANSFERABLE") {
+    if (boundTension.mode === "TRANSFERABLE") {
       const transferMarker = fr
         ? /transpos|transfér|applicable|mobilis|peut être adapté|peut être mobilisé/.test(combined)
         : /transfer|translat|applicable|adapt|can be applied|can be transferred/.test(combined);
       const directClaim = fr
-        ? /expérience (?:minière|dans le secteur|mining|de project finance|en project finance|des opérations capitalistiques)|maîtrise (?:du secteur|de project finance)|expertise (?:minière|sectorielle)/.test(combined)
+        ? /expérience\s+(?:minière|dans le secteur|mining|de project finance|en project finance|des opérations capitalistiques)|maîtrise\s+(?:du secteur|de project finance)|expertise\s+(?:minière|sectorielle)/.test(combined)
         : /mining experience|experience in (?:mining|project finance|capital-intensive)|project finance experience|mining expertise|sector expertise/.test(combined);
       if (!transferMarker) failures.push("interviewPriorities[" + i + "] is TRANSFERABLE but does not explicitly frame the capability as transferable.");
       if (directClaim) failures.push("interviewPriorities[" + i + "] or storiesToPrepare[" + i + "] converts TRANSFERABLE into a target-domain experience claim.");
     }
-    if (mode === "VERIFY_GAP") {
+    if (boundTension.mode === "VERIFY_GAP") {
       const verifyMarker = fr
         ? /vérifi|à confirmer|reste à établir|n'est pas (?:établi|documenté)|absence|ne permet pas d'affirmer/.test(combined)
         : /verify|confirm|needs to be established|not established|not documented|absence|cannot establish/.test(combined);
       const directClaim = fr
-        ? /expérience suffisante|expérience (?:minière|dans le secteur|en project finance|des opérations capitalistiques)|maîtrise (?:des|du)|connaissance (?:des|du) normes/.test(combined)
+        ? /expérience suffisante|expérience\s+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|maîtrise\s+(?:des|du)|connaissance\s+(?:des|du) normes/.test(combined)
         : /sufficient experience|mining experience|project finance experience|experience in capital-intensive|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(combined);
       if (!verifyMarker) failures.push("interviewPriorities[" + i + "] is VERIFY_GAP but does not explicitly frame the point as something to verify.");
       if (directClaim) failures.push("interviewPriorities[" + i + "] or storiesToPrepare[" + i + "] converts VERIFY_GAP into an established-experience claim.");
     }
-  });
+  }
   return [...new Set(failures)];
 }
 
@@ -591,14 +614,14 @@ Generate the complete strategy.`;
   return requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.2) as Promise<InternalStrategy>;
 }
 
-async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, authoritativeStrategicPlan = ""): Promise<InterviewStrategy> {
+async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InterviewStrategy> {
   let diagnostics: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const internal = await runPass2(session, evidenceMap, analysis, language, diagnostics, authoritativeStrategicPlan);
       if (!validateInternalStrategy(internal, evidenceMap)) { diagnostics = internalDiagnostics(internal, evidenceMap); console.warn("[Strategy Engine V2.2] Pass 2 internal validation failed:", diagnostics); continue; }
       shadowLexicalGroundingReport(internal, evidenceMap);
-      const modeDiagnostics = strategicModeDiagnostics(internal, authoritativeStrategicPlan, language);
+      const modeDiagnostics = strategicModeDiagnostics(internal, authoritativePlan, language);
       if (modeDiagnostics.length) { diagnostics = modeDiagnostics; console.warn("[Strategy Engine V2.3] strategic mode validation failed:", diagnostics); continue; }
       const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap);
       if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; console.warn("[Strategy Engine V2.2] evidence faithfulness failed:", diagnostics); continue; }
@@ -611,7 +634,7 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
   return safeInsufficientEvidenceStrategy(session, evidenceMap, analysis);
 }
 
-export async function runStrategyEngineV2(session: SessionRecord, authoritativeStrategicPlan = ""): Promise<InterviewStrategy> {
+export async function runStrategyEngineV2(session: SessionRecord, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InterviewStrategy> {
   const language = normalizeLanguage(session.preparation_language);
   const evidenceMap = buildEvidenceMap(session);
   const provableCount = evidenceMap.filter((node) => node.status === "PROVEN" || node.status === "PARTIALLY_PROVEN").length;
@@ -623,6 +646,6 @@ export async function runStrategyEngineV2(session: SessionRecord, authoritativeS
     return safeInsufficientEvidenceStrategy(session, evidenceMap, null);
   }
 
-  const result = await generateStrategicAnalysis(session, authoritativeStrategicPlan);
-  return generateExecutiveStrategy(session, result.evidenceMap, result.analysis, language, authoritativeStrategicPlan);
+  const result = await generateStrategicAnalysis(session, authoritativeStrategicPlan, authoritativePlan);
+  return generateExecutiveStrategy(session, result.evidenceMap, result.analysis, language, authoritativeStrategicPlan, authoritativePlan);
 }
