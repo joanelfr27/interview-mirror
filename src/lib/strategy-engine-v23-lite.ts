@@ -152,7 +152,46 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     item.relevant_jd_requirements.length > 0 &&
     item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
   );
-  if (!valid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
+
+  // Some model outputs contain a valid evidence block but an overly broad or
+  // weakly paraphrased JD retrieval label. Repair that label from the actual JD
+  // rather than rejecting otherwise CV-grounded evidence. Candidate facts and
+  // their CV provenance remain unchanged.
+  const jdSentences = session.job_description
+    .split(/(?<=[.!?])\\s+|\\n+/)
+    .map((s) => canonicalize(s))
+    .filter((s) => s.length >= 20);
+  const tokenSet = (value: string) => new Set(
+    canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/)
+      .filter((x) => x.length >= 5)
+  );
+  const overlap = (a: string, b: string) => {
+    const aa = tokenSet(a); const bb = tokenSet(b);
+    if (!aa.size || !bb.size) return 0;
+    let common = 0;
+    for (const token of aa) if (bb.has(token)) common++;
+    return common / Math.min(aa.size, bb.size);
+  };
+  const repairedEvidence = evidence.map((item) => {
+    const requirements = (item.relevant_jd_requirements ?? []).filter((r) => jdRequirementGrounding(r, session.job_description));
+    if (requirements.length > 0) return { ...item, relevant_jd_requirements: requirements.slice(0, 3) };
+    const factText = item.facts.map((f) => f.fact).join(" ");
+    const best = jdSentences
+      .map((sentence) => ({ sentence, score: Math.max(overlap(sentence, factText), overlap(sentence, item.source_text)) }))
+      .sort((a, b) => b.score - a.score)[0];
+    if (!best || best.score < 0.12) return item;
+    return { ...item, relevant_jd_requirements: [best.sentence] };
+  });
+
+  const repairedValid = repairedEvidence.every((item) =>
+    item && typeof item.id === "string" && item.source_text?.trim() &&
+    Array.isArray(item.facts) && item.facts.length > 0 &&
+    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim()) &&
+    Array.isArray(item.relevant_jd_requirements) &&
+    item.relevant_jd_requirements.length > 0 &&
+    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
+  );
+  if (!repairedValid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
 
   // Zero-hallucination boundary: every extracted fact must point back to text
   // that actually exists in the supplied CV. The model may summarize that source
@@ -179,7 +218,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       }
     }
   }
-  return { evidence: evidence.slice(0, 10) };
+  return { evidence: repairedEvidence.slice(0, 10) };
 }
 
 function jdRequirementGrounding(requirement: string, jobDescription: string): boolean {
