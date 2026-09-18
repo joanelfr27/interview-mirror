@@ -14,9 +14,9 @@ type CandidateEvidencePack = {
   evidence: CandidateEvidenceItem[];
 };
 
-type StrategicTensionMode = "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
+export type StrategicTensionMode = "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
 
-type StrategicTension = {
+export type StrategicTension = {
   id: string;
   mode: StrategicTensionMode;
   primary_evidence_node_id: string;
@@ -27,7 +27,7 @@ type StrategicTension = {
   forbidden_inference: string;
 };
 
-type StrategicPlan = {
+export type StrategicPlan = {
   candidate_positioning: string;
   tensions: StrategicTension[];
   verification_points: string[];
@@ -312,5 +312,5 @@ export async function runStrategyEngineV23Lite(session: SessionRecord): Promise<
   // context and validation; it is never replaced by serialized plan text.
   const evidenceMap = buildEvidenceMap(evidenceSession);
   const plan = await buildStrategicPlan(evidenceSession, evidenceMap);
-  return runStrategyEngineV2(evidenceSession, serializeAuthoritativePlan(plan));
+  return runStrategyEngineV2(evidenceSession, serializeAuthoritativePlan(plan), plan);
 }
