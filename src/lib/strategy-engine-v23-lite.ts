@@ -1,6 +1,6 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
-import { runStrategyEngineV2 } from "@/lib/strategy-engine";
+import { buildEvidenceMap, runStrategyEngineV2 } from "@/lib/strategy-engine";
 
 type CandidateEvidenceItem = {
   id: string;
@@ -12,6 +12,26 @@ type CandidateEvidenceItem = {
 
 type CandidateEvidencePack = {
   evidence: CandidateEvidenceItem[];
+};
+
+type StrategicTensionMode = "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
+
+type StrategicTension = {
+  id: string;
+  mode: StrategicTensionMode;
+  primary_evidence_node_id: string;
+  target_requirement: string;
+  interviewer_belief: string;
+  interviewer_doubt: string;
+  allowed_positioning: string;
+  forbidden_inference: string;
+};
+
+type StrategicPlan = {
+  candidate_positioning: string;
+  tensions: StrategicTension[];
+  verification_points: string[];
+  likely_questions: string[];
 };
 
 const EVIDENCE_SCHEMA = {
@@ -55,6 +75,33 @@ const EVIDENCE_SCHEMA = {
     }
   },
   required: ["evidence"]
+} as const;
+
+const STRATEGIC_PLAN_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    candidate_positioning: { type: "string" },
+    tensions: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          mode: { type: "string", enum: ["DIRECT","TRANSFERABLE","VERIFY_GAP"] },
+          primary_evidence_node_id: { type: "string" },
+          target_requirement: { type: "string" },
+          interviewer_belief: { type: "string" },
+          interviewer_doubt: { type: "string" },
+          allowed_positioning: { type: "string" },
+          forbidden_inference: { type: "string" }
+        },
+        required: ["id","mode","primary_evidence_node_id","target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]
+      }
+    },
+    verification_points: { type: "array", items: { type: "string" } },
+    likely_questions: { type: "array", items: { type: "string" } }
+  },
+  required: ["candidate_positioning","tensions","verification_points","likely_questions"]
 } as const;
 
 function structuredResponseFormat(name: string, schema: unknown) {
@@ -144,18 +191,133 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
   });
 }
 
+function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>): string[] {
+  const errors: string[] = [];
+  if (!plan.candidate_positioning?.trim()) errors.push("candidate_positioning is required.");
+  if (!Array.isArray(plan.tensions) || plan.tensions.length !== 3) errors.push("tensions must contain exactly 3 items.");
+  if (!Array.isArray(plan.likely_questions) || plan.likely_questions.length < 3) errors.push("likely_questions must contain at least 3 items.");
+  const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
+  const seen = new Set<string>();
+  for (const tension of plan.tensions ?? []) {
+    if (!["DIRECT","TRANSFERABLE","VERIFY_GAP"].includes(tension.mode)) errors.push(tension.id + ": invalid mode.");
+    const node = byId.get(tension.primary_evidence_node_id);
+    if (!node) errors.push(tension.id + ": unknown primary evidence node.");
+    else if (!["PROVEN","PARTIALLY_PROVEN"].includes(node.status)) errors.push(tension.id + ": primary evidence must be provable.");
+    if (seen.has(tension.primary_evidence_node_id)) errors.push("Strategic tensions must use distinct primary evidence nodes.");
+    seen.add(tension.primary_evidence_node_id);
+    for (const field of ["target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]) {
+      if (!(tension as any)[field]?.trim()) errors.push(tension.id + ": missing " + field + ".");
+    }
+  }
+  return [...new Set(errors)];
+}
+
+async function buildStrategicPlan(session: SessionRecord, evidenceMap: ReturnType<typeof buildEvidenceMap>): Promise<StrategicPlan> {
+  const language = normalizeLanguage(session.preparation_language);
+  const system = languageInstruction(language) + `
+
+You are Interview Mirror's strategic planning layer. Your output is an AUTHORITATIVE PLAN for a later strategy-writing model.
+
+The candidate evidence map is the only authoritative source of candidate facts.
+The raw job description defines requirements, but a requirement is NEVER candidate evidence.
+
+Build exactly 3 strategic tensions. A tension must connect:
+1) a target-role requirement,
+2) a specific interviewer belief,
+3) the most credible doubt the interviewer could have about that belief,
+4) one provable evidence node,
+5) an allowed way to position that evidence,
+6) an explicit forbidden inference.
+
+Use these modes:
+- DIRECT: the evidence directly demonstrates a relevant capability or responsibility.
+- TRANSFERABLE: the evidence demonstrates an underlying capability that can reasonably be positioned as transferable, but the candidate must NOT be presented as having the target-domain experience merely because the capability transfers.
+- VERIFY_GAP: the target requirement is not established strongly enough by the CV; use the evidence only to prepare how the candidate should handle the verification, not to claim the missing qualification/experience.
+
+Important:
+- Never convert mining, ERP, SAP, Oracle, Sage, project finance, or any other JD-only requirement into candidate experience unless the evidence map explicitly proves it.
+- For TRANSFERABLE and VERIFY_GAP, the forbidden_inference must explicitly state what must not be claimed.
+- Prefer non-obvious doubts about ownership, scope, depth, recency, scale, decision authority or transferability.
+- Do not manufacture a vulnerability just to sound insightful.
+- Preserve the distinction between evidence, requirement and strategic bridge.
+- Do not invent metrics, outcomes, tools, employers, industries, standards knowledge, dates or ownership.
+- The three tensions should be materially distinct.
+- The later strategy writer will receive ONLY this plan plus the evidence map. Do not rely on later generation to reinterpret the JD.
+
+Return the complete schema.
+`;
+
+  const user = "EVIDENCE MAP:\n" + JSON.stringify(evidenceMap, null, 2) +
+    "\n\nRAW CV (fact context only; do not create facts outside the evidence map):\n" + session.cv_text.slice(0, 9000) +
+    "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +
+    "\n\nCreate the authoritative strategic plan.";
+
+  let lastErrors: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const raw = await requestStructuredJson(system + (lastErrors.length ? "\nPrevious validation errors:\n- " + lastErrors.join("\n- ") : ""), user, "strategic_plan_v23", STRATEGIC_PLAN_SCHEMA);
+    const plan = raw as StrategicPlan;
+    lastErrors = validateStrategicPlan(plan, evidenceMap);
+    if (!lastErrors.length) return plan;
+  }
+  throw new Error("Strategic plan failed validation after repair cap: " + lastErrors.join(" | "));
+}
+
+function serializeAuthoritativePlan(plan: StrategicPlan): string {
+  return `AUTHORITATIVE STRATEGIC PLAN — THIS PLAN CONTROLS STRATEGIC INTERPRETATION.
+
+The downstream strategy engine must treat this document as the only strategic interpretation of the target role. It may improve wording and candidate-facing communication, but it must not invent a new requirement, tension, candidate capability, transferability claim or missing-experience claim.
+
+Candidate positioning:
+${plan.candidate_positioning}
+
+Strategic tensions:
+${plan.tensions.map((t, i) => `
+${i + 1}. [${t.mode}] Evidence node ${t.primary_evidence_node_id}
+Target requirement: ${t.target_requirement}
+Interviewer belief: ${t.interviewer_belief}
+Interviewer doubt: ${t.interviewer_doubt}
+Allowed positioning: ${t.allowed_positioning}
+FORBIDDEN INFERENCE: ${t.forbidden_inference}`).join("\n")}
+
+Verification points:
+${plan.verification_points.map((x) => "- " + x).join("\n") || "- None explicitly identified."}
+
+Likely questions:
+${plan.likely_questions.map((x) => "- " + x).join("\n")}
+
+HARD BOUNDARY:
+- The plan is not candidate evidence.
+- Evidence facts remain the only source of candidate-specific factual claims.
+- Do not upgrade TRANSFERABLE into DIRECT.
+- Do not convert VERIFY_GAP into proven experience.
+- Do not claim any item named in FORBIDDEN INFERENCE.
+`;
+}
+
 export async function runStrategyEngineV23Lite(session: SessionRecord): Promise<InterviewStrategy> {
   const pack = await extractCandidateEvidence(session);
-  const enrichedSession: SessionRecord = {
+
+  const evidenceSession: SessionRecord = {
     ...session,
     cv_analysis: session.cv_analysis
       ? { ...session.cv_analysis, evidenceChain: evidenceToChain(pack, session.job_description) }
       : undefined
   } as SessionRecord;
 
-  if (!enrichedSession.cv_analysis) {
+  if (!evidenceSession.cv_analysis) {
     throw new Error("CV analysis is required before generating an interview strategy.");
   }
 
-  return runStrategyEngineV2(enrichedSession);
+  // The plan is generated while the real JD is still available, then becomes the
+  // sole strategic-role input to the legacy V2.2 reasoning/writing stages.
+  // This is deliberately a controlled bridge: no UI/DB change and no weakening
+  // of the existing faithfulness gates.
+  const evidenceMap = buildEvidenceMap(evidenceSession);
+  const plan = await buildStrategicPlan(evidenceSession, evidenceMap);
+  const authoritativeSession: SessionRecord = {
+    ...evidenceSession,
+    job_description: serializeAuthoritativePlan(plan)
+  };
+
+  return runStrategyEngineV2(authoritativeSession);
 }
