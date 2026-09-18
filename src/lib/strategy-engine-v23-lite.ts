@@ -246,6 +246,8 @@ function normalizeStrategicPlanModeLanguage(plan: StrategicPlan): StrategicPlan 
   // Deterministic wording repair only. This never changes the selected mode,
   // evidence node, requirement, or factual content; it makes the mode boundary
   // explicit so downstream validators and the strategy writer cannot miss it.
+  const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
+  const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
   return {
     ...plan,
     tensions: (plan.tensions ?? []).map((tension) => {
