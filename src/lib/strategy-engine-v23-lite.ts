@@ -180,7 +180,11 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   if (!Array.isArray(plan.likely_questions) || plan.likely_questions.length < 3) errors.push("likely_questions must contain at least 3 items.");
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const seen = new Set<string>();
+  const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
+  const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
+  const directClaimPattern = /(?:expérience|experience)\s+(?:minière|dans le secteur|en project finance|de project finance|mining|in mining|in project finance|in the target sector)|(?:maîtrise|mastery|expertise)\s+(?:du secteur|minière|de project finance|of the sector|of project finance)/i;
   for (const tension of plan.tensions ?? []) {
+    if (!tension || !tension.id?.trim()) { errors.push("Every tension requires an id."); continue; }
     if (!["DIRECT","TRANSFERABLE","VERIFY_GAP"].includes(tension.mode)) errors.push(tension.id + ": invalid mode.");
     const node = byId.get(tension.primary_evidence_node_id);
     if (!node) errors.push(tension.id + ": unknown primary evidence node.");
@@ -190,7 +194,51 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
     for (const field of ["target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]) {
       if (!(tension as any)[field]?.trim()) errors.push(tension.id + ": missing " + field + ".");
     }
+
+    const combined = [
+      tension.interviewer_belief,
+      tension.interviewer_doubt,
+      tension.allowed_positioning,
+      tension.forbidden_inference,
+    ].filter(Boolean).join(" ");
+
+    if (tension.mode === "TRANSFERABLE") {
+      if (!transferPattern.test(tension.allowed_positioning)) {
+        errors.push(tension.id + ": TRANSFERABLE tension must explicitly state how the evidenced capability can transfer to the target requirement.");
+      }
+      if (directClaimPattern.test(tension.allowed_positioning)) {
+        errors.push(tension.id + ": TRANSFERABLE allowed_positioning contains a direct target-domain experience claim.");
+      }
+    }
+
+    if (tension.mode === "VERIFY_GAP") {
+      if (!verifyPattern.test(combined)) {
+        errors.push(tension.id + ": VERIFY_GAP must explicitly identify the requirement as something to verify or establish.");
+      }
+      if (directClaimPattern.test(tension.allowed_positioning)) {
+        errors.push(tension.id + ": VERIFY_GAP allowed_positioning contains a direct target-domain experience claim.");
+      }
+    }
+
+    if (tension.mode === "DIRECT" && verifyPattern.test(tension.allowed_positioning) && !/direct|démontr|établi|established|demonstrat/i.test(tension.allowed_positioning)) {
+      errors.push(tension.id + ": DIRECT tension is framed primarily as a verification gap.");
+    }
   }
+
+  if (plan.tensions.length === 3) {
+    const pairs = [[0,1],[0,2],[1,2]] as const;
+    for (const [a,b] of pairs) {
+      const left = canonicalize(plan.tensions[a].interviewer_belief + " " + plan.tensions[a].target_requirement);
+      const right = canonicalize(plan.tensions[b].interviewer_belief + " " + plan.tensions[b].target_requirement);
+      const leftTokens = new Set(left.toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+      const rightTokens = new Set(right.toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter((x) => x.length >= 5));
+      let common = 0;
+      for (const token of leftTokens) if (rightTokens.has(token)) common++;
+      const overlap = common / Math.max(1, Math.min(leftTokens.size, rightTokens.size));
+      if (overlap >= 0.8) errors.push("Strategic tensions " + (a + 1) + " and " + (b + 1) + " are not materially distinct.");
+    }
+  }
+
   return [...new Set(errors)];
 }
 
