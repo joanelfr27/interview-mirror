@@ -389,6 +389,41 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   return [...new Set(errors)];
 }
 
+function normalizeStrategicPlanGrounding(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>): StrategicPlan {
+  const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
+  const overlap = (a: string, b: string) => semanticOverlapForValidation(a, b);
+  const groundedDoubt = (tension: StrategicPlan["tensions"][number], nodeFact: string): string => {
+    if (tension.mode === "TRANSFERABLE") {
+      return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment une capacité transférable vers ${clampWords(tension.target_requirement, 16)} ?`;
+    }
+    if (tension.mode === "VERIFY_GAP") {
+      return `Le CV permet-il d'établir suffisamment ${clampWords(tension.target_requirement, 18)}, au-delà de ${clampWords(nodeFact, 14)} ?`;
+    }
+    return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment ${clampWords(tension.target_requirement, 16)}, notamment en profondeur et en portée ?`;
+  };
+  const tensions = (plan.tensions ?? []).map((tension) => {
+    const node = byId.get(tension.primary_evidence_node_id);
+    if (!node) return tension;
+    const doubtOk = overlap(tension.interviewer_doubt, tension.target_requirement) >= 0.25
+      || overlap(tension.interviewer_doubt, node.fact) >= 0.15;
+    return doubtOk ? tension : { ...tension, interviewer_doubt: groundedDoubt(tension, node.fact) };
+  });
+  const normalized = { ...plan, tensions };
+  const verificationPoints = (plan.verification_points ?? []).filter((point) =>
+    normalized.tensions.some((t) =>
+      overlap(point, t.target_requirement) >= 0.18 || overlap(point, t.interviewer_doubt) >= 0.18
+    )
+  );
+  const groundedVerificationPoints = verificationPoints.length === (plan.verification_points ?? []).length
+    ? verificationPoints
+    : normalized.tensions.map((tension) =>
+        tension.mode === "VERIFY_GAP"
+          ? `À confirmer pendant l'entretien : ${clampWords(tension.target_requirement, 20)}.`
+          : `À établir pendant l'entretien : le niveau de ${clampWords(tension.target_requirement, 18)} que l'élément documenté permet de démontrer.`
+      );
+  return { ...normalized, verification_points: groundedVerificationPoints };
+}
+
 function normalizeStrategicPlanModeLanguage(plan: StrategicPlan): StrategicPlan {
   // Deterministic wording repair only. This never changes the selected mode,
   // evidence node, requirement, or factual content; it makes the mode boundary
@@ -457,7 +492,10 @@ Return the complete schema.
   let lastErrors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
     const raw = await requestStructuredJson(system + (lastErrors.length ? "\nPrevious validation errors:\n- " + lastErrors.join("\n- ") : ""), user, "strategic_plan_v23", STRATEGIC_PLAN_SCHEMA);
-    const plan = normalizeStrategicPlanModeLanguage(raw as StrategicPlan);
+    const plan = normalizeStrategicPlanGrounding(
+      normalizeStrategicPlanModeLanguage(raw as StrategicPlan),
+      evidenceMap
+    );
     lastErrors = validateStrategicPlan(plan, evidenceMap);
     if (!lastErrors.length) return plan;
   }
