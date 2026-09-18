@@ -65,7 +65,7 @@ const PARTIAL_EVIDENCE_PATTERN = /\b(partial|partiel(?:le)?s?)\b/i;
 const UNCERTAIN_PATTERN = /\b(unclear|incertain|not specified|non précisé|ambigu[eë]?)\b/i;
 
 function classifyEvidenceType(item: EvidenceChainItem): EvidenceType {
-  const text = `${item.jd_requirement ?? ""} ${item.cv_evidence ?? ""}`;
+  const text = `${item.cv_evidence ?? ""}`;
   if (QUALIFICATION_KEYWORD_PATTERN.test(text) || MASTER_DEGREE_PATTERN.test(text)) return "QUALIFICATION";
   if (TOOL_PATTERN.test(text)) return "TOOL_OR_SYSTEM";
   if (INDUSTRY_PATTERN.test(text)) return "INDUSTRY_EXPERIENCE";
@@ -177,8 +177,7 @@ function findProvableEvidenceNode(nodeId: string | undefined, evidenceMap: Evide
   if (node.status !== "PROVEN" && node.status !== "PARTIALLY_PROVEN") return null;
   return node;
 }
-function hasEvidenceNodeAnchor(text: string, node: EvidenceMapNode): boolean {
-  const anchors = factAnchorWords(node.fact).filter((word) => !STORY_ANCHOR_STOPWORDS.has(word));
+function hasEvidenceNodeAnchor(text: string, node: EvidenceMapNode): boolean {  const anchors = factAnchorWords(node.fact).filter((word) => !STORY_ANCHOR_STOPWORDS.has(word));
   if (!anchors.length) return false;
   const normalized = canonicalize(text).toLowerCase();
   return anchors.some((anchor) => normalized.includes(anchor));
@@ -357,8 +356,7 @@ const FAITHFULNESS_SCHEMA = {
   required: ["checks"],
 } as const;
 
-function structuredResponseFormat(name: string, schema: unknown) {
-  return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
+function structuredResponseFormat(name: string, schema: unknown) {  return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
 
 async function requestStructuredJson(system: string, user: string, name: string, schema: unknown, temperature = 0.2): Promise<any> {
