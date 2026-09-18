@@ -420,15 +420,63 @@ async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], 
 export async function generateStrategicAnalysis(session: SessionRecord, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<{ evidenceMap: EvidenceMapNode[]; analysis: StrategicAnalysis }> {
   const language = normalizeLanguage(session.preparation_language);
   const evidenceMap = buildEvidenceMap(session);
-  
-  let diagnostics: string[] = []; let lastError: unknown = null;
+
+  // V2.3: the authoritative plan has already performed the strategic discovery
+  // step. Re-running the same discovery in Pass 1 added latency and introduced
+  // a second place where the model could reinterpret the same tension. Convert
+  // the validated plan into the internal foundation deterministically.
+  if (authoritativePlan) {
+    const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
+    const analysis: StrategicAnalysis = {
+      positioning: authoritativePlan.candidate_positioning,
+      roleMap: authoritativePlan.tensions.map((tension) => ({
+        theme: tension.target_requirement,
+        interviewer_relevance: tension.interviewer_belief,
+      })),
+      vulnerabilities: authoritativePlan.tensions.map((tension) => tension.interviewer_doubt),
+      proofObjectives: authoritativePlan.tensions.map((tension, index) => {
+        const node = byId.get(tension.primary_evidence_node_id);
+        if (!node) throw new Error("Authoritative plan references unknown evidence node " + tension.primary_evidence_node_id + ".");
+        return {
+          id: tension.id,
+          interviewer_belief: tension.interviewer_belief,
+          why_it_matters: tension.target_requirement,
+          primary_evidence_node_id: tension.primary_evidence_node_id,
+          evidence_status: node.status,
+          evidence_type: node.type,
+          proof_point: tension.allowed_positioning,
+          vulnerability: tension.interviewer_doubt,
+          mitigation: tension.allowed_positioning,
+          communication_angle: tension.allowed_positioning,
+          probing_question: authoritativePlan.likely_questions[index] ?? ("How would you substantiate " + tension.interviewer_belief + "?"),
+        };
+      }),
+      likelyQuestions: authoritativePlan.likely_questions,
+    };
+
+    if (validatePass1(analysis, evidenceMap, authoritativePlan)) {
+      console.log("[Strategy Engine V2.3] authoritative plan promoted directly to strategic foundation; Pass 1 model call skipped.");
+      return { evidenceMap, analysis };
+    }
+
+    console.warn("[Strategy Engine V2.3] deterministic strategic-foundation promotion failed; falling back to legacy Pass 1 validation loop.");
+  }
+
+  // Backward-compatible path for callers that do not provide an authoritative
+  // plan. V2.3-lite always supplies one, so this path is not on the normal
+  // generation route.
+  let diagnostics: string[] = [];
+  let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const raw = await runPass1(session, evidenceMap, language, diagnostics, authoritativeStrategicPlan, authoritativePlan);
       if (validatePass1(raw, evidenceMap, authoritativePlan)) return { evidenceMap, analysis: raw };
       diagnostics = pass1Diagnostics(raw, evidenceMap, authoritativePlan);
       lastError = new Error("Pass 1 Gate 1 failed: " + diagnostics.join(" | "));
-    } catch (error) { lastError = error; diagnostics = [error instanceof Error ? error.message : "Pass 1 structured generation failed."]; }
+    } catch (error) {
+      lastError = error;
+      diagnostics = [error instanceof Error ? error.message : "Pass 1 structured generation failed."];
+    }
   }
   throw lastError instanceof Error ? lastError : new Error("Pass 1 failed after repair cap.");
 }
