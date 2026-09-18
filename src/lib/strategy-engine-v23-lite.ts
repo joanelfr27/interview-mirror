@@ -183,18 +183,34 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
 }
 
 function jdRequirementGrounding(requirement: string, jobDescription: string): boolean {
+  const stopwords = new Set([
+    "about","which","where","when","their","there","avec","dans","pour","entre","cette","poste","vous","votre","notre","leurs",
+    "experience","expérience","candidate","candidat","role","poste","position","finance","financial","accounting","comptabilité",
+    "skills","compétences","strong","forte","fort","ability","capacité","knowledge","connaissance","command","maîtrise"
+  ]);
   const normalize = (value: string) => canonicalize(value).toLowerCase().split(/[^a-zà-ÿ0-9]+/)
-    .filter((token) => token.length >= 5 && !["about","which","where","when","their","there","avec","dans","pour","entre","cette","poste","vous","votre","notre","leurs"].includes(token));
-  const requirementTokens = new Set(normalize(requirement));
-  const jdTokens = new Set(normalize(jobDescription));
-  if (!requirementTokens.size || !jdTokens.size) return false;
-  let common = 0;
-  for (const token of requirementTokens) if (jdTokens.has(token)) common++;
-  // A requirement may be a concise paraphrase of the JD, so exact substring
-  // matching is not required. But at least two distinctive JD-grounded terms
-  // (or one for a very short requirement) must survive the normalization.
-  const minimum = requirementTokens.size <= 2 ? 1 : 2;
-  return common >= minimum;
+    .filter((token) => token.length >= 5 && !stopwords.has(token));
+  const requirementTokens = normalize(requirement);
+  const jdTokens = normalize(jobDescription);
+  if (!requirementTokens.length || !jdTokens.length) return false;
+
+  // Requirements can be concise paraphrases of the JD (especially across
+  // French/English), so exact whole-word matching alone is too brittle.
+  // A distinctive token is considered grounded when it is exact or shares a
+  // meaningful six-character stem with a JD token (e.g. financier/financial,
+  // auditeurs/audits). This remains a retrieval-link check, not candidate proof.
+  const grounded = requirementTokens.filter((token) =>
+    jdTokens.some((jdToken) =>
+      jdToken === token
+      || (token.length >= 7 && jdToken.length >= 7 && token.slice(0, 6) === jdToken.slice(0, 6))
+    )
+  );
+
+  // At least one distinctive requirement term must be traceable to the actual
+  // JD. We intentionally avoid requiring two exact tokens because valid
+  // paraphrases such as "gestion du reporting financier" may share only
+  // "reporting" with an English JD.
+  return grounded.length >= 1;
 }
 
 function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
