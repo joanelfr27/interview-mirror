@@ -586,7 +586,7 @@ function alignStrategyToAuthoritativePlan(
         ? /vérifi|à confirmer|reste à établir|n'est pas (?:établi|documenté)|absence|ne permet pas d'affirmer/.test(normalized)
         : /verify|confirm|needs to be established|not established|not documented|absence|cannot establish/.test(normalized);
       const directClaim = fr
-        ? /expériences+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|expérience suffisante|maîtrises+(?:des|du)|connaissances+(?:des|du) normes/.test(normalized)
+        ? /expérience\s+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|expérience suffisante|maîtrise\s+(?:des|du)|connaissance\s+(?:des|du) normes/.test(normalized)
         : /sufficient experience|mining experience|project finance experience|experience in capital-intensive|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(normalized);
       if (directClaim) {
         return fr
@@ -618,10 +618,13 @@ function alignStrategyToAuthoritativePlan(
         evidence_node_id: t.primary_evidence_node_id,
       };
     }),
-    storiesToPrepare: tensions.map((t, index) => ({
-      text: strategy.storiesToPrepare?.[index]?.text?.trim() || fallbackStory(t),
-      evidence_node_id: t.primary_evidence_node_id,
-    })),
+    storiesToPrepare: tensions.map((t, index) => {
+      const generated = strategy.storiesToPrepare?.[index]?.text?.trim() || fallbackStory(t);
+      return {
+        text: modeBoundary(generated, t),
+        evidence_node_id: t.primary_evidence_node_id,
+      };
+    }),
     // Preserve candidate-facing wording produced by Pass 2. The authoritative
     // plan remains the constraint source through the prompt, mode diagnostics,
     // evidence-faithfulness verifier, and evidence-node binding above.
