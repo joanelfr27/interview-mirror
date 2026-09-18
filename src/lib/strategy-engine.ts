@@ -286,6 +286,11 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   if (generic.test(allText) || internal.test(allText) || languageMismatch.test(allText)) return false;
   if (hasCrossSectionDuplication(s)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
+  // Final quality gate: each proof priority must be anchored to both the
+  // candidate's actual evidence and a distinctive target-role requirement.
+  // This replaces the old "sounds strategic" test with a deterministic
+  // candidate-specificity/reuse check.
+  if (!hasSpecificPriorityAnchors(s, _cvText, _jobDescription, _evidenceMap)) return false;
   return true;
 }
 function validateObjectiveShape(o: any): o is ProofObjective {
