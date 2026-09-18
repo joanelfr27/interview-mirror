@@ -455,7 +455,7 @@ function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMa
 }
 
 function strategicModeDiagnostics(strategy: InternalStrategy, authoritativeStrategicPlan: string, language: SessionLanguage): string[] {
-  const modes = [...authoritativeStrategicPlan.matchAll(/(?:^|\\n)\\s*\\d+\\.\\s*\\[(DIRECT|TRANSFERABLE|VERIFY_GAP)\\]/g)].map((m) => m[1] as StrategicTensionMode);
+  const modes = [...authoritativeStrategicPlan.matchAll(/(?:^|\n)\s*\d+\.\s*\[(DIRECT|TRANSFERABLE|VERIFY_GAP)\]/g)].map((m) => m[1] as StrategicTensionMode);
   if (modes.length !== 3) return [];
   const texts = [...strategy.interviewPriorities, ...strategy.storiesToPrepare].map((x) => x.text);
   const failures: string[] = [];
