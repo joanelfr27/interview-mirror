@@ -308,16 +308,10 @@ export async function runStrategyEngineV23Lite(session: SessionRecord): Promise<
     throw new Error("CV analysis is required before generating an interview strategy.");
   }
 
-  // The plan is generated while the real JD is still available, then becomes the
-  // sole strategic-role input to the legacy V2.2 reasoning/writing stages.
-  // This is deliberately a controlled bridge: no UI/DB change and no weakening
-  // of the existing faithfulness gates.
+  // The plan is generated from the evidence map + real JD, then passed as a
+  // first-class strategic directive. The real JD remains available for role
+  // context and validation; it is never replaced by serialized plan text.
   const evidenceMap = buildEvidenceMap(evidenceSession);
   const plan = await buildStrategicPlan(evidenceSession, evidenceMap);
-  const authoritativeSession: SessionRecord = {
-    ...evidenceSession,
-    job_description: serializeAuthoritativePlan(plan)
-  };
-
-  return runStrategyEngineV2(authoritativeSession);
+  return runStrategyEngineV2(evidenceSession, serializeAuthoritativePlan(plan));
 }
