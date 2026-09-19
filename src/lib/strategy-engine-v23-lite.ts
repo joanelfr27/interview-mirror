@@ -906,7 +906,11 @@ Important:
 Return the complete schema.
 `;
 
-  const rankedRequirementEvidence = rankRequirementEvidence(evidenceMap);\n  const user = "DETERMINISTIC REQUIREMENT-TO-EVIDENCE CANDIDATES (authoritative selection boundary):\n" + serializeRankedRequirementEvidence(rankedRequirementEvidence) +\n    "\n\nEVIDENCE MAP (complete candidate-fact boundary; use only to inspect the cited atomic facts):\n" + JSON.stringify(evidenceMap, null, 2) +\n    "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +\n    "\n\nCreate the authoritative strategic plan.";
+  const rankedRequirementEvidence = rankRequirementEvidence(evidenceMap);
+  const user = "DETERMINISTIC REQUIREMENT-TO-EVIDENCE CANDIDATES (authoritative selection boundary):\n" + serializeRankedRequirementEvidence(rankedRequirementEvidence) +
+    "\n\nEVIDENCE MAP (complete candidate-fact boundary; use only to inspect the cited atomic facts):\n" + JSON.stringify(evidenceMap, null, 2) +
+    "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +
+    "\n\nCreate the authoritative strategic plan.";
 
   let lastErrors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
