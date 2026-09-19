@@ -3,6 +3,7 @@ export type StrategicTensionMode = "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
 export type StrategicTension = {
   id: string;
   mode: StrategicTensionMode;
+  target_requirement_id: string;
   primary_evidence_node_id: string;
   supporting_fact_ids: string[];
   target_requirement: string;
