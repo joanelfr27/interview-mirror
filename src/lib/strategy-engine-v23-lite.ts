@@ -269,7 +269,13 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
       cv_evidence: clampWords(factText + relationshipText, 28),
       gap_identified: "none",
       interview_implication: "Use this documented evidence to test a distinct interviewer belief; do not treat the target-role requirement as candidate fact.",
-      actionable_recommendation: "Anchor the strategy to the documented facts and preserve the relationships between them."
+      actionable_recommendation: "Anchor the strategy to the documented facts and preserve the relationships between them.",
+      evidence_facts: block.facts.slice(0, 5).map((fact, factIndex) => ({
+        fact_id: `E${String(pack.evidence.indexOf(block) + 1).padStart(2, "0")}-F${factIndex + 1}`,
+        fact: clampWords(fact.fact, 18),
+        category: fact.category,
+        exact_source_text: fact.exact_source_text
+      }))
     };
   });
 }
