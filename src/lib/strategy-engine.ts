@@ -930,45 +930,57 @@ function authoritativePlanFallbackStrategy(session: SessionRecord, evidenceMap: 
   const fr = normalizeLanguage(session.preparation_language) === "fr";
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const tensions = (plan.tensions ?? []).slice(0, 3);
+  const boundFacts = (tension: StrategicPlan["tensions"][number], node: EvidenceMapNode | undefined): string[] => {
+    if (!node) return [];
+    const selected = new Set(tension.supporting_fact_ids ?? []);
+    return node.supporting_facts.filter((fact) => selected.has(fact.fact_id)).map((fact) => fact.fact).filter(Boolean);
+  };
+  const factAnchor = (tension: StrategicPlan["tensions"][number], node: EvidenceMapNode | undefined): string =>
+    boundFacts(tension, node).map((fact) => truncate(fact, 18)).join("; ") || truncate(node?.fact ?? tension.allowed_positioning, 18);
 
   const priorities = tensions.map((tension) => {
     const node = byId.get(tension.primary_evidence_node_id);
-    const fact = node?.fact ?? "l'élément documenté";
+    const fact = factAnchor(tension, node);
     return fr
-      ? `Reliez « ${truncate(fact, 18)} » à « ${truncate(tension.target_requirement, 18)} » et démontrez ${tension.interviewer_belief.toLowerCase()}.`
-      : `Connect “${truncate(fact, 18)}” to “${truncate(tension.target_requirement, 18)}” and demonstrate ${tension.interviewer_belief.toLowerCase()}.`;
+      ? `Reliez le fait documenté « ${fact} » à « ${truncate(tension.target_requirement, 18)} » et démontrez ${tension.interviewer_belief.toLowerCase()}.`
+      : `Connect the documented fact “${fact}” to “${truncate(tension.target_requirement, 18)}” and demonstrate ${tension.interviewer_belief.toLowerCase()}.`;
   });
 
   const stories = tensions.map((tension) => {
     const node = byId.get(tension.primary_evidence_node_id);
-    const fact = node?.fact ?? "l'élément documenté";
+    const fact = factAnchor(tension, node);
     return fr
-      ? `Récupérez un exemple précis sur « ${truncate(fact, 18)} » qui vous permet de répondre au doute : « ${truncate(tension.interviewer_doubt, 24)} ».`
-      : `Retrieve one precise example around “${truncate(fact, 18)}” that lets you answer the doubt: “${truncate(tension.interviewer_doubt, 24)}”.`;
+      ? `Récupérez un exemple précis sur « ${fact} » qui vous permet de répondre au doute : « ${truncate(tension.interviewer_doubt, 24)} ».`
+      : `Retrieve one precise example around “${fact}” that lets you answer the doubt: “${truncate(tension.interviewer_doubt, 24)}”.`;
   });
 
   const defenses = tensions.map((tension) => tension.allowed_positioning);
   const questions = tensions.map((tension) => {
     const node = byId.get(tension.primary_evidence_node_id);
-    const fact = node?.fact ?? "this documented experience";
+    const fact = factAnchor(tension, node);
     return fr
-      ? `En quoi « ${truncate(fact, 16)} » vous permet-il de répondre à « ${truncate(tension.target_requirement, 16)} » ?`
-      : `How does “${truncate(fact, 16)}” demonstrate your ability against “${truncate(tension.target_requirement, 16)}”?`;
+      ? `En quoi le fait documenté « ${fact} » vous permet-il de répondre à « ${truncate(tension.target_requirement, 16)} » ?`
+      : `How does the documented fact “${fact}” demonstrate your ability against “${truncate(tension.target_requirement, 16)}”?`;
   });
 
   const gaps = tensions.map((tension) => tension.interviewer_doubt);
   const strengths = tensions.map((tension) => {
     const node = byId.get(tension.primary_evidence_node_id);
     return fr
-      ? `Point d'appui : ${truncate(node?.fact ?? tension.allowed_positioning, 24)}.`
-      : `Evidence anchor: ${truncate(node?.fact ?? tension.allowed_positioning, 24)}.`;
+      ? `Point d'appui documenté : ${factAnchor(tension, node)}.`
+      : `Documented evidence anchor: ${factAnchor(tension, node)}.`;
   });
 
   return {
     candidatePositioning: plan.candidate_positioning,
-    strongestValueProposition: fr
-      ? `Votre valeur centrale repose sur ${truncate(tensions[0]?.target_requirement ?? "les responsabilités clés du poste", 24)}, en vous appuyant sur des faits documentés et sans dépasser ce que votre parcours établit.`
-      : `Your central value rests on ${truncate(tensions[0]?.target_requirement ?? "the role's key responsibilities", 24)}, supported by documented facts without exceeding what your background establishes.`,
+    strongestValueProposition: (() => {
+      const t = tensions[0];
+      const node = t ? byId.get(t.primary_evidence_node_id) : undefined;
+      const fact = t ? factAnchor(t, node) : (fr ? "les faits documentés du parcours" : "the documented facts in the background");
+      return fr
+        ? `Votre valeur centrale repose sur le fait documenté « ${fact} », relié à ${truncate(t?.target_requirement ?? "les responsabilités clés du poste", 24)}, sans dépasser ce que votre parcours établit.`
+        : `Your central value rests on the documented fact “${fact}”, connected to ${truncate(t?.target_requirement ?? "the role's key responsibilities", 24)}, without exceeding what your background establishes.`;
+    })(),
     strengthsToLeverage: strengths,
     gapsOrRisks: gaps,
     gapDefenseStrategy: defenses,
