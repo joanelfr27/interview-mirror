@@ -1,12 +1,28 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
-import type { InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
+import type {
+  AtomicFactRequirementRelation,
+  CanonicalJDRequirement,
+  DocumentedEvidenceLevel,
+  FactRequirementRelationType,
+  InterviewStrategy,
+  JDRequiredLevel,
+  JDRequirementType,
+  SessionLanguage,
+  SessionRecord
+} from "@/types";
 import { buildEvidenceMap, runStrategyEngineV2 } from "@/lib/strategy-engine";
 import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
 type CandidateEvidenceItem = {
   id: string;
   source_text: string;
-  facts: Array<{ fact: string; category: string; exact_source_text: string }>;
+  canonical_jd_requirements: CanonicalJDRequirement[];
+  facts: Array<{
+    fact: string;
+    category: string;
+    exact_source_text: string;
+    requirement_relations: AtomicFactRequirementRelation[];
+  }>;
   relationships: Array<{ from_fact: number; to_fact: number; relationship: string }>;
   relevant_jd_requirements: string[];
 };
@@ -26,6 +42,20 @@ const EVIDENCE_SCHEMA = {
         properties: {
           id: { type: "string" },
           source_text: { type: "string" },
+          canonical_jd_requirements: {
+            type: "array",
+            items: {
+              type: "object", additionalProperties: false,
+              properties: {
+                requirement_id: { type: "string" },
+                capability: { type: "string" },
+                requirement_type: { type: "string", enum: ["CAPABILITY","STANDARD","RESPONSIBILITY","DOMAIN","TOOL","QUALIFICATION"] },
+                required_level: { type: "string", enum: ["PREFERRED","KNOWLEDGE","WORKING","ADVANCED","OWNERSHIP"] },
+                exact_jd_source_text: { type: "string" }
+              },
+              required: ["requirement_id","capability","requirement_type","required_level","exact_jd_source_text"]
+            }
+          },
           facts: {
             type: "array",
             items: {
@@ -33,9 +63,22 @@ const EVIDENCE_SCHEMA = {
               properties: {
                 fact: { type: "string" },
                 category: { type: "string", enum: ["RESPONSIBILITY","ACHIEVEMENT","SCOPE","JURISDICTION","TOOL","LEADERSHIP","QUALIFICATION","INDUSTRY","PROCESS","STAKEHOLDER"] },
-                exact_source_text: { type: "string" }
+                exact_source_text: { type: "string" },
+                requirement_relations: {
+                  type: "array",
+                  items: {
+                    type: "object", additionalProperties: false,
+                    properties: {
+                      requirement_id: { type: "string" },
+                      relation: { type: "string", enum: ["DIRECT","RELATED"] },
+                      documented_level: { type: "string", enum: ["MENTION","EXPOSURE","PRACTICE","RESPONSIBILITY","OWNERSHIP","MASTERY"] },
+                      exact_cv_source_text: { type: "string" }
+                    },
+                    required: ["requirement_id","relation","documented_level","exact_cv_source_text"]
+                  }
+                }
               },
-              required: ["fact","category","exact_source_text"]
+              required: ["fact","category","exact_source_text","requirement_relations"]
             }
           },
           relevant_jd_requirements: { type: "array", items: { type: "string" } },
@@ -52,7 +95,7 @@ const EVIDENCE_SCHEMA = {
             }
           }
         },
-        required: ["id","source_text","facts","relationships","relevant_jd_requirements"]
+        required: ["id","source_text","canonical_jd_requirements","facts","relationships","relevant_jd_requirements"]
       }
     }
   },
@@ -131,6 +174,12 @@ Rules:
 - Facts should be concise enough for downstream strategic reasoning.
 - The purpose is strategic retrieval, not CV summarization.
 - For each evidence block, identify 1 to 3 JD requirements that this evidence can legitimately inform. This is a retrieval link, not proof that the candidate meets the requirement.
+- For each evidence block, emit canonical_jd_requirements derived only from JD wording (requirement_id, capability, requirement_type, required_level, exact_jd_source_text).
+- For each fact, emit requirement_relations tied to requirement_id with relation DIRECT or RELATED and documented_level derived only from exact CV wording.
+- DIRECT requires that exact_cv_source_text explicitly establishes the target capability/standard/responsibility/domain/tool/qualification named by the requirement.
+- RELATED indicates transferable or adjacent evidence that does not itself establish the requirement directly.
+- Never derive DIRECT from lexical overlap, acronyms, keywords, or relevant_jd_requirements.
+- Keep required_level (JD ask) and documented_level (CV evidence strength) semantically independent.
 - Keep missing requirements out of candidate evidence; the downstream strategy engine must handle missing evidence separately.
 - Candidate language: ${language === "fr" ? "French" : "English"}.
 `;
@@ -147,8 +196,17 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const normalizedCv = normalizeEvidenceText(session.cv_text);
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
+    Array.isArray(item.canonical_jd_requirements) &&
+    item.canonical_jd_requirements.length > 0 &&
+    item.canonical_jd_requirements.every((requirement) =>
+      requirement.requirement_id?.trim()
+      && requirement.capability?.trim()
+      && requirement.requirement_type?.trim()
+      && requirement.required_level?.trim()
+      && requirement.exact_jd_source_text?.trim()
+    ) &&
     Array.isArray(item.facts) && item.facts.length > 0 &&
-    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim()) &&
+    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
     item.relevant_jd_requirements.length > 0 &&
     item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
@@ -186,8 +244,17 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
 
   const repairedValid = repairedEvidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
+    Array.isArray(item.canonical_jd_requirements) &&
+    item.canonical_jd_requirements.length > 0 &&
+    item.canonical_jd_requirements.every((requirement) =>
+      requirement.requirement_id?.trim()
+      && requirement.capability?.trim()
+      && requirement.requirement_type?.trim()
+      && requirement.required_level?.trim()
+      && requirement.exact_jd_source_text?.trim()
+    ) &&
     Array.isArray(item.facts) && item.facts.length > 0 &&
-    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim()) &&
+    item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
     item.relevant_jd_requirements.length > 0 &&
     item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
@@ -209,6 +276,39 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       }
       if (fact.exact_source_text.length > 500) {
         throw new Error("Candidate evidence extraction produced an excessively long exact_source_text.");
+      }
+      const requirementIds = new Set(item.canonical_jd_requirements.map((requirement) => requirement.requirement_id));
+      const relationPairs = new Set<string>();
+      for (const relation of fact.requirement_relations) {
+        if (!requirementIds.has(relation.requirement_id)) {
+          throw new Error("Candidate evidence extraction returned a relation with an unknown requirement_id.");
+        }
+        if (relation.exact_cv_source_text.length > 500) {
+          throw new Error("Candidate evidence extraction produced an excessively long exact_cv_source_text.");
+        }
+        const relationSource = normalizeEvidenceText(relation.exact_cv_source_text);
+        if (!relationSource || !normalizedCv.includes(relationSource)) {
+          throw new Error("Candidate evidence extraction produced exact_cv_source_text not found in the supplied CV.");
+        }
+        if (relationSource !== exactSource) {
+          throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
+        }
+        const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
+        if (relationPairs.has(pairKey)) {
+          throw new Error("Candidate evidence extraction returned duplicate fact requirement relations.");
+        }
+        relationPairs.add(pairKey);
+      }
+    }
+    const requirementIds = new Set<string>();
+    for (const requirement of item.canonical_jd_requirements) {
+      if (requirementIds.has(requirement.requirement_id)) {
+        throw new Error("Candidate evidence extraction returned duplicate canonical requirement_id values inside one evidence block.");
+      }
+      requirementIds.add(requirement.requirement_id);
+      const jdSource = normalizeEvidenceText(requirement.exact_jd_source_text);
+      if (!jdSource || !normalizeEvidenceText(session.job_description).includes(jdSource)) {
+        throw new Error("Candidate evidence extraction produced exact_jd_source_text not found in the supplied JD.");
       }
     }
     for (const relationship of item.relationships.slice(0, 5)) {
@@ -255,6 +355,20 @@ function jdRequirementGrounding(requirement: string, jobDescription: string): bo
 
 function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
   const jd = canonicalize(jobDescription);
+  const normalizeRequirementType = (value: string): JDRequirementType => {
+    if (value === "CAPABILITY" || value === "STANDARD" || value === "RESPONSIBILITY" || value === "DOMAIN" || value === "TOOL" || value === "QUALIFICATION") return value;
+    return "CAPABILITY";
+  };
+  const normalizeRequiredLevel = (value: string): JDRequiredLevel => {
+    if (value === "PREFERRED" || value === "KNOWLEDGE" || value === "WORKING" || value === "ADVANCED" || value === "OWNERSHIP") return value;
+    return "KNOWLEDGE";
+  };
+  const normalizeRelationType = (value: string): FactRequirementRelationType => value === "DIRECT" ? "DIRECT" : "RELATED";
+  const normalizeDocumentedLevel = (value: string): DocumentedEvidenceLevel => {
+    if (value === "MENTION" || value === "EXPOSURE" || value === "PRACTICE" || value === "RESPONSIBILITY" || value === "OWNERSHIP" || value === "MASTERY") return value;
+    return "MENTION";
+  };
+
   return pack.evidence.slice(0, 10).map((block) => {
     const facts = block.facts.slice(0, 5).map((f) => clampWords(f.fact, 18));
     const relationships = block.relationships.slice(0, 5).map((r) => {
@@ -271,11 +385,24 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
       gap_identified: "none",
       interview_implication: "Use this documented evidence to test a distinct interviewer belief; do not treat the target-role requirement as candidate fact.",
       actionable_recommendation: "Anchor the strategy to the documented facts and preserve the relationships between them.",
+      canonical_jd_requirements: block.canonical_jd_requirements.slice(0, 8).map((requirement) => ({
+        requirement_id: canonicalize(requirement.requirement_id),
+        capability: clampWords(requirement.capability, 20),
+        requirement_type: normalizeRequirementType(canonicalize(requirement.requirement_type)),
+        required_level: normalizeRequiredLevel(canonicalize(requirement.required_level)),
+        exact_jd_source_text: requirement.exact_jd_source_text
+      })),
       evidence_facts: block.facts.slice(0, 5).map((fact, factIndex) => ({
         fact_id: `E${String(pack.evidence.indexOf(block) + 1).padStart(2, "0")}-F${factIndex + 1}`,
         fact: clampWords(fact.fact, 18),
         category: fact.category,
-        exact_source_text: fact.exact_source_text
+        exact_source_text: fact.exact_source_text,
+        requirement_relations: fact.requirement_relations.slice(0, 6).map((relation) => ({
+          requirement_id: canonicalize(relation.requirement_id),
+          relation: normalizeRelationType(canonicalize(relation.relation)),
+          documented_level: normalizeDocumentedLevel(canonicalize(relation.documented_level)),
+          exact_cv_source_text: relation.exact_cv_source_text
+        }))
       }))
     };
   });

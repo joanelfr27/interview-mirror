@@ -19,6 +19,27 @@ export type EvidenceChainFact = {
   fact: string;
   category: string;
   exact_source_text: string;
+  requirement_relations?: AtomicFactRequirementRelation[];
+};
+
+export type JDRequirementType = "CAPABILITY" | "STANDARD" | "RESPONSIBILITY" | "DOMAIN" | "TOOL" | "QUALIFICATION";
+export type JDRequiredLevel = "PREFERRED" | "KNOWLEDGE" | "WORKING" | "ADVANCED" | "OWNERSHIP";
+export type DocumentedEvidenceLevel = "MENTION" | "EXPOSURE" | "PRACTICE" | "RESPONSIBILITY" | "OWNERSHIP" | "MASTERY";
+export type FactRequirementRelationType = "DIRECT" | "RELATED";
+
+export type CanonicalJDRequirement = {
+  requirement_id: string;
+  capability: string;
+  requirement_type: JDRequirementType;
+  required_level: JDRequiredLevel;
+  exact_jd_source_text: string;
+};
+
+export type AtomicFactRequirementRelation = {
+  requirement_id: string;
+  relation: FactRequirementRelationType;
+  documented_level: DocumentedEvidenceLevel;
+  exact_cv_source_text: string;
 };
 
 export type EvidenceChainItem = {
@@ -27,6 +48,7 @@ export type EvidenceChainItem = {
   gap_identified: string;
   interview_implication: string;
   actionable_recommendation: string;
+  canonical_jd_requirements?: CanonicalJDRequirement[];
   evidence_facts?: EvidenceChainFact[];
 };
 

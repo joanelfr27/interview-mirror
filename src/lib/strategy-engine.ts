@@ -1,5 +1,5 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
-import type { CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
+import type { AtomicFactRequirementRelation, CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
 import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
 // ---------------------------------------------------------------------------
@@ -15,6 +15,7 @@ export type EvidenceMapFact = {
   fact: string;
   category: string;
   exact_source_text: string;
+  requirement_relations?: AtomicFactRequirementRelation[];
 };
 
 export type EvidenceMapNode = {
@@ -116,7 +117,16 @@ export function buildEvidenceMap(session: SessionRecord): EvidenceMapNode[] {
       fact_id: fact.fact_id || `E${String(index + 1).padStart(2, "0")}-F${factIndex + 1}`,
       fact: truncate(fact.fact ?? "", 18),
       category: fact.category ?? "OTHER",
-      exact_source_text: fact.exact_source_text ?? ""
+      exact_source_text: fact.exact_source_text ?? "",
+      requirement_relations: (fact.requirement_relations ?? [])
+        .filter((relation) => relation?.requirement_id && relation?.exact_cv_source_text)
+        .slice(0, 6)
+        .map((relation) => ({
+          requirement_id: relation.requirement_id,
+          relation: relation.relation,
+          documented_level: relation.documented_level,
+          exact_cv_source_text: relation.exact_cv_source_text
+        }))
     })).filter((fact) => fact.fact && fact.exact_source_text);
     return { node_id: `E${String(index + 1).padStart(2, "0")}`, type, status, fact, jd_requirement: truncate(item.jd_requirement ?? "", 16), supporting_facts };
   });
