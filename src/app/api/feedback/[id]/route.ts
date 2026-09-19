@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { STRATEGY_ENGINE_VERSION } from "@/lib/strategy-engine-version";
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { FeedbackQuestion, FeedbackResult, SessionRecord } from "@/types";
 import { createClient } from "@/lib/supabase/server";
@@ -219,7 +220,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { data: session } = await supabase.from("sessions").select("*").eq("id", id).eq("user_id", user.id).single();
   if (!session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   if (!session.interview_strategy) return NextResponse.json({ code: "STRATEGY_REQUIRED", error: "Interview Strategy is required before feedback can be generated." }, { status: 409 });
-  if ((session.interview_strategy as any)._strategy_engine_version !== "v2.2") return NextResponse.json({ code: "STRATEGY_REFRESH_REQUIRED", error: "This session uses an older interview strategy. Refresh the strategy before generating feedback." }, { status: 409 });
+  if ((session.interview_strategy as any)._strategy_engine_version !== STRATEGY_ENGINE_VERSION) return NextResponse.json({ code: "STRATEGY_REFRESH_REQUIRED", error: "This session uses an older interview strategy. Refresh the strategy before generating feedback." }, { status: 409 });
   const { data: questions } = await supabase.from("questions").select("*").eq("session_id", id).order("order_index", { ascending: true });
   const { data: answers } = await supabase.from("answers").select("*").eq("session_id", id);
   if (!questions?.length) return NextResponse.json({ error: "No interview questions found" }, { status: 400 });
