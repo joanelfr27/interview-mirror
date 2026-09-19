@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord, CvAnalysis } from "@/types";
 import { STRATEGY_ENGINE_VERSION } from "@/lib/strategy-engine-version";
 
+export const maxDuration = 60;
+
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
 function parseAnalysis(value: unknown): CvAnalysis | null { if (typeof value === "string") { try { return JSON.parse(value) as CvAnalysis; } catch { return null; } } return value && typeof value === "object" ? value as CvAnalysis : null; }
