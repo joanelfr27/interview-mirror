@@ -519,7 +519,6 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const seen = new Set<string>();
   const rankedRequirements = new Map(rankRequirementEvidence(evidenceMap).map((entry) => [entry.requirement.requirement_id, entry]));
-  const language = normalizeLanguage((evidenceMap as any)?._preparation_language);
   if (!Array.isArray(plan.verification_points)) errors.push("verification_points must be an array.");
   if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
     errors.push("verification_points must contain only non-empty strings.");
