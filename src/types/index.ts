@@ -61,7 +61,7 @@ export type InterviewStrategy = {
   interviewPlan: string;
   personalization: string;
   _strategy_engine_version?: string;
-  _strategy_status?: "INSUFFICIENT_EVIDENCE";
+  _strategy_status?: "INSUFFICIENT_EVIDENCE" | "AUTHORITATIVE_PLAN_FALLBACK";
   retest_priorities?: Array<{
     question: string;
     score: number;
