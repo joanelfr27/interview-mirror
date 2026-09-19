@@ -194,6 +194,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   if (evidence.length < 6) throw new Error("Candidate evidence extraction returned fewer than 6 evidence blocks.");
   const normalizeEvidenceText = (value: string) => canonicalize(value).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
   const normalizedCv = normalizeEvidenceText(session.cv_text);
+  const normalizedJd = normalizeEvidenceText(session.job_description);
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
@@ -290,7 +291,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
         if (!relationSource || !normalizedCv.includes(relationSource)) {
           throw new Error("Candidate evidence extraction produced exact_cv_source_text not found in the supplied CV.");
         }
-        if (relationSource !== exactSource) {
+        if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource)) {
           throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
         }
         const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
@@ -307,7 +308,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       }
       requirementIds.add(requirement.requirement_id);
       const jdSource = normalizeEvidenceText(requirement.exact_jd_source_text);
-      if (!jdSource || !normalizeEvidenceText(session.job_description).includes(jdSource)) {
+      if (!jdSource || !normalizedJd.includes(jdSource)) {
         throw new Error("Candidate evidence extraction produced exact_jd_source_text not found in the supplied JD.");
       }
     }
