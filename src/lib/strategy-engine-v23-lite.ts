@@ -180,6 +180,7 @@ Rules:
 - RELATED indicates transferable or adjacent evidence that does not itself establish the requirement directly.
 - Never derive DIRECT from lexical overlap, acronyms, keywords, or relevant_jd_requirements.
 - Keep required_level (JD ask) and documented_level (CV evidence strength) semantically independent.
+- If no usable JD text is provided, return empty canonical_jd_requirements, empty requirement_relations, and empty relevant_jd_requirements.
 - Keep missing requirements out of candidate evidence; the downstream strategy engine must handle missing evidence separately.
 - Candidate language: ${language === "fr" ? "French" : "English"}.
 `;
@@ -187,18 +188,20 @@ Rules:
 
 async function extractCandidateEvidence(session: SessionRecord): Promise<CandidateEvidencePack> {
   const language = normalizeLanguage(session.preparation_language);
+  const jobDescription = session.job_description ?? "";
+  const hasJobDescription = canonicalize(jobDescription).length > 0;
   const system = buildEvidencePrompt(session, language);
-  const user = "RAW CV:\n" + session.cv_text.slice(0, 14000) + "\n\nTARGET JOB DESCRIPTION (context only; never treat it as candidate evidence):\n" + session.job_description.slice(0, 9000);
+  const user = "RAW CV:\n" + session.cv_text.slice(0, 14000) + "\n\nTARGET JOB DESCRIPTION (context only; never treat it as candidate evidence):\n" + jobDescription.slice(0, 9000);
   const raw = await requestStructuredJson(system, user, "candidate_evidence_v23", EVIDENCE_SCHEMA);
   const evidence = Array.isArray(raw?.evidence) ? raw.evidence as CandidateEvidenceItem[] : [];
   if (evidence.length < 6) throw new Error("Candidate evidence extraction returned fewer than 6 evidence blocks.");
   const normalizeEvidenceText = (value: string) => canonicalize(value).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
   const normalizedCv = normalizeEvidenceText(session.cv_text);
-  const normalizedJd = normalizeEvidenceText(session.job_description);
+  const normalizedJd = normalizeEvidenceText(jobDescription);
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
-    item.canonical_jd_requirements.length > 0 &&
+    (!hasJobDescription || item.canonical_jd_requirements.length > 0) &&
     item.canonical_jd_requirements.every((requirement) =>
       requirement.requirement_id?.trim()
       && requirement.capability?.trim()
@@ -209,15 +212,15 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     Array.isArray(item.facts) && item.facts.length > 0 &&
     item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
-    item.relevant_jd_requirements.length > 0 &&
-    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
+    (!hasJobDescription || item.relevant_jd_requirements.length > 0) &&
+    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && (!hasJobDescription || jdRequirementGrounding(requirement, jobDescription)))
   );
 
   // Some model outputs contain a valid evidence block but an overly broad or
   // weakly paraphrased JD retrieval label. Repair that label from the actual JD
   // rather than rejecting otherwise CV-grounded evidence. Candidate facts and
   // their CV provenance remain unchanged.
-  const jdSentences = session.job_description
+  const jdSentences = jobDescription
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => canonicalize(s))
     .filter((s) => s.length >= 20);
@@ -233,7 +236,8 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     return common / Math.min(aa.size, bb.size);
   };
   const repairedEvidence = evidence.map((item) => {
-    const requirements = (item.relevant_jd_requirements ?? []).filter((r) => jdRequirementGrounding(r, session.job_description));
+    if (!hasJobDescription) return { ...item, relevant_jd_requirements: [], canonical_jd_requirements: [] };
+    const requirements = (item.relevant_jd_requirements ?? []).filter((r) => jdRequirementGrounding(r, jobDescription));
     if (requirements.length > 0) return { ...item, relevant_jd_requirements: requirements.slice(0, 3) };
     const factText = item.facts.map((f) => f.fact).join(" ");
     const best = jdSentences
@@ -246,7 +250,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const repairedValid = repairedEvidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
-    item.canonical_jd_requirements.length > 0 &&
+    (!hasJobDescription || item.canonical_jd_requirements.length > 0) &&
     item.canonical_jd_requirements.every((requirement) =>
       requirement.requirement_id?.trim()
       && requirement.capability?.trim()
@@ -257,8 +261,8 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     Array.isArray(item.facts) && item.facts.length > 0 &&
     item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
-    item.relevant_jd_requirements.length > 0 &&
-    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && jdRequirementGrounding(requirement, session.job_description))
+    (!hasJobDescription || item.relevant_jd_requirements.length > 0) &&
+    item.relevant_jd_requirements.every((requirement) => requirement?.trim() && (!hasJobDescription || jdRequirementGrounding(requirement, jobDescription)))
   );
   if (!repairedValid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
 
@@ -281,6 +285,9 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       const requirementIds = new Set(item.canonical_jd_requirements.map((requirement) => requirement.requirement_id));
       const relationPairs = new Set<string>();
       for (const relation of fact.requirement_relations) {
+        if (!hasJobDescription) {
+          throw new Error("Candidate evidence extraction returned fact requirement relations without JD context.");
+        }
         if (!requirementIds.has(relation.requirement_id)) {
           throw new Error("Candidate evidence extraction returned a relation with an unknown requirement_id.");
         }
@@ -303,6 +310,9 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     }
     const requirementIds = new Set<string>();
     for (const requirement of item.canonical_jd_requirements) {
+      if (!hasJobDescription) {
+        throw new Error("Candidate evidence extraction returned canonical JD requirements without JD context.");
+      }
       if (requirementIds.has(requirement.requirement_id)) {
         throw new Error("Candidate evidence extraction returned duplicate canonical requirement_id values inside one evidence block.");
       }
