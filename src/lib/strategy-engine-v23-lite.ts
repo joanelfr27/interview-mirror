@@ -532,7 +532,7 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
     const rankedRequirement = rankedRequirements.get(tension.target_requirement_id);
     if (!rankedRequirement) errors.push(tension.id + ": unknown target_requirement_id.");
     else if (rankedRequirement.mode !== tension.mode) errors.push(tension.id + ": mode does not match deterministic requirement evidence classification.");
-    else if (tension.mode !== "VERIFY_GAP" && !rankedRequirement.candidates.some((candidate) => candidate.node_id === tension.primary_evidence_node_id && candidate.fact_id && tension.supporting_fact_ids.includes(candidate.fact_id))) {
+    else if (!rankedRequirement.candidates.some((candidate) => candidate.node_id === tension.primary_evidence_node_id && (tension.mode === "VERIFY_GAP" || (candidate.fact_id && tension.supporting_fact_ids.includes(candidate.fact_id))))) {
       errors.push(tension.id + ": selected evidence is not among the deterministic candidates for target_requirement_id.");
     }
     const node = byId.get(tension.primary_evidence_node_id);
@@ -839,8 +839,32 @@ function rankRequirementEvidence(evidenceMap: ReturnType<typeof buildEvidenceMap
 
     const direct = ranked.filter((candidate) => candidate.relation === "DIRECT");
     const transferable = ranked.filter((candidate) => candidate.relation === "RELATED");
-    const mode: RequirementEvidenceMode = direct.length > 0 ? "DIRECT" : transferable.length > 0 ? "TRANSFERABLE" : "VERIFY_GAP";
-    result.push({ requirement, mode, candidates: (mode === "DIRECT" ? direct : mode === "TRANSFERABLE" ? transferable : ranked).slice(0, 5) });
+
+    // A VERIFY_GAP still needs a preparation anchor because the existing
+    // downstream strategy contract binds every tension to a real evidence node.
+    // The anchor is explicitly non-evidentiary: it must never upgrade the
+    // requirement into DIRECT or TRANSFERABLE.
+    if (direct.length === 0 && transferable.length === 0) {
+      const anchor = [...evidenceMap]
+        .flatMap((node) => node.supporting_facts.map((fact) => ({
+          node_id: node.node_id,
+          fact_id: fact.fact_id,
+          fact: fact.fact,
+          category: fact.category,
+          exact_source_text: fact.exact_source_text,
+          documented_level: null,
+          relation: null,
+          relation_exact_source_text: null,
+          association_hint: false,
+        })))
+        .sort((a, b) => a.node_id.localeCompare(b.node_id) || (a.fact_id ?? "").localeCompare(b.fact_id ?? ""))
+        .slice(0, 1);
+      result.push({ requirement, mode: "VERIFY_GAP", candidates: anchor });
+      continue;
+    }
+
+    const mode: RequirementEvidenceMode = direct.length > 0 ? "DIRECT" : "TRANSFERABLE";
+    result.push({ requirement, mode, candidates: (mode === "DIRECT" ? direct : transferable).slice(0, 5) });
   }
   return result;
 }
