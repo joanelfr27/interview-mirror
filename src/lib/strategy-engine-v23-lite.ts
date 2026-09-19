@@ -303,6 +303,7 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
     errors.push("verification_points must contain only non-empty strings.");
   }
   const fr = normalizeLanguage(language) === "fr";
+  const fr = normalizeLanguage(language) === "fr";
   const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
   const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
   const directClaimPattern = /(?:expérience|experience)\s+(?:minière|dans le secteur|en project finance|de project finance|mining|in mining|in project finance|in the target sector)|(?:maîtrise|mastery|expertise)\s+(?:du secteur|minière|de project finance|of the sector|of project finance)/i;
