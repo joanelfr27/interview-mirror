@@ -302,6 +302,7 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
     errors.push("verification_points must contain only non-empty strings.");
   }
+  const fr = normalizeLanguage(language) === "fr";
   const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
   const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
   const directClaimPattern = /(?:expérience|experience)\s+(?:minière|dans le secteur|en project finance|de project finance|mining|in mining|in project finance|in the target sector)|(?:maîtrise|mastery|expertise)\s+(?:du secteur|minière|de project finance|of the sector|of project finance)/i;
@@ -443,17 +444,19 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   return [...new Set(errors)];
 }
 
-function normalizeStrategicPlanGrounding(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>): StrategicPlan {
+function normalizeStrategicPlanGrounding(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>, language: SessionLanguage): StrategicPlan {
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const overlap = (a: string, b: string) => semanticOverlapForValidation(a, b);
+  const fr = normalizeLanguage(language) === "fr";
   const groundedDoubt = (tension: StrategicPlan["tensions"][number], nodeFact: string): string => {
-    if (tension.mode === "TRANSFERABLE") {
-      return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment une capacité transférable vers ${clampWords(tension.target_requirement, 16)} ?`;
+    if (fr) {
+      if (tension.mode === "TRANSFERABLE") return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment une capacité transférable vers ${clampWords(tension.target_requirement, 16)} ?`;
+      if (tension.mode === "VERIFY_GAP") return `Le CV permet-il d'établir suffisamment ${clampWords(tension.target_requirement, 18)}, au-delà de ${clampWords(nodeFact, 14)} ?`;
+      return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment ${clampWords(tension.target_requirement, 16)}, notamment en profondeur et en portée ?`;
     }
-    if (tension.mode === "VERIFY_GAP") {
-      return `Le CV permet-il d'établir suffisamment ${clampWords(tension.target_requirement, 18)}, au-delà de ${clampWords(nodeFact, 14)} ?`;
-    }
-    return `L'intervieweur pourrait-il considérer que ${clampWords(nodeFact, 18)} démontre suffisamment ${clampWords(tension.target_requirement, 16)}, notamment en profondeur et en portée ?`;
+    if (tension.mode === "TRANSFERABLE") return `Could the interviewer consider that ${clampWords(nodeFact, 18)} demonstrates a sufficiently transferable capability for ${clampWords(tension.target_requirement, 16)}?`;
+    if (tension.mode === "VERIFY_GAP") return `Does the CV establish ${clampWords(tension.target_requirement, 18)} strongly enough beyond ${clampWords(nodeFact, 14)}?`;
+    return `Could the interviewer consider that ${clampWords(nodeFact, 18)} sufficiently demonstrates ${clampWords(tension.target_requirement, 16)}, particularly in depth and scope?`;
   };
   const tensions = (plan.tensions ?? []).map((tension) => {
     const node = byId.get(tension.primary_evidence_node_id);
@@ -478,7 +481,7 @@ function normalizeStrategicPlanGrounding(plan: StrategicPlan, evidenceMap: Retur
   return { ...normalized, verification_points: groundedVerificationPoints };
 }
 
-function normalizeStrategicPlanModeLanguage(plan: StrategicPlan): StrategicPlan {
+function normalizeStrategicPlanModeLanguage(plan: StrategicPlan, language: SessionLanguage): StrategicPlan {
   // Deterministic wording repair only. This never changes the selected mode,
   // evidence node, requirement, or factual content; it makes the mode boundary
   // explicit so downstream validators and the strategy writer cannot miss it.
@@ -490,13 +493,13 @@ function normalizeStrategicPlanModeLanguage(plan: StrategicPlan): StrategicPlan 
       if (tension.mode === "TRANSFERABLE") {
         const allowed = transferPattern.test(tension.allowed_positioning)
           ? tension.allowed_positioning
-          : `Cette capacité peut être transposée et mobilisée pour répondre à ${tension.target_requirement}, sans prétendre à une expérience directe dans ce domaine. ${tension.allowed_positioning}`;
+          : (fr ? `Cette capacité peut être transposée et mobilisée pour répondre à ${tension.target_requirement}, sans prétendre à une expérience directe dans ce domaine. ${tension.allowed_positioning}` : `This capability can be transferred and applied to ${tension.target_requirement}, without claiming direct experience in that domain. ${tension.allowed_positioning}`);
         return { ...tension, allowed_positioning: allowed };
       }
       if (tension.mode === "VERIFY_GAP") {
         const allowed = verifyPattern.test(tension.allowed_positioning)
           ? tension.allowed_positioning
-          : `Ce point reste à confirmer pendant l'entretien ; appuyez-vous sur l'élément documenté ci-dessous sans le présenter comme une qualification ou une expérience déjà établie. ${tension.allowed_positioning}`;
+          : (fr ? `Ce point reste à confirmer pendant l'entretien ; appuyez-vous sur l'élément documenté ci-dessous sans le présenter comme une qualification ou une expérience déjà établie. ${tension.allowed_positioning}` : `This point remains to be verified in the interview; use the documented evidence below without presenting it as an already established qualification or experience. ${tension.allowed_positioning}`);
         return { ...tension, allowed_positioning: allowed };
       }
       return tension;
@@ -549,8 +552,9 @@ Return the complete schema.
   for (let attempt = 0; attempt < 3; attempt++) {
     const raw = await requestStructuredJson(system + (lastErrors.length ? "\nPrevious validation errors:\n- " + lastErrors.join("\n- ") : ""), user, "strategic_plan_v23", STRATEGIC_PLAN_SCHEMA);
     const plan = normalizeStrategicPlanGrounding(
-      normalizeStrategicPlanModeLanguage(raw as StrategicPlan),
-      evidenceMap
+      normalizeStrategicPlanModeLanguage(raw as StrategicPlan, language),
+      evidenceMap,
+      language
     );
     lastErrors = validateStrategicPlan(plan, evidenceMap);
     if (!lastErrors.length) return plan;
