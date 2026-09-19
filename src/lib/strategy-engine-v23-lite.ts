@@ -394,9 +394,9 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
         if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource) && provenanceOverlap(exactSource, relationSource) < 0.8) {
           throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
         }
-        const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
+        const pairKey = relation.requirement_id;
         if (relationPairs.has(pairKey)) {
-          throw new Error("Candidate evidence extraction returned duplicate fact requirement relations.");
+          throw new Error("Candidate evidence extraction returned duplicate fact/requirement relations.");
         }
         relationPairs.add(pairKey);
       }
