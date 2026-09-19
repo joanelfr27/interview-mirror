@@ -14,6 +14,13 @@ export type AnalysisProvenance = {
   contract_version: "v5.1";
 };
 
+export type EvidenceChainFact = {
+  fact_id: string;
+  fact: string;
+  category: string;
+  exact_source_text: string;
+};
+
 export type EvidenceChainItem = {
   jd_requirement: string;
   cv_evidence: string | null;
