@@ -389,7 +389,7 @@ function validatePass1(raw: any, evidenceMap: EvidenceMapNode[], authoritativePl
   return true;
 }
 
-type BoundStrategyText = { text: string; evidence_node_id: string };
+type BoundStrategyText = { text: string; evidence_node_id: string; supporting_fact_ids: string[] };
 type InternalStrategy = {
   candidatePositioning: string;
   strongestValueProposition: BoundStrategyText;
@@ -424,8 +424,8 @@ const PASS1_SCHEMA = {
 
 const BOUND_TEXT_SCHEMA = {
   type: "object", additionalProperties: false,
-  properties: { text: { type: "string" }, evidence_node_id: { type: "string" } },
-  required: ["text", "evidence_node_id"],
+  properties: { text: { type: "string" }, evidence_node_id: { type: "string" }, supporting_fact_ids: { type: "array", items: { type: "string" }, minItems: 1 } },
+  required: ["text", "evidence_node_id", "supporting_fact_ids"],
 } as const;
 
 const PASS2_SCHEMA = {
@@ -566,7 +566,11 @@ export async function generateStrategicAnalysis(session: SessionRecord, authorit
 function validateInternalStrategy(strategy: unknown, evidenceMap: EvidenceMapNode[]): strategy is InternalStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any; const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
-  const isBound = (x: any) => x && typeof x === "object" && isNonEmptyString(x.text) && isNonEmptyString(x.evidence_node_id) && byId.has(x.evidence_node_id) && ["PROVEN", "PARTIALLY_PROVEN"].includes(byId.get(x.evidence_node_id)!.status);
+  const isBound = (x: any) => {
+    if (!x || typeof x !== "object" || !isNonEmptyString(x.text) || !isNonEmptyString(x.evidence_node_id) || !byId.has(x.evidence_node_id) || !["PROVEN", "PARTIALLY_PROVEN"].includes(byId.get(x.evidence_node_id)!.status)) return false;
+    const validIds = new Set((byId.get(x.evidence_node_id)!.supporting_facts ?? []).map((f) => f.fact_id));
+    return Array.isArray(x.supporting_fact_ids) && x.supporting_fact_ids.length > 0 && new Set(x.supporting_fact_ids).size === x.supporting_fact_ids.length && x.supporting_fact_ids.every((id: unknown) => typeof id === "string" && validIds.has(id));
+  };
   if (typeof s.candidatePositioning !== "string" || !isBound(s.strongestValueProposition) || !Array.isArray(s.strengthsToLeverage) || !Array.isArray(s.gapsOrRisks) || !Array.isArray(s.gapDefenseStrategy) || !Array.isArray(s.interviewPriorities) || !Array.isArray(s.likelyDifficultQuestions) || !Array.isArray(s.storiesToPrepare) || typeof s.communicationPriorities !== "string" || typeof s.interviewPlan !== "string" || typeof s.personalization !== "string") return false;
   if (s.interviewPriorities.length !== 3 || s.storiesToPrepare.length !== 3) return false;
   if (s.strengthsToLeverage.length > 3 || s.gapsOrRisks.length > 3 || s.gapDefenseStrategy.length > 3 || s.likelyDifficultQuestions.length < 3) return false;
@@ -580,7 +584,9 @@ function validateInternalStrategy(strategy: unknown, evidenceMap: EvidenceMapNod
 
 function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[]): string[] {
   const failures: string[] = []; const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
-  const checkBound = (label: string, item: BoundStrategyText) => { const node = byId.get(item?.evidence_node_id); if (!node) failures.push(label + ": unknown evidence_node_id " + item?.evidence_node_id); else if (!["PROVEN", "PARTIALLY_PROVEN"].includes(node.status)) failures.push(label + ": evidence node is not provable."); };
+  const checkBound = (label: string, item: BoundStrategyText) => { const node = byId.get(item?.evidence_node_id); if (!node) failures.push(label + ": unknown evidence_node_id " + item?.evidence_node_id);
+    else if (!["PROVEN", "PARTIALLY_PROVEN"].includes(node.status)) failures.push(label + ": evidence node is not provable.");
+    else if (!Array.isArray(item?.supporting_fact_ids) || item.supporting_fact_ids.length === 0 || item.supporting_fact_ids.some((id: string) => !node.supporting_facts.some((f) => f.fact_id === id))) failures.push(label + ": supporting_fact_ids must reference atomic facts on the bound evidence node."); };
   checkBound("strongestValueProposition", strategy.strongestValueProposition);
   strategy.strengthsToLeverage.forEach((x, i) => checkBound("strengthsToLeverage[" + i + "]", x));
   strategy.interviewPriorities.forEach((x, i) => checkBound("interviewPriorities[" + i + "]", x));
@@ -589,6 +595,10 @@ function internalDiagnostics(strategy: InternalStrategy, evidenceMap: EvidenceMa
   if (strategy.storiesToPrepare.length !== 3) failures.push("storiesToPrepare must contain exactly 3 items.");
   if (strategy.interviewPriorities.length === 3 && new Set(strategy.interviewPriorities.map((x) => x.evidence_node_id)).size !== 3) failures.push("interviewPriorities must bind to three distinct primary evidence nodes.");
   return failures;
+}
+
+function factIdsForNode(evidenceMap: EvidenceMapNode[], nodeId: string): string[] {
+  return (evidenceMap.find((node) => node.node_id === nodeId)?.supporting_facts ?? []).map((fact) => fact.fact_id).slice(0, 3);
 }
 
 function alignStrategyToAuthoritativePlan(
@@ -721,12 +731,14 @@ function alignStrategyToAuthoritativePlan(
     strongestValueProposition: {
       text: strongestValid ? strongestText : centralValueForTensions(strongestNode || tensions[0]),
       evidence_node_id: strongest?.evidence_node_id || tensions[0].primary_evidence_node_id,
+      supporting_fact_ids: strongest?.supporting_fact_ids?.length ? strongest.supporting_fact_ids : (tensions[0].supporting_fact_ids ?? factIdsForNode(evidenceMap, tensions[0].primary_evidence_node_id)),
     },
     interviewPriorities: tensions.map((t, index) => {
       const generated = strategy.interviewPriorities?.[index]?.text?.trim() || fallbackPriority(t);
       return {
         text: modeBoundary(generated, t),
         evidence_node_id: t.primary_evidence_node_id,
+        supporting_fact_ids: t.supporting_fact_ids,
       };
     }),
     storiesToPrepare: tensions.map((t, index) => {
@@ -741,6 +753,7 @@ function alignStrategyToAuthoritativePlan(
       return {
         text: overlap >= 0.72 ? bounded + " " + retrievalCue : bounded,
         evidence_node_id: t.primary_evidence_node_id,
+        supporting_fact_ids: t.supporting_fact_ids,
       };
     }),
     // Preserve candidate-facing wording produced by Pass 2. The authoritative
@@ -845,11 +858,11 @@ function strategicModeDiagnostics(strategy: InternalStrategy, authoritativePlan:
   return [...new Set(failures)];
 }
 
-function collectFaithfulnessClaims(strategy: InternalStrategy): Array<{ claim_id: string; text: string; evidence_node_id: string }> {
-  const claims: Array<{ claim_id: string; text: string; evidence_node_id: string }> = [{ claim_id: "strongestValueProposition", text: strategy.strongestValueProposition.text, evidence_node_id: strategy.strongestValueProposition.evidence_node_id }];
-  strategy.strengthsToLeverage.forEach((x, i) => claims.push({ claim_id: "strengthsToLeverage[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
-  strategy.interviewPriorities.forEach((x, i) => claims.push({ claim_id: "interviewPriorities[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
-  strategy.storiesToPrepare.forEach((x, i) => claims.push({ claim_id: "storiesToPrepare[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id }));
+function collectFaithfulnessClaims(strategy: InternalStrategy): Array<{ claim_id: string; text: string; evidence_node_id: string; supporting_fact_ids: string[] }> {
+  const claims: Array<{ claim_id: string; text: string; evidence_node_id: string }> = [{ claim_id: "strongestValueProposition", text: strategy.strongestValueProposition.text, evidence_node_id: strategy.strongestValueProposition.evidence_node_id, supporting_fact_ids: strategy.strongestValueProposition.supporting_fact_ids }];
+  strategy.strengthsToLeverage.forEach((x, i) => claims.push({ claim_id: "strengthsToLeverage[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
+  strategy.interviewPriorities.forEach((x, i) => claims.push({ claim_id: "interviewPriorities[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
+  strategy.storiesToPrepare.forEach((x, i) => claims.push({ claim_id: "storiesToPrepare[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
   return claims;
 }
 
@@ -864,7 +877,7 @@ function shadowLexicalGroundingReport(strategy: InternalStrategy, evidenceMap: E
 }
 async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMap: EvidenceMapNode[], authoritativePlan: StrategicPlan | null = null): Promise<{ ok: boolean; diagnostics: string[] }> {
   const claims = collectFaithfulnessClaims(strategy); const byId = new Map(evidenceMap.map((n) => [n.node_id, n]));
-  const invalid = claims.filter((c) => { const node = byId.get(c.evidence_node_id); return !node || !["PROVEN", "PARTIALLY_PROVEN"].includes(node.status); });
+  const invalid = claims.filter((c) => { const node = byId.get(c.evidence_node_id); const validIds = new Set((node?.supporting_facts ?? []).map((f) => f.fact_id)); return !node || !["PROVEN", "PARTIALLY_PROVEN"].includes(node.status) || !Array.isArray(c.supporting_fact_ids) || c.supporting_fact_ids.length === 0 || c.supporting_fact_ids.some((id) => !validIds.has(id)); });
   if (invalid.length) return { ok: false, diagnostics: invalid.map((c) => c.claim_id + ": invalid or non-provable evidence binding.") };
   const tensionByNode = new Map((authoritativePlan?.tensions ?? []).map((t) => [t.primary_evidence_node_id, t]));
   const payload = claims.map((c) => {
@@ -874,6 +887,7 @@ async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMa
       claim: c.text,
       evidence_node_id: c.evidence_node_id,
       evidence_fact: byId.get(c.evidence_node_id)!.fact,
+      supporting_facts: (byId.get(c.evidence_node_id)!.supporting_facts ?? []).filter((fact) => c.supporting_fact_ids.includes(fact.fact_id)).map((fact) => ({ fact_id: fact.fact_id, fact: fact.fact, category: fact.category, exact_source_text: fact.exact_source_text })),
       strategic_context: tension ? {
         mode: tension.mode,
         target_requirement: tension.target_requirement,
@@ -884,7 +898,7 @@ async function verifyEvidenceFaithfulness(strategy: InternalStrategy, evidenceMa
       } : null,
     };
   });
-  const system = "You are Interview Mirror's evidence-faithfulness verifier. Check whether each candidate-facing statement is faithful to the exact evidence fact it cites while preserving the authoritative strategic context. The evidence fact is the hard boundary for candidate-specific facts. Natural paraphrases and directly supported implications are faithful; literal word overlap is not required. Mark false only when the statement asserts or clearly implies an unsupported candidate-specific employer, tool/system usage, standards knowledge, mastery/expertise, industry experience, metric, date, geography, scope, ownership, responsibility, qualification, or outcome. IMPORTANT: strategic statements are allowed to mention the target-role requirement, interviewer doubt, or a missing qualification when they are explicitly framed as a requirement, doubt, transferability issue, or verification point. Do NOT treat mention of a job requirement as candidate experience. For TRANSFERABLE, the statement must preserve transfer/adaptation framing and must not claim target-domain experience. For VERIFY_GAP, the statement may explicitly say the requirement remains to be verified/established and must not present it as candidate experience. A preparation instruction such as “prepare an example” is not itself a factual claim; evaluate only candidate facts asserted inside it. Use the strategic_context to distinguish role requirements from candidate facts. Return exactly one check for every claim_id.";
+  const system = "You are Interview Mirror's evidence-faithfulness verifier. Check whether each candidate-facing statement is faithful to the exact atomic evidence facts and their exact CV source text that it cites while preserving the authoritative strategic context. The evidence facts and their exact_source_text are the hard boundary for candidate-specific facts. Natural paraphrases and directly supported implications are faithful; literal word overlap is not required. Mark false only when the statement asserts or clearly implies an unsupported candidate-specific employer, tool/system usage, standards knowledge, mastery/expertise, industry experience, metric, date, geography, scope, ownership, responsibility, qualification, or outcome. IMPORTANT: strategic statements are allowed to mention the target-role requirement, interviewer doubt, or a missing qualification when they are explicitly framed as a requirement, doubt, transferability issue, or verification point. Do NOT treat mention of a job requirement as candidate experience. For TRANSFERABLE, the statement must preserve transfer/adaptation framing and must not claim target-domain experience. For VERIFY_GAP, the statement may explicitly say the requirement remains to be verified/established and must not present it as candidate experience. A preparation instruction such as “prepare an example” is not itself a factual claim; evaluate only candidate facts asserted inside it. Use the strategic_context to distinguish role requirements from candidate facts. Return exactly one check for every claim_id.";
   const raw = await requestStructuredJson(system, "Evaluate these claims against their bound evidence facts and strategic context:\n" + JSON.stringify(payload, null, 2), "evidence_faithfulness", FAITHFULNESS_SCHEMA, 0);
   const checks = Array.isArray(raw?.checks) ? raw.checks as FaithfulnessCheck[] : []; const byClaim = new Map(checks.map((c) => [c.claim_id, c])); const diagnostics: string[] = [];
   for (const claim of claims) { const check = byClaim.get(claim.claim_id); if (!check) diagnostics.push(claim.claim_id + ": verifier returned no check."); else if (!check.faithful) diagnostics.push(claim.claim_id + ": unsupported details: " + (check.unsupported_details?.join("; ") || "unspecified")); }
