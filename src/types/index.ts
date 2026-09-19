@@ -100,6 +100,7 @@ export type CvAnalysis = {
   summary: string;
   suggestedFocusAreas: string[];
   evidenceChain: EvidenceChainItem[];
+  jdRequirements?: CanonicalJDRequirement[];
   provenance?: AnalysisProvenance;
 };
 
