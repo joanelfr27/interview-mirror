@@ -4,6 +4,7 @@ export type StrategicTension = {
   id: string;
   mode: StrategicTensionMode;
   primary_evidence_node_id: string;
+  supporting_fact_ids: string[];
   target_requirement: string;
   interviewer_belief: string;
   interviewer_doubt: string;
