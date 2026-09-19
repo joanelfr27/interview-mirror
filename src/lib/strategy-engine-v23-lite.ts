@@ -71,13 +71,14 @@ const STRATEGIC_PLAN_SCHEMA = {
           id: { type: "string" },
           mode: { type: "string", enum: ["DIRECT","TRANSFERABLE","VERIFY_GAP"] },
           primary_evidence_node_id: { type: "string" },
+          supporting_fact_ids: { type: "array", items: { type: "string" }, minItems: 1 },
           target_requirement: { type: "string" },
           interviewer_belief: { type: "string" },
           interviewer_doubt: { type: "string" },
           allowed_positioning: { type: "string" },
           forbidden_inference: { type: "string" }
         },
-        required: ["id","mode","primary_evidence_node_id","target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]
+        required: ["id","mode","primary_evidence_node_id","supporting_fact_ids","target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]
       }
     },
     verification_points: { type: "array", items: { type: "string" } },
@@ -310,6 +311,14 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
     const node = byId.get(tension.primary_evidence_node_id);
     if (!node) errors.push(tension.id + ": unknown primary evidence node.");
     else if (!["PROVEN","PARTIALLY_PROVEN"].includes(node.status)) errors.push(tension.id + ": primary evidence must be provable.");
+    const boundFactIds = new Set((node?.supporting_facts ?? []).map((fact) => fact.fact_id));
+    if (!Array.isArray(tension.supporting_fact_ids) || tension.supporting_fact_ids.length < 1) {
+      errors.push(tension.id + ": supporting_fact_ids must contain at least one atomic fact_id.");
+    } else {
+      const uniqueFactIds = new Set(tension.supporting_fact_ids);
+      if (uniqueFactIds.size !== tension.supporting_fact_ids.length) errors.push(tension.id + ": supporting_fact_ids must be unique.");
+      for (const factId of tension.supporting_fact_ids) if (!boundFactIds.has(factId)) errors.push(tension.id + ": supporting_fact_id " + factId + " is not present on the bound evidence node.");
+    }
     if (seen.has(tension.primary_evidence_node_id)) errors.push("Strategic tensions must use distinct primary evidence nodes.");
     seen.add(tension.primary_evidence_node_id);
     for (const field of ["target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]) {
@@ -509,7 +518,8 @@ Build exactly 3 strategic tensions. A tension must connect:
 2) a specific interviewer belief,
 3) the most credible doubt the interviewer could have about that belief,
 4) one provable evidence node,
-5) an allowed way to position that evidence,
+5) the exact atomic fact_id values from that node that support this tension (one or more; use only IDs present in supporting_facts),
+6) an allowed way to position that evidence,
 6) an explicit forbidden inference.
 
 Use these modes:
@@ -523,6 +533,7 @@ Important:
 - Prefer non-obvious doubts about ownership, scope, depth, recency, scale, decision authority or transferability.
 - Do not manufacture a vulnerability just to sound insightful.
 - Preserve the distinction between evidence, requirement and strategic bridge.
+- supporting_fact_ids are mandatory provenance bindings. Never invent IDs; select only the atomic fact_id values present in the bound evidence node. Use the smallest sufficient set of facts.
 - Do not invent metrics, outcomes, tools, employers, industries, standards knowledge, dates or ownership.
 - The three tensions should be materially distinct.
 - The later strategy writer will receive ONLY this plan plus the evidence map. Do not rely on later generation to reinterpret the JD.
@@ -558,6 +569,7 @@ ${plan.candidate_positioning}
 Strategic tensions:
 ${plan.tensions.map((t, i) => `
 ${i + 1}. [${t.mode}] Evidence node ${t.primary_evidence_node_id}
+Supporting atomic facts: ${t.supporting_fact_ids.join(", ")}
 Target requirement: ${t.target_requirement}
 Interviewer belief: ${t.interviewer_belief}
 Interviewer doubt: ${t.interviewer_doubt}
