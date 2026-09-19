@@ -714,7 +714,7 @@ function alignStrategyToAuthoritativePlan(
         evidence_node_id: tension.primary_evidence_node_id,
         supporting_fact_ids: tension.supporting_fact_ids?.length
           ? tension.supporting_fact_ids
-          : factIdsForNode(nodeById.has(tension.primary_evidence_node_id) ? evidenceMap : evidenceMap, tension.primary_evidence_node_id),
+          : factIdsForNode(evidenceMap, tension.primary_evidence_node_id),
       };
     }),
 
