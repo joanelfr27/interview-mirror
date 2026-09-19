@@ -86,6 +86,16 @@ function classifyEvidenceType(item: EvidenceChainItem): EvidenceType {
 
 function classifyEvidenceStatus(item: EvidenceChainItem): EvidenceStatus {
   if (!item.cv_evidence || item.cv_evidence === "NO CV EVIDENCE FOUND") return "NOT_DOCUMENTED";
+
+  // "No gap identified" is not proof. The evidence node may only be treated as
+  // provable when the analysis also carries atomic facts with exact CV source text.
+  // This prevents an AI-generated cv_evidence sentence from becoming "PROVEN"
+  // merely because gap_identified happens to be "none".
+  const hasAtomicEvidence = (item.evidence_facts ?? []).some(
+    (fact) => isNonEmptyString(fact.fact) && isNonEmptyString(fact.exact_source_text)
+  );
+  if (!hasAtomicEvidence) return "UNKNOWN";
+
   const gap = (item.gap_identified ?? "").trim().toLowerCase();
   const hasGapNote = Boolean(gap) && gap !== "none" && gap !== "aucun" && !/no gap|aucun écart/i.test(gap);
   if (PARTIAL_EVIDENCE_PATTERN.test(item.cv_evidence) || (hasGapNote && PARTIAL_EVIDENCE_PATTERN.test(gap))) return "PARTIALLY_PROVEN";
