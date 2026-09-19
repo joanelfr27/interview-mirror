@@ -86,13 +86,6 @@ const auditCases = [
 ];
 
 export default function NemotronLabPage() {
-  const [status, setStatus] = useState("Running synthetic test…");
-  const [result, setResult] = useState<Tension[]>([]);
-  const [deepSeekResult, setDeepSeekResult] = useState<Tension[]>([]);
-  const [overall, setOverall] = useState("");
-  const [deepSeekOverall, setDeepSeekOverall] = useState("");
-  const [error, setError] = useState("");
-
   const [caseIndex, setCaseIndex] = useState(0);
   const [status, setStatus] = useState("Ready");
   const [result, setResult] = useState<Tension[]>([]);
@@ -252,11 +245,6 @@ export default function NemotronLabPage() {
             </div>
           </div>
 
-
-            <div className="mt-8 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">
-              Waiting for the model response…
-            </div>
-          ) : null}
         </div>
       </div>
     </main>
