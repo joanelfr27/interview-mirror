@@ -615,6 +615,7 @@ function factIdsForNode(evidenceMap: EvidenceMapNode[], nodeId: string): string[
 
 function alignStrategyToAuthoritativePlan(
   strategy: InternalStrategy,
+  evidenceMap: EvidenceMapNode[],
   authoritativePlan: StrategicPlan | null,
   language: SessionLanguage,
 ): InternalStrategy {
@@ -1084,7 +1085,7 @@ Interview date: ${session.interview_date ?? "Not provided"}
 
 Generate the complete strategy.`;
   const raw = await requestStructuredJson(system, user, "strategy_pass2", PASS2_SCHEMA, 0.2) as InternalStrategy;
-  return alignStrategyToAuthoritativePlan(raw, authoritativePlan, language);
+  return alignStrategyToAuthoritativePlan(raw, evidenceMap, authoritativePlan, language);
 }
 
 async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: EvidenceMapNode[], analysis: StrategicAnalysis, language: SessionLanguage, authoritativeStrategicPlan = "", authoritativePlan: StrategicPlan | null = null): Promise<InterviewStrategy> {
