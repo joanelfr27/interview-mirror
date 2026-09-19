@@ -150,8 +150,6 @@ export default function NemotronLabPage() {
                 </div>
               </article>
             ))}
-            ))}
-
             <div className="space-y-5">
               {deepSeekResult.map((tension, index) => (
                 <article key={index} className="rounded-xl border p-5">
