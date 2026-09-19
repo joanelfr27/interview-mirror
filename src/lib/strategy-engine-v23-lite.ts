@@ -397,10 +397,10 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
       interview_implication: "Use this documented evidence to test a distinct interviewer belief; do not treat the target-role requirement as candidate fact.",
       actionable_recommendation: "Anchor the strategy to the documented facts and preserve the relationships between them.",
       canonical_jd_requirements: block.canonical_jd_requirements.slice(0, 8).map((requirement) => ({
-        requirement_id: canonicalize(requirement.requirement_id),
+        requirement_id: requirement.requirement_id,
         capability: clampWords(requirement.capability, 20),
-        requirement_type: normalizeRequirementType(canonicalize(requirement.requirement_type)),
-        required_level: normalizeRequiredLevel(canonicalize(requirement.required_level)),
+        requirement_type: normalizeRequirementType(requirement.requirement_type),
+        required_level: normalizeRequiredLevel(requirement.required_level),
         exact_jd_source_text: requirement.exact_jd_source_text
       })),
       evidence_facts: block.facts.slice(0, 5).map((fact, factIndex) => ({
@@ -409,9 +409,9 @@ function evidenceToChain(pack: CandidateEvidencePack, jobDescription: string) {
         category: fact.category,
         exact_source_text: fact.exact_source_text,
         requirement_relations: fact.requirement_relations.slice(0, 6).map((relation) => ({
-          requirement_id: canonicalize(relation.requirement_id),
-          relation: normalizeRelationType(canonicalize(relation.relation)),
-          documented_level: normalizeDocumentedLevel(canonicalize(relation.documented_level)),
+          requirement_id: relation.requirement_id,
+          relation: normalizeRelationType(relation.relation),
+          documented_level: normalizeDocumentedLevel(relation.documented_level),
           exact_cv_source_text: relation.exact_cv_source_text
         }))
       }))
