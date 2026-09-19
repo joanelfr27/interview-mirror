@@ -28,6 +28,7 @@ type CandidateEvidenceItem = {
 };
 
 type CandidateEvidencePack = {
+  canonical_jd_requirements: CanonicalJDRequirement[];
   evidence: CandidateEvidenceItem[];
 };
 
@@ -35,6 +36,20 @@ type CandidateEvidencePack = {
 const EVIDENCE_SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
+    canonical_jd_requirements: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        properties: {
+          requirement_id: { type: "string" },
+          capability: { type: "string" },
+          requirement_type: { type: "string", enum: ["CAPABILITY","STANDARD","RESPONSIBILITY","DOMAIN","TOOL","QUALIFICATION"] },
+          required_level: { type: "string", enum: ["PREFERRED","KNOWLEDGE","WORKING","ADVANCED","OWNERSHIP"] },
+          exact_jd_source_text: { type: "string" }
+        },
+        required: ["requirement_id","capability","requirement_type","required_level","exact_jd_source_text"]
+      }
+    },
     evidence: {
       type: "array",
       items: {
@@ -99,7 +114,7 @@ const EVIDENCE_SCHEMA = {
       }
     }
   },
-  required: ["evidence"]
+  required: ["canonical_jd_requirements","evidence"]
 } as const;
 
 const STRATEGIC_PLAN_SCHEMA = {
@@ -175,7 +190,8 @@ Rules:
 - The purpose is strategic retrieval, not CV summarization.
 - For each evidence block, identify 1 to 3 JD requirements that this evidence can legitimately inform. This is a retrieval link, not proof that the candidate meets the requirement.
 - If no legitimate JD alignment exists for an evidence block, leave JD-linked arrays empty for that block.
-- For each evidence block, emit canonical_jd_requirements derived only from JD wording (requirement_id, capability, requirement_type, required_level, exact_jd_source_text).
+- First emit one canonical_jd_requirements registry covering the material requirements actually stated in the JD. This registry is the authoritative requirement set, including requirements for which the CV has no evidence.
+- For each evidence block, canonical_jd_requirements may repeat only the requirements that are relevant to that block; these are references to the same canonical requirement_id values.
 - For each fact, emit requirement_relations tied to requirement_id with relation DIRECT or RELATED and documented_level derived only from exact CV wording.
 - DIRECT requires that exact_cv_source_text explicitly establishes the target capability/standard/responsibility/domain/tool/qualification named by the requirement.
 - RELATED indicates transferable or adjacent evidence that does not itself establish the requirement directly.
@@ -194,12 +210,25 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const system = buildEvidencePrompt(session, language);
   const user = "RAW CV:\n" + session.cv_text.slice(0, 14000) + "\n\nTARGET JOB DESCRIPTION (context only; never treat it as candidate evidence):\n" + jobDescription.slice(0, 9000);
   const raw = await requestStructuredJson(system, user, "candidate_evidence_v23", EVIDENCE_SCHEMA);
+  const canonicalJdRequirements = Array.isArray(raw?.canonical_jd_requirements)
+    ? raw.canonical_jd_requirements as CanonicalJDRequirement[]
+    : [];
   const evidence = Array.isArray(raw?.evidence) ? raw.evidence as CandidateEvidenceItem[] : [];
   if (evidence.length < 6) throw new Error("Candidate evidence extraction returned fewer than 6 evidence blocks.");
   const normalizeEvidenceText = (value: string) => canonicalize(value).toLowerCase().replace(/[^a-zà-ÿ0-9]+/g, " ").trim();
   const normalizedCv = normalizeEvidenceText(session.cv_text);
   const normalizedJd = normalizeEvidenceText(jobDescription);
-  const valid = evidence.every((item) =>
+  const validRequirements = canonicalJdRequirements.length === 0 && hasJobDescription
+    ? false
+    : canonicalJdRequirements.every((requirement) =>
+        requirement.requirement_id?.trim()
+        && requirement.capability?.trim()
+        && requirement.requirement_type?.trim()
+        && requirement.required_level?.trim()
+        && requirement.exact_jd_source_text?.trim()
+      );
+
+  const valid = validRequirements && evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
     item.canonical_jd_requirements.every((requirement) =>
@@ -291,6 +320,21 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   );
   if (!repairedValid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
 
+  const requirementIds = new Set<string>();
+  for (const requirement of canonicalJdRequirements) {
+    if (requirementIds.has(requirement.requirement_id)) {
+      throw new Error("Candidate evidence extraction returned duplicate canonical JD requirement_id values.");
+    }
+    requirementIds.add(requirement.requirement_id);
+    if (!hasJobDescription) {
+      throw new Error("Candidate evidence extraction returned canonical JD requirements without JD context.");
+    }
+    const jdSource = normalizeEvidenceText(requirement.exact_jd_source_text);
+    if (!jdSource || !normalizedJd.includes(jdSource)) {
+      throw new Error("Candidate evidence extraction produced canonical JD exact_jd_source_text not found in the supplied JD.");
+    }
+  }
+
   // Zero-hallucination boundary: every extracted fact must point back to text
   // that actually exists in the supplied CV. The model may summarize that source
   // into "fact", but it cannot invent the source passage itself.
@@ -364,7 +408,10 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       }
     }
   }
-  return { evidence: repairedEvidence.slice(0, 10) };
+  return {
+    canonical_jd_requirements: canonicalJdRequirements,
+    evidence: repairedEvidence.slice(0, 10),
+  };
 }
 
 function jdRequirementGrounding(requirement: string, jobDescription: string): boolean {
@@ -904,7 +951,11 @@ export async function runStrategyEngineV23Lite(session: SessionRecord): Promise<
   const evidenceSession: SessionRecord = {
     ...session,
     cv_analysis: session.cv_analysis
-      ? { ...session.cv_analysis, evidenceChain: evidenceToChain(pack, session.job_description) }
+      ? {
+          ...session.cv_analysis,
+          evidenceChain: evidenceToChain(pack, session.job_description),
+          jdRequirements: pack.canonical_jd_requirements,
+        }
       : undefined
   } as SessionRecord;
 
