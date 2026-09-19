@@ -11,6 +11,7 @@ import type {
   SessionRecord
 } from "@/types";
 import { buildEvidenceMap, runStrategyEngineV2 } from "@/lib/strategy-engine";
+import type { EvidenceMapNode } from "@/lib/strategy-engine";
 import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
 type CandidateEvidenceItem = {
