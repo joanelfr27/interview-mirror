@@ -128,6 +128,7 @@ const STRATEGIC_PLAN_SCHEMA = {
         properties: {
           id: { type: "string" },
           mode: { type: "string", enum: ["DIRECT","TRANSFERABLE","VERIFY_GAP"] },
+          target_requirement_id: { type: "string" },
           primary_evidence_node_id: { type: "string" },
           supporting_fact_ids: { type: "array", items: { type: "string" }, minItems: 1 },
           target_requirement: { type: "string" },
@@ -136,7 +137,7 @@ const STRATEGIC_PLAN_SCHEMA = {
           allowed_positioning: { type: "string" },
           forbidden_inference: { type: "string" }
         },
-        required: ["id","mode","primary_evidence_node_id","supporting_fact_ids","target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]
+        required: ["id","mode","target_requirement_id","primary_evidence_node_id","supporting_fact_ids","target_requirement","interviewer_belief","interviewer_doubt","allowed_positioning","forbidden_inference"]
       }
     },
     verification_points: { type: "array", items: { type: "string" } },
@@ -272,6 +273,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     );
     const mapCanonicalFromRequirements = (requirements: string[]) => {
       const seen = new Set<string>();
+  const rankedRequirements = new Map(rankRequirementEvidence(evidenceMap).map((entry) => [entry.requirement.requirement_id, entry]));
       return requirements
         .map((requirement) => canonicalBySource.get(normalizeEvidenceText(requirement)))
         .filter((requirement): requirement is CanonicalJDRequirement => Boolean(requirement))
@@ -527,6 +529,12 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   for (const tension of plan.tensions ?? []) {
     if (!tension || !tension.id?.trim()) { errors.push("Every tension requires an id."); continue; }
     if (!["DIRECT","TRANSFERABLE","VERIFY_GAP"].includes(tension.mode)) errors.push(tension.id + ": invalid mode.");
+    const rankedRequirement = rankedRequirements.get(tension.target_requirement_id);
+    if (!rankedRequirement) errors.push(tension.id + ": unknown target_requirement_id.");
+    else if (rankedRequirement.mode !== tension.mode) errors.push(tension.id + ": mode does not match deterministic requirement evidence classification.");
+    else if (tension.mode !== "VERIFY_GAP" && !rankedRequirement.candidates.some((candidate) => candidate.node_id === tension.primary_evidence_node_id && candidate.fact_id && tension.supporting_fact_ids.includes(candidate.fact_id))) {
+      errors.push(tension.id + ": selected evidence is not among the deterministic candidates for target_requirement_id.");
+    }
     const node = byId.get(tension.primary_evidence_node_id);
     if (!node) errors.push(tension.id + ": unknown primary evidence node.");
     else if (!["PROVEN","PARTIALLY_PROVEN"].includes(node.status)) errors.push(tension.id + ": primary evidence must be provable.");
@@ -870,7 +878,8 @@ Build exactly 3 strategic tensions. A tension must connect:
 2) a specific interviewer belief,
 3) the most credible doubt the interviewer could have about that belief,
 4) one provable evidence node,
-5) the exact atomic fact_id values from that node that support this tension (one or more; use only IDs present in supporting_facts),
+5) the canonical requirement_id selected from the deterministic candidate set,
+6) the exact atomic fact_id values from that node that support this tension (one or more; use only IDs present in supporting_facts),
 6) an allowed way to position that evidence,
 7) an explicit forbidden inference.
 
@@ -885,6 +894,7 @@ Important:
 - Prefer non-obvious doubts about ownership, scope, depth, recency, scale, decision authority or transferability.
 - Do not manufacture a vulnerability just to sound insightful.
 - Preserve the distinction between evidence, requirement and strategic bridge.
+- target_requirement_id is mandatory provenance binding to the deterministic candidate set. Never invent it or substitute an unranked requirement.
 - supporting_fact_ids are mandatory provenance bindings. Never invent IDs; select only the atomic fact_id values present in the bound evidence node. Use the smallest sufficient set of facts.
 - Do not invent metrics, outcomes, tools, employers, industries, standards knowledge, dates or ownership.
 - The three tensions should be materially distinct.
@@ -922,7 +932,7 @@ ${plan.candidate_positioning}
 
 Strategic tensions:
 ${plan.tensions.map((t, i) => `
-${i + 1}. [${t.mode}] Evidence node ${t.primary_evidence_node_id}
+${i + 1}. [${t.mode}] Requirement ${t.target_requirement_id} — Evidence node ${t.primary_evidence_node_id}
 Supporting atomic facts: ${t.supporting_fact_ids.join(", ")}
 Target requirement: ${t.target_requirement}
 Interviewer belief: ${t.interviewer_belief}
