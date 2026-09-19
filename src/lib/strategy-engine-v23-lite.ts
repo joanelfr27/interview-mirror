@@ -842,13 +842,14 @@ Important:
 - Do not invent metrics, outcomes, tools, employers, industries, standards knowledge, dates or ownership.
 - The three tensions should be materially distinct.
 - The later strategy writer will receive ONLY this plan plus the evidence map. Do not rely on later generation to reinterpret the JD.
+- A deterministic requirement-to-evidence candidate set is supplied below. Select target requirements and evidence only from these candidates. Do not search the raw evidence map for a stronger unranked candidate.
+- DIRECT candidates require a validated atomic DIRECT relation with bound CV provenance. TRANSFERABLE candidates require a validated RELATED relation. If no direct candidate exists, the requirement is explicitly marked VERIFY_GAP; do not manufacture a proof objective from a merely related or keyword-associated fact.
+- Requirement association hints and lexical overlap are corroboration only. They never create or upgrade DIRECT evidence.
 
 Return the complete schema.
 `;
 
-  const user = "EVIDENCE MAP (complete candidate-fact boundary):\n" + JSON.stringify(evidenceMap, null, 2) +
-    "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +
-    "\n\nCreate the authoritative strategic plan.";
+  const rankedRequirementEvidence = rankRequirementEvidence(evidenceMap);\n  const user = "DETERMINISTIC REQUIREMENT-TO-EVIDENCE CANDIDATES (authoritative selection boundary):\n" + serializeRankedRequirementEvidence(rankedRequirementEvidence) +\n    "\n\nEVIDENCE MAP (complete candidate-fact boundary; use only to inspect the cited atomic facts):\n" + JSON.stringify(evidenceMap, null, 2) +\n    "\n\nRAW JOB DESCRIPTION:\n" + session.job_description.slice(0, 9000) +\n    "\n\nCreate the authoritative strategic plan.";
 
   let lastErrors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt++) {
