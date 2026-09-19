@@ -27,6 +27,7 @@ export type EvidenceChainItem = {
   gap_identified: string;
   interview_implication: string;
   actionable_recommendation: string;
+  evidence_facts?: EvidenceChainFact[];
 };
 
 export type SessionRecord = {
