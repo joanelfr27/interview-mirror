@@ -657,22 +657,21 @@ function alignStrategyToAuthoritativePlan(
 
   const storyRetrievalFocus = (t: StrategicPlan["tensions"][number]) => {
     const doubt = t.interviewer_doubt.toLowerCase();
-    const frFocus = /ownership|responsabil|rôle personnel|implication/.test(doubt)
-      ? "Avant l'entretien, retrouvez un exemple où votre rôle personnel est identifiable et préparez la séquence situation → action personnelle → résultat."
+    const fr = normalizeLanguage(language) === "fr";
+    return /ownership|responsabil|rôle personnel|implication|role personnel/.test(doubt)
+      ? (fr ? "Avant l'entretien, retrouvez un exemple où votre rôle personnel est identifiable et préparez la séquence situation → action personnelle → résultat." : "Before the interview, retrieve an example where your personal role is clear and prepare the sequence situation → personal action → result.")
       : /scope|périmètre|perimeter/.test(doubt)
-        ? "Avant l'entretien, retrouvez un exemple dont le périmètre est clair et préparez le contexte, votre niveau d'intervention et les interlocuteurs concernés."
+        ? (fr ? "Avant l'entretien, retrouvez un exemple dont le périmètre est clair et préparez le contexte, votre niveau d'intervention et les interlocuteurs concernés." : "Before the interview, retrieve an example with a clear scope and prepare the context, your level of involvement, and the stakeholders involved.")
         : /scale|échelle|volume|ampleur/.test(doubt)
-          ? "Avant l'entretien, retrouvez un exemple permettant de situer l'ampleur de votre intervention et préparez les éléments de contexte disponibles."
+          ? (fr ? "Avant l'entretien, retrouvez un exemple permettant de situer l'ampleur de votre intervention et préparez les éléments de contexte disponibles." : "Before the interview, retrieve an example that shows the scale of your involvement and prepare the available contextual details.")
           : /depth|profondeur|niveau|expertise|maîtrise|connaissance/.test(doubt)
-            ? "Avant l'entretien, retrouvez un exemple qui montre ce que vous avez réellement pratiqué et préparez ce que vous pouvez démontrer concrètement, sans extrapoler."
+            ? (fr ? "Avant l'entretien, retrouvez un exemple qui montre ce que vous avez réellement pratiqué et préparez ce que vous pouvez démontrer concrètement, sans extrapoler." : "Before the interview, retrieve an example that shows what you actually practiced and prepare what you can demonstrate concretely, without extrapolating.")
             : /recen|recent|current/.test(doubt)
-              ? "Avant l'entretien, retrouvez l'exemple le plus récent et préparez clairement sa période, son contexte et votre rôle."
+              ? (fr ? "Avant l'entretien, retrouvez l'exemple le plus récent et préparez clairement sa période, son contexte et votre rôle." : "Before the interview, retrieve the most recent example and prepare its timing, context, and your role clearly.")
               : /transfer|transpos|transfér|applicable|mobilis|sector|secteur|industry|domaine/.test(doubt)
-                ? "Avant l'entretien, retrouvez un exemple permettant d'expliquer le lien entre votre expérience documentée et l'exigence cible, sans revendiquer l'expérience sectorielle non établie."
-                : "Avant l'entretien, retrouvez un exemple précis et préparez votre rôle, l'action réalisée et le résultat documenté.";
-    return frFocus;
+                ? (fr ? "Avant l'entretien, retrouvez un exemple permettant d'expliquer le lien entre votre expérience documentée et l'exigence cible, sans revendiquer l'expérience sectorielle non établie." : "Before the interview, retrieve an example that explains the link between your documented experience and the target requirement, without claiming unestablished sector experience.")
+                : (fr ? "Avant l'entretien, retrouvez un exemple précis et préparez votre rôle, l'action réalisée et le résultat documenté." : "Before the interview, retrieve a precise example and prepare your role, the action taken, and the documented result.");
   };
-
   const communicationFocusForTensions = () => fr
     ? "Dans chaque réponse, commencez par le fait documenté, explicitez votre rôle et reliez-le à l'exigence visée. Pour les capacités transférables, nommez le lien d'adaptation ; pour les points à vérifier, dites clairement ce qui reste à établir."
     : "In each answer, start with the documented fact, clarify your role, and connect it to the target requirement. For transferable capabilities, name the adaptation link; for points to verify, state clearly what remains to be established.";
