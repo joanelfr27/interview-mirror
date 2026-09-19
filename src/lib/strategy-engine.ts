@@ -294,22 +294,24 @@ function hasSpecificPriorityAnchors(strategy: any, cvText: string, jobDescriptio
   return strategy.interviewPriorities.every((priority: unknown, index: number) => {
     if (typeof priority !== "string") return false;
 
-    // The authoritative Pass 1 proof objective identifies the exact evidence node
-    // for this priority. Fall back to positional mapping only when that metadata
-    // is unavailable (e.g. legacy persisted validation).
+    // During fresh generation, the authoritative Pass 1 proof objective identifies
+    // the exact evidence node. Persisted public strategies intentionally do not expose
+    // node IDs, so cache validation must not guess by array position. Instead, when the
+    // authoritative metadata is unavailable, accept only a priority that anchors to
+    // BOTH evidence and the JD requirement on the SAME evidence node.
     const primaryNodeId = strategicAnalysis?.proofObjectives?.[index]?.primary_evidence_node_id;
-    const node = primaryNodeId ? evidenceById.get(primaryNodeId) : evidenceMap[index];
-    if (!node) return false;
+    const candidateNodes = primaryNodeId
+      ? [evidenceById.get(primaryNodeId)].filter((node): node is EvidenceMapNode => Boolean(node))
+      : evidenceMap;
 
-    const boundEvidenceTokens = distinctiveTokens(node.fact);
     const priorityTokens = distinctiveTokens(priority);
-    const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
-
-    // Role specificity must come from the JD requirement bound to the same evidence node.
-    const requirementTokens = distinctiveTokens(node.jd_requirement);
-    const roleOverlap = [...requirementTokens].filter((token) => priorityTokens.has(token));
-
-    return evidenceOverlap.length >= 1 && roleOverlap.length >= 1;
+    return candidateNodes.some((node) => {
+      const boundEvidenceTokens = distinctiveTokens(node.fact);
+      const evidenceOverlap = [...boundEvidenceTokens].filter((token) => priorityTokens.has(token));
+      const requirementTokens = distinctiveTokens(node.jd_requirement);
+      const roleOverlap = [...requirementTokens].filter((token) => priorityTokens.has(token));
+      return evidenceOverlap.length >= 1 && roleOverlap.length >= 1;
+    });
   });
 }
 function hasPresentationArtifacts(text: string): boolean { return /\b(?:expérience pertinente|point d'ancrage|evidence anchor)\s*:/i.test(text); }
