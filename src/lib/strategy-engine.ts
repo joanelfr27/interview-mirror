@@ -1069,6 +1069,8 @@ You are Interview Mirror's senior interview strategy writer. A validated strateg
 
 Rules:
 - candidatePositioning is role-specific, not a CV summary.
+- LANGUAGE HARD BOUNDARY: every candidate-facing output field must be entirely in the selected preparation language. The JD may be supplied in another language, but never copy raw JD wording into candidate-facing strategy. Translate or paraphrase requirements, doubts and positioning into the selected language.
+- Evidence source text may remain verbatim only when it is explicitly presented as a source quotation/evidence reference. Do not silently embed English or French source phrases into otherwise translated strategic prose.
 - strongestValueProposition is one central message bound to a real evidence node.
 - strengthsToLeverage are established advantages bound to evidence.
 - interviewPriorities are EXACTLY 3 in the same order as the authoritative plan's three tensions and bind to their primary evidence.
@@ -1089,6 +1091,7 @@ Rules:
 - QUALIFICATION is not employment experience.
 - Distinguish what must be demonstrated from what could cause doubt.
 - Natural paraphrase is encouraged.
+- Treat target_requirement in the authoritative plan as a candidate-facing paraphrase, not as permission to copy the exact JD source. If the exact JD source and target_requirement differ in language, always use target_requirement in the candidate-facing output.
 ${strategicPlanBlock}${diagnosticBlock}`;
   const user = `AUTHORITATIVE STRATEGIC PLAN:
 ${authoritativeStrategicPlan}
