@@ -302,8 +302,6 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
     errors.push("verification_points must contain only non-empty strings.");
   }
-  const fr = normalizeLanguage(language) === "fr";
-  const fr = normalizeLanguage(language) === "fr";
   const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
   const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
   const directClaimPattern = /(?:expérience|experience)\s+(?:minière|dans le secteur|en project finance|de project finance|mining|in mining|in project finance|in the target sector)|(?:maîtrise|mastery|expertise)\s+(?:du secteur|minière|de project finance|of the sector|of project finance)/i;
@@ -476,13 +474,18 @@ function normalizeStrategicPlanGrounding(plan: StrategicPlan, evidenceMap: Retur
     ? verificationPoints
     : normalized.tensions.map((tension) =>
         tension.mode === "VERIFY_GAP"
-          ? `À confirmer pendant l'entretien : ${clampWords(tension.target_requirement, 20)}.`
-          : `À établir pendant l'entretien : le niveau de ${clampWords(tension.target_requirement, 18)} que l'élément documenté permet de démontrer.`
+          ? (fr
+            ? `À confirmer pendant l'entretien : ${clampWords(tension.target_requirement, 20)}.`
+            : `Confirm during the interview: ${clampWords(tension.target_requirement, 20)}.`)
+          : (fr
+            ? `À établir pendant l'entretien : le niveau de ${clampWords(tension.target_requirement, 18)} que l'élément documenté permet de démontrer.`
+            : `Establish during the interview: the level of ${clampWords(tension.target_requirement, 18)} that the documented evidence supports.`)
       );
   return { ...normalized, verification_points: groundedVerificationPoints };
 }
 
 function normalizeStrategicPlanModeLanguage(plan: StrategicPlan, language: SessionLanguage): StrategicPlan {
+  const fr = normalizeLanguage(language) === "fr";
   // Deterministic wording repair only. This never changes the selected mode,
   // evidence node, requirement, or factual content; it makes the mode boundary
   // explicit so downstream validators and the strategy writer cannot miss it.
