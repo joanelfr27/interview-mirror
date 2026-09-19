@@ -15,7 +15,7 @@ function isValidQuestionSet(data: unknown, strategy: unknown): data is { questio
     ...(Array.isArray(s?.gapDefenseStrategy) ? s.gapDefenseStrategy : []),
     ...(typeof s?.strongestValueProposition === "string" ? [s.strongestValueProposition] : []),
   ].filter((value): value is string => typeof value === "string" && value.trim().length > 0));
-  const generic = /\\b(tell me about yourself|why do you want this job|what are your strengths|what are your weaknesses|where do you see yourself|why should we hire you|team conflict|conflict with a colleague|leadership style|hobbies)\\b/i;
+  const generic = /\b(tell me about yourself|why do you want this job|what are your strengths|what are your weaknesses|where do you see yourself|why should we hire you|team conflict|conflict with a colleague|leadership style|hobbies)\b/i;
   return questions.every((item) => {
     if (!item || typeof item !== "object") return false;
     const question = (item as { question?: unknown }).question;
