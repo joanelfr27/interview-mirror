@@ -174,6 +174,7 @@ Rules:
 - Facts should be concise enough for downstream strategic reasoning.
 - The purpose is strategic retrieval, not CV summarization.
 - For each evidence block, identify 1 to 3 JD requirements that this evidence can legitimately inform. This is a retrieval link, not proof that the candidate meets the requirement.
+- If no legitimate JD alignment exists for an evidence block, leave JD-linked arrays empty for that block.
 - For each evidence block, emit canonical_jd_requirements derived only from JD wording (requirement_id, capability, requirement_type, required_level, exact_jd_source_text).
 - For each fact, emit requirement_relations tied to requirement_id with relation DIRECT or RELATED and documented_level derived only from exact CV wording.
 - DIRECT requires that exact_cv_source_text explicitly establishes the target capability/standard/responsibility/domain/tool/qualification named by the requirement.
@@ -201,7 +202,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const valid = evidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
-    (!hasJobDescription || item.canonical_jd_requirements.length > 0) &&
     item.canonical_jd_requirements.every((requirement) =>
       requirement.requirement_id?.trim()
       && requirement.capability?.trim()
@@ -212,7 +212,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     Array.isArray(item.facts) && item.facts.length > 0 &&
     item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
-    (!hasJobDescription || item.relevant_jd_requirements.length > 0) &&
     item.relevant_jd_requirements.every((requirement) => requirement?.trim() && (!hasJobDescription || jdRequirementGrounding(requirement, jobDescription)))
   );
 
@@ -237,33 +236,47 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   };
   const repairedEvidence = evidence.map((item) => {
     if (!hasJobDescription) return { ...item, relevant_jd_requirements: [], canonical_jd_requirements: [] };
+    const canonicalBySource = new Map(
+      item.canonical_jd_requirements
+        .filter((requirement) => jdRequirementGrounding(requirement.exact_jd_source_text, jobDescription))
+        .map((requirement) => [normalizeEvidenceText(requirement.exact_jd_source_text), requirement] as const)
+    );
+    const mapCanonicalFromRequirements = (requirements: string[]) => {
+      const seen = new Set<string>();
+      return requirements
+        .map((requirement) => canonicalBySource.get(normalizeEvidenceText(requirement)))
+        .filter((requirement): requirement is CanonicalJDRequirement => Boolean(requirement))
+        .filter((requirement) => {
+          if (seen.has(requirement.requirement_id)) return false;
+          seen.add(requirement.requirement_id);
+          return true;
+        });
+    };
     const requirements = (item.relevant_jd_requirements ?? []).filter((r) => jdRequirementGrounding(r, jobDescription));
     if (requirements.length > 0) {
       const selected = requirements.slice(0, 3);
-      const selectedNorm = new Set(selected.map((requirement) => normalizeEvidenceText(requirement)));
-      const alignedCanonical = item.canonical_jd_requirements.filter((requirement) =>
-        selectedNorm.has(normalizeEvidenceText(requirement.exact_jd_source_text))
-        || selectedNorm.has(normalizeEvidenceText(requirement.capability))
-      );
+      const alignedCanonical = mapCanonicalFromRequirements(selected);
       return {
         ...item,
         relevant_jd_requirements: selected,
-        canonical_jd_requirements: (alignedCanonical.length > 0 ? alignedCanonical : item.canonical_jd_requirements)
-          .filter((requirement) => jdRequirementGrounding(requirement.exact_jd_source_text, jobDescription))
+        canonical_jd_requirements: alignedCanonical
       };
     }
     const factText = item.facts.map((f) => f.fact).join(" ");
     const best = jdSentences
       .map((sentence) => ({ sentence, score: Math.max(overlap(sentence, factText), overlap(sentence, item.source_text)) }))
       .sort((a, b) => b.score - a.score)[0];
-    if (!best || best.score < 0.12) return item;
-    return { ...item, relevant_jd_requirements: [best.sentence] };
+    if (!best || best.score < 0.12) return { ...item, relevant_jd_requirements: [], canonical_jd_requirements: [] };
+    return {
+      ...item,
+      relevant_jd_requirements: [best.sentence],
+      canonical_jd_requirements: mapCanonicalFromRequirements([best.sentence])
+    };
   });
 
   const repairedValid = repairedEvidence.every((item) =>
     item && typeof item.id === "string" && item.source_text?.trim() &&
     Array.isArray(item.canonical_jd_requirements) &&
-    (!hasJobDescription || item.canonical_jd_requirements.length > 0) &&
     item.canonical_jd_requirements.every((requirement) =>
       requirement.requirement_id?.trim()
       && requirement.capability?.trim()
@@ -274,7 +287,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     Array.isArray(item.facts) && item.facts.length > 0 &&
     item.facts.every((f) => f.fact?.trim() && f.exact_source_text?.trim() && Array.isArray(f.requirement_relations)) &&
     Array.isArray(item.relevant_jd_requirements) &&
-    (!hasJobDescription || item.relevant_jd_requirements.length > 0) &&
     item.relevant_jd_requirements.every((requirement) => requirement?.trim() && (!hasJobDescription || jdRequirementGrounding(requirement, jobDescription)))
   );
   if (!repairedValid) throw new Error("Candidate evidence extraction returned an invalid evidence pack.");
@@ -334,7 +346,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
         if (!relationSource || !normalizedCv.includes(relationSource)) {
           throw new Error("Candidate evidence extraction produced exact_cv_source_text not found in the supplied CV.");
         }
-        if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource) && provenanceOverlap(exactSource, relationSource) < 0.8) {
+        if (!source.includes(relationSource) && !relationSource.includes(source) && provenanceOverlap(source, relationSource) < 0.8) {
           throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
         }
         const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
