@@ -683,6 +683,132 @@ function normalizeStrategicPlanModeLanguage(plan: StrategicPlan, language: Sessi
   };
 }
 
+
+type RequirementEvidenceMode = "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
+
+type RankedRequirementEvidence = {
+  requirement: CanonicalJDRequirement;
+  mode: RequirementEvidenceMode;
+  candidates: Array<{
+    node_id: string;
+    fact_id: string | null;
+    fact: string;
+    category: string;
+    exact_source_text: string;
+    documented_level: DocumentedEvidenceLevel | null;
+    relation: FactRequirementRelationType | null;
+    relation_exact_source_text: string | null;
+    association_hint: boolean;
+  }>;
+};
+
+const DOCUMENTED_LEVEL_ORDER: Record<DocumentedEvidenceLevel, number> = {
+  MASTERY: 6,
+  OWNERSHIP: 5,
+  RESPONSIBILITY: 4,
+  PRACTICE: 3,
+  EXPOSURE: 2,
+  MENTION: 1,
+};
+
+const REQUIREMENT_CATEGORY_COMPATIBILITY: Record<JDRequirementType, Set<string>> = {
+  CAPABILITY: new Set(["RESPONSIBILITY", "ACHIEVEMENT", "PROCESS", "LEADERSHIP", "SCOPE"]),
+  STANDARD: new Set(["QUALIFICATION", "RESPONSIBILITY", "PROCESS", "ACHIEVEMENT"]),
+  RESPONSIBILITY: new Set(["RESPONSIBILITY", "ACHIEVEMENT", "PROCESS", "SCOPE", "STAKEHOLDER", "LEADERSHIP"]),
+  DOMAIN: new Set(["INDUSTRY", "SCOPE", "JURISDICTION", "PROCESS", "RESPONSIBILITY"]),
+  TOOL: new Set(["TOOL", "PROCESS", "RESPONSIBILITY"]),
+  QUALIFICATION: new Set(["QUALIFICATION"]),
+};
+
+function rankRequirementEvidence(evidenceMap: ReturnType<typeof buildEvidenceMap>): RankedRequirementEvidence[] {
+  const requirements = new Map<string, CanonicalJDRequirement>();
+  for (const node of evidenceMap) {
+    const nodeWithRequirements = node as EvidenceMapNode & { canonical_jd_requirements?: CanonicalJDRequirement[] };
+    for (const requirement of nodeWithRequirements.canonical_jd_requirements ?? []) {
+      if (!requirements.has(requirement.requirement_id)) requirements.set(requirement.requirement_id, requirement);
+    }
+  }
+
+  const result: RankedRequirementEvidence[] = [];
+  for (const requirement of requirements.values()) {
+    const candidates: RankedRequirementEvidence["candidates"] = [];
+    for (const node of evidenceMap) {
+      const nodeWithRequirements = node as EvidenceMapNode & { canonical_jd_requirements?: CanonicalJDRequirement[] };
+      const associationHint = Boolean(nodeWithRequirements.canonical_jd_requirements?.some((candidate) => candidate.requirement_id === requirement.requirement_id));
+      for (const fact of node.supporting_facts) {
+        const relation = fact.requirement_relations?.find((candidate) => candidate.requirement_id === requirement.requirement_id);
+        if (!relation && !associationHint) continue;
+        const exactSource = canonicalize(fact.exact_source_text);
+        const relationSource = relation ? canonicalize(relation.exact_cv_source_text) : "";
+        const provenanceBound = Boolean(exactSource && relationSource && (exactSource === relationSource || exactSource.includes(relationSource) || relationSource.includes(exactSource)));
+        let mode: RequirementEvidenceMode;
+        if (relation?.relation === "DIRECT" && provenanceBound) mode = "DIRECT";
+        else if (relation?.relation === "RELATED" && provenanceBound) mode = "TRANSFERABLE";
+        else continue;
+        candidates.push({
+          node_id: node.node_id,
+          fact_id: fact.fact_id,
+          fact: fact.fact,
+          category: fact.category,
+          exact_source_text: fact.exact_source_text,
+          documented_level: relation?.documented_level ?? null,
+          relation: relation?.relation ?? null,
+          relation_exact_source_text: relation?.exact_cv_source_text ?? null,
+          association_hint: associationHint,
+        });
+      }
+    }
+
+    const deduped = new Map<string, RankedRequirementEvidence["candidates"][number]>();
+    for (const candidate of candidates) {
+      const key = `${candidate.node_id}::${candidate.fact_id ?? ""}`;
+      const existing = deduped.get(key);
+      if (!existing) { deduped.set(key, candidate); continue; }
+      const candidateLevel = candidate.documented_level ? DOCUMENTED_LEVEL_ORDER[candidate.documented_level] : 0;
+      const existingLevel = existing.documented_level ? DOCUMENTED_LEVEL_ORDER[existing.documented_level] : 0;
+      if (candidateLevel > existingLevel) deduped.set(key, candidate);
+    }
+
+    const compatibleCategories = REQUIREMENT_CATEGORY_COMPATIBILITY[requirement.requirement_type];
+    const ranked = [...deduped.values()].sort((a, b) => {
+      const aLevel = a.documented_level ? DOCUMENTED_LEVEL_ORDER[a.documented_level] : 0;
+      const bLevel = b.documented_level ? DOCUMENTED_LEVEL_ORDER[b.documented_level] : 0;
+      const aCategory = compatibleCategories.has(a.category) ? 1 : 0;
+      const bCategory = compatibleCategories.has(b.category) ? 1 : 0;
+      const aProvenance = a.relation_exact_source_text === a.exact_source_text ? 1 : 0;
+      const bProvenance = b.relation_exact_source_text === b.exact_source_text ? 1 : 0;
+      const aAssociation = a.association_hint ? 1 : 0;
+      const bAssociation = b.association_hint ? 1 : 0;
+      return bProvenance - aProvenance || bLevel - aLevel || bCategory - aCategory || bAssociation - aAssociation || a.node_id.localeCompare(b.node_id) || (a.fact_id ?? "").localeCompare(b.fact_id ?? "");
+    });
+
+    const direct = ranked.filter((candidate) => candidate.relation === "DIRECT");
+    const transferable = ranked.filter((candidate) => candidate.relation === "RELATED");
+    const mode: RequirementEvidenceMode = direct.length > 0 ? "DIRECT" : transferable.length > 0 ? "TRANSFERABLE" : "VERIFY_GAP";
+    result.push({ requirement, mode, candidates: (mode === "DIRECT" ? direct : mode === "TRANSFERABLE" ? transferable : ranked).slice(0, 5) });
+  }
+  return result;
+}
+
+function serializeRankedRequirementEvidence(ranked: RankedRequirementEvidence[]): string {
+  return ranked.map((entry) => {
+    const candidateLines = entry.candidates.length
+      ? entry.candidates.map((candidate) =>
+          "  - " + candidate.node_id + "/" + (candidate.fact_id ?? "no-fact-id") + " [" + (candidate.relation ?? "NO_RELATION") + "; " + (candidate.documented_level ?? "NONE") + "; " + candidate.category + "] " + candidate.fact + " | CV source: " + candidate.exact_source_text
+        ).join("\n")
+      : "  - No direct or related atomic CV evidence is documented; treat this requirement as VERIFY_GAP and retain it as a preparation anchor only.";
+    return [
+      "REQUIREMENT " + entry.requirement.requirement_id,
+      "Capability: " + entry.requirement.capability,
+      "Type: " + entry.requirement.requirement_type,
+      "JD required level: " + entry.requirement.required_level,
+      "Exact JD source: " + entry.requirement.exact_jd_source_text,
+      "Deterministic evidence mode: " + entry.mode,
+      "Ranked atomic evidence candidates:",
+      candidateLines,
+    ].join("\n");
+  }).join("\n\n");
+}
 async function buildStrategicPlan(session: SessionRecord, evidenceMap: ReturnType<typeof buildEvidenceMap>): Promise<StrategicPlan> {
   const language = normalizeLanguage(session.preparation_language);
   const system = languageInstruction(language) + `
