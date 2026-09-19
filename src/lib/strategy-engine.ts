@@ -10,12 +10,20 @@ import type { StrategicPlan } from "@/lib/strategy-plan-types";
 export type EvidenceType = "EXPERIENCE" | "RESPONSIBILITY" | "ACHIEVEMENT" | "QUALIFICATION" | "SKILL" | "INDUSTRY_EXPERIENCE" | "TOOL_OR_SYSTEM";
 export type EvidenceStatus = "PROVEN" | "PARTIALLY_PROVEN" | "UNKNOWN" | "NOT_DOCUMENTED";
 
+export type EvidenceMapFact = {
+  fact_id: string;
+  fact: string;
+  category: string;
+  exact_source_text: string;
+};
+
 export type EvidenceMapNode = {
   node_id: string;
   type: EvidenceType;
   status: EvidenceStatus;
   fact: string;
   jd_requirement: string;
+  supporting_facts: EvidenceMapFact[];
 };
 
 export type ProofObjective = {
@@ -94,7 +102,13 @@ export function buildEvidenceMap(session: SessionRecord): EvidenceMapNode[] {
     const fact = status === "NOT_DOCUMENTED" || status === "UNKNOWN"
       ? `Not established by the CV for: ${truncate(item.jd_requirement ?? "", 16)}`
       : truncate(item.cv_evidence ?? item.jd_requirement ?? "", 28);
-    return { node_id: `E${String(index + 1).padStart(2, "0")}`, type, status, fact, jd_requirement: truncate(item.jd_requirement ?? "", 16) };
+    const supporting_facts = (item.evidence_facts ?? []).slice(0, 5).map((fact, factIndex) => ({
+      fact_id: fact.fact_id || `E${String(index + 1).padStart(2, "0")}-F${factIndex + 1}`,
+      fact: truncate(fact.fact ?? "", 18),
+      category: fact.category ?? "OTHER",
+      exact_source_text: fact.exact_source_text ?? ""
+    })).filter((fact) => fact.fact && fact.exact_source_text);
+    return { node_id: `E${String(index + 1).padStart(2, "0")}`, type, status, fact, jd_requirement: truncate(item.jd_requirement ?? "", 16), supporting_facts };
   });
 }
 
