@@ -1,5 +1,5 @@
 import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
-import type { AtomicFactRequirementRelation, CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
+import type { AtomicFactRequirementRelation, CanonicalJDRequirement, CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
 import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +24,7 @@ export type EvidenceMapNode = {
   status: EvidenceStatus;
   fact: string;
   jd_requirement: string;
+  canonical_jd_requirements?: CanonicalJDRequirement[];
   supporting_facts: EvidenceMapFact[];
 };
 
@@ -128,7 +129,15 @@ export function buildEvidenceMap(session: SessionRecord): EvidenceMapNode[] {
           exact_cv_source_text: relation.exact_cv_source_text
         }))
     })).filter((fact) => fact.fact && fact.exact_source_text);
-    return { node_id: `E${String(index + 1).padStart(2, "0")}`, type, status, fact, jd_requirement: truncate(item.jd_requirement ?? "", 16), supporting_facts };
+    return {
+      node_id: `E${String(index + 1).padStart(2, "0")}`,
+      type,
+      status,
+      fact,
+      jd_requirement: truncate(item.jd_requirement ?? "", 16),
+      canonical_jd_requirements: session.cv_analysis?.jdRequirements ?? [],
+      supporting_facts,
+    };
   });
 }
 
