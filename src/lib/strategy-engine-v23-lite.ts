@@ -238,7 +238,20 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   const repairedEvidence = evidence.map((item) => {
     if (!hasJobDescription) return { ...item, relevant_jd_requirements: [], canonical_jd_requirements: [] };
     const requirements = (item.relevant_jd_requirements ?? []).filter((r) => jdRequirementGrounding(r, jobDescription));
-    if (requirements.length > 0) return { ...item, relevant_jd_requirements: requirements.slice(0, 3) };
+    if (requirements.length > 0) {
+      const selected = requirements.slice(0, 3);
+      const selectedNorm = new Set(selected.map((requirement) => normalizeEvidenceText(requirement)));
+      const alignedCanonical = item.canonical_jd_requirements.filter((requirement) =>
+        selectedNorm.has(normalizeEvidenceText(requirement.exact_jd_source_text))
+        || selectedNorm.has(normalizeEvidenceText(requirement.capability))
+      );
+      return {
+        ...item,
+        relevant_jd_requirements: selected,
+        canonical_jd_requirements: (alignedCanonical.length > 0 ? alignedCanonical : item.canonical_jd_requirements)
+          .filter((requirement) => jdRequirementGrounding(requirement.exact_jd_source_text, jobDescription))
+      };
+    }
     const factText = item.facts.map((f) => f.fact).join(" ");
     const best = jdSentences
       .map((sentence) => ({ sentence, score: Math.max(overlap(sentence, factText), overlap(sentence, item.source_text)) }))
@@ -269,11 +282,35 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   // Zero-hallucination boundary: every extracted fact must point back to text
   // that actually exists in the supplied CV. The model may summarize that source
   // into "fact", but it cannot invent the source passage itself.
-  for (const item of evidence.slice(0, 10)) {
+  const provenanceOverlap = (a: string, b: string): number => {
+    const aa = new Set(a.split(" ").filter(Boolean));
+    const bb = new Set(b.split(" ").filter(Boolean));
+    if (!aa.size || !bb.size) return 0;
+    let common = 0;
+    for (const token of aa) if (bb.has(token)) common++;
+    return common / Math.min(aa.size, bb.size);
+  };
+
+  for (const item of repairedEvidence.slice(0, 10)) {
     const source = normalizeEvidenceText(item.source_text);
     if (!source || !normalizedCv.includes(source)) {
       throw new Error("Candidate evidence extraction produced a source_text not found in the supplied CV.");
     }
+    const requirementIds = new Set<string>();
+    for (const requirement of item.canonical_jd_requirements) {
+      if (!hasJobDescription) {
+        throw new Error("Candidate evidence extraction returned canonical JD requirements without JD context.");
+      }
+      if (requirementIds.has(requirement.requirement_id)) {
+        throw new Error("Candidate evidence extraction returned duplicate canonical requirement_id values inside one evidence block.");
+      }
+      requirementIds.add(requirement.requirement_id);
+      const jdSource = normalizeEvidenceText(requirement.exact_jd_source_text);
+      if (!jdSource || !normalizedJd.includes(jdSource)) {
+        throw new Error("Candidate evidence extraction produced exact_jd_source_text not found in the supplied JD.");
+      }
+    }
+
     for (const fact of item.facts.slice(0, 5)) {
       const exactSource = normalizeEvidenceText(fact.exact_source_text);
       if (!exactSource || !normalizedCv.includes(exactSource)) {
@@ -282,7 +319,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
       if (fact.exact_source_text.length > 500) {
         throw new Error("Candidate evidence extraction produced an excessively long exact_source_text.");
       }
-      const requirementIds = new Set(item.canonical_jd_requirements.map((requirement) => requirement.requirement_id));
       const relationPairs = new Set<string>();
       for (const relation of fact.requirement_relations) {
         if (!hasJobDescription) {
@@ -298,7 +334,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
         if (!relationSource || !normalizedCv.includes(relationSource)) {
           throw new Error("Candidate evidence extraction produced exact_cv_source_text not found in the supplied CV.");
         }
-        if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource)) {
+        if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource) && provenanceOverlap(exactSource, relationSource) < 0.8) {
           throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
         }
         const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
@@ -306,20 +342,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
           throw new Error("Candidate evidence extraction returned duplicate fact requirement relations.");
         }
         relationPairs.add(pairKey);
-      }
-    }
-    const requirementIds = new Set<string>();
-    for (const requirement of item.canonical_jd_requirements) {
-      if (!hasJobDescription) {
-        throw new Error("Candidate evidence extraction returned canonical JD requirements without JD context.");
-      }
-      if (requirementIds.has(requirement.requirement_id)) {
-        throw new Error("Candidate evidence extraction returned duplicate canonical requirement_id values inside one evidence block.");
-      }
-      requirementIds.add(requirement.requirement_id);
-      const jdSource = normalizeEvidenceText(requirement.exact_jd_source_text);
-      if (!jdSource || !normalizedJd.includes(jdSource)) {
-        throw new Error("Candidate evidence extraction produced exact_jd_source_text not found in the supplied JD.");
       }
     }
     for (const relationship of item.relationships.slice(0, 5)) {
