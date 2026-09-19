@@ -852,7 +852,10 @@ function rankRequirementEvidence(evidenceMap: ReturnType<typeof buildEvidenceMap
       return bProvenance - aProvenance || bLevel - aLevel || bCategory - aCategory || bAssociation - aAssociation || a.node_id.localeCompare(b.node_id) || (a.fact_id ?? "").localeCompare(b.fact_id ?? "");
     });
 
-    const direct = ranked.filter((candidate) => candidate.relation === "DIRECT");
+    const minimumDocumentedLevel: Record<JDRequiredLevel, DocumentedEvidenceLevel> = { PREFERRED: "MENTION", KNOWLEDGE: "EXPOSURE", WORKING: "PRACTICE", ADVANCED: "RESPONSIBILITY", OWNERSHIP: "OWNERSHIP" };
+    const meetsRequiredLevel = (candidate: RankedRequirementEvidence["candidates"][number]) => Boolean(candidate.documented_level && DOCUMENTED_LEVEL_ORDER[candidate.documented_level] >= DOCUMENTED_LEVEL_ORDER[minimumDocumentedLevel[requirement.required_level]]);
+    const direct = ranked.filter((candidate) => candidate.relation === "DIRECT" && meetsRequiredLevel(candidate));
+    const insufficientDirect = ranked.filter((candidate) => candidate.relation === "DIRECT" && !meetsRequiredLevel(candidate));
     const transferable = ranked.filter((candidate) => candidate.relation === "RELATED");
 
     // A VERIFY_GAP still needs a preparation anchor because the existing
