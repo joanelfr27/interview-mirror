@@ -346,7 +346,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
         if (!relationSource || !normalizedCv.includes(relationSource)) {
           throw new Error("Candidate evidence extraction produced exact_cv_source_text not found in the supplied CV.");
         }
-        if (!source.includes(relationSource) && !relationSource.includes(source) && provenanceOverlap(source, relationSource) < 0.8) {
+        if (!exactSource.includes(relationSource) && !relationSource.includes(exactSource) && provenanceOverlap(exactSource, relationSource) < 0.8) {
           throw new Error("Candidate evidence extraction relation provenance must stay bound to the fact exact_source_text.");
         }
         const pairKey = `${relation.requirement_id}::${relation.relation}::${relation.documented_level}::${relationSource}`;
