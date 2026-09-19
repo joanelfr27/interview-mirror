@@ -520,7 +520,7 @@ Build exactly 3 strategic tensions. A tension must connect:
 4) one provable evidence node,
 5) the exact atomic fact_id values from that node that support this tension (one or more; use only IDs present in supporting_facts),
 6) an allowed way to position that evidence,
-6) an explicit forbidden inference.
+7) an explicit forbidden inference.
 
 Use these modes:
 - DIRECT: the evidence directly demonstrates a relevant capability or responsibility.
