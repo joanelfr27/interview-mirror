@@ -871,7 +871,7 @@ function strategicModeDiagnostics(strategy: InternalStrategy, authoritativePlan:
 }
 
 function collectFaithfulnessClaims(strategy: InternalStrategy): Array<{ claim_id: string; text: string; evidence_node_id: string; supporting_fact_ids: string[] }> {
-  const claims: Array<{ claim_id: string; text: string; evidence_node_id: string }> = [{ claim_id: "strongestValueProposition", text: strategy.strongestValueProposition.text, evidence_node_id: strategy.strongestValueProposition.evidence_node_id, supporting_fact_ids: strategy.strongestValueProposition.supporting_fact_ids }];
+  const claims: Array<{ claim_id: string; text: string; evidence_node_id: string; supporting_fact_ids: string[] }> = [{ claim_id: "strongestValueProposition", text: strategy.strongestValueProposition.text, evidence_node_id: strategy.strongestValueProposition.evidence_node_id, supporting_fact_ids: strategy.strongestValueProposition.supporting_fact_ids }];
   strategy.strengthsToLeverage.forEach((x, i) => claims.push({ claim_id: "strengthsToLeverage[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
   strategy.interviewPriorities.forEach((x, i) => claims.push({ claim_id: "interviewPriorities[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
   strategy.storiesToPrepare.forEach((x, i) => claims.push({ claim_id: "storiesToPrepare[" + i + "]", text: x.text, evidence_node_id: x.evidence_node_id, supporting_fact_ids: x.supporting_fact_ids }));
