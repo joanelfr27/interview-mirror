@@ -639,208 +639,131 @@ function alignStrategyToAuthoritativePlan(
   language: SessionLanguage,
 ): InternalStrategy {
   if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return strategy;
+
   const fr = language === "fr";
   const tensions = authoritativePlan.tensions;
 
-  // The authoritative plan controls evidence binding and strategic mode.
-  // It must not overwrite the strategy writer's candidate-specific wording:
-  // doing so turns a rich priority into a generic template and can make the
-  // final candidate-specificity gate reject an otherwise valid strategy.
-  const modeBoundary = (text: string, tension: StrategicPlan["tensions"][number]) => {
+  // This function is intentionally a BINDING layer, not a text-normalization
+  // layer. Pass 2 is responsible for producing the candidate-facing strategic
+  // wording. Rewriting valid Pass 2 prose into deterministic templates here
+  // destroys the interviewer reasoning that the authoritative plan contains.
+  const enforceModeBoundary = (
+    text: string,
+    tension: StrategicPlan["tensions"][number],
+  ): string => {
     const normalized = text.toLowerCase();
+
     if (tension.mode === "TRANSFERABLE") {
-      const marker = fr
-        ? /transpos|transfér|applicable|mobilis|peut être adapté|peut être mobilisé/.test(normalized)
-        : /transfer|translat|applicable|adapt|can be applied|can be transferred/.test(normalized);
       const directClaim = fr
         ? /expérience\s+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|maîtrise\s+(?:des|du)|connaissance\s+(?:des|du) normes/.test(normalized)
         : /mining experience|experience in (?:mining|project finance|capital-intensive)|project finance experience|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(normalized);
+
       if (directClaim) {
         return fr
           ? `Présentez les éléments documentés de votre parcours comme une capacité transférable vers « ${tension.target_requirement} », sans les présenter comme une expérience directe ou une maîtrise établie de ce domaine.`
           : `Present the documented elements of your background as a transferable capability toward “${tension.target_requirement}”, not as direct experience or established mastery of that domain.`;
       }
-      if (marker) return text;
-      return fr
-        ? `${text} Cette capacité doit être présentée comme transférable vers « ${tension.target_requirement} », sans la présenter comme une expérience directe dans ce domaine.`
-        : `${text} This capability must be presented as transferable to “${tension.target_requirement}”, not as direct experience in that domain.`;
     }
+
     if (tension.mode === "VERIFY_GAP") {
-      const marker = fr
-        ? /vérifi|à confirmer|reste à établir|n'est pas (?:établi|documenté)|absence|ne permet pas d'affirmer/.test(normalized)
-        : /verify|confirm|needs to be established|not established|not documented|absence|cannot establish/.test(normalized);
       const directClaim = fr
         ? /expérience\s+(?:minière|dans le secteur|en project finance|des opérations capitalistiques)|expérience suffisante|maîtrise\s+(?:des|du)|connaissance\s+(?:des|du) normes/.test(normalized)
         : /sufficient experience|mining experience|project finance experience|experience in capital-intensive|mastery of|knowledge of (?:the )?(?:standards|industry)/.test(normalized);
+
       if (directClaim) {
         return fr
           ? `Le point à vérifier pendant l'entretien est ce que les éléments documentés de votre parcours permettent réellement d'établir sur « ${tension.target_requirement} ».`
           : `The interview should verify what the documented elements of your background actually establish against “${tension.target_requirement}”.`;
       }
-      if (marker) return text;
-      return fr
-        ? `${text} Ce point reste à confirmer pendant l'entretien au regard de « ${tension.target_requirement} ».`
-        : `${text} This point remains to be confirmed in the interview against “${tension.target_requirement}”.`;
     }
+
     return text;
   };
 
-  const centralValueForTensions = (t: StrategicPlan["tensions"][number]) => fr
-    ? "Votre message central doit relier l'expérience documentée à « " + t.target_requirement + " », en restant strictement dans ce que les faits établissent."
-    : "Your central message should connect the documented experience to “" + t.target_requirement + "”, while staying strictly within what the evidence establishes.";
+  const nodeById = new Map(evidenceMap.map((node) => [node.node_id, node]));
 
-  const fallbackPriority = (t: StrategicPlan["tensions"][number]) => fr
-    ? `Démontrer, à partir de l'expérience documentée, ce que vous pouvez personnellement apporter sur « ${t.target_requirement} ».`
-    : `Demonstrate, from the documented experience, what you can personally bring to “${t.target_requirement}”.`;
-
-  const fallbackStory = (t: StrategicPlan["tensions"][number]) => fr
-    ? `Préparez un exemple précis lié à l'expérience documentée et expliquez votre rôle personnel, la décision et le résultat sans ajouter d'information non établie.`
-    : `Prepare a precise example from the documented experience and explain your personal role, the decision and the result without adding unestablished information.`;
-
-  const storyRetrievalFocus = (t: StrategicPlan["tensions"][number]) => {
-    const doubt = t.interviewer_doubt.toLowerCase();
-    const fr = normalizeLanguage(language) === "fr";
-    return /ownership|responsabil|rôle personnel|implication|role personnel/.test(doubt)
-      ? (fr ? "Avant l'entretien, retrouvez un exemple où votre rôle personnel est identifiable et préparez la séquence situation → action personnelle → résultat." : "Before the interview, retrieve an example where your personal role is clear and prepare the sequence situation → personal action → result.")
-      : /scope|périmètre|perimeter/.test(doubt)
-        ? (fr ? "Avant l'entretien, retrouvez un exemple dont le périmètre est clair et préparez le contexte, votre niveau d'intervention et les interlocuteurs concernés." : "Before the interview, retrieve an example with a clear scope and prepare the context, your level of involvement, and the stakeholders involved.")
-        : /scale|échelle|volume|ampleur/.test(doubt)
-          ? (fr ? "Avant l'entretien, retrouvez un exemple permettant de situer l'ampleur de votre intervention et préparez les éléments de contexte disponibles." : "Before the interview, retrieve an example that shows the scale of your involvement and prepare the available contextual details.")
-          : /depth|profondeur|niveau|expertise|maîtrise|connaissance/.test(doubt)
-            ? (fr ? "Avant l'entretien, retrouvez un exemple qui montre ce que vous avez réellement pratiqué et préparez ce que vous pouvez démontrer concrètement, sans extrapoler." : "Before the interview, retrieve an example that shows what you actually practiced and prepare what you can demonstrate concretely, without extrapolating.")
-            : /recen|recent|current/.test(doubt)
-              ? (fr ? "Avant l'entretien, retrouvez l'exemple le plus récent et préparez clairement sa période, son contexte et votre rôle." : "Before the interview, retrieve the most recent example and prepare its timing, context, and your role clearly.")
-              : /transfer|transpos|transfér|applicable|mobilis|sector|secteur|industry|domaine/.test(doubt)
-                ? (fr ? "Avant l'entretien, retrouvez un exemple permettant d'expliquer le lien entre votre expérience documentée et l'exigence cible, sans revendiquer l'expérience sectorielle non établie." : "Before the interview, retrieve an example that explains the link between your documented experience and the target requirement, without claiming unestablished sector experience.")
-                : (fr ? "Avant l'entretien, retrouvez un exemple précis et préparez votre rôle, l'action réalisée et le résultat documenté." : "Before the interview, retrieve a precise example and prepare your role, the action taken, and the documented result.");
-  };
-  const communicationFocusForTensions = () => fr
-    ? "Dans chaque réponse, commencez par le fait documenté, explicitez votre rôle et reliez-le à l'exigence visée. Pour les capacités transférables, nommez le lien d'adaptation ; pour les points à vérifier, dites clairement ce qui reste à établir."
-    : "In each answer, start with the documented fact, clarify your role, and connect it to the target requirement. For transferable capabilities, name the adaptation link; for points to verify, state clearly what remains to be established.";
-
-  const personalizationForTensions = () => fr
-    ? "Cette stratégie est construite autour de trois tensions propres à ce poste : ce que votre parcours documenté permet de démontrer, ce qui peut être transféré vers l'exigence cible et ce que l'entretien doit encore confirmer."
-    : "This strategy is built around three tensions specific to this role: what your documented background can demonstrate, what can transfer to the target requirement, and what the interview still needs to confirm.";
-
-  const interviewPlanForTensions = () => fr
-    ? "Commencez par le positionnement central, puis traitez les trois tensions dans l'ordre. Pour chaque tension : 1) rappelez le fait documenté ; 2) apportez l'exemple préparé ; 3) répondez au doute de l'intervieweur ; 4) terminez par ce que l'entretien doit confirmer ou établir. Ne comblez aucun manque d'information."
-    : "Start with the central positioning, then work through the three tensions in order. For each tension: 1) state the documented fact; 2) give the prepared example; 3) address the interviewer's doubt; 4) finish with what the interview must confirm or establish. Do not fill any evidence gaps with assumptions.";
-
-  const difficultQuestionForTension = (t: StrategicPlan["tensions"][number]) => {
-    if (fr) {
-      return "Pouvez-vous donner un exemple concret qui permette d'établir ce que votre expérience documentée apporte sur « " + t.target_requirement + " », et répondre au point suivant : " + t.interviewer_doubt;
-    }
-    return "Can you give a concrete example that establishes what your documented experience brings to “" + t.target_requirement + "”, and address the following point: " + t.interviewer_doubt;
-  };
-
-  const defenseForTension = (t: StrategicPlan["tensions"][number]) => {
-    const doubt = t.interviewer_doubt.toLowerCase();
-    const actions: string[] = [];
-    if (/ownership|responsabil|rôle personnel|role personnel|implication/.test(doubt)) actions.push(fr ? "précisez ce que vous faisiez personnellement" : "clarify what you personally did");
-    if (/scope|périmètre|perimeter/.test(doubt)) actions.push(fr ? "délimitez clairement votre périmètre" : "define your scope clearly");
-    if (/scale|échelle|volume|grande envergure|ampleur/.test(doubt)) actions.push(fr ? "donnez le contexte et l'ampleur de votre intervention" : "give the context and scale of your involvement");
-    if (/depth|profondeur|niveau|expertise|maîtrise|mastery|connaissance/.test(doubt)) actions.push(fr ? "distinguez ce que vous avez réellement pratiqué de ce que vous comprenez ou pourriez mobiliser" : "distinguish what you actually practiced from what you understand or could apply");
-    if (/recent|récen|current/.test(doubt)) actions.push(fr ? "situez l'expérience dans le temps" : "place the experience in time");
-    if (/transfer|transpos|transfér|applicable|mobilis|sector|secteur|industry|domaine/.test(doubt)) actions.push(fr ? "expliquez le lien transférable avec l'exigence du poste" : "explain the transferable link to the role requirement");
-    if (!actions.length) actions.push(fr ? "répondez avec les faits documentés et indiquez explicitement ce qui reste à vérifier" : "answer from the documented facts and state explicitly what still needs to be verified");
-    return fr
-      ? `Pour répondre à ce doute, ${actions.join(", ")}. Ne présentez pas comme acquis ce que les éléments fournis ne permettent pas d'établir.`
-      : `To address this doubt, ${actions.join(", ")}. Do not present as established anything the supplied evidence cannot support.`;
-  };
-
-  const strongest = strategy.strongestValueProposition;
-  const strongestNode = strongest?.evidence_node_id
-    ? tensions.find((t) => t.primary_evidence_node_id === strongest.evidence_node_id)
-    : null;
-  const strongestText = strongest?.text?.trim() || "";
-  const strongestValid = strongestText
-    && (!strongestNode || semanticOverlap(strongestText, strongestNode.target_requirement) >= 0.16);
   return {
     ...strategy,
-    candidatePositioning: strategy.candidatePositioning?.trim()
-      ? strategy.candidatePositioning
-      : centralValueForTensions(tensions[0]),
+    candidatePositioning:
+      strategy.candidatePositioning?.trim() ||
+      authoritativePlan.candidate_positioning,
+
     strongestValueProposition: {
-      text: strongestValid ? strongestText : centralValueForTensions(strongestNode || tensions[0]),
-      evidence_node_id: strongest?.evidence_node_id || tensions[0].primary_evidence_node_id,
-      supporting_fact_ids: strongest?.supporting_fact_ids?.length ? strongest.supporting_fact_ids : (tensions[0].supporting_fact_ids ?? factIdsForNode(evidenceMap, tensions[0].primary_evidence_node_id)),
+      ...strategy.strongestValueProposition,
+      text:
+        strategy.strongestValueProposition?.text?.trim() ||
+        authoritativePlan.candidate_positioning,
+      evidence_node_id:
+        strategy.strongestValueProposition?.evidence_node_id ||
+        tensions[0].primary_evidence_node_id,
+      supporting_fact_ids:
+        strategy.strongestValueProposition?.supporting_fact_ids?.length
+          ? strategy.strongestValueProposition.supporting_fact_ids
+          : (tensions[0].supporting_fact_ids ?? factIdsForNode(evidenceMap, tensions[0].primary_evidence_node_id)),
     },
-    interviewPriorities: tensions.map((t, index) => {
-      const generated = strategy.interviewPriorities?.[index]?.text?.trim() || fallbackPriority(t);
+
+    // Preserve Pass 2's strategic wording. Only re-bind the authoritative
+    // evidence IDs and apply the hard DIRECT/TRANSFERABLE/VERIFY_GAP boundary.
+    interviewPriorities: tensions.map((tension, index) => {
+      const generated = strategy.interviewPriorities?.[index];
       return {
-        text: modeBoundary(generated, t),
-        evidence_node_id: t.primary_evidence_node_id,
-        supporting_fact_ids: t.supporting_fact_ids,
+        text: enforceModeBoundary(
+          generated?.text?.trim() || tension.interviewer_belief,
+          tension,
+        ),
+        evidence_node_id: tension.primary_evidence_node_id,
+        supporting_fact_ids: tension.supporting_fact_ids?.length
+          ? tension.supporting_fact_ids
+          : factIdsForNode(nodeById.has(tension.primary_evidence_node_id) ? evidenceMap : evidenceMap, tension.primary_evidence_node_id),
       };
     }),
-    storiesToPrepare: tensions.map((t, index) => {
-      const generated = strategy.storiesToPrepare?.[index]?.text?.trim() || fallbackStory(t);
-      const bounded = modeBoundary(generated, t);
-      const priority = strategy.interviewPriorities?.[index]?.text?.trim() || "";
-      // A story must retrieve usable evidence under pressure, not merely repeat
-      // the strategic priority. Add a deterministic retrieval cue when the model
-      // leaves the story too close to the priority.
-      const overlap = priority ? semanticOverlap(bounded, priority) : 0;
-      const retrievalCue = storyRetrievalFocus(t);
+
+    storiesToPrepare: tensions.map((tension, index) => {
+      const generated = strategy.storiesToPrepare?.[index];
       return {
-        text: overlap >= 0.72 ? bounded + " " + retrievalCue : bounded,
-        evidence_node_id: t.primary_evidence_node_id,
-        supporting_fact_ids: t.supporting_fact_ids,
+        text: enforceModeBoundary(
+          generated?.text?.trim() || tension.interviewer_doubt,
+          tension,
+        ),
+        evidence_node_id: tension.primary_evidence_node_id,
+        supporting_fact_ids: tension.supporting_fact_ids?.length
+          ? tension.supporting_fact_ids
+          : factIdsForNode(evidenceMap, tension.primary_evidence_node_id),
       };
     }),
-    // Preserve candidate-facing wording produced by Pass 2. The authoritative
-    // plan remains the constraint source through the prompt, mode diagnostics,
-    // evidence-faithfulness verifier, and evidence-node binding above.
-    // The interviewer doubt is part of the authoritative strategic plan. Preserve it
-    // as the point of attention instead of allowing Pass 2 to turn the same priority
-    // into a question. The candidate-facing defense can still be refined by Pass 2,
-    // but the plan remains the source of the underlying doubt.
-    gapsOrRisks: tensions.map((t) => t.interviewer_doubt),
-    // Difficult questions must operationalize each strategic tension: the interviewer
-    // should probe the exact requirement/doubt, not receive three generic interview questions.
-    // Keep one question per tension and fall back deterministically when Pass 2 returns
-    // a generic or poorly aligned question.
-    likelyDifficultQuestions: tensions.map((t, index) => {
-      const generated = strategy.likelyDifficultQuestions?.[index]?.trim() || "";
-      const aligned = generated
-        && semanticOverlap(generated, t.interviewer_doubt) >= 0.28
-        && semanticOverlap(generated, t.target_requirement) >= 0.18;
-      return aligned ? generated : difficultQuestionForTension(t);
-    }),
-    gapDefenseStrategy: tensions.map((t, index) => {
-      const generated = strategy.gapDefenseStrategy?.[index]?.trim();
-      const generatedOverlap = generated ? semanticOverlap(generated, t.interviewer_doubt) : 1;
-      return generated && generatedOverlap < 0.72 ? generated : defenseForTension(t);
-    }),
-    communicationPriorities: (() => {
-      const generated = strategy.communicationPriorities?.trim() || "";
-      // Keep candidate-facing wording when it is clearly strategic; otherwise use
-      // a deterministic execution rule that applies the three authoritative modes.
-      const planTerms = tensions.flatMap((t) => [t.target_requirement, t.interviewer_doubt]);
-      const relevance = planTerms.filter((term) => generated && semanticOverlap(generated, term) >= 0.18).length;
-      return generated && relevance >= 2 ? generated : communicationFocusForTensions();
-    })(),
-    interviewPlan: (() => {
-      const generated = strategy.interviewPlan?.trim() || "";
-      const relevance = tensions.filter((t) =>
-        generated
-        && semanticOverlap(generated, t.target_requirement) >= 0.16
-        && semanticOverlap(generated, t.interviewer_doubt) >= 0.16
-      ).length;
-      return relevance >= 2 ? generated : interviewPlanForTensions();
-    })(),
-    personalization: (() => {
-      const generated = strategy.personalization?.trim() || "";
-      const relevance = tensions.filter((t) =>
-        generated
-        && (semanticOverlap(generated, t.target_requirement) >= 0.16
-          || semanticOverlap(generated, t.interviewer_doubt) >= 0.16)
-      ).length;
-      return relevance >= 2 ? generated : personalizationForTensions();
-    })(),
+
+    // The authoritative doubt is the semantic source of truth for the point
+    // of attention. Unlike the old normalizer, do not rewrite priorities,
+    // questions, defenses, or communication sections into generic templates.
+    gapsOrRisks: tensions.map((tension) => tension.interviewer_doubt),
+
+    likelyDifficultQuestions:
+      strategy.likelyDifficultQuestions?.filter((x) => x?.trim()).slice(0, 3).length === 3
+        ? strategy.likelyDifficultQuestions.slice(0, 3)
+        : authoritativePlan.likely_questions.slice(0, 3),
+
+    gapDefenseStrategy:
+      strategy.gapDefenseStrategy?.filter((x) => x?.trim()).length
+        ? strategy.gapDefenseStrategy.slice(0, 3)
+        : tensions.map((tension) => tension.allowed_positioning),
+
+    communicationPriorities:
+      strategy.communicationPriorities?.trim() ||
+      (fr
+        ? "Reliez chaque réponse au fait documenté, au doute de l'intervieweur et à la limite exacte de ce que votre parcours permet d'établir."
+        : "Connect each answer to the documented fact, the interviewer's doubt, and the exact boundary of what your background establishes."),
+
+    interviewPlan:
+      strategy.interviewPlan?.trim() ||
+      (fr
+        ? "Traitez les trois tensions dans l'ordre : preuve documentée, exemple préparé, doute résiduel et point à confirmer."
+        : "Work through the three tensions in order: documented proof, prepared example, residual doubt, and point to verify."),
+
+    personalization:
+      strategy.personalization?.trim() ||
+      authoritativePlan.candidate_positioning,
   };
 }
-
 function strategicModeDiagnostics(strategy: InternalStrategy, authoritativePlan: StrategicPlan | null, language: SessionLanguage): string[] {
   if (!authoritativePlan || authoritativePlan.tensions.length !== 3) return [];
   const failures: string[] = [];
