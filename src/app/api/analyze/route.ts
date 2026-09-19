@@ -29,12 +29,45 @@ async function tryFetchJobDescription(url: string): Promise<string> { try { cons
 function extractStandaloneUrl(value: string): string | null { const t = value.trim(); if (!/^https?:\/\/\S+$/i.test(t)) return null; try { return new URL(t).toString(); } catch { return null; } }
 function removeUrls(value: string): string { return canonicalize(value.replace(/https?:\/\/\S+/gi, " ")); }
 
-function isValidAnalysis(value: unknown): value is CvAnalysis {
+function evidenceTokenSet(value: string): Set<string> {
+  return new Set(
+    canonicalize(value)
+      .toLowerCase()
+      .split(/[^a-zà-ÿ0-9]+/)
+      .filter((token) => token.length >= 5)
+  );
+}
+
+function groundingOverlap(claim: string, source: string): number {
+  const claimTokens = evidenceTokenSet(claim);
+  const sourceTokens = evidenceTokenSet(source);
+  if (!claimTokens.size || !sourceTokens.size) return 0;
+  let common = 0;
+  for (const token of claimTokens) if (sourceTokens.has(token)) common++;
+  return common / Math.min(claimTokens.size, sourceTokens.size);
+}
+
+function isValidAnalysis(value: unknown, cvText?: string, jobDescription?: string): value is CvAnalysis {
   if (!value || typeof value !== "object") return false;
   const a = value as any;
   if (!Number.isFinite(Number(a.matchScore)) || !Array.isArray(a.strengths) || !Array.isArray(a.gaps) || !Array.isArray(a.keywordAlignment) || typeof a.summary !== "string" || !Array.isArray(a.suggestedFocusAreas) || !Array.isArray(a.evidenceChain) || !a.evidenceChain.length) return false;
   const generic = /\b(prepare examples|be ready|prepare for|show your|improve your|prepare simple examples|préparez des exemples|soyez prêt|améliorez votre|clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|based on the cv|à partir du cv)\b/i;
-  return a.evidenceChain.every((item: any) => item && typeof item.jd_requirement === "string" && item.jd_requirement.trim() && typeof item.cv_evidence === "string" && item.cv_evidence.trim() && typeof item.gap_identified === "string" && item.gap_identified.trim() && typeof item.interview_implication === "string" && item.interview_implication.trim() && typeof item.actionable_recommendation === "string" && item.actionable_recommendation.trim() && !generic.test(item.actionable_recommendation)) && a.strengths.every((x: any) => typeof x === "string" && x.trim()) && a.gaps.every((x: any) => typeof x === "string" && x.trim()) && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
+  const cvSource = cvText ? canonicalize(cvText) : "";
+  const jdSource = jobDescription ? canonicalize(jobDescription) : "";
+  const evidenceGrounded = a.evidenceChain.every((item: any) => {
+    if (!item || typeof item.jd_requirement !== "string" || !item.jd_requirement.trim() || typeof item.cv_evidence !== "string" || !item.cv_evidence.trim() || typeof item.gap_identified !== "string" || !item.gap_identified.trim() || typeof item.interview_implication !== "string" || !item.interview_implication.trim() || typeof item.actionable_recommendation !== "string" || !item.actionable_recommendation.trim() || generic.test(item.actionable_recommendation)) return false;
+    const jdGrounded = item.jd_requirement === NO_EVIDENCE
+      ? false
+      : groundingOverlap(item.jd_requirement, jdSource) >= 0.20;
+    const cvGrounded = item.cv_evidence === NO_EVIDENCE
+      ? true
+      : groundingOverlap(item.cv_evidence, cvSource) >= 0.20;
+    return jdGrounded && cvGrounded;
+  });
+  return evidenceGrounded
+    && a.strengths.every((x: any) => typeof x === "string" && x.trim())
+    && a.gaps.every((x: any) => typeof x === "string" && x.trim())
+    && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
 }
 
 async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
@@ -47,7 +80,7 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
     const raw = completion.choices[0]?.message?.content;
     if (!raw) throw new Error("Empty AI response");
     const parsed = JSON.parse(raw) as CvAnalysis;
-    if (!isValidAnalysis(parsed)) throw new Error("Invalid evidence-grounded analysis");
+    if (!isValidAnalysis(parsed, cvText, jobDescription)) throw new Error("Invalid evidence-grounded analysis");
     return parsed;
   } catch (error) {
     console.error("[ANALYSIS FAILED]", error instanceof Error ? error.message : "analysis failure");
