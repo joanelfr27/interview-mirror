@@ -273,7 +273,6 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
     );
     const mapCanonicalFromRequirements = (requirements: string[]) => {
       const seen = new Set<string>();
-  const rankedRequirements = new Map(rankRequirementEvidence(evidenceMap).map((entry) => [entry.requirement.requirement_id, entry]));
       return requirements
         .map((requirement) => canonicalBySource.get(normalizeEvidenceText(requirement)))
         .filter((requirement): requirement is CanonicalJDRequirement => Boolean(requirement))
@@ -519,6 +518,7 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   if (!Array.isArray(plan.likely_questions) || plan.likely_questions.length < 3) errors.push("likely_questions must contain at least 3 items.");
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const seen = new Set<string>();
+  const rankedRequirements = new Map(rankRequirementEvidence(evidenceMap).map((entry) => [entry.requirement.requirement_id, entry]));
   if (!Array.isArray(plan.verification_points)) errors.push("verification_points must be an array.");
   if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
     errors.push("verification_points must contain only non-empty strings.");
@@ -880,8 +880,8 @@ Build exactly 3 strategic tensions. A tension must connect:
 4) one provable evidence node,
 5) the canonical requirement_id selected from the deterministic candidate set,
 6) the exact atomic fact_id values from that node that support this tension (one or more; use only IDs present in supporting_facts),
-6) an allowed way to position that evidence,
-7) an explicit forbidden inference.
+7) an allowed way to position that evidence,
+8) an explicit forbidden inference.
 
 Use these modes:
 - DIRECT: the evidence directly demonstrates a relevant capability or responsibility.
