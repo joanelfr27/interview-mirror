@@ -32,7 +32,9 @@ const syntheticJD = `Finance Manager, West & Central Africa
 export default function NemotronLabPage() {
   const [status, setStatus] = useState("Running synthetic test…");
   const [result, setResult] = useState<Tension[]>([]);
+  const [deepSeekResult, setDeepSeekResult] = useState<Tension[]>([]);
   const [overall, setOverall] = useState("");
+  const [deepSeekOverall, setDeepSeekOverall] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -52,7 +54,17 @@ export default function NemotronLabPage() {
         }
         setOverall(payload?.result?.overall_challenge ?? "");
         setResult(Array.isArray(payload?.result?.tensions) ? payload.result.tensions : []);
-        setStatus("Test completed.");
+
+        const second = await fetch("/api/dev/deepseek-adversary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cv: syntheticCV, jd: syntheticJD }),
+        });
+        const secondPayload = await second.json();
+        if (!second.ok) throw new Error(secondPayload?.details ?? secondPayload?.error ?? "DeepSeek test failed.");
+        setDeepSeekOverall(secondPayload?.result?.overall_challenge ?? "");
+        setDeepSeekResult(Array.isArray(secondPayload?.result?.tensions) ? secondPayload.result.tensions : []);
+        setStatus("Comparison completed.");
       } catch (e) {
         if (!cancelled) {
           setStatus("Test failed.");
@@ -102,7 +114,14 @@ export default function NemotronLabPage() {
             </section>
           ) : null}
 
-          <div className="mt-8 space-y-5">
+          {deepSeekOverall ? (
+            <section className="mt-4 rounded-xl border bg-slate-50 p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">DeepSeek overall challenge</p>
+              <p className="mt-2 leading-relaxed">{deepSeekOverall}</p>
+            </section>
+          ) : null}
+
+          <div className="mt-8 grid gap-5 lg:grid-cols-2">
             {result.map((tension, index) => (
               <article key={index} className="rounded-xl border p-5">
                 <div className="mb-4 flex items-center justify-between">
@@ -131,9 +150,37 @@ export default function NemotronLabPage() {
                 </div>
               </article>
             ))}
+            ))}
+
+            <div className="space-y-5">
+              {deepSeekResult.map((tension, index) => (
+                <article key={index} className="rounded-xl border p-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="font-semibold">DeepSeek tension {index + 1}</h2>
+                    <span className="text-xs text-slate-400">DeepSeek V4 Flash 0731</span>
+                  </div>
+                  <div className="space-y-4">
+                    {[
+                      ["Unresolved question", tension.unresolved_question],
+                      ["Candidate evidence", tension.candidate_evidence],
+                      ["Evidence limit", tension.evidence_limit],
+                      ["Must demonstrate", tension.must_demonstrate],
+                      ["Remaining doubt", tension.remaining_doubt],
+                      ["Preparation consequence", tension.preparation_consequence],
+                      ["WOW insight", tension.wow_insight],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                        <p className="mt-2 text-sm leading-relaxed">{value || "—"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
 
-          {!result.length && !error ? (
+          {!result.length && !deepSeekResult.length && !error ? (
             <div className="mt-8 rounded-xl border border-dashed p-8 text-center text-sm text-slate-500">
               Waiting for the model response…
             </div>
