@@ -158,7 +158,7 @@ async function extractCandidateEvidence(session: SessionRecord): Promise<Candida
   // rather than rejecting otherwise CV-grounded evidence. Candidate facts and
   // their CV provenance remain unchanged.
   const jdSentences = session.job_description
-    .split(/(?<=[.!?])\\s+|\\n+/)
+    .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => canonicalize(s))
     .filter((s) => s.length >= 20);
   const tokenSet = (value: string) => new Set(
