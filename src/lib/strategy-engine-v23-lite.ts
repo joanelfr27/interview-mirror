@@ -511,7 +511,7 @@ function semanticOverlapForValidation(a: string, b: string): number {
   return common / Math.min(aa.size, bb.size);
 }
 
-function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>): string[] {
+function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<typeof buildEvidenceMap>, language: SessionLanguage = "en"): string[] {
   const errors: string[] = [];
   if (!plan.candidate_positioning?.trim()) errors.push("candidate_positioning is required.");
   if (!Array.isArray(plan.tensions) || plan.tensions.length !== 3) errors.push("tensions must contain exactly 3 items.");
@@ -519,9 +519,24 @@ function validateStrategicPlan(plan: StrategicPlan, evidenceMap: ReturnType<type
   const byId = new Map(evidenceMap.map((node) => [node.node_id, node]));
   const seen = new Set<string>();
   const rankedRequirements = new Map(rankRequirementEvidence(evidenceMap).map((entry) => [entry.requirement.requirement_id, entry]));
+  const language = normalizeLanguage((evidenceMap as any)?._preparation_language);
   if (!Array.isArray(plan.verification_points)) errors.push("verification_points must be an array.");
   if (Array.isArray(plan.verification_points) && plan.verification_points.some((x) => typeof x !== "string" || !x.trim())) {
     errors.push("verification_points must contain only non-empty strings.");
+  }
+  const candidateFacingPlanText = [
+    plan.candidate_positioning,
+    ...(plan.tensions ?? []).flatMap((t) => [
+      t.target_requirement, t.interviewer_belief, t.interviewer_doubt, t.allowed_positioning, t.forbidden_inference
+    ]),
+    ...(plan.verification_points ?? []),
+    ...(plan.likely_questions ?? [])
+  ].filter((x): x is string => typeof x === "string").join(" ");
+  const planLanguageMismatch = language === "fr"
+    ? /\b(?:strong command of|strong knowledge of|your experience|ability to|progressive finance experience|financial documentation|the candidate|the interviewer|this role|this requirement|experience in|experience with|project finance|capital-intensive operations)\b/i.test(candidateFacingPlanText)
+    : /\b(?:votre expérience|maîtrise de|capacité à|le candidat|l'intervieweur|ce poste|cette exigence|expérience en|expérience avec|doit démontrer|point à vérifier)\b/i.test(candidateFacingPlanText);
+  if (planLanguageMismatch) {
+    errors.push("Candidate-facing strategic plan contains language outside the selected preparation language.");
   }
   const transferPattern = /transpos|transfér|applicable|mobilis|adapt|transfer|transferable|appliqu|can be applied|can be transferred/i;
   const verifyPattern = /vérifi|à confirmer|reste à établir|non (?:établi|documenté)|not established|not documented|needs to be established|verify|confirm/i;
@@ -922,6 +937,8 @@ Important:
 - supporting_fact_ids are mandatory provenance bindings. Never invent IDs; select only the atomic fact_id values present in the bound evidence node. Use the smallest sufficient set of facts.
 - Do not invent metrics, outcomes, tools, employers, industries, standards knowledge, dates or ownership.
 - The three tensions should be materially distinct.
+- LANGUAGE HARD BOUNDARY: every candidate-facing strategic field in this plan — candidate_positioning, target_requirement, interviewer_belief, interviewer_doubt, allowed_positioning, forbidden_inference, verification_points and likely_questions — MUST be written entirely in the selected preparation language. The exact JD source text is reference data only and must never be copied into candidate-facing fields. Translate/paraphrase the requirement; do not reproduce English JD wording in a French plan or French wording in an English plan.
+- Exact CV source text may remain verbatim only when explicitly presented as source evidence; do not embed raw source quotations inside strategic prose unless clearly marked as evidence.
 - The later strategy writer will receive ONLY this plan plus the evidence map. Do not rely on later generation to reinterpret the JD.
 - A deterministic requirement-to-evidence candidate set is supplied below. Select target requirements and evidence only from these candidates. Do not search the raw evidence map for a stronger unranked candidate.
 - DIRECT candidates require a validated atomic DIRECT relation with bound CV provenance. TRANSFERABLE candidates require a validated RELATED relation. If no direct candidate exists, the requirement is explicitly marked VERIFY_GAP; do not manufacture a proof objective from a merely related or keyword-associated fact.
@@ -944,7 +961,7 @@ Return the complete schema.
       evidenceMap,
       language
     );
-    lastErrors = validateStrategicPlan(plan, evidenceMap);
+    lastErrors = validateStrategicPlan(plan, evidenceMap, language);
     if (!lastErrors.length) return plan;
   }
   throw new Error("Strategic plan failed validation after repair cap: " + lastErrors.join(" | "));
