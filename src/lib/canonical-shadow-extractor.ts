@@ -88,19 +88,19 @@ const CANDIDATE_SCHEMA = {
           ownership: { type: "string", enum: ["INDIVIDUAL", "TEAM", "SHARED", "SUPERVISED", "UNKNOWN"] },
           normalized_action: { type: "string" },
           object: { type: "string" },
-          domain: { type: ["string", "null"] },
-          jurisdiction: { type: ["string", "null"] },
-          situation: { type: ["string", "null"] },
+          domain: { anyOf: [{ type: "string" }, { type: "null" }] },
+          jurisdiction: { anyOf: [{ type: "string" }, { type: "null" }] },
+          situation: { anyOf: [{ type: "string" }, { type: "null" }] },
           tools_or_systems: { type: "array", items: { type: "string" } },
           standards: { type: "array", items: { type: "string" } },
-          quantity: { type: ["string", "null"] },
-          currency: { type: ["string", "null"] },
-          team_size: { type: ["integer", "null"] },
-          scope: { type: ["string", "null"] },
-          start: { type: ["string", "null"] },
-          end: { type: ["string", "null"] },
-          recency: { type: ["string", "null"] },
-          outcome: { type: ["string", "null"] },
+          quantity: { anyOf: [{ type: "string" }, { type: "null" }] },
+          currency: { anyOf: [{ type: "string" }, { type: "null" }] },
+          team_size: { anyOf: [{ type: "integer" }, { type: "null" }] },
+          scope: { anyOf: [{ type: "string" }, { type: "null" }] },
+          start: { anyOf: [{ type: "string" }, { type: "null" }] },
+          end: { anyOf: [{ type: "string" }, { type: "null" }] },
+          recency: { anyOf: [{ type: "string" }, { type: "null" }] },
+          outcome: { anyOf: [{ type: "string" }, { type: "null" }] },
           assertion_type: { type: "string", enum: ["STATED", "QUANTIFIED", "CREDENTIAL", "EMPLOYMENT", "RESPONSIBILITY", "OUTCOME_CLAIM"] },
           has_quantifiable_metric: { type: "boolean" },
           has_third_party_entity: { type: "boolean" },
@@ -170,6 +170,16 @@ function responseFormat(name: string, schema: unknown) {
 
 function canonicalize(value: string): string {
   return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function detectSourceLanguage(cv: string, jd: string): "en" | "fr" | "mixed" {
+  const text = (cv + "\n" + jd).toLowerCase();
+  const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|finance|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
+  const english = (text.match(/\b(?:experience|responsibilities|education|skills|finance|role|management|degree|you|with|from)\b/g) ?? []).length;
+  if (french === 0 && english === 0) return "mixed";
+  if (french > english * 1.5) return "fr";
+  if (english > french * 1.5) return "en";
+  return "mixed";
 }
 
 function findExactSpan(
@@ -360,7 +370,7 @@ export async function extractCanonicalShadow(
 ): Promise<CanonicalShadowResult> {
   const language = normalizeLanguage(session.preparation_language);
   const context: PipelineContext = {
-    source_language: language,
+    source_language: detectSourceLanguage(session.cv_text ?? "", session.job_description ?? ""),
     product_language: language,
     interview_language: language,
   };
@@ -492,6 +502,7 @@ export async function extractCanonicalShadow(
       status: "UNRESOLVED",
     })),
     unresolved_items: [],
+    candidate_elicitations: [],
     demonstration_objectives: [],
   };
 
