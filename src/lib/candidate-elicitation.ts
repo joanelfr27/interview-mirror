@@ -35,8 +35,8 @@ export function buildElicitationQuestion(
   const facets = ledger.requirements.find(r => r.id === item.requirement_id)?.facets
     .filter(f => item.facet_ids.includes(f.id)).map(f => f.requirement).join("; ") ?? "this requirement";
   const question = language === "fr"
-    ? "Votre CV ne permet pas encore d'établir clairement " + facets + ". L'avez-vous réellement pratiqué ? Si oui, décrivez un exemple concret, votre rôle personnel, le périmètre, le contexte et le résultat. Si non, dites-le clairement et indiquez l'expérience la plus proche que vous pourriez transférer."
-    : "Your CV does not yet establish " + facets + " clearly. Have you actually done this? If yes, describe one concrete example, your personal role, scope, context and outcome. If not, say so clearly and identify the closest experience you could transfer.";
+    ? "Pour mieux comprendre ce point, décrivez librement toute expérience pertinente que vous avez réellement vécue, votre rôle personnel, le contexte, le périmètre et le résultat. Si vous n’avez pas d’expérience directe, indiquez-le et, si pertinent, décrivez l’expérience la plus proche que vous pourriez transférer."
+    : "To clarify this point, describe any relevant experience you have actually had, your personal role, context, scope and outcome. If you do not have direct experience, say so and, if relevant, describe the closest experience you could transfer.";
   return { id: "ELICIT-" + item.id, unresolved_item_id: item.id, question };
 }
 
