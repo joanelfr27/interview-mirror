@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spanWithinParent } from "../src/lib/canonical-shadow-extractor.ts";
 import {
   aggregateRequirementStatus,
   validateAtomicEvidence,
@@ -535,4 +536,31 @@ test("candidate elicitation answer spans must exactly match the submitted answer
     answer_source_span_id: answerSpan.id,
   }, ledger);
   assert.ok(errors.some(e => e.includes("does not exactly match")));
+});
+
+
+test("facet source mapping fails closed when the same phrase occurs more than once", () => {
+  const parent = {
+    id: "SPAN-JD-REQUIREMENT-0-39",
+    document_id: "JD",
+    text: "Manage finance and manage finance",
+    start_offset: 0,
+    end_offset: 33,
+    language: "en",
+  };
+  assert.equal(spanWithinParent(parent, "manage finance"), null);
+});
+
+test("facet source mapping preserves a unique phrase occurrence", () => {
+  const parent = {
+    id: "SPAN-JD-REQUIREMENT-0-20",
+    document_id: "JD",
+    text: "Manage finance now",
+    start_offset: 0,
+    end_offset: 18,
+    language: "en",
+  };
+  const span = spanWithinParent(parent, "Manage finance");
+  assert.equal(span?.start_offset, 0);
+  assert.equal(span?.end_offset, 14);
 });
