@@ -174,7 +174,7 @@ function canonicalize(value: string): string {
   return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function detectSourceLanguage(cv: string, jd: string): "en" | "fr" | "mixed" {
+export function detectSourceLanguage(cv: string, jd: string): "en" | "fr" | "mixed" {
   const text = (cv + "\n" + jd).toLowerCase();
   const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|finance|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
   const english = (text.match(/\b(?:experience|responsibilities|education|skills|finance|role|management|degree|you|with|from)\b/g) ?? []).length;
@@ -184,7 +184,7 @@ function detectSourceLanguage(cv: string, jd: string): "en" | "fr" | "mixed" {
   return "mixed";
 }
 
-function detectQuoteLanguage(quote: string, documentLanguage: "en" | "fr" | "mixed"): "en" | "fr" | "mixed" {
+export function detectQuoteLanguage(quote: string, documentLanguage: "en" | "fr" | "mixed"): "en" | "fr" | "mixed" {
   const quoteLanguage = detectSourceLanguage(quote, "");
   return quoteLanguage === "mixed" ? documentLanguage : quoteLanguage;
 }
