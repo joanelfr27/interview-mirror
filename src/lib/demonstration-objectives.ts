@@ -23,7 +23,9 @@ export function buildDemonstrationObjectives(ledger: EvidenceLedger): {
     const req = ledger.requirements.find(r => r.id === item.requirement_id);
     if (!req) continue;
     const facets = req.facets.filter(f => item.facet_ids.includes(f.id));
-    const atoms = ledger.evidence.filter(a => item.supporting_evidence_ids.includes(a.id));
+    const atoms = ledger.evidence.filter(
+      a => item.supporting_evidence_ids.includes(a.id) && a.assertion.polarity === "AFFIRMATIVE",
+    );
     const elicitation = ledger.candidate_elicitations.find(e => e.unresolved_item_id === item.id);
     const classification: CandidateGapClassification | undefined = elicitation?.classification;
 
