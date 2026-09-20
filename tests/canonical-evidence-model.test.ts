@@ -506,7 +506,7 @@ test("candidate elicitation answer spans must exactly match the submitted answer
     document_id: "ELICIT-SESSION",
     text: "I managed",
     start_offset: 0,
-    end_offset: 9,
+    end_offset: 8,
     language: "en",
   };
   const ledger: EvidenceLedger = {
@@ -543,7 +543,7 @@ test("facet source mapping fails closed when the same phrase occurs more than on
   const parent = {
     id: "SPAN-JD-REQUIREMENT-0-39",
     document_id: "JD",
-    text: "Manage finance and manage finance",
+    text: "manage finance and manage finance",
     start_offset: 0,
     end_offset: 33,
     language: "en",
