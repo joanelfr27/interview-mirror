@@ -57,11 +57,19 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
   const requirements = new Map(ledger.requirements.map(x => [x.id, x]));
   const valid: SupportJudgment[] = [];
+  const seenFacetKeys = new Set<string>();
 
   for (const item of raw) {
     const req = requirements.get(item.requirement_id);
     const facet = req?.facets.find(x => x.id === item.facet_id);
     if (!req || !facet) { errors.push("Rejected judgment " + item.id + ": unknown requirement/facet."); continue; }
+
+    const facetKey = item.requirement_id + "::" + item.facet_id;
+    if (seenFacetKeys.has(facetKey)) {
+      errors.push("Rejected judgment " + item.id + ": duplicate judgment for the same requirement facet.");
+      continue;
+    }
+    seenFacetKeys.add(facetKey);
 
     const cited = [...new Set(item.supporting_evidence_ids)].filter(id => evidenceIds.has(id));
     if (item.status === "NONE" || item.abstained) {
