@@ -224,6 +224,7 @@ export type DemonstrationObjective = {
 };
 
 export type EvidenceLedger = {
+  source_spans: SourceSpan[];
   evidence: AtomicEvidence[];
   requirements: Requirement[];
   support_judgments: SupportJudgment[];
