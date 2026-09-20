@@ -174,11 +174,13 @@ export function adaptLegacyAnalysisToCanonical(session: SessionRecord): Evidence
   }));
 
   return {
+    source_spans: sourceSpans,
     evidence: atoms,
     requirements,
     support_judgments: judgments,
     requirement_statuses: requirementStatuses,
     unresolved_items: [],
+    candidate_elicitations: [],
     demonstration_objectives: [],
   };
 }
