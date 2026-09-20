@@ -214,6 +214,21 @@ function findExactSpan(
   return null;
 }
 
+function spanWithinParent(parent: SourceSpan, quote: string): SourceSpan | null {
+  const target = quote.trim();
+  const relative = parent.text.indexOf(target);
+  if (!target || relative < 0) return null;
+  const start = parent.start_offset + relative;
+  return {
+    id: "SPAN-" + parent.document_id + "-" + start,
+    document_id: parent.document_id,
+    text: target,
+    start_offset: start,
+    end_offset: start + target.length,
+    language: parent.language,
+  };
+}
+
 function toAtomicEvidence(
   raw: RawCandidateAtom,
   span: SourceSpan,
@@ -441,13 +456,7 @@ export async function extractCanonicalShadow(
         continue;
       }
 
-      const facetSpan = findExactSpan(
-        `JD-${session.id}`,
-        session.job_description ?? "",
-        rawFacet.source_quote,
-        jdLanguage,
-        jdUsed,
-      );
+      const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote);
 
       if (!facetSpan) {
         warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote could not be mapped uniquely in the JD.`);
