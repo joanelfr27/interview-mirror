@@ -232,7 +232,28 @@ export function validateSupportJudgment(value: SupportJudgment): string[] {
   if (value.status === "CONTRADICTORY" && value.supporting_evidence_ids.length === 0) e.push("CONTRADICTORY must cite evidence.");
   if (value.abstained && value.status !== "NONE") e.push("Abstention may only produce NONE.");
   if (!value.abstained && value.status === "NONE" && value.confidence > 0.5) e.push("A non-abstained NONE judgment cannot carry high confidence.");
+  if (value.status !== "NONE" && value.supporting_evidence_ids.length === 0) e.push("Positive support statuses must cite at least one evidence atom.");
   return e;
+}
+
+export function validateSupportJudgmentAgainstEvidence(
+  value: SupportJudgment,
+  evidence: AtomicEvidence[],
+): string[] {
+  const errors = [...validateSupportJudgment(value)];
+  const evidenceById = new Map(evidence.map(atom => [atom.id, atom]));
+  const cited = value.supporting_evidence_ids.map(id => evidenceById.get(id)).filter(Boolean) as AtomicEvidence[];
+
+  if (value.status !== "NONE" && value.supporting_evidence_ids.some(id => !evidenceById.has(id))) {
+    errors.push("Support judgment cites unknown evidence.");
+  }
+  if (
+    ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(value.status) &&
+    cited.some(atom => atom.assertion.polarity === "NEGATED")
+  ) {
+    errors.push("Positive support statuses cannot use NEGATED evidence as positive support.");
+  }
+  return errors;
 }
 
 export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
@@ -250,7 +271,7 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
   for (const j of ledger.support_judgments) {
     if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
-    if (j.status === "NONE" && j.supporting_evidence_ids.length) errors.push(`Support judgment ${j.id}: NONE cannot cite evidence.`);
+    errors.push(...validateSupportJudgmentAgainstEvidence(j, ledger.evidence).map(error => `Support judgment ${j.id}: ${error}`));
     if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
     if (j.support_basis === "CANDIDATE_SELF_REPORTED" && j.status === "DIRECT") errors.push(`Support judgment ${j.id}: self-reported undocumented evidence cannot be DIRECT.`);
     if (j.status === "ANALOGICAL_TRANSFER" && (!j.analogical_mapping?.shared_dimensions?.length || !j.analogical_mapping?.unshared_dimensions?.length)) errors.push(`Support judgment ${j.id}: ANALOGICAL_TRANSFER requires shared and unshared dimensions.`);
@@ -315,7 +336,8 @@ export function buildUnresolvedItems(ledger: EvidenceLedger): UnresolvedItem[] {
     const judgments = req.facets.map(f => ledger.support_judgments.find(j => j.requirement_id === req.id && j.facet_id === f.id));
     const unresolvedFacets = req.facets.filter((_, i) => {
       const j = judgments[i];
-      return !j || j.abstained || j.status === "NONE" || j.status === "PARTIAL" || j.status === "ANALOGICAL_TRANSFER";
+      return !j || j.abstained || j.status === "NONE" || j.status === "PARTIAL" ||
+        j.status === "ANALOGICAL_TRANSFER" || j.status === "CONTRADICTORY";
     });
     if (!unresolvedFacets.length) continue;
     const contradictions = judgments.flatMap(j => j?.status === "CONTRADICTORY" ? j.supporting_evidence_ids : []);
@@ -326,7 +348,7 @@ export function buildUnresolvedItems(ledger: EvidenceLedger): UnresolvedItem[] {
       requirement_id: req.id,
       facet_ids: unresolvedFacets.map(f => f.id),
       type: contradictions.length ? "CONFLICTING" : partial ? "AMBIGUOUS" : "ABSENT",
-      supporting_evidence_ids: [...new Set(support)],
+      supporting_evidence_ids: [...new Set(support.filter(id => !contradictions.includes(id)))],
       contradiction_evidence_ids: [...new Set(contradictions)],
       absence_basis: contradictions.length ? "EXPLICIT_CONTRADICTION" : "UNMENTIONED",
       negation_evidence_ids: [...new Set(contradictions.filter(id => ledger.evidence.find(e => e.id === id)?.assertion.polarity === "NEGATED"))],
