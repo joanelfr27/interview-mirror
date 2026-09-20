@@ -110,6 +110,7 @@ export type SupportJudgment = {
   confidence: number;
   abstained: boolean;
   support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
+  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
   abstention_reason?: string;
 };
 
@@ -252,6 +253,7 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (j.status === "NONE" && j.supporting_evidence_ids.length) errors.push(`Support judgment ${j.id}: NONE cannot cite evidence.`);
     if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
     if (j.support_basis === "CANDIDATE_SELF_REPORTED" && j.status === "DIRECT") errors.push(`Support judgment ${j.id}: self-reported undocumented evidence cannot be DIRECT.`);
+    if (j.status === "ANALOGICAL_TRANSFER" && (!j.analogical_mapping?.shared_dimensions?.length || !j.analogical_mapping?.unshared_dimensions?.length)) errors.push(`Support judgment ${j.id}: ANALOGICAL_TRANSFER requires shared and unshared dimensions.`);
     if (j.abstained && !j.abstention_reason?.trim()) errors.push(`Support judgment ${j.id}: abstention_reason is required.`);
     for (const id of j.supporting_evidence_ids) if (!evidenceIds.has(id)) errors.push(`Support judgment ${j.id} references unknown evidence ${id}.`);
     const parent = ledger.requirements.find(r => r.id === j.requirement_id);
