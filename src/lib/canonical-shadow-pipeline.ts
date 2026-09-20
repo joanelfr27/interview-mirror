@@ -2,6 +2,8 @@ import type { SessionRecord } from "@/types";
 import { extractCanonicalShadow, type CanonicalShadowResult } from "@/lib/canonical-shadow-extractor";
 import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
 import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
+import { buildElicitationQuestion } from "@/lib/candidate-elicitation";
+import { normalizeLanguage } from "@/lib/openai";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
 
 /**
@@ -25,9 +27,21 @@ export async function runCanonicalShadowPipeline(session: SessionRecord): Promis
   ledger = judged.ledger;
   diagnostics.push(...judged.diagnostics);
 
+  const language = normalizeLanguage(session.preparation_language);
+  const elicitations = ledger.unresolved_items.map(item =>
+    buildElicitationQuestion(item, ledger, language),
+  );
+  ledger = { ...ledger, candidate_elicitations: elicitations };
+  diagnostics.push(...validateRequirementGraph(ledger));
+
   const objectives = attachDemonstrationObjectives(ledger);
   ledger = objectives.ledger;
   diagnostics.push(...objectives.diagnostics, ...validateRequirementGraph(ledger));
+
+  const finalErrors = validateRequirementGraph(ledger);
+  if (finalErrors.length) {
+    throw new Error("Canonical shadow graph failed final validation: " + finalErrors.join(" | "));
+  }
 
   return { ledger, diagnostics, extraction: extraction.diagnostics };
 }
