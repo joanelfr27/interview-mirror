@@ -163,6 +163,27 @@ test("contradicted facets remain in unresolved inference queue", () => {
   assert.deepEqual(unresolved[0].contradiction_evidence_ids, ["A2"]);
 });
 
+test("duplicate judgments for one facet are rejected", () => {
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [atom("A1")],
+    requirements: [requirement()],
+    support_judgments: [
+      judgment("F-1", "DIRECT", ["A1"]),
+      { ...judgment("F-1", "PARTIAL", ["A1"]), id: "SJ-F-1-DUP" },
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  assert.ok(validateRequirementGraph(ledger).some(e => e.includes("duplicates another judgment")));
+});
+
 test("negated evidence cannot be bound as a demonstration true atom", () => {
   const errors = validateDemonstrationEvidenceBinding(
     {
