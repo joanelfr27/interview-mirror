@@ -18,7 +18,7 @@
 - Shadow endpoint/pipeline with no database writes and no production Strategy invocation.
 
 ## What is NOT yet established
-- Build/typecheck/test CI result for this branch until the workflow runs.
+- CI result: GREEN for typecheck, canonical tests and build on the current correction branch.
 - Runtime extraction quality on real CV/JD pairs.
 - Semantic validity of SupportJudgments.
 - Expert agreement.
