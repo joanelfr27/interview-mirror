@@ -73,7 +73,7 @@ function toAtomicEvidence(
       scale: {},
       time: {},
       outcome: null,
-      assertion: { type: "STATED" },
+      assertion: { type: "STATED", polarity: "AFFIRMATIVE" },
       verifiability: {
         has_quantifiable_metric: /[%€$£]|\b(?:million|thousand|k|m)\b/i.test(exactSource),
         has_third_party_entity: /\b(?:SAP|Oracle|Sage|ACCA|CFA|CPA|MBA)\b/i.test(exactSource),
