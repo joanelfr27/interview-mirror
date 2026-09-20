@@ -283,7 +283,6 @@ function toAtomicEvidence(
 
 async function extractAtoms(
   cv: string,
-  language: "en" | "fr",
 ): Promise<RawCandidateAtom[]> {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
@@ -329,7 +328,6 @@ Hard rules:
 
 async function extractRequirements(
   jd: string,
-  language: "en" | "fr",
 ): Promise<RawRequirement[]> {
   const openai = getOpenAI();
   const response = await openai.chat.completions.create({
@@ -398,8 +396,8 @@ export async function extractCanonicalShadow(
 
   const contextErrors = validatePipelineContext(context);
   const [rawAtoms, rawRequirements] = await Promise.all([
-    extractAtoms(session.cv_text ?? "", language),
-    extractRequirements(session.job_description ?? "", language),
+    extractAtoms(session.cv_text ?? ""),
+    extractRequirements(session.job_description ?? ""),
   ]);
 
   const sourceSpans: SourceSpan[] = [];
