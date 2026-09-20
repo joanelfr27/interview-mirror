@@ -420,12 +420,55 @@ export function validateCandidateElicitation(value: CandidateElicitation, ledger
   if (value.answer_assertion_type !== undefined && value.answer_assertion_type !== "ELICITED") {
     errors.push("CandidateElicitation.answer_assertion_type must be ELICITED when present.");
   }
-  if (value.answer_source_span_id && !ledger.source_spans.some(span => span.id === value.answer_source_span_id)) {
+
+  const answerSpan = value.answer_source_span_id
+    ? ledger.source_spans.find(span => span.id === value.answer_source_span_id)
+    : undefined;
+  if (value.answer_source_span_id && !answerSpan) {
     errors.push("CandidateElicitation references an unknown answer source span.");
   }
   if (value.answer_source_span_id && !value.answer) {
     errors.push("CandidateElicitation answer source span requires an answer.");
   }
+  if (answerSpan && value.answer) {
+    if (!answerSpan.document_id.startsWith("ELICIT-")) {
+      errors.push("CandidateElicitation answer source span must belong to the elicited answer document.");
+    }
+    if (
+      answerSpan.start_offset < 0 ||
+      answerSpan.end_offset > value.answer.length ||
+      value.answer.slice(answerSpan.start_offset, answerSpan.end_offset) !== answerSpan.text
+    ) {
+      errors.push("CandidateElicitation answer source span does not exactly match the submitted answer.");
+    }
+  }
+
+  if (value.classification) {
+    if (!value.answer) errors.push("CandidateElicitation classification requires an answer.");
+    if (value.answer_assertion_type !== "ELICITED") errors.push("CandidateElicitation classification requires ELICITED assertion type.");
+    if (!value.classification_rationale?.trim()) errors.push("CandidateElicitation classification requires a rationale.");
+
+    const atom = ledger.evidence.find(candidate => candidate.id === `ELICIT-ATOM-${value.id}`);
+    if (!atom) {
+      errors.push("CandidateElicitation classification requires its canonical elicited atom.");
+    } else {
+      if (atom.provenance.source_type !== "CANDIDATE_ELICITED" || atom.assertion.type !== "ELICITED") {
+        errors.push("CandidateElicitation classification must bind to CANDIDATE_ELICITED evidence.");
+      }
+      if (value.answer_source_span_id !== atom.source_span_id) {
+        errors.push("CandidateElicitation classification must bind to its answer source span.");
+      }
+      if (value.classification === "EXPERIENCE_GAP" && atom.assertion.polarity !== "NEGATED") {
+        errors.push("EXPERIENCE_GAP classification requires a NEGATED elicited atom.");
+      }
+      if (value.classification !== "EXPERIENCE_GAP" && atom.assertion.polarity !== "AFFIRMATIVE") {
+        errors.push(`${value.classification} classification requires an AFFIRMATIVE elicited atom.`);
+      }
+    }
+  } else if (value.classification_rationale) {
+    errors.push("CandidateElicitation classification_rationale requires a classification.");
+  }
+
   return errors;
 }
 
