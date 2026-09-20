@@ -1,4 +1,4 @@
-import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type EvidenceLedger,
@@ -104,7 +104,6 @@ export async function judgeCanonicalSupport(
   session: SessionRecord,
   ledger: EvidenceLedger,
 ): Promise<{ ledger: EvidenceLedger; diagnostics: string[] }> {
-  const language = normalizeLanguage(session.preparation_language);
   const openai = getOpenAI();
 
   const compactEvidence = ledger.evidence.map(atom => ({
@@ -121,8 +120,9 @@ export async function judgeCanonicalSupport(
     })),
   }));
 
-  const system = languageInstruction(language) + "\n\n" +
+  const system =
     "You are Interview Mirror's normative evidentiary reader.\n" +
+    "This is an internal canonical reasoning layer. Keep rationale and analogical dimension labels in stable English; preserve supplied source quotes verbatim. Never translate or rewrite evidence facts based on the user's product or interview language.\n" +
     "For each JD requirement facet, determine what the supplied candidate atoms support. " +
     "This is NOT a prediction of a real interviewer's thoughts and NOT a judgment of intrinsic ability.\n\n" +
     "DIRECT = explicit atom(s) directly satisfy the facet. PARTIAL = explicit atom(s) address part but a material dimension remains unresolved. " +
