@@ -5,6 +5,7 @@ import {
   type SupportJudgment,
   type SupportStatus,
   validateSupportJudgment,
+  validateSupportJudgmentAgainstEvidence,
   aggregateRequirementStatus,
   buildUnresolvedItems,
   validateRequirementGraph,
@@ -74,7 +75,7 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
       }
     }
 
-    const validation = validateSupportJudgment(item);
+    const validation = validateSupportJudgmentAgainstEvidence(item, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     valid.push(item);
   }
@@ -147,5 +148,9 @@ export async function judgeCanonicalSupport(
     unresolved_items: [],
   };
   next.unresolved_items = buildUnresolvedItems(next);
-  return { ledger: next, diagnostics: [...sanitized.errors, ...validateRequirementGraph(next)] };
+  const graphErrors = validateRequirementGraph(next);
+  if (graphErrors.length) {
+    throw new Error("Canonical support graph failed validation: " + graphErrors.join(" | "));
+  }
+  return { ledger: next, diagnostics: sanitized.errors };
 }
