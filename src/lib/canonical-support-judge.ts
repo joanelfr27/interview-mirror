@@ -29,7 +29,7 @@ const SCHEMA = {
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
       },
-      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis"],
+      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","analogical_mapping"],
     }},
   },
   required: ["judgments"],
