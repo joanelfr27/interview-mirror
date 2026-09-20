@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:canonical": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/canonical-evidence-model.test.ts tests/canonical-support-judge.test.ts tests/candidate-elicitation-language.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",

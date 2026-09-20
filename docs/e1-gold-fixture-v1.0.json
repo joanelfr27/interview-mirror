@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "purpose": "E1 deterministic validator and annotation calibration fixture",
+  "cases": [
+    {
+      "id": "direct-credential",
+      "jd_facet": "ACCA qualification",
+      "candidate_atom": "ACCA qualified Finance Leader",
+      "expected_support": "DIRECT",
+      "rationale": "Explicit credential match."
+    },
+    {
+      "id": "partial-scale",
+      "jd_facet": "Finance leadership across 10 countries",
+      "candidate_atom": "Finance leadership",
+      "expected_support": "PARTIAL",
+      "rationale": "Function is explicit; required geographic scale is not."
+    },
+    {
+      "id": "analogical-transfer",
+      "jd_facet": "Project finance in mining",
+      "candidate_atom": "Financial analysis supporting investment decisions in another African industry",
+      "expected_support": "ANALOGICAL_TRANSFER",
+      "shared_dimensions": ["financial analysis", "investment decision support"],
+      "unshared_dimensions": ["mining/project-finance context"]
+    },
+    {
+      "id": "explicit-negation",
+      "jd_facet": "Experience with SAP",
+      "candidate_atom": "I have never worked with SAP.",
+      "expected_support": "CONTRADICTORY",
+      "rationale": "Explicit negative claim conflicts with the facet."
+    },
+    {
+      "id": "unmentioned",
+      "jd_facet": "Experience with Oracle",
+      "candidate_atom": "No Oracle statement in candidate source.",
+      "expected_support": "NONE",
+      "rationale": "Absence is not contradiction."
+    }
+  ]
+}

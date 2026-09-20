@@ -1,0 +1,705 @@
+/**
+ * Interview Mirror — Canonical Evidence Model (E1)
+ *
+ * Epistemic layer only. UI copy, fit scores, interviewer mind-reading and
+ * generated strategy prose do not belong here.
+ *
+ * Canonical chain:
+ * Document -> SourceSpan -> AtomicEvidence (L1)
+ * Candidate: L1 -> CompetencyInstance (L2 view) -> CareerTheme (L3 view)
+ * Role: SourceSpan -> Requirement -> Facet
+ * Support: Atom(s) -> Facet -> RequirementStatus
+ * Unresolved -> CandidateElicitation -> GapClassification -> DemonstrationObjective
+ */
+
+export type EvidenceSourceType =
+  | "CV" | "LINKEDIN" | "APPLICATION" | "CANDIDATE_ELICITED"
+  | "INTERVIEW_TRANSCRIPT" | "USER_EDITED";
+export type EvidenceLanguage = "en" | "fr" | string;
+export type EvidenceOwnership = "INDIVIDUAL" | "TEAM" | "SHARED" | "SUPERVISED" | "UNKNOWN";
+export type AssertionType =
+  | "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT"
+  | "RESPONSIBILITY" | "OUTCOME_CLAIM" | "ELICITED";
+export type AssertionPolarity = "AFFIRMATIVE" | "NEGATED";
+
+export type VerifiabilitySignals = {
+  has_quantifiable_metric: boolean;
+  has_third_party_entity: boolean;
+  has_time_anchor: boolean;
+};
+
+export type SourceSpan = {
+  id: string;
+  document_id: string;
+  text: string;
+  start_offset: number;
+  end_offset: number;
+  language: EvidenceLanguage;
+};
+
+export type AtomicEvidence = {
+  id: string;
+  source_span_id: string;
+  provenance: {
+    source_type: EvidenceSourceType;
+    language: EvidenceLanguage;
+    extraction_method: "PARSER" | "LLM" | "USER";
+  };
+  subject: { actor: string; ownership: EvidenceOwnership };
+  action: { normalized_action: string; object: string };
+  context: {
+    domain?: string;
+    jurisdiction?: string;
+    situation?: string;
+    tools_or_systems?: string[];
+    standards?: string[];
+  };
+  scale: { quantity?: string; currency?: string; team_size?: number; scope?: string };
+  time: { start?: string; end?: string; recency?: string };
+  outcome: string | null;
+  assertion: { type: AssertionType; polarity: AssertionPolarity };
+  verifiability: VerifiabilitySignals;
+  extraction_confidence: number;
+};
+
+export type CompetencyInstance = {
+  id: string;
+  label: string;
+  supporting_evidence_ids: string[];
+};
+
+export type CareerTheme = {
+  id: string;
+  label: string;
+  supporting_evidence_ids: string[];
+  supporting_competency_ids?: string[];
+};
+
+export type RequirementFacetType =
+  | "FUNCTION" | "CONTEXT" | "SCOPE" | "SCALE" | "TOOL_METHOD"
+  | "LEVEL" | "OWNERSHIP" | "STAKEHOLDER" | "GOVERNANCE" | "OUTCOME";
+export type RequirementSalience = "CORE" | "IMPORTANT" | "SUPPORTING" | "CONTEXTUAL";
+
+export type RequirementFacet = {
+  id: string;
+  type: RequirementFacetType;
+  requirement: string;
+  source_span_id: string;
+};
+
+export type Requirement = {
+  id: string;
+  source_span_id: string;
+  normalized_requirement: string;
+  category: string;
+  salience: RequirementSalience;
+  facets: RequirementFacet[];
+  extraction_confidence: number;
+};
+
+export type SupportStatus =
+  | "DIRECT" | "PARTIAL" | "ANALOGICAL_TRANSFER" | "CONTRADICTORY" | "NONE";
+
+export type SupportJudgment = {
+  id: string;
+  requirement_id: string;
+  facet_id: string;
+  status: SupportStatus;
+  supporting_evidence_ids: string[];
+  rationale: string;
+  confidence: number;
+  abstained: boolean;
+  support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
+  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
+  abstention_reason?: string;
+};
+
+export type RequirementStatus = "SUPPORTED" | "PARTIAL" | "UNRESOLVED" | "CONTRADICTED";
+export type UnresolvedInferenceType = "ABSENT" | "AMBIGUOUS" | "CONFLICTING";
+
+export type UnresolvedItem = {
+  id: string;
+  requirement_id: string;
+  facet_ids: string[];
+  type: UnresolvedInferenceType;
+  supporting_evidence_ids: string[];
+  contradiction_evidence_ids: string[];
+  absence_basis: "UNMENTIONED" | "EXPLICIT_CONTRADICTION" | "CONFLICTING_SOURCES";
+  negation_evidence_ids: string[];
+};
+
+export type CandidateGapClassification = "EVIDENCE_GAP" | "TRANSFERABLE" | "EXPERIENCE_GAP";
+
+export type CandidateElicitation = {
+  id: string;
+  unresolved_item_id: string;
+  question: string;
+  answer?: string;
+  answer_source_span_id?: string;
+  answer_assertion_type?: "ELICITED";
+  classification?: CandidateGapClassification;
+  classification_rationale?: string;
+};
+
+export type DemonstrationObjective = {
+  id: string;
+  target_unresolved_item_id: string;
+  observable_cue: string;
+  supporting_true_atom_ids: string[];
+  truthfulness_boundary: {
+    permitted_claims: string[];
+    prohibited_claims: string[];
+  };
+  candidate_gap_classification?: CandidateGapClassification;
+  probe_family?: string;
+};
+
+export type EvidenceLedger = {
+  source_spans: SourceSpan[];
+  evidence: AtomicEvidence[];
+  requirements: Requirement[];
+  support_judgments: SupportJudgment[];
+  requirement_statuses: Array<{ requirement_id: string; status: RequirementStatus }>;
+  unresolved_items: UnresolvedItem[];
+  candidate_elicitations: CandidateElicitation[];
+  demonstration_objectives: DemonstrationObjective[];
+  // CompetencyInstance and CareerTheme remain virtual L2/L3 projections over L1.
+  // They are intentionally not persisted in the reasoning ledger and never feed LLM support judgments.
+};
+
+export type PipelineContext = {
+  source_language: EvidenceLanguage;
+  product_language: "en" | "fr";
+  interview_language: "en" | "fr";
+};
+
+const SUPPORT_STATUSES = new Set<SupportStatus>([
+  "DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE",
+]);
+const OWNERSHIPS = new Set<EvidenceOwnership>(["INDIVIDUAL","TEAM","SHARED","SUPERVISED","UNKNOWN"]);
+const ASSERTIONS = new Set<AssertionType>([
+  "STATED","QUANTIFIED","CREDENTIAL","EMPLOYMENT","RESPONSIBILITY","OUTCOME_CLAIM","ELICITED",
+]);
+const SOURCE_TYPES = new Set<EvidenceSourceType>([
+  "CV","LINKEDIN","APPLICATION","CANDIDATE_ELICITED","INTERVIEW_TRANSCRIPT","USER_EDITED",
+]);
+const UNRESOLVED_TYPES = new Set<UnresolvedInferenceType>(["ABSENT","AMBIGUOUS","CONFLICTING"]);
+
+function finite01(v: number): boolean { return Number.isFinite(v) && v >= 0 && v <= 1; }
+
+export function validateSourceSpan(value: SourceSpan): string[] {
+  const e: string[] = [];
+  if (!value.id) e.push("SourceSpan.id is required.");
+  if (!value.document_id) e.push("SourceSpan.document_id is required.");
+  if (!value.text?.trim()) e.push("SourceSpan.text is required.");
+  if (!Number.isInteger(value.start_offset) || value.start_offset < 0) e.push("SourceSpan.start_offset must be a non-negative integer.");
+  if (!Number.isInteger(value.end_offset) || value.end_offset < value.start_offset) e.push("SourceSpan.end_offset must be >= start_offset.");
+  return e;
+}
+
+export type CanonicalLanguage = "en" | "fr" | "mixed";
+
+export function detectSourceLanguage(cv: string, jd: string): CanonicalLanguage {
+  const text = (cv + "\n" + jd).toLowerCase();
+  const frenchPattern = /(?:^|[^\p{L}])(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec|j'ai|l'équipe|les|des|une|un|pour|sur|par|aux|est|et|de|du|que|qui|ce|cette|mon|ma|mes|préparé|piloté|trésorerie|clôtures)(?=$|[^\p{L}])/gu;
+  const englishPattern = /(?:^|[^\p{L}])(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and|the|of|to|for|in|on|is|this|that|my|led|prepared|treasury|close)(?=$|[^\p{L}])/gu;
+  const segments = text.split(/[\n.!?]+/).map(segment => segment.trim()).filter(Boolean);
+  let hasFrenchSegment = false;
+  let hasEnglishSegment = false;
+  for (const segment of segments) {
+    const french = segment.match(frenchPattern)?.length ?? 0;
+    const english = segment.match(englishPattern)?.length ?? 0;
+    if (french > 0 && french >= english) hasFrenchSegment = true;
+    if (english > 0 && english >= french) hasEnglishSegment = true;
+  }
+  if (hasFrenchSegment && hasEnglishSegment) return "mixed";
+  const french = text.match(frenchPattern)?.length ?? 0;
+  const english = text.match(englishPattern)?.length ?? 0;
+  if (french === 0 && english === 0) return "mixed";
+  if (french > english * 1.5) return "fr";
+  if (english > french * 1.5) return "en";
+  return "mixed";
+}
+
+export function detectQuoteLanguage(quote: string, documentLanguage: CanonicalLanguage): CanonicalLanguage {
+  const quoteLanguage = detectSourceLanguage(quote, "");
+  return quoteLanguage === "mixed" ? documentLanguage : quoteLanguage;
+}
+
+export function validateAtomicEvidenceAgainstSource(
+  value: AtomicEvidence,
+  sourceSpan: SourceSpan,
+): string[] {
+  const errors: string[] = [];
+  const source = sourceSpan.text;
+
+  const requireExact = (label: string, raw: string | undefined | null) => {
+    const value = raw?.trim();
+    if (value && !source.includes(value)) {
+      errors.push(`AtomicEvidence.${label} is not grounded in its source quote.`);
+    }
+  };
+
+  // "candidate" is a canonical actor placeholder, not a claim about a named person.
+  if (
+    value.subject.actor.trim() &&
+    !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(value.subject.actor.trim())
+  ) {
+    requireExact("subject.actor", value.subject.actor);
+  }
+
+  // Free-text semantic fields are deliberately fail-closed: normalization may
+  // change casing/spacing, but it may not introduce facts absent from the quote.
+  requireExact("action.normalized_action", value.action.normalized_action);
+  requireExact("action.object", value.action.object);
+  requireExact("context.domain", value.context.domain);
+  requireExact("context.jurisdiction", value.context.jurisdiction);
+  requireExact("context.situation", value.context.situation);
+  for (const tool of value.context.tools_or_systems ?? []) requireExact("context.tools_or_systems", tool);
+  for (const standard of value.context.standards ?? []) requireExact("context.standards", standard);
+  requireExact("scale.quantity", value.scale.quantity);
+  requireExact("scale.currency", value.scale.currency);
+  requireExact("scale.scope", value.scale.scope);
+  requireExact("time.start", value.time.start);
+  requireExact("time.end", value.time.end);
+  requireExact("time.recency", value.time.recency);
+  requireExact("outcome", value.outcome);
+
+  if (value.scale.team_size !== undefined) {
+    const literal = String(value.scale.team_size);
+    if (!source.includes(literal)) errors.push("AtomicEvidence.scale.team_size is not grounded in its source quote.");
+  }
+
+  const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
+    INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
+    TEAM: /\b(?:we|our|team|teams|nous|notre|nos|équipe|équipes)\b/i,
+    SHARED: /\b(?:shared|co-owned|co-owned|partagé|partagée|partagés|partagées)\b/i,
+    SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
+  };
+  if (value.subject.ownership !== "UNKNOWN" && !ownershipMarkers[value.subject.ownership].test(source)) {
+    errors.push(`AtomicEvidence.subject.ownership=${value.subject.ownership} is not explicitly grounded in its source quote.`);
+  }
+
+  if (value.assertion.polarity === "NEGATED" &&
+      !/(?:\b(?:not|never|no|without|didn['’]t|doesn['’]t|cannot|can't|non|sans|jamais|aucun|aucune|n['’]ai|n['’]a)\b)/i.test(source)) {
+    errors.push("AtomicEvidence NEGATED polarity is not explicitly grounded in the source quote.");
+  }
+
+  if (value.assertion.type === "QUANTIFIED" &&
+      !/(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+    errors.push("QUANTIFIED assertion type requires an explicit metric or amount in the source quote.");
+  }
+
+  if (value.assertion.type === "OUTCOME_CLAIM" && !value.outcome?.trim()) {
+    errors.push("OUTCOME_CLAIM requires an outcome grounded in the source quote.");
+  }
+
+  if (value.verifiability.has_quantifiable_metric !== /(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+    errors.push("has_quantifiable_metric does not match deterministic source evidence.");
+  }
+  if (value.verifiability.has_time_anchor !== /\b(?:19|20)\d{2}\b/.test(source)) {
+    errors.push("has_time_anchor does not match deterministic source evidence.");
+  }
+
+  const explicitThirdPartyMarker =
+    /\b(?:at|for|with|from|chez|pour|avec|au sein de)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
+    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère)\b/i.test(source);
+  if (value.verifiability.has_third_party_entity && !explicitThirdPartyMarker) {
+    errors.push("has_third_party_entity is not supported by deterministic source evidence.");
+  }
+
+  return errors;
+}
+
+export function validateAtomicEvidence(value: AtomicEvidence): string[] {
+  const e: string[] = [];
+  if (!value.id) e.push("AtomicEvidence.id is required.");
+  if (!value.source_span_id) e.push("AtomicEvidence.source_span_id is required.");
+  if (!SOURCE_TYPES.has(value.provenance?.source_type)) e.push("AtomicEvidence.provenance.source_type is invalid.");
+  if (!value.provenance?.language) e.push("AtomicEvidence.provenance.language is required.");
+  if (!["PARSER","LLM","USER"].includes(value.provenance?.extraction_method)) e.push("AtomicEvidence.provenance.extraction_method is invalid.");
+  if (!value.subject?.actor) e.push("AtomicEvidence.subject.actor is required.");
+  if (!OWNERSHIPS.has(value.subject?.ownership)) e.push("AtomicEvidence.subject.ownership is invalid.");
+  if (!value.action?.normalized_action) e.push("AtomicEvidence.action.normalized_action is required.");
+  if (!value.action?.object) e.push("AtomicEvidence.action.object is required.");
+  if (!ASSERTIONS.has(value.assertion?.type)) e.push("AtomicEvidence.assertion.type is invalid.");
+  if (!finite01(value.extraction_confidence)) e.push("AtomicEvidence.extraction_confidence must be between 0 and 1.");
+  if (value.scale?.team_size !== undefined && (!Number.isInteger(value.scale.team_size) || value.scale.team_size < 0)) e.push("AtomicEvidence.scale.team_size must be a non-negative integer.");
+  if (value.provenance?.source_type === "CANDIDATE_ELICITED" && value.assertion?.type !== "ELICITED") e.push("CANDIDATE_ELICITED evidence must have ELICITED assertion type.");
+  if (!["AFFIRMATIVE","NEGATED"].includes(value.assertion?.polarity)) e.push("AtomicEvidence.assertion.polarity is invalid.");
+  if (value.provenance?.source_type !== "CANDIDATE_ELICITED" && value.assertion?.type === "ELICITED") e.push("ELICITED assertion requires CANDIDATE_ELICITED provenance.");
+  return e;
+}
+
+export function validateSupportJudgment(value: SupportJudgment): string[] {
+  const e: string[] = [];
+  if (!value.id) e.push("SupportJudgment.id is required.");
+  if (!value.requirement_id) e.push("SupportJudgment.requirement_id is required.");
+  if (!value.facet_id) e.push("SupportJudgment.facet_id is required.");
+  if (!SUPPORT_STATUSES.has(value.status)) e.push("SupportJudgment.status is invalid.");
+  if (!Array.isArray(value.supporting_evidence_ids)) e.push("SupportJudgment.supporting_evidence_ids must be an array.");
+  if (!value.rationale?.trim()) e.push("SupportJudgment.rationale is required.");
+  if (!finite01(value.confidence)) e.push("SupportJudgment.confidence must be between 0 and 1.");
+  if (typeof value.abstained !== "boolean") e.push("SupportJudgment.abstained is required.");
+  if (value.abstained && !value.abstention_reason?.trim()) e.push("Abstention requires an abstention_reason.");
+  if (value.status === "NONE" && value.supporting_evidence_ids.length > 0) e.push("NONE cannot cite supporting evidence.");
+  if (value.status === "CONTRADICTORY" && value.supporting_evidence_ids.length === 0) e.push("CONTRADICTORY must cite evidence.");
+  if (value.abstained && value.status !== "NONE") e.push("Abstention may only produce NONE.");
+  if (!value.abstained && value.status === "NONE" && value.confidence > 0.5) e.push("A non-abstained NONE judgment cannot carry high confidence.");
+  if (value.status !== "NONE" && value.supporting_evidence_ids.length === 0) e.push("Positive support statuses must cite at least one evidence atom.");
+  return e;
+}
+
+
+export function validateSupportJudgmentAgainstFacet(
+  value: SupportJudgment,
+  facet: RequirementFacet,
+  evidence: AtomicEvidence[],
+): string[] {
+  const errors = validateSupportJudgmentAgainstEvidence(value, evidence);
+  const cited = evidence.filter(atom => value.supporting_evidence_ids.includes(atom.id) && atom.assertion.polarity === "AFFIRMATIVE");
+  const has = (predicate: (atom: AtomicEvidence) => boolean) => cited.some(predicate);
+  if (value.status === "DIRECT") {
+    if (facet.type === "SCALE" && !has(atom => Boolean(atom.scale.quantity || atom.scale.team_size !== undefined || atom.scale.scope))) errors.push("DIRECT support for SCALE requires explicit quantity, team size, or scope evidence.");
+    if (facet.type === "TOOL_METHOD" && !has(atom => Boolean(atom.context.tools_or_systems?.length || atom.context.standards?.length))) errors.push("DIRECT support for TOOL_METHOD requires explicit tool, system, method, or standard evidence.");
+    if (facet.type === "OWNERSHIP" && !has(atom => atom.subject.ownership !== "UNKNOWN")) errors.push("DIRECT support for OWNERSHIP requires explicit non-UNKNOWN ownership evidence.");
+    if (facet.type === "OUTCOME" && !has(atom => Boolean(atom.outcome?.trim()))) errors.push("DIRECT support for OUTCOME requires an explicit outcome evidence field.");
+    if (facet.type === "GOVERNANCE" && !has(atom => Boolean(atom.context.standards?.length || atom.context.tools_or_systems?.length))) errors.push("DIRECT support for GOVERNANCE requires explicit governance, standard, system, or control evidence.");
+  }
+  const affirmativeKeys = new Set(cited.map(atom => [
+    atom.action.normalized_action.trim().toLowerCase(),
+    atom.action.object.trim().toLowerCase(),
+    (atom.context.domain ?? "").trim().toLowerCase(),
+    (atom.context.jurisdiction ?? "").trim().toLowerCase(),
+  ].join("|")));
+  if (["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(value.status) && affirmativeKeys.size > 0) {
+    const conflict = evidence.some(atom =>
+      atom.assertion.polarity === "NEGATED" &&
+      !value.supporting_evidence_ids.includes(atom.id) &&
+      affirmativeKeys.has([
+        atom.action.normalized_action.trim().toLowerCase(),
+        atom.action.object.trim().toLowerCase(),
+        (atom.context.domain ?? "").trim().toLowerCase(),
+        (atom.context.jurisdiction ?? "").trim().toLowerCase(),
+      ].join("|"))
+    );
+    if (conflict) errors.push("Positive support is blocked because a conflicting NEGATED atom exists for the same semantic claim.");
+  }
+  return errors;
+}
+
+export function assertCompleteFacetJudgments(
+  raw: Array<{ requirement_id: string; facet_id: string }>,
+  facets: RequirementFacet[],
+): string[] {
+  const expected = new Set(facets.map(f => f.id));
+  const seen = new Set<string>();
+  const errors: string[] = [];
+  for (const item of raw) {
+    if (seen.has(item.facet_id)) errors.push("Duplicate judgment returned for facet " + item.facet_id + ".");
+    seen.add(item.facet_id);
+    if (!expected.has(item.facet_id)) errors.push("Judgment returned for unknown facet " + item.facet_id + ".");
+  }
+  for (const id of expected) if (!seen.has(id)) errors.push("Missing judgment for facet " + id + ".");
+  return errors;
+}
+
+export function validateSupportJudgmentAgainstEvidence(
+  value: SupportJudgment,
+  evidence: AtomicEvidence[],
+): string[] {
+  const errors = [...validateSupportJudgment(value)];
+  const evidenceById = new Map(evidence.map(atom => [atom.id, atom]));
+  const cited = value.supporting_evidence_ids.map(id => evidenceById.get(id)).filter(Boolean) as AtomicEvidence[];
+
+  if (value.status !== "NONE" && value.supporting_evidence_ids.some(id => !evidenceById.has(id))) {
+    errors.push("Support judgment cites unknown evidence.");
+  }
+  if (
+    ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(value.status) &&
+    cited.some(atom => atom.assertion.polarity === "NEGATED")
+  ) {
+    errors.push("Positive support statuses cannot use NEGATED evidence as positive support.");
+  }
+  return errors;
+}
+
+export function validateCandidateElicitation(value: CandidateElicitation, ledger: EvidenceLedger): string[] {
+  const errors: string[] = [];
+  if (!value.id) errors.push("CandidateElicitation.id is required.");
+  if (!value.unresolved_item_id) errors.push("CandidateElicitation.unresolved_item_id is required.");
+  if (!value.question?.trim()) errors.push("CandidateElicitation.question is required.");
+  if (!ledger.unresolved_items.some(item => item.id === value.unresolved_item_id)) {
+    errors.push("CandidateElicitation references an unknown unresolved item.");
+  }
+  if (value.answer_assertion_type !== undefined && value.answer_assertion_type !== "ELICITED") {
+    errors.push("CandidateElicitation.answer_assertion_type must be ELICITED when present.");
+  }
+
+  const answerSpan = value.answer_source_span_id
+    ? ledger.source_spans.find(span => span.id === value.answer_source_span_id)
+    : undefined;
+  if (value.answer_source_span_id && !answerSpan) {
+    errors.push("CandidateElicitation references an unknown answer source span.");
+  }
+  if (value.answer_source_span_id && !value.answer) {
+    errors.push("CandidateElicitation answer source span requires an answer.");
+  }
+  if (answerSpan && value.answer) {
+    if (!answerSpan.document_id.startsWith("ELICIT-")) {
+      errors.push("CandidateElicitation answer source span must belong to the elicited answer document.");
+    }
+    if (
+      answerSpan.start_offset < 0 ||
+      answerSpan.end_offset > value.answer.length ||
+      value.answer.slice(answerSpan.start_offset, answerSpan.end_offset) !== answerSpan.text
+    ) {
+      errors.push("CandidateElicitation answer source span does not exactly match the submitted answer.");
+    }
+  }
+
+  if (value.classification) {
+    if (!value.answer) errors.push("CandidateElicitation classification requires an answer.");
+    if (value.answer_assertion_type !== "ELICITED") errors.push("CandidateElicitation classification requires ELICITED assertion type.");
+    if (!value.classification_rationale?.trim()) errors.push("CandidateElicitation classification requires a rationale.");
+
+    const atom = ledger.evidence.find(candidate => candidate.id === `ELICIT-ATOM-${value.id}`);
+    if (!atom) {
+      errors.push("CandidateElicitation classification requires its canonical elicited atom.");
+    } else {
+      if (atom.provenance.source_type !== "CANDIDATE_ELICITED" || atom.assertion.type !== "ELICITED") {
+        errors.push("CandidateElicitation classification must bind to CANDIDATE_ELICITED evidence.");
+      }
+      if (value.answer_source_span_id !== atom.source_span_id) {
+        errors.push("CandidateElicitation classification must bind to its answer source span.");
+      }
+      if (value.classification === "EXPERIENCE_GAP" && atom.assertion.polarity !== "NEGATED") {
+        errors.push("EXPERIENCE_GAP classification requires a NEGATED elicited atom.");
+      }
+      if (value.classification !== "EXPERIENCE_GAP" && atom.assertion.polarity !== "AFFIRMATIVE") {
+        errors.push(`${value.classification} classification requires an AFFIRMATIVE elicited atom.`);
+      }
+    }
+  } else if (value.classification_rationale) {
+    errors.push("CandidateElicitation classification_rationale requires a classification.");
+  }
+
+  return errors;
+}
+
+export function validateRequirementGraph(
+  ledger: EvidenceLedger,
+  options: { allowUnjudgedFacets?: boolean } = {},
+): string[] {
+  const errors: string[] = [];
+  const evidenceIds = new Set(ledger.evidence.map(x => x.id));
+  const requirementIds = new Set(ledger.requirements.map(x => x.id));
+  const facetIds = new Set(ledger.requirements.flatMap(x => x.facets.map(f => f.id)));
+  const spanIds = new Set(ledger.source_spans.map(x => x.id));
+
+  for (const atom of ledger.evidence) if (!spanIds.has(atom.source_span_id)) errors.push(`Atom ${atom.id} references unknown source span.`);
+  for (const req of ledger.requirements) {
+    if (!spanIds.has(req.source_span_id)) errors.push(`Requirement ${req.id} references unknown source span.`);
+    for (const facet of req.facets) if (!spanIds.has(facet.source_span_id)) errors.push(`Facet ${facet.id} references unknown source span.`);
+  }
+  const sourceSpanIds = new Set<string>();
+  const evidenceIdsSeen = new Set<string>();
+  const requirementIdsSeen = new Set<string>();
+  const facetIdsSeen = new Set<string>();
+  const unresolvedIdsSeen = new Set<string>();
+  const requirementStatusIdsSeen = new Set<string>();
+  for (const span of ledger.source_spans) {
+    if (sourceSpanIds.has(span.id)) errors.push(`Source span ${span.id} is duplicated.`);
+    sourceSpanIds.add(span.id);
+  }
+  for (const atom of ledger.evidence) {
+    if (evidenceIdsSeen.has(atom.id)) errors.push(`Atomic evidence ${atom.id} is duplicated.`);
+    evidenceIdsSeen.add(atom.id);
+  }
+  for (const req of ledger.requirements) {
+    if (requirementIdsSeen.has(req.id)) errors.push(`Requirement ${req.id} is duplicated.`);
+    requirementIdsSeen.add(req.id);
+    for (const facet of req.facets) {
+      if (facetIdsSeen.has(facet.id)) errors.push(`Requirement facet ${facet.id} is duplicated.`);
+      facetIdsSeen.add(facet.id);
+    }
+  }
+  for (const u of ledger.unresolved_items) {
+    if (unresolvedIdsSeen.has(u.id)) errors.push(`Unresolved item ${u.id} is duplicated.`);
+    unresolvedIdsSeen.add(u.id);
+  }
+  if (!options.allowUnjudgedFacets) {
+    errors.push(
+      ...assertCompleteFacetJudgments(
+        ledger.support_judgments,
+        ledger.requirements.flatMap(requirement => requirement.facets),
+      ),
+    );
+  }
+
+  const judgmentKeys = new Set<string>();
+  for (const j of ledger.support_judgments) {
+    const key = `${j.requirement_id}::${j.facet_id}`;
+    if (judgmentKeys.has(key)) errors.push(`Support judgment ${j.id} duplicates another judgment for facet ${j.facet_id}.`);
+    judgmentKeys.add(key);
+    if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
+    if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
+    const facet = ledger.requirements.find(r => r.id === j.requirement_id)?.facets.find(f => f.id === j.facet_id);
+    if (facet) errors.push(...validateSupportJudgmentAgainstFacet(j, facet, ledger.evidence).map(error => "Support judgment " + j.id + ": " + error));
+    if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
+    const citedAtoms = j.supporting_evidence_ids
+      .map(id => ledger.evidence.find(atom => atom.id === id))
+      .filter((atom): atom is AtomicEvidence => Boolean(atom));
+    const hasElicited = citedAtoms.some(atom => atom.provenance.source_type === "CANDIDATE_ELICITED");
+    const hasDocumented = citedAtoms.some(atom => atom.provenance.source_type !== "CANDIDATE_ELICITED");
+    if (j.support_basis === "DOCUMENTED" && hasElicited) errors.push(`Support judgment ${j.id}: DOCUMENTED basis cannot cite elicited evidence.`);
+    if (j.support_basis === "CANDIDATE_SELF_REPORTED" && hasDocumented) errors.push(`Support judgment ${j.id}: self-reported basis cannot cite documented evidence.`);
+    if (hasElicited && hasDocumented) errors.push(`Support judgment ${j.id}: mixed evidence basis requires an explicit model state.`);
+    if (j.support_basis === "CANDIDATE_SELF_REPORTED" && j.status === "DIRECT") errors.push(`Support judgment ${j.id}: self-reported undocumented evidence cannot be DIRECT.`);
+    if (j.status === "ANALOGICAL_TRANSFER" && (!j.analogical_mapping?.shared_dimensions?.length || !j.analogical_mapping?.unshared_dimensions?.length)) errors.push(`Support judgment ${j.id}: ANALOGICAL_TRANSFER requires shared and unshared dimensions.`);
+    if (j.abstained && !j.abstention_reason?.trim()) errors.push(`Support judgment ${j.id}: abstention_reason is required.`);
+    for (const id of j.supporting_evidence_ids) if (!evidenceIds.has(id)) errors.push(`Support judgment ${j.id} references unknown evidence ${id}.`);
+    const parent = ledger.requirements.find(r => r.id === j.requirement_id);
+    if (parent && !parent.facets.some(f => f.id === j.facet_id)) errors.push(`Support judgment ${j.id} facet does not belong to its requirement.`);
+  }
+  const elicitationIds = new Set<string>();
+  const elicitationByAtomId = new Map<string, CandidateGapClassification>();
+  for (const elicitation of ledger.candidate_elicitations) {
+    if (elicitationIds.has(elicitation.id)) errors.push(`Candidate elicitation ${elicitation.id} is duplicated.`);
+    elicitationIds.add(elicitation.id);
+    errors.push(...validateCandidateElicitation(elicitation, ledger));
+    if (elicitation.classification) {
+      elicitationByAtomId.set(`ELICIT-ATOM-${elicitation.id}`, elicitation.classification);
+    }
+  }
+
+  for (const judgment of ledger.support_judgments) {
+    const citedClassifications = [...new Set(
+      judgment.supporting_evidence_ids
+        .map(id => elicitationByAtomId.get(id))
+        .filter((classification): classification is CandidateGapClassification => Boolean(classification)),
+    )];
+    for (const classification of citedClassifications) {
+      if (classification === "EXPERIENCE_GAP" &&
+          ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(judgment.status)) {
+        errors.push(`Support judgment ${judgment.id}: EXPERIENCE_GAP elicited evidence cannot produce positive support.`);
+      }
+      if (classification === "TRANSFERABLE" &&
+          ["DIRECT", "CONTRADICTORY"].includes(judgment.status)) {
+        errors.push(`Support judgment ${judgment.id}: TRANSFERABLE elicited evidence cannot be DIRECT or CONTRADICTORY.`);
+      }
+      if (classification === "EVIDENCE_GAP" && judgment.status === "CONTRADICTORY") {
+        errors.push(`Support judgment ${judgment.id}: EVIDENCE_GAP elicited evidence cannot be CONTRADICTORY.`);
+      }
+    }
+  }
+  for (const u of ledger.unresolved_items) {
+    if (!requirementIds.has(u.requirement_id)) errors.push(`Unresolved item ${u.id} references unknown requirement.`);
+    const parent = ledger.requirements.find(r => r.id === u.requirement_id);
+    for (const id of u.facet_ids) if (!parent?.facets.some(f => f.id === id)) errors.push(`Unresolved item ${u.id} references invalid facet.`);
+    for (const id of [...u.supporting_evidence_ids, ...u.contradiction_evidence_ids]) if (!evidenceIds.has(id)) errors.push(`Unresolved item ${u.id} references unknown evidence.`);
+    if (!UNRESOLVED_TYPES.has(u.type)) errors.push(`Unresolved item ${u.id} has invalid type.`);
+  }
+  for (const rs of ledger.requirement_statuses) {
+    if (requirementStatusIdsSeen.has(rs.requirement_id)) errors.push(`Requirement status for ${rs.requirement_id} is duplicated.`);
+    requirementStatusIdsSeen.add(rs.requirement_id);
+    const req = ledger.requirements.find(r => r.id === rs.requirement_id);
+    if (!req) errors.push(`Requirement status references unknown requirement ${rs.requirement_id}.`);
+    else {
+      const expected = aggregateRequirementStatus(req, ledger.support_judgments);
+      if (expected !== rs.status) errors.push(`Requirement status for ${rs.requirement_id} is ${rs.status} but deterministic aggregation yields ${expected}.`);
+    }
+  }
+  for (const requirement of ledger.requirements) {
+    if (!requirementStatusIdsSeen.has(requirement.id)) {
+      errors.push(`Requirement ${requirement.id} has no requirement status.`);
+    }
+  }
+  for (const d of ledger.demonstration_objectives) {
+    if (!ledger.unresolved_items.some(u => u.id === d.target_unresolved_item_id)) errors.push(`Demonstration objective ${d.id} targets unknown unresolved item.`);
+    errors.push(...validateDemonstrationEvidenceBinding(d, ledger.evidence));
+    if (!d.truthfulness_boundary?.permitted_claims?.length && !d.truthfulness_boundary?.prohibited_claims?.length) errors.push(`Demonstration objective ${d.id} has no truthfulness boundary content.`);
+  }
+  return errors;
+}
+
+export function validateDemonstrationObjective(value: DemonstrationObjective): string[] {
+  const e: string[] = [];
+  if (!value.id) e.push("DemonstrationObjective.id is required.");
+  if (!value.target_unresolved_item_id) e.push("DemonstrationObjective.target_unresolved_item_id is required.");
+  if (!value.observable_cue?.trim()) e.push("DemonstrationObjective.observable_cue is required.");
+  if (!Array.isArray(value.supporting_true_atom_ids)) e.push("supporting_true_atom_ids must be an array.");
+  if (!value.truthfulness_boundary || !Array.isArray(value.truthfulness_boundary.permitted_claims) || !Array.isArray(value.truthfulness_boundary.prohibited_claims)) e.push("A truthfulness boundary is required.");
+  return e;
+}
+
+export function validatePipelineContext(value: PipelineContext): string[] {
+  const e: string[] = [];
+  if (!value.source_language) e.push("PipelineContext.source_language is required.");
+  if (!["en","fr"].includes(value.product_language)) e.push("PipelineContext.product_language must be en or fr.");
+  if (!["en","fr"].includes(value.interview_language)) e.push("PipelineContext.interview_language must be en or fr.");
+  return e;
+}
+
+export function aggregateRequirementStatus(requirement: Requirement, judgments: SupportJudgment[]): RequirementStatus {
+  if (!requirement.facets.length) return "UNRESOLVED";
+  const relevant = requirement.facets.map(f => judgments.find(j => j.requirement_id === requirement.id && j.facet_id === f.id));
+  if (relevant.some(j => j?.status === "CONTRADICTORY")) return "CONTRADICTED";
+  if (relevant.every(j => j?.status === "DIRECT")) return "SUPPORTED";
+  if (relevant.some(j => j?.status === "DIRECT" || j?.status === "PARTIAL" || j?.status === "ANALOGICAL_TRANSFER")) return "PARTIAL";
+  return "UNRESOLVED";
+}
+
+export function buildUnresolvedItems(ledger: EvidenceLedger): UnresolvedItem[] {
+  const result: UnresolvedItem[] = [];
+  for (const req of ledger.requirements) {
+    const judgments = req.facets.map(f => ledger.support_judgments.find(j => j.requirement_id === req.id && j.facet_id === f.id));
+    const unresolvedFacets = req.facets.filter((_, i) => {
+      const j = judgments[i];
+      return !j || j.abstained || j.status === "NONE" || j.status === "PARTIAL" ||
+        j.status === "ANALOGICAL_TRANSFER" || j.status === "CONTRADICTORY";
+    });
+    if (!unresolvedFacets.length) continue;
+    const contradictions = judgments.flatMap(j => j?.status === "CONTRADICTORY" ? j.supporting_evidence_ids : []);
+    const support = judgments.flatMap(j => j?.supporting_evidence_ids ?? []);
+    const partial = judgments.some(j => j?.status === "PARTIAL" || j?.status === "ANALOGICAL_TRANSFER");
+    result.push({
+      id: `UNRESOLVED-${req.id}`,
+      requirement_id: req.id,
+      facet_ids: unresolvedFacets.map(f => f.id),
+      type: contradictions.length ? "CONFLICTING" : partial ? "AMBIGUOUS" : "ABSENT",
+      supporting_evidence_ids: [...new Set(support.filter(id => !contradictions.includes(id)))],
+      contradiction_evidence_ids: [...new Set(contradictions)],
+      absence_basis: contradictions.length ? "EXPLICIT_CONTRADICTION" : "UNMENTIONED",
+      negation_evidence_ids: [...new Set(contradictions.filter(id => ledger.evidence.find(e => e.id === id)?.assertion.polarity === "NEGATED"))],
+    });
+  }
+  return result;
+}
+
+export function validateDemonstrationEvidenceBinding(objective: DemonstrationObjective, evidence: AtomicEvidence[]): string[] {
+  const byId = new Map(evidence.map(x => [x.id, x]));
+  const errors: string[] = [];
+  for (const id of objective.supporting_true_atom_ids) {
+    const atom = byId.get(id);
+    if (!atom) errors.push(`DemonstrationObjective ${objective.id} references unknown atomic evidence ${id}.`);
+    else if (atom.assertion.polarity !== "AFFIRMATIVE") {
+      errors.push(`DemonstrationObjective ${objective.id} cannot treat NEGATED evidence ${id} as a supporting true atom.`);
+    }
+  }
+  return errors;
+}
+
+export function validateSpanBounds(sourceSpan: SourceSpan, documentText: string): string[] {
+  if (sourceSpan.start_offset < 0 || sourceSpan.end_offset > documentText.length) return [`SourceSpan ${sourceSpan.id} is outside document bounds.`];
+  return documentText.slice(sourceSpan.start_offset, sourceSpan.end_offset) === sourceSpan.text ? [] : [`SourceSpan ${sourceSpan.id} does not exactly match the source document.`];
+}
+
+export function forbiddenInferenceViolations(atom: AtomicEvidence): string[] {
+  const violations: string[] = [];
+  if (atom.provenance.source_type !== "CANDIDATE_ELICITED" && atom.assertion.type === "ELICITED") violations.push("ELICITED assertion type requires CANDIDATE_ELICITED provenance.");
+  if (atom.subject.ownership === "UNKNOWN" && /\b(my|I|j'ai|je|mon|ma|mes)\b/i.test(atom.action.normalized_action)) violations.push("Ownership cannot be upgraded from UNKNOWN by wording alone.");
+  return violations;
+}
+
+export { SUPPORT_STATUSES, UNRESOLVED_TYPES };
