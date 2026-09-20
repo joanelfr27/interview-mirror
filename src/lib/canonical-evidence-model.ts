@@ -359,7 +359,10 @@ export function validateCandidateElicitation(value: CandidateElicitation, ledger
   return errors;
 }
 
-export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
+export function validateRequirementGraph(
+  ledger: EvidenceLedger,
+  options: { allowUnjudgedFacets?: boolean } = {},
+): string[] {
   const errors: string[] = [];
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
   const requirementIds = new Set(ledger.requirements.map(x => x.id));
@@ -397,6 +400,15 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (unresolvedIdsSeen.has(u.id)) errors.push(`Unresolved item ${u.id} is duplicated.`);
     unresolvedIdsSeen.add(u.id);
   }
+  if (!options.allowUnjudgedFacets) {
+    errors.push(
+      ...assertCompleteFacetJudgments(
+        ledger.support_judgments,
+        ledger.requirements.flatMap(requirement => requirement.facets),
+      ),
+    );
+  }
+
   const judgmentKeys = new Set<string>();
   for (const j of ledger.support_judgments) {
     const key = `${j.requirement_id}::${j.facet_id}`;
