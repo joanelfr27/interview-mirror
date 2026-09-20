@@ -226,6 +226,76 @@ export function detectQuoteLanguage(quote: string, documentLanguage: CanonicalLa
   return quoteLanguage === "mixed" ? documentLanguage : quoteLanguage;
 }
 
+export function validateAtomicEvidenceAgainstSource(
+  value: AtomicEvidence,
+  sourceSpan: SourceSpan,
+): string[] {
+  const errors: string[] = [];
+  const source = sourceSpan.text;
+
+  const requireExact = (label: string, raw: string | undefined | null) => {
+    const value = raw?.trim();
+    if (value && !source.includes(value)) {
+      errors.push(`AtomicEvidence.${label} is not grounded in its source quote.`);
+    }
+  };
+
+  // Free-text semantic fields are deliberately fail-closed: normalization may
+  // change casing/spacing, but it may not introduce facts absent from the quote.
+  requireExact("action.normalized_action", value.action.normalized_action);
+  requireExact("action.object", value.action.object);
+  requireExact("context.domain", value.context.domain);
+  requireExact("context.jurisdiction", value.context.jurisdiction);
+  requireExact("context.situation", value.context.situation);
+  for (const tool of value.context.tools_or_systems ?? []) requireExact("context.tools_or_systems", tool);
+  for (const standard of value.context.standards ?? []) requireExact("context.standards", standard);
+  requireExact("scale.quantity", value.scale.quantity);
+  requireExact("scale.currency", value.scale.currency);
+  requireExact("scale.scope", value.scale.scope);
+  requireExact("time.start", value.time.start);
+  requireExact("time.end", value.time.end);
+  requireExact("time.recency", value.time.recency);
+  requireExact("outcome", value.outcome);
+
+  if (value.scale.team_size !== undefined) {
+    const literal = String(value.scale.team_size);
+    if (!source.includes(literal)) errors.push("AtomicEvidence.scale.team_size is not grounded in its source quote.");
+  }
+
+  const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
+    INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
+    TEAM: /\b(?:we|our|team|teams|nous|notre|nos|équipe|équipes)\b/i,
+    SHARED: /\b(?:shared|co-owned|co-owned|partagé|partagée|partagés|partagées)\b/i,
+    SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
+  };
+  if (value.subject.ownership !== "UNKNOWN" && !ownershipMarkers[value.subject.ownership].test(source)) {
+    errors.push(`AtomicEvidence.subject.ownership=${value.subject.ownership} is not explicitly grounded in its source quote.`);
+  }
+
+  if (value.assertion.polarity === "NEGATED" &&
+      !/(?:\b(?:not|never|no|without|didn['’]t|doesn['’]t|cannot|can't|non|sans|jamais|aucun|aucune|n['’]ai|n['’]a)\b)/i.test(source)) {
+    errors.push("AtomicEvidence NEGATED polarity is not explicitly grounded in the source quote.");
+  }
+
+  if (value.assertion.type === "QUANTIFIED" &&
+      !/(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+    errors.push("QUANTIFIED assertion type requires an explicit metric or amount in the source quote.");
+  }
+
+  if (value.assertion.type === "OUTCOME_CLAIM" && !value.outcome?.trim()) {
+    errors.push("OUTCOME_CLAIM requires an outcome grounded in the source quote.");
+  }
+
+  if (value.verifiability.has_quantifiable_metric !== /(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+    errors.push("has_quantifiable_metric does not match deterministic source evidence.");
+  }
+  if (value.verifiability.has_time_anchor !== /\b(?:19|20)\d{2}\b/.test(source)) {
+    errors.push("has_time_anchor does not match deterministic source evidence.");
+  }
+
+  return errors;
+}
+
 export function validateAtomicEvidence(value: AtomicEvidence): string[] {
   const e: string[] = [];
   if (!value.id) e.push("AtomicEvidence.id is required.");
