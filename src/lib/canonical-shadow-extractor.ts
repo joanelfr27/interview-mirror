@@ -2,7 +2,7 @@ import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence,
-  type EvidenceLedger,
+  type EvidenceLedger, detectSourceLanguage, detectQuoteLanguage,
   type EvidenceOwnership,
   type EvidenceSourceType,
   type Requirement,
@@ -174,8 +174,7 @@ function canonicalize(value: string): string {
   return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-import { detectSourceLanguage, detectQuoteLanguage } from "@/lib/canonical-language";
-export { detectSourceLanguage, detectQuoteLanguage } from "@/lib/canonical-language";
+
 
 function findExactSpan(
   documentId: string,
