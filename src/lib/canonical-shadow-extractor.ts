@@ -184,6 +184,11 @@ function detectSourceLanguage(cv: string, jd: string): "en" | "fr" | "mixed" {
   return "mixed";
 }
 
+function detectQuoteLanguage(quote: string, documentLanguage: "en" | "fr" | "mixed"): "en" | "fr" | "mixed" {
+  const quoteLanguage = detectSourceLanguage(quote, "");
+  return quoteLanguage === "mixed" ? documentLanguage : quoteLanguage;
+}
+
 function findExactSpan(
   documentId: string,
   document: string,
@@ -411,7 +416,8 @@ export async function extractCanonicalShadow(
   const jdUsed = new Set<string>();
 
   for (const raw of rawAtoms) {
-    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, sourceLanguage, cvUsed, "ATOM");
+    const spanLanguage = detectQuoteLanguage(raw.source_quote, sourceLanguage);
+    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
       warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
@@ -441,7 +447,7 @@ export async function extractCanonicalShadow(
       `JD-${session.id}`,
       session.job_description ?? "",
       raw.source_quote,
-      jdLanguage,
+      detectQuoteLanguage(raw.source_quote, jdLanguage),
       jdUsed,
       "REQUIREMENT",
     );
