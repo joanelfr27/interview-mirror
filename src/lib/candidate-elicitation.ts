@@ -9,6 +9,16 @@ import {
 
 const CLASSIFICATIONS = ["EVIDENCE_GAP","TRANSFERABLE","EXPERIENCE_GAP"] as const;
 
+function detectAnswerLanguage(answer: string): "en" | "fr" | "mixed" {
+  const text = answer.toLowerCase();
+  const french = (text.match(/\b(?:je|j'ai|nous|avec|dans|pour|sur|une|des|le|la|les|expérience|responsabilité|géré|gérer|équipe|résultat)\b/g) ?? []).length;
+  const english = (text.match(/\b(?:i|i've|we|with|in|for|on|an|the|experience|responsibility|managed|manage|team|result)\b/g) ?? []).length;
+  if (!french && !english) return "mixed";
+  if (french > english * 1.5) return "fr";
+  if (english > french * 1.5) return "en";
+  return "mixed";
+}
+
 const SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
@@ -47,7 +57,7 @@ export async function classifyCandidateElicitation(
   elicitation: CandidateElicitation,
   answer: string,
 ): Promise<{ ledger: EvidenceLedger; elicitation: CandidateElicitation; diagnostics: string[] }> {
-  const language = normalizeLanguage(session.preparation_language);
+  const language = detectAnswerLanguage(answer);
   const item = ledger.unresolved_items.find(x => x.id === elicitation.unresolved_item_id);
   if (!item) throw new Error("Unknown unresolved item: " + elicitation.unresolved_item_id);
 
