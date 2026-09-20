@@ -288,6 +288,32 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!spanIds.has(req.source_span_id)) errors.push(`Requirement ${req.id} references unknown source span.`);
     for (const facet of req.facets) if (!spanIds.has(facet.source_span_id)) errors.push(`Facet ${facet.id} references unknown source span.`);
   }
+  const sourceSpanIds = new Set<string>();
+  const evidenceIdsSeen = new Set<string>();
+  const requirementIdsSeen = new Set<string>();
+  const facetIdsSeen = new Set<string>();
+  const unresolvedIdsSeen = new Set<string>();
+  const requirementStatusIdsSeen = new Set<string>();
+  for (const span of ledger.source_spans) {
+    if (sourceSpanIds.has(span.id)) errors.push(`Source span ${span.id} is duplicated.`);
+    sourceSpanIds.add(span.id);
+  }
+  for (const atom of ledger.evidence) {
+    if (evidenceIdsSeen.has(atom.id)) errors.push(`Atomic evidence ${atom.id} is duplicated.`);
+    evidenceIdsSeen.add(atom.id);
+  }
+  for (const req of ledger.requirements) {
+    if (requirementIdsSeen.has(req.id)) errors.push(`Requirement ${req.id} is duplicated.`);
+    requirementIdsSeen.add(req.id);
+    for (const facet of req.facets) {
+      if (facetIdsSeen.has(facet.id)) errors.push(`Requirement facet ${facet.id} is duplicated.`);
+      facetIdsSeen.add(facet.id);
+    }
+  }
+  for (const u of ledger.unresolved_items) {
+    if (unresolvedIdsSeen.has(u.id)) errors.push(`Unresolved item ${u.id} is duplicated.`);
+    unresolvedIdsSeen.add(u.id);
+  }
   const judgmentKeys = new Set<string>();
   for (const j of ledger.support_judgments) {
     const key = `${j.requirement_id}::${j.facet_id}`;
@@ -297,6 +323,14 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
     errors.push(...validateSupportJudgmentAgainstEvidence(j, ledger.evidence).map(error => `Support judgment ${j.id}: ${error}`));
     if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
+    const citedAtoms = j.supporting_evidence_ids
+      .map(id => ledger.evidence.find(atom => atom.id === id))
+      .filter((atom): atom is AtomicEvidence => Boolean(atom));
+    const hasElicited = citedAtoms.some(atom => atom.provenance.source_type === "CANDIDATE_ELICITED");
+    const hasDocumented = citedAtoms.some(atom => atom.provenance.source_type !== "CANDIDATE_ELICITED");
+    if (j.support_basis === "DOCUMENTED" && hasElicited) errors.push(`Support judgment ${j.id}: DOCUMENTED basis cannot cite elicited evidence.`);
+    if (j.support_basis === "CANDIDATE_SELF_REPORTED" && hasDocumented) errors.push(`Support judgment ${j.id}: self-reported basis cannot cite documented evidence.`);
+    if (hasElicited && hasDocumented) errors.push(`Support judgment ${j.id}: mixed evidence basis requires an explicit model state.`);
     if (j.support_basis === "CANDIDATE_SELF_REPORTED" && j.status === "DIRECT") errors.push(`Support judgment ${j.id}: self-reported undocumented evidence cannot be DIRECT.`);
     if (j.status === "ANALOGICAL_TRANSFER" && (!j.analogical_mapping?.shared_dimensions?.length || !j.analogical_mapping?.unshared_dimensions?.length)) errors.push(`Support judgment ${j.id}: ANALOGICAL_TRANSFER requires shared and unshared dimensions.`);
     if (j.abstained && !j.abstention_reason?.trim()) errors.push(`Support judgment ${j.id}: abstention_reason is required.`);
@@ -318,6 +352,8 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!UNRESOLVED_TYPES.has(u.type)) errors.push(`Unresolved item ${u.id} has invalid type.`);
   }
   for (const rs of ledger.requirement_statuses) {
+    if (requirementStatusIdsSeen.has(rs.requirement_id)) errors.push(`Requirement status for ${rs.requirement_id} is duplicated.`);
+    requirementStatusIdsSeen.add(rs.requirement_id);
     const req = ledger.requirements.find(r => r.id === rs.requirement_id);
     if (!req) errors.push(`Requirement status references unknown requirement ${rs.requirement_id}.`);
     else {
