@@ -11,6 +11,7 @@ import {
   type Requirement,
   type SupportJudgment,
 } from "../src/lib/canonical-evidence-model.ts";
+import { detectSourceLanguage, detectQuoteLanguage } from "../src/lib/canonical-shadow-extractor.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
   return {
@@ -235,4 +236,35 @@ test("negated evidence cannot be bound as a demonstration true atom", () => {
     [atom("A2", "NEGATED")],
   );
   assert.ok(errors.some(e => e.includes("cannot treat NEGATED evidence")));
+});
+
+
+test("source language detection preserves mixed-language document context but quote-level detection identifies each quote", () => {
+  const document = "I managed finance and reporting.\nJ'ai dirigé l'équipe finance.";
+  assert.equal(detectSourceLanguage(document, ""), "mixed");
+  assert.equal(detectQuoteLanguage("I managed finance and reporting.", "mixed"), "en");
+  assert.equal(detectQuoteLanguage("J'ai dirigé l'équipe finance.", "mixed"), "fr");
+});
+
+test("requirement graph rejects incomplete requirement status coverage", () => {
+  const req2 = { ...requirement(), id: "REQ-2", source_span_id: "span-req-2", normalized_requirement: "Lead teams" };
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+      { id: "span-req-2", document_id: "JD", text: "Lead teams", start_offset: 15, end_offset: 25, language: "en" },
+    ],
+    evidence: [atom("A1")],
+    requirements: [requirement(), req2],
+    support_judgments: [
+      judgment("F-1", "DIRECT", ["A1"]),
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(ledger);
+  assert.ok(errors.some(e => e.includes("Requirement REQ-2 has no requirement status.")));
 });
