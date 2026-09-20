@@ -358,8 +358,16 @@ export function buildUnresolvedItems(ledger: EvidenceLedger): UnresolvedItem[] {
 }
 
 export function validateDemonstrationEvidenceBinding(objective: DemonstrationObjective, evidence: AtomicEvidence[]): string[] {
-  const known = new Set(evidence.map(x => x.id));
-  return objective.supporting_true_atom_ids.filter(id => !known.has(id)).map(id => `DemonstrationObjective ${objective.id} references unknown atomic evidence ${id}.`);
+  const byId = new Map(evidence.map(x => [x.id, x]));
+  const errors: string[] = [];
+  for (const id of objective.supporting_true_atom_ids) {
+    const atom = byId.get(id);
+    if (!atom) errors.push(`DemonstrationObjective ${objective.id} references unknown atomic evidence ${id}.`);
+    else if (atom.assertion.polarity !== "AFFIRMATIVE") {
+      errors.push(`DemonstrationObjective ${objective.id} cannot treat NEGATED evidence ${id} as a supporting true atom.`);
+    }
+  }
+  return errors;
 }
 
 export function validateSpanBounds(sourceSpan: SourceSpan, documentText: string): string[] {
