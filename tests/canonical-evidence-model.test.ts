@@ -13,9 +13,7 @@ import {
   detectSourceLanguage,
   detectQuoteLanguage,
   validateSupportJudgmentAgainstFacet,
-  assertCompleteFacetJudgments,
-  buildCandidateElicitations,
-} from "../src/lib/canonical-evidence-model.ts";
+  assertCompleteFacetJudgments} from "../src/lib/canonical-evidence-model.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
   return {
