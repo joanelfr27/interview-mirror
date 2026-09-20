@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:canonical": "tsx --test tests/canonical-evidence-model.test.ts",
+    "test:canonical": "node --test tests/canonical-evidence-model.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -47,7 +47,6 @@
     "eslint-config-next": "^15.2.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.3",
-    "tsx": "^4.19.2"
+    "typescript": "^5.7.3"
   }
 }
