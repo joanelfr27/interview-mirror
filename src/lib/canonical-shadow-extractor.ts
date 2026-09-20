@@ -15,6 +15,7 @@ import {
   validateSpanBounds,
   forbiddenInferenceViolations,
   validatePipelineContext,
+  validateRequirementGraph,
   type PipelineContext,
 } from "@/lib/canonical-evidence-model";
 
@@ -513,6 +514,11 @@ export async function extractCanonicalShadow(
     candidate_elicitations: [],
     demonstration_objectives: [],
   };
+
+  const graphErrors = validateRequirementGraph(ledger);
+  if (graphErrors.length) {
+    throw new Error("Canonical extraction graph failed validation: " + graphErrors.join(" | "));
+  }
 
   return {
     pipeline_context: context,
