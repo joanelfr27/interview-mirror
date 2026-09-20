@@ -86,7 +86,7 @@ export async function classifyCandidateElicitation(
   let span: SourceSpan | null = null;
 
   if (!quote || start < 0) {
-    diagnostics.push("Elicited classification rejected because atom_quote was not an exact answer substring.");
+    throw new Error("Elicited classification rejected because atom_quote was not an exact answer substring.");
   } else {
     span = {
       id: "SPAN-ELICIT-" + elicitation.id,
@@ -108,7 +108,10 @@ export async function classifyCandidateElicitation(
       },
       extraction_confidence: 1,
     };
-    diagnostics.push(...validateAtomicEvidence(atom));
+    const atomErrors = validateAtomicEvidence(atom);
+    if (atomErrors.length) {
+      throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
+    }
   }
 
   const updatedElicitation: CandidateElicitation = {
@@ -124,6 +127,9 @@ export async function classifyCandidateElicitation(
     evidence: atom && !validateAtomicEvidence(atom).length ? [...ledger.evidence, atom] : ledger.evidence,
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
-  diagnostics.push(...validateRequirementGraph(next));
+  const graphErrors = validateRequirementGraph(next);
+  if (graphErrors.length) {
+    throw new Error("Elicited evidence graph failed validation: " + graphErrors.join(" | "));
+  }
   return { ledger: next, elicitation: updatedElicitation, diagnostics };
 }
