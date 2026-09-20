@@ -163,6 +163,45 @@ test("contradicted facets remain in unresolved inference queue", () => {
   assert.deepEqual(unresolved[0].contradiction_evidence_ids, ["A2"]);
 });
 
+test("duplicate facet IDs are rejected", () => {
+  const req = requirement();
+  req.facets.push({ ...req.facets[0], id: "F-1" });
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [atom("A1")],
+    requirements: [req],
+    support_judgments: [],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  assert.ok(validateRequirementGraph(ledger).some(e => e.includes("Requirement facet F-1 is duplicated")));
+});
+
+test("support basis must match cited evidence provenance", () => {
+  const elicited = atom("A2");
+  elicited.provenance.source_type = "CANDIDATE_ELICITED";
+  elicited.assertion.type = "ELICITED";
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A2", document_id: "ELICIT", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [elicited],
+    requirements: [requirement()],
+    support_judgments: [judgment("F-1", "PARTIAL", ["A2"]), judgment("F-2", "NONE")],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  assert.ok(validateRequirementGraph(ledger).some(e => e.includes("DOCUMENTED basis cannot cite elicited evidence")));
+});
+
 test("duplicate judgments for one facet are rejected", () => {
   const ledger: EvidenceLedger = {
     source_spans: [
