@@ -20,6 +20,7 @@ export type EvidenceOwnership = "INDIVIDUAL" | "TEAM" | "SHARED" | "SUPERVISED" 
 export type AssertionType =
   | "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT"
   | "RESPONSIBILITY" | "OUTCOME_CLAIM" | "ELICITED";
+export type AssertionPolarity = "AFFIRMATIVE" | "NEGATED";
 
 export type VerifiabilitySignals = {
   has_quantifiable_metric: boolean;
@@ -56,7 +57,7 @@ export type AtomicEvidence = {
   scale: { quantity?: string; currency?: string; team_size?: number; scope?: string };
   time: { start?: string; end?: string; recency?: string };
   outcome: string | null;
-  assertion: { type: AssertionType };
+  assertion: { type: AssertionType; polarity: AssertionPolarity };
   verifiability: VerifiabilitySignals;
   extraction_confidence: number;
 };
@@ -108,6 +109,7 @@ export type SupportJudgment = {
   rationale: string;
   confidence: number;
   abstained: boolean;
+  abstention_reason?: string;
 };
 
 export type RequirementStatus = "SUPPORTED" | "PARTIAL" | "UNRESOLVED" | "CONTRADICTED";
@@ -121,6 +123,7 @@ export type UnresolvedItem = {
   supporting_evidence_ids: string[];
   contradiction_evidence_ids: string[];
   absence_basis: "UNMENTIONED" | "EXPLICIT_CONTRADICTION" | "CONFLICTING_SOURCES";
+  negation_evidence_ids: string[];
 };
 
 export type CandidateGapClassification = "EVIDENCE_GAP" | "TRANSFERABLE" | "EXPERIENCE_GAP";
@@ -158,6 +161,8 @@ export type EvidenceLedger = {
   unresolved_items: UnresolvedItem[];
   candidate_elicitations: CandidateElicitation[];
   demonstration_objectives: DemonstrationObjective[];
+  // CompetencyInstance and CareerTheme remain virtual L2/L3 projections over L1.
+  // They are intentionally not persisted in the reasoning ledger and never feed LLM support judgments.
 };
 
 export type PipelineContext = {
@@ -205,6 +210,7 @@ export function validateAtomicEvidence(value: AtomicEvidence): string[] {
   if (!finite01(value.extraction_confidence)) e.push("AtomicEvidence.extraction_confidence must be between 0 and 1.");
   if (value.scale?.team_size !== undefined && (!Number.isInteger(value.scale.team_size) || value.scale.team_size < 0)) e.push("AtomicEvidence.scale.team_size must be a non-negative integer.");
   if (value.provenance?.source_type === "CANDIDATE_ELICITED" && value.assertion?.type !== "ELICITED") e.push("CANDIDATE_ELICITED evidence must have ELICITED assertion type.");
+  if (!["AFFIRMATIVE","NEGATED"].includes(value.assertion?.polarity)) e.push("AtomicEvidence.assertion.polarity is invalid.");
   if (value.provenance?.source_type !== "CANDIDATE_ELICITED" && value.assertion?.type === "ELICITED") e.push("ELICITED assertion requires CANDIDATE_ELICITED provenance.");
   return e;
 }
@@ -219,6 +225,7 @@ export function validateSupportJudgment(value: SupportJudgment): string[] {
   if (!value.rationale?.trim()) e.push("SupportJudgment.rationale is required.");
   if (!finite01(value.confidence)) e.push("SupportJudgment.confidence must be between 0 and 1.");
   if (typeof value.abstained !== "boolean") e.push("SupportJudgment.abstained is required.");
+  if (value.abstained && !value.abstention_reason?.trim()) e.push("Abstention requires an abstention_reason.");
   if (value.status === "NONE" && value.supporting_evidence_ids.length > 0) e.push("NONE cannot cite supporting evidence.");
   if (value.status === "CONTRADICTORY" && value.supporting_evidence_ids.length === 0) e.push("CONTRADICTORY must cite evidence.");
   if (value.abstained && value.status !== "NONE") e.push("Abstention may only produce NONE.");
@@ -242,6 +249,7 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
     if (j.status === "NONE" && j.supporting_evidence_ids.length) errors.push(`Support judgment ${j.id}: NONE cannot cite evidence.`);
+    if (j.abstained && !j.abstention_reason?.trim()) errors.push(`Support judgment ${j.id}: abstention_reason is required.`);
     for (const id of j.supporting_evidence_ids) if (!evidenceIds.has(id)) errors.push(`Support judgment ${j.id} references unknown evidence ${id}.`);
     const parent = ledger.requirements.find(r => r.id === j.requirement_id);
     if (parent && !parent.facets.some(f => f.id === j.facet_id)) errors.push(`Support judgment ${j.id} facet does not belong to its requirement.`);
@@ -307,7 +315,8 @@ export function buildUnresolvedItems(ledger: EvidenceLedger): UnresolvedItem[] {
       type: contradictions.length ? "CONFLICTING" : partial ? "AMBIGUOUS" : "ABSENT",
       supporting_evidence_ids: [...new Set(support)],
       contradiction_evidence_ids: [...new Set(contradictions)],
-      absence_basis: contradictions.length ? "CONFLICTING_SOURCES" : "UNMENTIONED",
+      absence_basis: contradictions.length ? "EXPLICIT_CONTRADICTION" : "UNMENTIONED",
+      negation_evidence_ids: [...new Set(contradictions.filter(id => ledger.evidence.find(e => e.id === id)?.assertion.polarity === "NEGATED"))],
     });
   }
   return result;
