@@ -503,8 +503,9 @@ export async function extractCanonicalShadow(
     requirements.push(requirement);
   }
 
+  const uniqueSourceSpans = [...new Map(sourceSpans.map(span => [span.id, span])).values()];
   const ledger: EvidenceLedger = {
-    source_spans: sourceSpans,
+    source_spans: uniqueSourceSpans,
     evidence: atoms,
     requirements,
     support_judgments: [],
@@ -520,7 +521,7 @@ export async function extractCanonicalShadow(
   return {
     pipeline_context: context,
     ledger,
-    source_spans: sourceSpans,
+    source_spans: uniqueSourceSpans,
     diagnostics: {
       errors,
       warnings,
