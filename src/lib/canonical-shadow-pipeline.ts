@@ -1,5 +1,5 @@
 import type { SessionRecord } from "@/types";
-import { extractCanonicalShadow } from "@/lib/canonical-shadow-extractor";
+import { extractCanonicalShadow, type CanonicalShadowResult } from "@/lib/canonical-shadow-extractor";
 import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
 import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
@@ -11,7 +11,7 @@ import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-e
 export async function runCanonicalShadowPipeline(session: SessionRecord): Promise<{
   ledger: EvidenceLedger;
   diagnostics: string[];
-  extraction: ReturnType<typeof extractCanonicalShadow> extends Promise<infer T> ? T["diagnostics"] : never;
+  extraction: CanonicalShadowResult["diagnostics"];
 }> {
   const extraction = await extractCanonicalShadow(session);
   let ledger = extraction.ledger;
