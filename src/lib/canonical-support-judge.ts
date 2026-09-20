@@ -4,7 +4,6 @@ import {
   type EvidenceLedger,
   type SupportJudgment,
   type SupportStatus,
-  validateSupportJudgment,
   validateSupportJudgmentAgainstEvidence,
   aggregateRequirementStatus,
   buildUnresolvedItems,
