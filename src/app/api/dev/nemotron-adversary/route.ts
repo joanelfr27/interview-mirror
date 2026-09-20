@@ -11,9 +11,9 @@ type AdversaryRequest = {
 
 function jsonFromModel(raw: string): unknown {
   const cleaned = raw.trim()
-    .replace(/^\`\`\`json\s*/i, "")
-    .replace(/^\`\`\`\s*/i, "")
-    .replace(/\s*\`\`\`$/i, "")
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
     .trim();
   try {
     return JSON.parse(cleaned);
@@ -26,7 +26,7 @@ function jsonFromModel(raw: string): unknown {
 }
 
 function buildPrompt(input: AdversaryRequest): string {
-  return \`
+  return `
 You are the Strategic Adversary inside Interview Mirror.
 
 Your job is NOT to summarize the CV, match keywords, praise the candidate, or write generic interview advice.
@@ -71,14 +71,14 @@ Return ONLY valid JSON:
 }
 
 CV:
-\${input.cv.slice(0, 14000)}
+${input.cv.slice(0, 14000)}
 
 JOB DESCRIPTION:
-\${input.jd.slice(0, 10000)}
+${input.jd.slice(0, 10000)}
 
 CURRENT STRATEGY (if supplied):
-\${JSON.stringify(input.strategy ?? null).slice(0, 12000)}
-\`;
+${JSON.stringify(input.strategy ?? null).slice(0, 12000)}
+`;
 }
 
 export async function GET() {
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
-      "Authorization": \`Bearer \${apiKey}\`,
+      "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "http://localhost:3000",
       "X-Title": "Interview Mirror Strategic Adversary",
