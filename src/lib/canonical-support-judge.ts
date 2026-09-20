@@ -12,7 +12,7 @@ import {
 
 type RawJudgment = {
   id: string; requirement_id: string; facet_id: string; status: SupportStatus;
-  supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean;
+  supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean; abstention_reason?: string;
 };
 
 const STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
@@ -28,7 +28,7 @@ const SCHEMA = {
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
       },
-      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained"],
+      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason"],
     }},
   },
   required: ["judgments"],
@@ -51,7 +51,7 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
 
     const cited = [...new Set(item.supporting_evidence_ids)].filter(id => evidenceIds.has(id));
     if (item.status === "NONE" || item.abstained) {
-      item.status = "NONE"; item.abstained = true; item.supporting_evidence_ids = [];
+      item.status = "NONE"; item.abstained = true; item.supporting_evidence_ids = []; item.abstention_reason = item.abstention_reason || "Insufficient explicit evidence to make a positive support judgment.";
     } else {
       item.supporting_evidence_ids = cited;
       if (!cited.length) {
@@ -72,7 +72,7 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
       requirement_id: req.id, facet_id: facet.id, status: "NONE",
       supporting_evidence_ids: [],
       rationale: "No valid support judgment was returned for this facet; abstained rather than inferring.",
-      confidence: 0, abstained: true,
+      confidence: 0, abstained: true, abstention_reason: "No valid facet judgment was returned; abstained rather than inferring.",
     });
   }
   return { judgments: valid, errors };
@@ -107,7 +107,7 @@ export async function judgeCanonicalSupport(
     "ANALOGICAL_TRANSFER = explicit atom shows genuinely adjacent capability/context, not the same requirement. " +
     "CONTRADICTORY = explicit candidate evidence conflicts with the facet. NONE = supplied evidence does not support the facet; abstain when uncertain.\n\n" +
     "Hard rules: cite only supplied evidence IDs; one facet may cite multiple atoms and one atom may support multiple facets; " +
-    "never infer missing tools, scope, ownership, outcomes, seniority, industry or qualifications; not mentioned is not contradictory; " +
+    "never infer missing tools, scope, ownership, outcomes, seniority, industry or qualifications; not mentioned is not contradictory; an explicitly NEGATED atom is evidence of contradiction when it conflicts with the facet; " +
     "CONTRADICTORY requires explicit conflict; if insufficient to distinguish positive statuses, abstain as NONE; " +
     "rationale must describe evidentiary relationship, not imagined interviewer belief; confidence is mapping confidence; return one judgment per facet.";
 
