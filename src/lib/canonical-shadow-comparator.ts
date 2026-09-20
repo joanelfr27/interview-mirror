@@ -21,6 +21,9 @@ export type ShadowComparison = {
     atom_count: number;
     requirement_count: number;
     facet_count: number;
+    support_judgment_count: number;
+    unresolved_item_count: number;
+    demonstration_objective_count: number;
     source_span_count: number;
     rejected_atom_count: number;
     rejected_requirement_count: number;
@@ -107,21 +110,32 @@ export function compareCanonicalShadow(
     );
   }
 
+  if (shadow.ledger.support_judgments.length > 0) {
+    observations.push(
+      "Facet-level support judgments now exist; they are normative evidentiary mappings, not predictions of interviewer mental states.",
+    );
+  }
+
+  if (shadow.ledger.unresolved_items.length > 0) {
+    observations.push(
+      "Unresolved items are explicit preparation objects and must be classified by candidate elicitation before being called an evidence gap or experience gap.",
+    );
+  }
+
   return {
     legacy: {
       evidence_item_count: chain.length,
       fact_count: legacyFactCount,
-      requirement_count: new Set(
-        chain.flatMap((item) =>
-          (item.canonical_jd_requirements ?? []).map((requirement) => requirement.requirement_id),
-        ),
-      ).size,
+      requirement_count: chain.reduce((sum, item) => sum + (item.canonical_jd_requirements?.length ?? 0), 0),
       explicit_no_evidence_count: legacyExplicitNoEvidenceCount,
     },
     canonical: {
       atom_count: canonicalAtomCount,
       requirement_count: canonicalRequirementCount,
       facet_count: canonicalFacetCount,
+      support_judgment_count: shadow.ledger.support_judgments.length,
+      unresolved_item_count: shadow.ledger.unresolved_items.length,
+      demonstration_objective_count: shadow.ledger.demonstration_objectives.length,
       source_span_count: shadow.source_spans.length,
       rejected_atom_count: shadow.diagnostics.rejected_atoms.length,
       rejected_requirement_count: shadow.diagnostics.rejected_requirements.length,
