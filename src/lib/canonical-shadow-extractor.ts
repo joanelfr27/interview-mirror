@@ -202,7 +202,7 @@ function findExactSpan(
     if (!used.has(key)) {
       used.add(key);
       return {
-        id: `SPAN-${documentId}-${index}`,
+        id: `SPAN-${documentId}-${index}-${index + target.length}`,
         document_id: documentId,
         text: target,
         start_offset: index,
@@ -222,7 +222,7 @@ function spanWithinParent(parent: SourceSpan, quote: string): SourceSpan | null 
   if (!target || relative < 0) return null;
   const start = parent.start_offset + relative;
   return {
-    id: "SPAN-" + parent.document_id + "-" + start,
+    id: "SPAN-" + parent.document_id + "-" + start + "-" + (start + target.length),
     document_id: parent.document_id,
     text: target,
     start_offset: start,
