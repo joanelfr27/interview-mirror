@@ -357,11 +357,11 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   if (hasPriorityRiskDuplication(s, authoritativeVulnerabilities)) return false;
   if (hasDifficultQuestionDuplication(s)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
-  // Final quality gate: each proof priority must be anchored to both the
-  // candidate's actual evidence and a distinctive target-role requirement.
-  // This replaces the old "sounds strategic" test with a deterministic
-  // candidate-specificity/reuse check.
-  if (!hasSpecificPriorityAnchors(s, _cvText, _jobDescription, _evidenceMap, _strategicAnalysis)) return false;
+  // Candidate-specific grounding is enforced before this public boundary:
+  // internal strategy items carry evidence_node_id/supporting_fact_ids, are checked
+  // against the authoritative plan, and pass evidence-faithfulness verification.
+  // Do not re-impose literal/lexical CV/JD matching here: natural paraphrase can be
+  // fully grounded while sharing no distinctive surface token with the source.
   return true;
 }
 function validateObjectiveShape(o: any): o is ProofObjective {
@@ -1042,7 +1042,7 @@ async function generateExecutiveStrategy(session: SessionRecord, evidenceMap: Ev
       const faithfulness = await verifyEvidenceFaithfulness(internal, evidenceMap, authoritativePlan);
       if (!faithfulness.ok) { diagnostics = faithfulness.diagnostics; console.warn("[Strategy Engine V2.2] evidence faithfulness failed:", diagnostics); continue; }
       const publicStrategy = publicStrategyFromInternal(internal);
-      if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Gate 2B quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; console.warn("[Strategy Engine V2.2] Gate 2B failed:", diagnostics); continue; }
+      if (!isValidStrategy(publicStrategy, language, session.job_description, session.cv_analysis, session.cv_text, evidenceMap, analysis)) { diagnostics = ["Public quality validation failed: duplication, generic phrasing, language mismatch, or public contract issue."]; console.warn("[Strategy Engine V2.3] public quality gate failed:", diagnostics); continue; }
       return publicStrategy;
     } catch (error) { diagnostics = [error instanceof Error ? error.message : "Pass 2 structured generation failed."]; console.warn("[Strategy Engine V2.2] Pass 2 generation error:", diagnostics); }
   }
