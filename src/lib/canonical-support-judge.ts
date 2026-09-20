@@ -55,7 +55,7 @@ function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
 
-function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgments: SupportJudgment[]; errors: string[] } {
+export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgments: SupportJudgment[]; errors: string[] } {
   const errors: string[] = [];
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
   const requirements = new Map(ledger.requirements.map(x => [x.id, x]));
