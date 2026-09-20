@@ -201,8 +201,8 @@ export type CanonicalLanguage = "en" | "fr" | "mixed";
 
 export function detectSourceLanguage(cv: string, jd: string): CanonicalLanguage {
   const text = (cv + "\n" + jd).toLowerCase();
-  const frenchPattern = /(?:^|[^\\p{L}])(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec|j'ai|l'équipe|les|des|une|un|pour|sur|par|aux|est|et|de|du|que|qui|ce|cette|mon|ma|mes|préparé|piloté|trésorerie|clôtures)(?=$|[^\\p{L}])/gu;
-  const englishPattern = /(?:^|[^\\p{L}])(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and|the|of|to|for|in|on|is|this|that|my|led|prepared|treasury|close)(?=$|[^\\p{L}])/gu;
+  const frenchPattern = /(?:^|[^\p{L}])(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec|j'ai|l'équipe|les|des|une|un|pour|sur|par|aux|est|et|de|du|que|qui|ce|cette|mon|ma|mes|préparé|piloté|trésorerie|clôtures)(?=$|[^\p{L}])/gu;
+  const englishPattern = /(?:^|[^\p{L}])(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and|the|of|to|for|in|on|is|this|that|my|led|prepared|treasury|close)(?=$|[^\p{L}])/gu;
   const segments = text.split(/[\n.!?]+/).map(segment => segment.trim()).filter(Boolean);
   let hasFrenchSegment = false;
   let hasEnglishSegment = false;
