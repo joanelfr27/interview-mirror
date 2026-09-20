@@ -326,7 +326,7 @@ export function validateSpanBounds(sourceSpan: SourceSpan, documentText: string)
 export function forbiddenInferenceViolations(atom: AtomicEvidence): string[] {
   const violations: string[] = [];
   if (atom.provenance.source_type !== "CANDIDATE_ELICITED" && atom.assertion.type === "ELICITED") violations.push("ELICITED assertion type requires CANDIDATE_ELICITED provenance.");
-  if (atom.subject.ownership === "UNKNOWN" && /\\b(my|I|j'ai|je|mon|ma|mes)\\b/i.test(atom.action.normalized_action)) violations.push("Ownership cannot be upgraded from UNKNOWN by wording alone.");
+  if (atom.subject.ownership === "UNKNOWN" && /\b(my|I|j'ai|je|mon|ma|mes)\b/i.test(atom.action.normalized_action)) violations.push("Ownership cannot be upgraded from UNKNOWN by wording alone.");
   return violations;
 }
 
