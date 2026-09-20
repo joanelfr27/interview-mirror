@@ -202,7 +202,7 @@ export type CanonicalLanguage = "en" | "fr" | "mixed";
 export function detectSourceLanguage(cv: string, jd: string): CanonicalLanguage {
   const text = (cv + "\n" + jd).toLowerCase();
   const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|finance|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
-  const english = (text.match(/\b(?:experience|responsibilities|education|skills|finance|role|management|degree|you|with|from)\b/g) ?? []).length;
+  const english = (text.match(/\b(?:experience|responsibilities|education|skills|finance|role|management|degree|you|with|from|managed|reporting|team|result|and)\b/g) ?? []).length;
   if (french === 0 && english === 0) return "mixed";
   if (french > english * 1.5) return "fr";
   if (english > french * 1.5) return "en";
