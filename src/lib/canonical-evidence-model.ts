@@ -339,6 +339,17 @@ export function validateSupportJudgmentAgainstEvidence(
   return errors;
 }
 
+export function buildCandidateElicitations(ledger: EvidenceLedger): CandidateElicitation[] {
+  return ledger.unresolved_items.map(item => {
+    const requirement = ledger.requirements.find(r => r.id === item.requirement_id);
+    const facets = requirement?.facets.filter(f => item.facet_ids.includes(f.id)).map(f => f.requirement).join("; ") || requirement?.normalized_requirement || "this requirement";
+    const question = item.type === "CONFLICTING"
+      ? "Your documents contain conflicting evidence regarding " + facets + ". Can you clarify what you personally did, and in what context?"
+      : "Can you describe your experience with " + facets + ", including your personal role and the scope involved?";
+    return { id: "ELICIT-" + item.id, unresolved_item_id: item.id, question };
+  });
+}
+
 export function validateCandidateElicitation(value: CandidateElicitation, ledger: EvidenceLedger): string[] {
   const errors: string[] = [];
   if (!value.id) errors.push("CandidateElicitation.id is required.");
