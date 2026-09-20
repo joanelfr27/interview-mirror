@@ -246,6 +246,8 @@ test("negated evidence cannot be bound as a demonstration true atom", () => {
 test("Unicode-safe language detection recognizes accented French and English", () => {
   assert.equal(detectSourceLanguage("J'ai piloté la trésorerie et préparé les clôtures.", ""), "fr");
   assert.equal(detectSourceLanguage("I led treasury and prepared the close.", ""), "en");
+  assert.equal(detectSourceLanguage("xdirigé", ""), "mixed");
+  assert.equal(detectSourceLanguage("xmanaged", ""), "mixed");
 });
 
 test("source language detection preserves mixed-language document context but quote-level detection identifies each quote", () => {
