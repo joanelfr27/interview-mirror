@@ -368,11 +368,6 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     for (const id of [...u.supporting_evidence_ids, ...u.contradiction_evidence_ids]) if (!evidenceIds.has(id)) errors.push(`Unresolved item ${u.id} references unknown evidence.`);
     if (!UNRESOLVED_TYPES.has(u.type)) errors.push(`Unresolved item ${u.id} has invalid type.`);
   }
-  for (const requirement of ledger.requirements) {
-    if (!requirementStatusIdsSeen.has(requirement.id)) {
-      errors.push(`Requirement ${requirement.id} has no requirement status.`);
-    }
-  }
   for (const rs of ledger.requirement_statuses) {
     if (requirementStatusIdsSeen.has(rs.requirement_id)) errors.push(`Requirement status for ${rs.requirement_id} is duplicated.`);
     requirementStatusIdsSeen.add(rs.requirement_id);
@@ -381,6 +376,11 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     else {
       const expected = aggregateRequirementStatus(req, ledger.support_judgments);
       if (expected !== rs.status) errors.push(`Requirement status for ${rs.requirement_id} is ${rs.status} but deterministic aggregation yields ${expected}.`);
+    }
+  }
+  for (const requirement of ledger.requirements) {
+    if (!requirementStatusIdsSeen.has(requirement.id)) {
+      errors.push(`Requirement ${requirement.id} has no requirement status.`);
     }
   }
   for (const d of ledger.demonstration_objectives) {
