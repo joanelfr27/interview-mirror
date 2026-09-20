@@ -1,4 +1,4 @@
-import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence,
@@ -293,9 +293,9 @@ async function extractAtoms(
     messages: [
       {
         role: "system",
-        content: `${languageInstruction(language)}
+        content: `You are the canonical candidate-evidence extractor for Interview Mirror.
 
-You are the canonical candidate-evidence extractor for Interview Mirror.
+Source-language rule: preserve the language of the supplied CV in normalized fields. Do not translate, rewrite into the preparation language, or mix languages. Source quotes must remain verbatim. The preparation/product language is irrelevant to this canonical extraction layer.`
 
 Extract atomic evidence directly from the supplied CV. An atom is ONE explicit proposition that can be traced to one exact source quote.
 
@@ -339,9 +339,9 @@ async function extractRequirements(
     messages: [
       {
         role: "system",
-        content: `${languageInstruction(language)}
+        content: `You are the canonical job-requirement decomposer for Interview Mirror.
 
-You are the canonical job-requirement decomposer for Interview Mirror.
+Source-language rule: preserve the language of the supplied job description in normalized fields. Do not translate, rewrite into the preparation language, or mix languages. Source quotes must remain verbatim. The preparation/product language is irrelevant to this canonical extraction layer.`
 
 Extract material requirements directly from the supplied job description.
 
