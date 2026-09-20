@@ -13,6 +13,7 @@ import {
 type RawJudgment = {
   id: string; requirement_id: string; facet_id: string; status: SupportStatus;
   supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
+  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
 };
 
 const STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
