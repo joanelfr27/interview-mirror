@@ -256,6 +256,26 @@ export function validateSupportJudgmentAgainstEvidence(
   return errors;
 }
 
+export function validateCandidateElicitation(value: CandidateElicitation, ledger: EvidenceLedger): string[] {
+  const errors: string[] = [];
+  if (!value.id) errors.push("CandidateElicitation.id is required.");
+  if (!value.unresolved_item_id) errors.push("CandidateElicitation.unresolved_item_id is required.");
+  if (!value.question?.trim()) errors.push("CandidateElicitation.question is required.");
+  if (!ledger.unresolved_items.some(item => item.id === value.unresolved_item_id)) {
+    errors.push("CandidateElicitation references an unknown unresolved item.");
+  }
+  if (value.answer_assertion_type !== undefined && value.answer_assertion_type !== "ELICITED") {
+    errors.push("CandidateElicitation.answer_assertion_type must be ELICITED when present.");
+  }
+  if (value.answer_source_span_id && !ledger.source_spans.some(span => span.id === value.answer_source_span_id)) {
+    errors.push("CandidateElicitation references an unknown answer source span.");
+  }
+  if (value.answer_source_span_id && !value.answer) {
+    errors.push("CandidateElicitation answer source span requires an answer.");
+  }
+  return errors;
+}
+
 export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
   const errors: string[] = [];
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
@@ -268,7 +288,11 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!spanIds.has(req.source_span_id)) errors.push(`Requirement ${req.id} references unknown source span.`);
     for (const facet of req.facets) if (!spanIds.has(facet.source_span_id)) errors.push(`Facet ${facet.id} references unknown source span.`);
   }
+  const judgmentKeys = new Set<string>();
   for (const j of ledger.support_judgments) {
+    const key = `${j.requirement_id}::${j.facet_id}`;
+    if (judgmentKeys.has(key)) errors.push(`Support judgment ${j.id} duplicates another judgment for facet ${j.facet_id}.`);
+    judgmentKeys.add(key);
     if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
     errors.push(...validateSupportJudgmentAgainstEvidence(j, ledger.evidence).map(error => `Support judgment ${j.id}: ${error}`));
@@ -279,6 +303,12 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     for (const id of j.supporting_evidence_ids) if (!evidenceIds.has(id)) errors.push(`Support judgment ${j.id} references unknown evidence ${id}.`);
     const parent = ledger.requirements.find(r => r.id === j.requirement_id);
     if (parent && !parent.facets.some(f => f.id === j.facet_id)) errors.push(`Support judgment ${j.id} facet does not belong to its requirement.`);
+  }
+  const elicitationIds = new Set<string>();
+  for (const elicitation of ledger.candidate_elicitations) {
+    if (elicitationIds.has(elicitation.id)) errors.push(`Candidate elicitation ${elicitation.id} is duplicated.`);
+    elicitationIds.add(elicitation.id);
+    errors.push(...validateCandidateElicitation(elicitation, ledger));
   }
   for (const u of ledger.unresolved_items) {
     if (!requirementIds.has(u.requirement_id)) errors.push(`Unresolved item ${u.id} references unknown requirement.`);
