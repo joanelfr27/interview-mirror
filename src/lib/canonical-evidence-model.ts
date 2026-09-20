@@ -109,6 +109,7 @@ export type SupportJudgment = {
   rationale: string;
   confidence: number;
   abstained: boolean;
+  support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
   abstention_reason?: string;
 };
 
@@ -249,6 +250,8 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
     if (j.status === "NONE" && j.supporting_evidence_ids.length) errors.push(`Support judgment ${j.id}: NONE cannot cite evidence.`);
+    if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
+    if (j.support_basis === "CANDIDATE_SELF_REPORTED" && j.status === "DIRECT") errors.push(`Support judgment ${j.id}: self-reported undocumented evidence cannot be DIRECT.`);
     if (j.abstained && !j.abstention_reason?.trim()) errors.push(`Support judgment ${j.id}: abstention_reason is required.`);
     for (const id of j.supporting_evidence_ids) if (!evidenceIds.has(id)) errors.push(`Support judgment ${j.id} references unknown evidence ${id}.`);
     const parent = ledger.requirements.find(r => r.id === j.requirement_id);
@@ -260,6 +263,14 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     for (const id of u.facet_ids) if (!parent?.facets.some(f => f.id === id)) errors.push(`Unresolved item ${u.id} references invalid facet.`);
     for (const id of [...u.supporting_evidence_ids, ...u.contradiction_evidence_ids]) if (!evidenceIds.has(id)) errors.push(`Unresolved item ${u.id} references unknown evidence.`);
     if (!UNRESOLVED_TYPES.has(u.type)) errors.push(`Unresolved item ${u.id} has invalid type.`);
+  }
+  for (const rs of ledger.requirement_statuses) {
+    const req = ledger.requirements.find(r => r.id === rs.requirement_id);
+    if (!req) errors.push(`Requirement status references unknown requirement ${rs.requirement_id}.`);
+    else {
+      const expected = aggregateRequirementStatus(req, ledger.support_judgments);
+      if (expected !== rs.status) errors.push(`Requirement status for ${rs.requirement_id} is ${rs.status} but deterministic aggregation yields ${expected}.`);
+    }
   }
   for (const d of ledger.demonstration_objectives) {
     if (!ledger.unresolved_items.some(u => u.id === d.target_unresolved_item_id)) errors.push(`Demonstration objective ${d.id} targets unknown unresolved item.`);
