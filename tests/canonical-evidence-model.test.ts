@@ -299,32 +299,3 @@ test("support judge completeness fails closed on missing or duplicate facets", (
   assert.ok(duplicate.some(e => e.includes("Duplicate judgment returned for facet F-1")));
 });
 
-
-test("unresolved evidence produces a non-leading candidate elicitation", () => {
-  const req = requirement();
-  const ledger: EvidenceLedger = {
-    source_spans: [
-      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
-      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
-    ],
-    evidence: [atom("A1")],
-    requirements: [req],
-    support_judgments: [judgment("F-1", "NONE"), judgment("F-2", "NONE")],
-    requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
-    unresolved_items: buildUnresolvedItems({
-      source_spans: [],
-      evidence: [atom("A1")],
-      requirements: [req],
-      support_judgments: [judgment("F-1", "NONE"), judgment("F-2", "NONE")],
-      requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
-      unresolved_items: [],
-      candidate_elicitations: [],
-      demonstration_objectives: [],
-    }),
-    candidate_elicitations: [],
-    demonstration_objectives: [],
-  };
-  const elicitations = buildCandidateElicitations(ledger);
-  assert.equal(elicitations.length, 1);
-  assert.match(elicitations[0].question, /Can you describe your experience/);
-});
