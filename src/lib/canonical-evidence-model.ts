@@ -265,6 +265,60 @@ export function validateSupportJudgment(value: SupportJudgment): string[] {
   return e;
 }
 
+
+export function validateSupportJudgmentAgainstFacet(
+  value: SupportJudgment,
+  facet: RequirementFacet,
+  evidence: AtomicEvidence[],
+): string[] {
+  const errors = validateSupportJudgmentAgainstEvidence(value, evidence);
+  const cited = evidence.filter(atom => value.supporting_evidence_ids.includes(atom.id) && atom.assertion.polarity === "AFFIRMATIVE");
+  const has = (predicate: (atom: AtomicEvidence) => boolean) => cited.some(predicate);
+  if (value.status === "DIRECT") {
+    if (facet.type === "SCALE" && !has(atom => Boolean(atom.scale.quantity || atom.scale.team_size !== undefined || atom.scale.scope))) errors.push("DIRECT support for SCALE requires explicit quantity, team size, or scope evidence.");
+    if (facet.type === "TOOL_METHOD" && !has(atom => Boolean(atom.context.tools_or_systems?.length || atom.context.standards?.length))) errors.push("DIRECT support for TOOL_METHOD requires explicit tool, system, method, or standard evidence.");
+    if (facet.type === "OWNERSHIP" && !has(atom => atom.subject.ownership !== "UNKNOWN")) errors.push("DIRECT support for OWNERSHIP requires explicit non-UNKNOWN ownership evidence.");
+    if (facet.type === "OUTCOME" && !has(atom => Boolean(atom.outcome?.trim()))) errors.push("DIRECT support for OUTCOME requires an explicit outcome evidence field.");
+    if (facet.type === "GOVERNANCE" && !has(atom => Boolean(atom.context.standards?.length || atom.context.tools_or_systems?.length))) errors.push("DIRECT support for GOVERNANCE requires explicit governance, standard, system, or control evidence.");
+  }
+  const affirmativeKeys = new Set(cited.map(atom => [
+    atom.action.normalized_action.trim().toLowerCase(),
+    atom.action.object.trim().toLowerCase(),
+    (atom.context.domain ?? "").trim().toLowerCase(),
+    (atom.context.jurisdiction ?? "").trim().toLowerCase(),
+  ].join("|")));
+  if (["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(value.status) && affirmativeKeys.size > 0) {
+    const conflict = evidence.some(atom =>
+      atom.assertion.polarity === "NEGATED" &&
+      !value.supporting_evidence_ids.includes(atom.id) &&
+      affirmativeKeys.has([
+        atom.action.normalized_action.trim().toLowerCase(),
+        atom.action.object.trim().toLowerCase(),
+        (atom.context.domain ?? "").trim().toLowerCase(),
+        (atom.context.jurisdiction ?? "").trim().toLowerCase(),
+      ].join("|"))
+    );
+    if (conflict) errors.push("Positive support is blocked because a conflicting NEGATED atom exists for the same semantic claim.");
+  }
+  return errors;
+}
+
+export function assertCompleteFacetJudgments(
+  raw: Array<{ requirement_id: string; facet_id: string }>,
+  facets: RequirementFacet[],
+): string[] {
+  const expected = new Set(facets.map(f => f.id));
+  const seen = new Set<string>();
+  const errors: string[] = [];
+  for (const item of raw) {
+    if (seen.has(item.facet_id)) errors.push("Duplicate judgment returned for facet " + item.facet_id + ".");
+    seen.add(item.facet_id);
+    if (!expected.has(item.facet_id)) errors.push("Judgment returned for unknown facet " + item.facet_id + ".");
+  }
+  for (const id of expected) if (!seen.has(id)) errors.push("Missing judgment for facet " + id + ".");
+  return errors;
+}
+
 export function validateSupportJudgmentAgainstEvidence(
   value: SupportJudgment,
   evidence: AtomicEvidence[],
@@ -350,7 +404,8 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     judgmentKeys.add(key);
     if (!requirementIds.has(j.requirement_id)) errors.push(`Support judgment ${j.id} references unknown requirement.`);
     if (!facetIds.has(j.facet_id)) errors.push(`Support judgment ${j.id} references unknown facet.`);
-    errors.push(...validateSupportJudgmentAgainstEvidence(j, ledger.evidence).map(error => `Support judgment ${j.id}: ${error}`));
+    const facet = ledger.requirements.find(r => r.id === j.requirement_id)?.facets.find(f => f.id === j.facet_id);
+    if (facet) errors.push(...validateSupportJudgmentAgainstFacet(j, facet, ledger.evidence).map(error => "Support judgment " + j.id + ": " + error));
     if (!["DOCUMENTED","CANDIDATE_SELF_REPORTED"].includes(j.support_basis)) errors.push(`Support judgment ${j.id}: invalid support_basis.`);
     const citedAtoms = j.supporting_evidence_ids
       .map(id => ledger.evidence.find(atom => atom.id === id))
