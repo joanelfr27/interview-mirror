@@ -82,6 +82,17 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
       }
     }
 
+    const citedAtoms = item.supporting_evidence_ids
+      .map(id => ledger.evidence.find(atom => atom.id === id))
+      .filter((atom): atom is EvidenceLedger["evidence"][number] => Boolean(atom));
+    const hasElicited = citedAtoms.some(atom => atom.provenance.source_type === "CANDIDATE_ELICITED");
+    const hasDocumented = citedAtoms.some(atom => atom.provenance.source_type !== "CANDIDATE_ELICITED");
+    if (hasElicited && hasDocumented) {
+      errors.push("Rejected judgment " + item.id + ": mixed documented and elicited evidence requires an explicit mixed basis.");
+      continue;
+    }
+    item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
+
     const validation = validateSupportJudgmentAgainstEvidence(item, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     valid.push(item);
