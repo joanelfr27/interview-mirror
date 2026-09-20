@@ -1,4 +1,4 @@
-import { NextResponse } from "next";
+import { NextResponse } from "next/server";
 
 const MODEL = "deepseek/deepseek-v4-flash-0731:free";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
