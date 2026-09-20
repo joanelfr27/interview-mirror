@@ -13,8 +13,8 @@ const CLASSIFICATIONS = ["EVIDENCE_GAP","TRANSFERABLE","EXPERIENCE_GAP"] as cons
 
 export function detectAnswerLanguage(answer: string): "en" | "fr" | "mixed" {
   const text = answer.toLowerCase();
-  const frenchPattern = /(?:^|[^\\p{L}])(?:je|j'ai|nous|avec|dans|pour|sur|une|des|le|la|les|expérience|responsabilité|géré|gérer|équipe|résultat|piloté|préparé|trésorerie|clôtures)(?=$|[^\\p{L}])/gu;
-  const englishPattern = /(?:^|[^\\p{L}])(?:i|i've|we|with|in|for|on|an|the|experience|responsibility|managed|manage|team|result|led|prepared|treasury|close)(?=$|[^\\p{L}])/gu;
+  const frenchPattern = /(?:^|[^\p{L}])(?:je|j'ai|nous|avec|dans|pour|sur|une|des|le|la|les|expérience|responsabilité|géré|gérer|équipe|résultat|piloté|préparé|trésorerie|clôtures)(?=$|[^\p{L}])/gu;
+  const englishPattern = /(?:^|[^\p{L}])(?:i|i've|we|with|in|for|on|an|the|experience|responsibility|managed|manage|team|result|led|prepared|treasury|close)(?=$|[^\p{L}])/gu;
   const french = text.match(frenchPattern)?.length ?? 0;
   const english = text.match(englishPattern)?.length ?? 0;
   if (!french && !english) return "mixed";
