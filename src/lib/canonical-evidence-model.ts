@@ -563,10 +563,35 @@ export function validateRequirementGraph(
     if (parent && !parent.facets.some(f => f.id === j.facet_id)) errors.push(`Support judgment ${j.id} facet does not belong to its requirement.`);
   }
   const elicitationIds = new Set<string>();
+  const elicitationByAtomId = new Map<string, CandidateGapClassification>();
   for (const elicitation of ledger.candidate_elicitations) {
     if (elicitationIds.has(elicitation.id)) errors.push(`Candidate elicitation ${elicitation.id} is duplicated.`);
     elicitationIds.add(elicitation.id);
     errors.push(...validateCandidateElicitation(elicitation, ledger));
+    if (elicitation.classification) {
+      elicitationByAtomId.set(`ELICIT-ATOM-${elicitation.id}`, elicitation.classification);
+    }
+  }
+
+  for (const judgment of ledger.support_judgments) {
+    const citedClassifications = [...new Set(
+      judgment.supporting_evidence_ids
+        .map(id => elicitationByAtomId.get(id))
+        .filter((classification): classification is CandidateGapClassification => Boolean(classification)),
+    )];
+    for (const classification of citedClassifications) {
+      if (classification === "EXPERIENCE_GAP" &&
+          ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(judgment.status)) {
+        errors.push(`Support judgment ${judgment.id}: EXPERIENCE_GAP elicited evidence cannot produce positive support.`);
+      }
+      if (classification === "TRANSFERABLE" &&
+          ["DIRECT", "CONTRADICTORY"].includes(judgment.status)) {
+        errors.push(`Support judgment ${judgment.id}: TRANSFERABLE elicited evidence cannot be DIRECT or CONTRADICTORY.`);
+      }
+      if (classification === "EVIDENCE_GAP" && judgment.status === "CONTRADICTORY") {
+        errors.push(`Support judgment ${judgment.id}: EVIDENCE_GAP elicited evidence cannot be CONTRADICTORY.`);
+      }
+    }
   }
   for (const u of ledger.unresolved_items) {
     if (!requirementIds.has(u.requirement_id)) errors.push(`Unresolved item ${u.id} references unknown requirement.`);
