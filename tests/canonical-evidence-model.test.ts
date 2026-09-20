@@ -598,3 +598,59 @@ test("third-party verification cannot be asserted without a deterministic source
   const errors = validateAtomicEvidenceAgainstSource(evidence, span);
   assert.ok(errors.some(e => e.includes("has_third_party_entity")));
 });
+
+
+test("elicitation classification cannot be overturned by an inconsistent support status", () => {
+  const makeLedger = (classification: "EXPERIENCE_GAP" | "TRANSFERABLE" | "EVIDENCE_GAP", status: SupportJudgment["status"]) => {
+    const elicited = atom("ELICIT-ATOM-E1");
+    elicited.provenance.source_type = "CANDIDATE_ELICITED";
+    elicited.assertion.type = "ELICITED";
+    elicited.assertion.polarity = classification === "EXPERIENCE_GAP" ? "NEGATED" : "AFFIRMATIVE";
+    const span = {
+      id: "SPAN-ELICIT-E1",
+      document_id: "ELICIT-SESSION",
+      text: classification === "EXPERIENCE_GAP" ? "I have never managed finance" : "I managed a related process",
+      start_offset: 0,
+      end_offset: classification === "EXPERIENCE_GAP" ? 27 : 26,
+      language: "en",
+    };
+    elicited.source_span_id = span.id;
+    return {
+      source_spans: [span, { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" }],
+      evidence: [elicited],
+      requirements: [requirement()],
+      support_judgments: [judgment("F-1", status, [elicited.id]), judgment("F-2", "NONE")],
+      requirement_statuses: [{ requirement_id: "REQ-1", status: status === "CONTRADICTORY" ? "CONTRADICTED" : status === "DIRECT" ? "PARTIAL" : "UNRESOLVED" }],
+      unresolved_items: [{
+        id: "U-E1",
+        requirement_id: "REQ-1",
+        facet_ids: ["F-1"],
+        type: "ABSENT",
+        supporting_evidence_ids: [],
+        contradiction_evidence_ids: [],
+        absence_basis: "UNMENTIONED",
+        negation_evidence_ids: [],
+      }],
+      candidate_elicitations: [{
+        id: "E1",
+        unresolved_item_id: "U-E1",
+        question: "Describe your experience.",
+        answer: span.text,
+        answer_source_span_id: span.id,
+        answer_assertion_type: "ELICITED",
+        classification,
+        classification_rationale: "test",
+      }],
+      demonstration_objectives: [],
+    } as EvidenceLedger;
+  };
+
+  const experienceErrors = validateRequirementGraph(makeLedger("EXPERIENCE_GAP", "DIRECT"));
+  assert.ok(experienceErrors.some(e => e.includes("EXPERIENCE_GAP elicited evidence cannot produce positive support")));
+
+  const transferableErrors = validateRequirementGraph(makeLedger("TRANSFERABLE", "DIRECT"));
+  assert.ok(transferableErrors.some(e => e.includes("TRANSFERABLE elicited evidence cannot be DIRECT")));
+
+  const evidenceGapErrors = validateRequirementGraph(makeLedger("EVIDENCE_GAP", "CONTRADICTORY"));
+  assert.ok(evidenceGapErrors.some(e => e.includes("EVIDENCE_GAP elicited evidence cannot be CONTRADICTORY")));
+});
