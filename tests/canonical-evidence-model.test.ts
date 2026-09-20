@@ -12,6 +12,8 @@ import {
   type SupportJudgment,
   detectSourceLanguage,
   detectQuoteLanguage,
+  validateSupportJudgmentAgainstFacet,
+  assertCompleteFacetJudgments,
 } from "../src/lib/canonical-evidence-model.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
@@ -240,6 +242,11 @@ test("negated evidence cannot be bound as a demonstration true atom", () => {
 });
 
 
+test("Unicode-safe language detection recognizes accented French and English", () => {
+  assert.equal(detectSourceLanguage("J'ai piloté la trésorerie et préparé les clôtures.", ""), "fr");
+  assert.equal(detectSourceLanguage("I led treasury and prepared the close.", ""), "en");
+});
+
 test("source language detection preserves mixed-language document context but quote-level detection identifies each quote", () => {
   const document = "I managed finance and reporting.\nJ'ai dirigé l'équipe finance.";
   assert.equal(detectSourceLanguage(document, ""), "mixed");
@@ -268,4 +275,25 @@ test("requirement graph rejects incomplete requirement status coverage", () => {
   };
   const errors = validateRequirementGraph(ledger);
   assert.ok(errors.some(e => e.includes("Requirement REQ-2 has no requirement status.")));
+});
+
+
+test("DIRECT support is blocked when affirmative and negated atoms conflict", () => {
+  const positive = atom("A1", "AFFIRMATIVE");
+  const negative = atom("A2", "NEGATED");
+  const errors = validateSupportJudgmentAgainstFacet(judgment("F-1", "DIRECT", ["A1"]), requirement().facets[0], [positive, negative]);
+  assert.ok(errors.some(e => e.includes("conflicting NEGATED atom")));
+});
+
+test("DIRECT SCALE support requires explicit scale evidence", () => {
+  const errors = validateSupportJudgmentAgainstFacet(judgment("F-2", "DIRECT", ["A1"]), requirement().facets[1], [atom("A1")]);
+  assert.ok(errors.some(e => e.includes("SCALE requires explicit")));
+});
+
+test("support judge completeness fails closed on missing or duplicate facets", () => {
+  const req = requirement();
+  const missing = assertCompleteFacetJudgments([{ requirement_id: "REQ-1", facet_id: "F-1" }], req.facets);
+  assert.ok(missing.some(e => e.includes("Missing judgment for facet F-2")));
+  const duplicate = assertCompleteFacetJudgments([{ requirement_id: "REQ-1", facet_id: "F-1" }, { requirement_id: "REQ-1", facet_id: "F-1" }, { requirement_id: "REQ-1", facet_id: "F-2" }], req.facets);
+  assert.ok(duplicate.some(e => e.includes("Duplicate judgment returned for facet F-1")));
 });
