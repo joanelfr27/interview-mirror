@@ -28,6 +28,19 @@ const SCHEMA = {
         supporting_evidence_ids: { type: "array", items: { type: "string" } },
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
+        abstention_reason: { anyOf: [{ type: "string" }, { type: "null" }] },
+        support_basis: { type: "string", enum: ["DOCUMENTED", "CANDIDATE_SELF_REPORTED"] },
+        analogical_mapping: {
+          anyOf: [{
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              shared_dimensions: { type: "array", items: { type: "string" } },
+              unshared_dimensions: { type: "array", items: { type: "string" } },
+            },
+            required: ["shared_dimensions", "unshared_dimensions"],
+          }, { type: "null" }]
+        },
       },
       required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","analogical_mapping"],
     }},
