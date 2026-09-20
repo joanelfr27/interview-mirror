@@ -10,6 +10,7 @@ import {
   validateRequirementGraph,
   assertCompleteFacetJudgments,
   validateSupportJudgmentAgainstFacet,
+  buildCandidateElicitations,
 } from "@/lib/canonical-evidence-model";
 
 type RawJudgment = {
@@ -174,6 +175,7 @@ export async function judgeCanonicalSupport(
     unresolved_items: [],
   };
   next.unresolved_items = buildUnresolvedItems(next);
+  next.candidate_elicitations = buildCandidateElicitations(next);
   const graphErrors = validateRequirementGraph(next);
   if (graphErrors.length) {
     throw new Error("Canonical support graph failed validation: " + graphErrors.join(" | "));
