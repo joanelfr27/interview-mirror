@@ -297,7 +297,7 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
   }
   for (const d of ledger.demonstration_objectives) {
     if (!ledger.unresolved_items.some(u => u.id === d.target_unresolved_item_id)) errors.push(`Demonstration objective ${d.id} targets unknown unresolved item.`);
-    for (const id of d.supporting_true_atom_ids) if (!evidenceIds.has(id)) errors.push(`Demonstration objective ${d.id} references unknown evidence ${id}.`);
+    errors.push(...validateDemonstrationEvidenceBinding(d, ledger.evidence));
     if (!d.truthfulness_boundary?.permitted_claims?.length && !d.truthfulness_boundary?.prohibited_claims?.length) errors.push(`Demonstration objective ${d.id} has no truthfulness boundary content.`);
   }
   return errors;
