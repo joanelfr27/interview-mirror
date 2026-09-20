@@ -8,6 +8,8 @@ import {
   aggregateRequirementStatus,
   buildUnresolvedItems,
   validateRequirementGraph,
+  assertCompleteFacetJudgments,
+  validateSupportJudgmentAgainstFacet,
 } from "@/lib/canonical-evidence-model";
 
 type RawJudgment = {
@@ -93,7 +95,7 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
-    const validation = validateSupportJudgmentAgainstEvidence(item, ledger.evidence);
+    const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     valid.push(item);
   }
@@ -155,7 +157,10 @@ export async function judgeCanonicalSupport(
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical support judgment response.");
   const parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
-  const sanitized = sanitizeJudgments(parsed.judgments ?? [], ledger);
+  const rawJudgments = parsed.judgments ?? [];
+  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
+  if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
+  const sanitized = sanitizeJudgments(rawJudgments, ledger);
   const judgments = sanitized.judgments;
   const next: EvidenceLedger = {
     ...ledger,
