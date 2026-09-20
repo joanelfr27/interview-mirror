@@ -337,7 +337,7 @@ function hasInternalStrategyInstructions(text: string): boolean {
   return /\b(?:une expérience réelle du parcours doit servir|this experience should serve as an anchor|serve as the corresponding strategic anchor|point stratégique correspondant|_reasoning|proof[_ ]objective|evidence[_ ]node|primary[_ ]evidence)\b/i.test(text);
 }
 
-export function isValidStrategy(strategy: unknown, language: SessionLanguage, _jobDescription = "", _analysis: CvAnalysis | null = null, _cvText = "", _evidenceMap: EvidenceMapNode[] = [], _strategicAnalysis: StrategicAnalysis | null = null): strategy is InterviewStrategy {
+export function isValidStrategy(strategy: unknown, language: SessionLanguage, _jobDescription = "", _analysis: CvAnalysis | null = null, _cvText = "", _evidenceMap: EvidenceMapNode[] = [], _strategicAnalysis: StrategicAnalysis | null = null, enforceLegacyCacheGrounding = false): strategy is InterviewStrategy {
   if (!strategy || typeof strategy !== "object") return false;
   const s = strategy as any;
   const allText = [s.candidatePositioning, s.strongestValueProposition, s.communicationPriorities, s.interviewPlan, s.personalization, ...(s.strengthsToLeverage ?? []), ...(s.gapsOrRisks ?? []), ...(s.gapDefenseStrategy ?? []), ...(s.interviewPriorities ?? []), ...(s.likelyDifficultQuestions ?? []), ...(s.storiesToPrepare ?? [])].filter((x: unknown) => typeof x === "string").join(" ");
@@ -357,11 +357,17 @@ export function isValidStrategy(strategy: unknown, language: SessionLanguage, _j
   if (hasPriorityRiskDuplication(s, authoritativeVulnerabilities)) return false;
   if (hasDifficultQuestionDuplication(s)) return false;
   if (stories.some((x: string) => hasPresentationArtifacts(x) || hasInternalStrategyInstructions(x))) return false;
-  // Candidate-specific grounding is enforced before this public boundary:
-  // internal strategy items carry evidence_node_id/supporting_fact_ids, are checked
-  // against the authoritative plan, and pass evidence-faithfulness verification.
-  // Do not re-impose literal/lexical CV/JD matching here: natural paraphrase can be
-  // fully grounded while sharing no distinctive surface token with the source.
+  // Fresh generation is grounded structurally before this public boundary:
+  // internal items carry evidence_node_id/supporting_fact_ids, are checked against
+  // the authoritative plan, and pass evidence-faithfulness verification.
+  //
+  // Persisted strategies no longer retain those internal IDs. For that cache-only
+  // path, retain the legacy candidate/JD anchor check as a conservative integrity
+  // screen. It may invalidate an old cached strategy and trigger regeneration, but
+  // it must never reject a freshly generated, structurally grounded paraphrase.
+  if (enforceLegacyCacheGrounding) {
+    if (!hasSpecificPriorityAnchors(s, _cvText, _jobDescription, _evidenceMap, _strategicAnalysis)) return false;
+  }
   return true;
 }
 function validateObjectiveShape(o: any): o is ProofObjective {
