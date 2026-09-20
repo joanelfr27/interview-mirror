@@ -13,7 +13,10 @@ import {
   detectSourceLanguage,
   detectQuoteLanguage,
   validateSupportJudgmentAgainstFacet,
-  assertCompleteFacetJudgments} from "../src/lib/canonical-evidence-model.ts";
+  assertCompleteFacetJudgments,
+  validateAtomicEvidenceAgainstSource,
+  validateCandidateElicitation
+} from "../src/lib/canonical-evidence-model.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
   return {
@@ -398,4 +401,138 @@ test("final requirement graph rejects incomplete facet judgments", () => {
   const errors = validateRequirementGraph(ledger);
   assert.ok(errors.some(e => e.includes("Missing judgment for facet F-2")));
   assert.equal(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }).length, 0);
+});
+
+
+test("field-level grounding rejects an invented structured outcome despite an exact source quote", () => {
+  const evidence = atom("A1");
+  evidence.outcome = "€2M savings";
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "I managed finance",
+    start_offset: 0,
+    end_offset: 17,
+    language: "en",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("outcome is not grounded")));
+});
+
+test("field-level grounding rejects an invented tool while preserving exact quoted evidence", () => {
+  const evidence = atom("A1");
+  evidence.context.tools_or_systems = ["SAP"];
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "I managed finance",
+    start_offset: 0,
+    end_offset: 17,
+    language: "en",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("tools_or_systems is not grounded")));
+});
+
+test("field-level grounding accepts structured fields explicitly present in the quote", () => {
+  const evidence = atom("A1");
+  evidence.scale.quantity = "20";
+  evidence.outcome = "reduced costs";
+  evidence.verifiability.has_quantifiable_metric = true;
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "I managed 20 finance processes and reduced costs",
+    start_offset: 0,
+    end_offset: 47,
+    language: "en",
+  };
+  evidence.action.normalized_action = "managed";
+  evidence.action.object = "finance processes";
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.deepEqual(errors, []);
+});
+
+test("candidate elicitation classification must agree with elicited atom polarity", () => {
+  const answer = "I have managed finance.";
+  const answerSpan = {
+    id: "SPAN-ELICIT-ELICIT-U-1",
+    document_id: "ELICIT-SESSION",
+    text: answer,
+    start_offset: 0,
+    end_offset: answer.length,
+    language: "en",
+  };
+  const elicited = atom("ELICIT-ATOM-ELICIT-U-1");
+  elicited.source_span_id = answerSpan.id;
+  elicited.provenance.source_type = "CANDIDATE_ELICITED";
+  elicited.assertion.type = "ELICITED";
+  const ledger: EvidenceLedger = {
+    source_spans: [answerSpan],
+    evidence: [elicited],
+    requirements: [],
+    support_judgments: [],
+    requirement_statuses: [],
+    unresolved_items: [{
+      id: "ELICIT-U-1",
+      requirement_id: "REQ-1",
+      facet_ids: [],
+      type: "ABSENT",
+      supporting_evidence_ids: [],
+      contradiction_evidence_ids: [],
+      absence_basis: "UNMENTIONED",
+      negation_evidence_ids: [],
+    }],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateCandidateElicitation({
+    id: "ELICIT-U-1",
+    unresolved_item_id: "ELICIT-U-1",
+    question: "Describe your experience.",
+    answer,
+    answer_source_span_id: answerSpan.id,
+    answer_assertion_type: "ELICITED",
+    classification: "EXPERIENCE_GAP",
+    classification_rationale: "test",
+  }, ledger);
+  assert.ok(errors.some(e => e.includes("EXPERIENCE_GAP classification requires a NEGATED")));
+});
+
+test("candidate elicitation answer spans must exactly match the submitted answer", () => {
+  const answerSpan = {
+    id: "SPAN-ELICIT-ELICIT-U-2",
+    document_id: "ELICIT-SESSION",
+    text: "I managed",
+    start_offset: 0,
+    end_offset: 9,
+    language: "en",
+  };
+  const ledger: EvidenceLedger = {
+    source_spans: [answerSpan],
+    evidence: [],
+    requirements: [],
+    support_judgments: [],
+    requirement_statuses: [],
+    unresolved_items: [{
+      id: "ELICIT-U-2",
+      requirement_id: "REQ-1",
+      facet_ids: [],
+      type: "ABSENT",
+      supporting_evidence_ids: [],
+      contradiction_evidence_ids: [],
+      absence_basis: "UNMENTIONED",
+      negation_evidence_ids: [],
+    }],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateCandidateElicitation({
+    id: "ELICIT-U-2",
+    unresolved_item_id: "ELICIT-U-2",
+    question: "Describe your experience.",
+    answer: "I managed finance.",
+    answer_source_span_id: answerSpan.id,
+  }, ledger);
+  assert.ok(errors.some(e => e.includes("does not exactly match")));
 });
