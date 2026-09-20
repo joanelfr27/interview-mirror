@@ -12,7 +12,7 @@ import {
 
 type RawJudgment = {
   id: string; requirement_id: string; facet_id: string; status: SupportStatus;
-  supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean; abstention_reason?: string;
+  supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
 };
 
 const STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
@@ -28,7 +28,7 @@ const SCHEMA = {
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
       },
-      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason"],
+      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis"],
     }},
   },
   required: ["judgments"],
@@ -72,7 +72,7 @@ function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgme
       requirement_id: req.id, facet_id: facet.id, status: "NONE",
       supporting_evidence_ids: [],
       rationale: "No valid support judgment was returned for this facet; abstained rather than inferring.",
-      confidence: 0, abstained: true, abstention_reason: "No valid facet judgment was returned; abstained rather than inferring.",
+      confidence: 0, abstained: true, abstention_reason: "No valid facet judgment was returned; abstained rather than inferring.", support_basis: "DOCUMENTED",
     });
   }
   return { judgments: valid, errors };
