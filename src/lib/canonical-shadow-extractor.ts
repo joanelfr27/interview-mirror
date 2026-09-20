@@ -211,11 +211,14 @@ function findExactSpan(
   return null;
 }
 
-function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "FACET" = "FACET"): SourceSpan | null {
+export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "FACET" = "FACET"): SourceSpan | null {
   const target = quote.trim();
-  const relative = parent.text.indexOf(target);
-  if (!target || relative < 0) return null;
-  const start = parent.start_offset + relative;
+  if (!target) return null;
+  const first = parent.text.indexOf(target);
+  if (first < 0) return null;
+  const second = parent.text.indexOf(target, first + Math.max(1, target.length));
+  if (second >= 0) return null;
+  const start = parent.start_offset + first;
   return {
     id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + (start + target.length),
     document_id: parent.document_id,
