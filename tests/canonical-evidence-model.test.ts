@@ -8,7 +8,7 @@ import {
   type EvidenceLedger,
   type Requirement,
   type SupportJudgment,
-} from "../src/lib/canonical-evidence-model";
+} from "../src/lib/canonical-evidence-model.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
   return {
