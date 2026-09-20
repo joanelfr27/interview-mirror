@@ -51,6 +51,7 @@ type RawCandidateAtom = {
   recency?: string | null;
   outcome?: string | null;
   assertion_type: "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT" | "RESPONSIBILITY" | "OUTCOME_CLAIM";
+  polarity: "AFFIRMATIVE" | "NEGATED";
   has_quantifiable_metric: boolean;
   has_third_party_entity: boolean;
   has_time_anchor: boolean;
@@ -102,6 +103,7 @@ const CANDIDATE_SCHEMA = {
           recency: { anyOf: [{ type: "string" }, { type: "null" }] },
           outcome: { anyOf: [{ type: "string" }, { type: "null" }] },
           assertion_type: { type: "string", enum: ["STATED", "QUANTIFIED", "CREDENTIAL", "EMPLOYMENT", "RESPONSIBILITY", "OUTCOME_CLAIM"] },
+          polarity: { type: "string", enum: ["AFFIRMATIVE", "NEGATED"] },
           has_quantifiable_metric: { type: "boolean" },
           has_third_party_entity: { type: "boolean" },
           has_time_anchor: { type: "boolean" },
@@ -111,7 +113,7 @@ const CANDIDATE_SCHEMA = {
           "id","source_quote","actor","ownership","normalized_action","object",
           "domain","jurisdiction","situation","tools_or_systems","standards",
           "quantity","currency","team_size","scope","start","end","recency",
-          "outcome","assertion_type","has_quantifiable_metric",
+          "outcome","assertion_type","polarity","has_quantifiable_metric",
           "has_third_party_entity","has_time_anchor","extraction_confidence"
         ]
       }
@@ -268,7 +270,7 @@ function toAtomicEvidence(
       ...(raw.recency ? { recency: raw.recency } : {}),
     },
     outcome: raw.outcome ?? null,
-    assertion: { type: raw.assertion_type },
+    assertion: { type: raw.assertion_type, polarity: raw.polarity },
     verifiability: {
       has_quantifiable_metric: raw.has_quantifiable_metric,
       has_third_party_entity: raw.has_third_party_entity,
@@ -300,6 +302,7 @@ Hard rules:
 - source_quote must be copied verbatim from the CV.
 - Never summarize multiple unrelated CV statements into one atom.
 - Never infer ownership, scope, scale, outcome, seniority, tool, geography, date or responsibility.
+- Mark polarity NEGATED only when the CV explicitly negates the proposition; unmentioned is not negated.
 - If the CV does not explicitly state a field, return null, [] or UNKNOWN as appropriate.
 - Do not use any prior CV analysis, strengths, gaps or strategy.
 - Do not judge candidate fit.
