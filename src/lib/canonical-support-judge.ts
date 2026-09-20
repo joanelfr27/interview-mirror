@@ -161,6 +161,9 @@ export async function judgeCanonicalSupport(
   const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
   if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
+  if (sanitized.errors.length) {
+    throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
+  }
   const judgments = sanitized.judgments;
   const next: EvidenceLedger = {
     ...ledger,
