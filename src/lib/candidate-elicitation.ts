@@ -11,10 +11,12 @@ import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
 
 const CLASSIFICATIONS = ["EVIDENCE_GAP","TRANSFERABLE","EXPERIENCE_GAP"] as const;
 
-function detectAnswerLanguage(answer: string): "en" | "fr" | "mixed" {
+export function detectAnswerLanguage(answer: string): "en" | "fr" | "mixed" {
   const text = answer.toLowerCase();
-  const french = (text.match(/\b(?:je|j'ai|nous|avec|dans|pour|sur|une|des|le|la|les|expérience|responsabilité|géré|gérer|équipe|résultat)\b/g) ?? []).length;
-  const english = (text.match(/\b(?:i|i've|we|with|in|for|on|an|the|experience|responsibility|managed|manage|team|result)\b/g) ?? []).length;
+  const frenchPattern = /(?:^|[^\\p{L}])(?:je|j'ai|nous|avec|dans|pour|sur|une|des|le|la|les|expérience|responsabilité|géré|gérer|équipe|résultat|piloté|préparé|trésorerie|clôtures)(?=$|[^\\p{L}])/gu;
+  const englishPattern = /(?:^|[^\\p{L}])(?:i|i've|we|with|in|for|on|an|the|experience|responsibility|managed|manage|team|result|led|prepared|treasury|close)(?=$|[^\\p{L}])/gu;
+  const french = text.match(frenchPattern)?.length ?? 0;
+  const english = text.match(englishPattern)?.length ?? 0;
   if (!french && !english) return "mixed";
   if (french > english * 1.5) return "fr";
   if (english > french * 1.5) return "en";
