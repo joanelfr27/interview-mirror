@@ -330,3 +330,52 @@ test("all DIRECT dimension guards reject missing evidence", () => {
   assert.ok(outcomeErrors.some(e => e.includes("OUTCOME requires an explicit")));
   assert.ok(governanceErrors.some(e => e.includes("GOVERNANCE requires explicit")));
 });
+
+
+test("ANALOGICAL_TRANSFER requires explicit shared and unshared dimensions", () => {
+  const a = atom("A1");
+  const req = requirement();
+  const base: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [a],
+    requirements: [req],
+    support_judgments: [
+      { ...judgment("F-1", "ANALOGICAL_TRANSFER", ["A1"]), analogical_mapping: undefined },
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(base);
+  assert.ok(errors.some(e => e.includes("ANALOGICAL_TRANSFER requires shared and unshared dimensions")));
+});
+
+test("mixed documented and elicited evidence cannot be represented as a single basis", () => {
+  const elicited = atom("A2");
+  elicited.provenance.source_type = "CANDIDATE_ELICITED";
+  elicited.assertion.type = "ELICITED";
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-A2", document_id: "ELICIT", text: "I also managed finance", start_offset: 0, end_offset: 21, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [atom("A1"), elicited],
+    requirements: [requirement()],
+    support_judgments: [
+      judgment("F-1", "PARTIAL", ["A1", "A2"]),
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(ledger);
+  assert.ok(errors.some(e => e.includes("mixed evidence basis requires an explicit model state")));
+});
