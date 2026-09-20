@@ -190,6 +190,7 @@ function findExactSpan(
   quote: string,
   language: string,
   used: Set<string>,
+  spanKind: "ATOM" | "REQUIREMENT" = "ATOM",
 ): SourceSpan | null {
   const target = quote.trim();
   if (!target) return null;
@@ -216,7 +217,7 @@ function findExactSpan(
   return null;
 }
 
-function spanWithinParent(parent: SourceSpan, quote: string): SourceSpan | null {
+function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "FACET" = "FACET"): SourceSpan | null {
   const target = quote.trim();
   const relative = parent.text.indexOf(target);
   if (!target || relative < 0) return null;
@@ -412,7 +413,7 @@ export async function extractCanonicalShadow(
   const jdUsed = new Set<string>();
 
   for (const raw of rawAtoms) {
-    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, sourceLanguage, cvUsed);
+    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, sourceLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
       warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
@@ -444,6 +445,7 @@ export async function extractCanonicalShadow(
       raw.source_quote,
       jdLanguage,
       jdUsed,
+      "REQUIREMENT",
     );
 
     if (!requirementSpan) {
@@ -459,7 +461,7 @@ export async function extractCanonicalShadow(
         continue;
       }
 
-      const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote);
+      const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote, "FACET");
 
       if (!facetSpan) {
         warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote could not be mapped uniquely in the JD.`);
