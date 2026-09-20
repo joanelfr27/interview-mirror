@@ -98,7 +98,7 @@ export async function classifyCandidateElicitation(
       subject: { actor: parsed.actor, ownership: parsed.ownership },
       action: { normalized_action: parsed.normalized_action, object: parsed.object },
       context: {}, scale: {}, time: {}, outcome: null,
-      assertion: { type: "ELICITED" },
+      assertion: { type: "ELICITED", polarity: "AFFIRMATIVE" },
       verifiability: {
         has_quantifiable_metric: /[%€$£]|\b\d+(?:\.\d+)?\b/.test(quote),
         has_third_party_entity: false,
