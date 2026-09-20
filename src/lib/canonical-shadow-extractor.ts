@@ -11,6 +11,7 @@ import {
   type RequirementSalience,
   type SourceSpan,
   validateAtomicEvidence,
+  validateAtomicEvidenceAgainstSource,
   validateSourceSpan,
   validateSpanBounds,
   forbiddenInferenceViolations,
@@ -417,6 +418,7 @@ export async function extractCanonicalShadow(
       ...validateSourceSpan(span),
       ...validateSpanBounds(span, session.cv_text ?? ""),
       ...validateAtomicEvidence(atom),
+      ...validateAtomicEvidenceAgainstSource(atom, span),
       ...forbiddenInferenceViolations(atom),
     ];
 
