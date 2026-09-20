@@ -201,8 +201,20 @@ export type CanonicalLanguage = "en" | "fr" | "mixed";
 
 export function detectSourceLanguage(cv: string, jd: string): CanonicalLanguage {
   const text = (cv + "\n" + jd).toLowerCase();
-  const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
-  const english = (text.match(/\b(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and)\b/g) ?? []).length;
+  const frenchPattern = /\b(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec)\b/g;
+  const englishPattern = /\b(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and)\b/g;
+  const segments = text.split(/[\n.!?]+/).map(segment => segment.trim()).filter(Boolean);
+  let hasFrenchSegment = false;
+  let hasEnglishSegment = false;
+  for (const segment of segments) {
+    const french = segment.match(frenchPattern)?.length ?? 0;
+    const english = segment.match(englishPattern)?.length ?? 0;
+    if (french > 0 && french >= english) hasFrenchSegment = true;
+    if (english > 0 && english >= french) hasEnglishSegment = true;
+  }
+  if (hasFrenchSegment && hasEnglishSegment) return "mixed";
+  const french = text.match(frenchPattern)?.length ?? 0;
+  const english = text.match(englishPattern)?.length ?? 0;
   if (french === 0 && english === 0) return "mixed";
   if (french > english * 1.5) return "fr";
   if (english > french * 1.5) return "en";
