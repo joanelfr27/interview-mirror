@@ -379,3 +379,23 @@ test("mixed documented and elicited evidence cannot be represented as a single b
   const errors = validateRequirementGraph(ledger);
   assert.ok(errors.some(e => e.includes("mixed evidence basis requires an explicit model state")));
 });
+
+
+test("final requirement graph rejects incomplete facet judgments", () => {
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [atom("A1")],
+    requirements: [requirement()],
+    support_judgments: [judgment("F-1", "DIRECT", ["A1"])],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(ledger);
+  assert.ok(errors.some(e => e.includes("Missing judgment for facet F-2")));
+  assert.equal(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }).length, 0);
+});
