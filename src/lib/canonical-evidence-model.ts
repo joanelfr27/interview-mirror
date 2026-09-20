@@ -240,6 +240,14 @@ export function validateAtomicEvidenceAgainstSource(
     }
   };
 
+  // "candidate" is a canonical actor placeholder, not a claim about a named person.
+  if (
+    value.subject.actor.trim() &&
+    !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(value.subject.actor.trim())
+  ) {
+    requireExact("subject.actor", value.subject.actor);
+  }
+
   // Free-text semantic fields are deliberately fail-closed: normalization may
   // change casing/spacing, but it may not introduce facts absent from the quote.
   requireExact("action.normalized_action", value.action.normalized_action);
@@ -291,6 +299,13 @@ export function validateAtomicEvidenceAgainstSource(
   }
   if (value.verifiability.has_time_anchor !== /\b(?:19|20)\d{2}\b/.test(source)) {
     errors.push("has_time_anchor does not match deterministic source evidence.");
+  }
+
+  const explicitThirdPartyMarker =
+    /\b(?:at|for|with|from|chez|pour|avec|au sein de)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
+    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère)\b/i.test(source);
+  if (value.verifiability.has_third_party_entity && !explicitThirdPartyMarker) {
+    errors.push("has_third_party_entity is not supported by deterministic source evidence.");
   }
 
   return errors;
