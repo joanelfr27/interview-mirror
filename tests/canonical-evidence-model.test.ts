@@ -299,3 +299,34 @@ test("support judge completeness fails closed on missing or duplicate facets", (
   assert.ok(duplicate.some(e => e.includes("Duplicate judgment returned for facet F-1")));
 });
 
+
+
+test("all DIRECT dimension guards reject missing evidence", () => {
+  const base = atom("A1");
+  const toolErrors = validateSupportJudgmentAgainstFacet(
+    judgment("F-1", "DIRECT", ["A1"]),
+    { id: "F-TOOL", type: "TOOL_METHOD", requirement: "Use SAP", source_span_id: "span-req" },
+    [base],
+  );
+  const ownershipAtom = atom("A2");
+  ownershipAtom.subject.ownership = "UNKNOWN";
+  const ownershipErrors = validateSupportJudgmentAgainstFacet(
+    judgment("F-1", "DIRECT", ["A2"]),
+    { id: "F-OWN", type: "OWNERSHIP", requirement: "Own the process", source_span_id: "span-req" },
+    [ownershipAtom],
+  );
+  const outcomeErrors = validateSupportJudgmentAgainstFacet(
+    judgment("F-1", "DIRECT", ["A1"]),
+    { id: "F-OUT", type: "OUTCOME", requirement: "Deliver results", source_span_id: "span-req" },
+    [base],
+  );
+  const governanceErrors = validateSupportJudgmentAgainstFacet(
+    judgment("F-1", "DIRECT", ["A1"]),
+    { id: "F-GOV", type: "GOVERNANCE", requirement: "Operate under controls", source_span_id: "span-req" },
+    [base],
+  );
+  assert.ok(toolErrors.some(e => e.includes("TOOL_METHOD requires explicit")));
+  assert.ok(ownershipErrors.some(e => e.includes("OWNERSHIP requires explicit")));
+  assert.ok(outcomeErrors.some(e => e.includes("OUTCOME requires an explicit")));
+  assert.ok(governanceErrors.some(e => e.includes("GOVERNANCE requires explicit")));
+});
