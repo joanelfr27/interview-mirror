@@ -19,8 +19,9 @@ const SCHEMA = {
     ownership: { type: "string", enum: ["INDIVIDUAL","TEAM","SHARED","SUPERVISED","UNKNOWN"] },
     normalized_action: { type: "string" },
     object: { type: "string" },
+    polarity: { type: "string", enum: ["AFFIRMATIVE", "NEGATED"] },
   },
-  required: ["classification","rationale","atom_quote","actor","ownership","normalized_action","object"],
+  required: ["classification","rationale","atom_quote","actor","ownership","normalized_action","object","polarity"],
 } as const;
 
 function responseFormat(name: string, schema: unknown) {
@@ -75,6 +76,7 @@ export async function classifyCandidateElicitation(
   const parsed = JSON.parse(raw) as {
     classification: CandidateGapClassification; rationale: string; atom_quote: string;
     actor: string; ownership: EvidenceOwnership; normalized_action: string; object: string;
+    polarity: "AFFIRMATIVE" | "NEGATED";
   };
 
   const quote = parsed.atom_quote.trim();
@@ -98,7 +100,7 @@ export async function classifyCandidateElicitation(
       subject: { actor: parsed.actor, ownership: parsed.ownership },
       action: { normalized_action: parsed.normalized_action, object: parsed.object },
       context: {}, scale: {}, time: {}, outcome: null,
-      assertion: { type: "ELICITED", polarity: "AFFIRMATIVE" },
+      assertion: { type: "ELICITED", polarity: parsed.polarity },
       verifiability: {
         has_quantifiable_metric: /[%€$£]|\b\d+(?:\.\d+)?\b/.test(quote),
         has_third_party_entity: false,
