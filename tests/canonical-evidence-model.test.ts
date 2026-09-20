@@ -4,6 +4,8 @@ import {
   aggregateRequirementStatus,
   validateAtomicEvidence,
   validateRequirementGraph,
+  buildUnresolvedItems,
+  validateDemonstrationEvidenceBinding,
   type AtomicEvidence,
   type EvidenceLedger,
   type Requirement,
@@ -93,4 +95,84 @@ test("source-traceability does not imply semantic validity", () => {
   };
   assert.equal(validateRequirementGraph(ledger).length, 0);
   assert.equal(aggregateRequirementStatus(ledger.requirements[0], ledger.support_judgments), "PARTIAL");
+});
+
+
+test("positive support must cite affirmative evidence", () => {
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [atom("A1")],
+    requirements: [requirement()],
+    support_judgments: [
+      judgment("F-1", "DIRECT"),
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(ledger);
+  assert.ok(errors.some(e => e.includes("Positive support statuses must cite at least one evidence atom")));
+});
+
+test("negated evidence cannot be used as positive support", () => {
+  const negated = atom("A2", "NEGATED");
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A2", document_id: "CV", text: "I did not manage finance", start_offset: 0, end_offset: 23, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [negated],
+    requirements: [requirement()],
+    support_judgments: [judgment("F-1", "DIRECT", ["A2"]), judgment("F-2", "NONE")],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "PARTIAL" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const errors = validateRequirementGraph(ledger);
+  assert.ok(errors.some(e => e.includes("NEGATED evidence as positive support")));
+});
+
+test("contradicted facets remain in unresolved inference queue", () => {
+  const req = requirement();
+  const negated = atom("A2", "NEGATED");
+  const ledger: EvidenceLedger = {
+    source_spans: [
+      { id: "span-A2", document_id: "CV", text: "I did not manage finance", start_offset: 0, end_offset: 23, language: "en" },
+      { id: "span-req", document_id: "JD", text: "Manage finance", start_offset: 0, end_offset: 14, language: "en" },
+    ],
+    evidence: [negated],
+    requirements: [req],
+    support_judgments: [
+      judgment("F-1", "CONTRADICTORY", ["A2"]),
+      judgment("F-2", "NONE"),
+    ],
+    requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+  const unresolved = buildUnresolvedItems(ledger);
+  assert.equal(unresolved.length, 1);
+  assert.equal(unresolved[0].type, "CONFLICTING");
+  assert.deepEqual(unresolved[0].contradiction_evidence_ids, ["A2"]);
+});
+
+test("negated evidence cannot be bound as a demonstration true atom", () => {
+  const errors = validateDemonstrationEvidenceBinding(
+    {
+      id: "DEMO-1",
+      target_unresolved_item_id: "U-1",
+      observable_cue: "Show evidence",
+      supporting_true_atom_ids: ["A2"],
+      truthfulness_boundary: { permitted_claims: [], prohibited_claims: ["Do not invent facts."] },
+    },
+    [atom("A2", "NEGATED")],
+  );
+  assert.ok(errors.some(e => e.includes("cannot treat NEGATED evidence")));
 });
