@@ -10,8 +10,9 @@ import {
   type EvidenceLedger,
   type Requirement,
   type SupportJudgment,
+  detectSourceLanguage,
+  detectQuoteLanguage,
 } from "../src/lib/canonical-evidence-model.ts";
-import { detectSourceLanguage, detectQuoteLanguage } from "../src/lib/canonical-shadow-extractor.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
   return {
