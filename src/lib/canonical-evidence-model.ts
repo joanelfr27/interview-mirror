@@ -201,8 +201,8 @@ export type CanonicalLanguage = "en" | "fr" | "mixed";
 
 export function detectSourceLanguage(cv: string, jd: string): CanonicalLanguage {
   const text = (cv + "\n" + jd).toLowerCase();
-  const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|finance|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
-  const english = (text.match(/\b(?:experience|responsibilities|education|skills|finance|role|management|degree|you|with|from|managed|reporting|team|result|and)\b/g) ?? []).length;
+  const french = (text.match(/\b(?:expérience|responsabilités|formation|compétences|dirigé|équipe|poste|gestion|diplôme|vous|dans|avec)\b/g) ?? []).length;
+  const english = (text.match(/\b(?:experience|responsibilities|education|skills|role|management|degree|you|with|from|managed|reporting|team|result|and)\b/g) ?? []).length;
   if (french === 0 && english === 0) return "mixed";
   if (french > english * 1.5) return "fr";
   if (english > french * 1.5) return "en";
@@ -367,16 +367,6 @@ export function validateRequirementGraph(ledger: EvidenceLedger): string[] {
     for (const id of u.facet_ids) if (!parent?.facets.some(f => f.id === id)) errors.push(`Unresolved item ${u.id} references invalid facet.`);
     for (const id of [...u.supporting_evidence_ids, ...u.contradiction_evidence_ids]) if (!evidenceIds.has(id)) errors.push(`Unresolved item ${u.id} references unknown evidence.`);
     if (!UNRESOLVED_TYPES.has(u.type)) errors.push(`Unresolved item ${u.id} has invalid type.`);
-  }
-  for (const rs of ledger.requirement_statuses) {
-    if (requirementStatusIdsSeen.has(rs.requirement_id)) errors.push(`Requirement status for ${rs.requirement_id} is duplicated.`);
-    requirementStatusIdsSeen.add(rs.requirement_id);
-    const req = ledger.requirements.find(r => r.id === rs.requirement_id);
-    if (!req) errors.push(`Requirement status references unknown requirement ${rs.requirement_id}.`);
-    else {
-      const expected = aggregateRequirementStatus(req, ledger.support_judgments);
-      if (expected !== rs.status) errors.push(`Requirement status for ${rs.requirement_id} is ${rs.status} but deterministic aggregation yields ${expected}.`);
-    }
   }
   for (const rs of ledger.requirement_statuses) {
     if (requirementStatusIdsSeen.has(rs.requirement_id)) errors.push(`Requirement status for ${rs.requirement_id} is duplicated.`);
