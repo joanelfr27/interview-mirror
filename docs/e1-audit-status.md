@@ -42,3 +42,8 @@ CompetencyInstance (L2) and CareerTheme (L3) are virtual projections over L1. Th
 
 ## Epistemic rule
 Traceability/validation demonstrates structural integrity only. It does not demonstrate semantic correctness. Semantic correctness requires independent expert or human-rater evaluation.
+
+
+## Final verification run
+
+Post-correction CI verification requested on the final E1 baseline. This documentation-only change does not alter E1 runtime behavior.
