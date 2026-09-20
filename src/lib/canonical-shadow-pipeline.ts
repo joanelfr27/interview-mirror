@@ -19,7 +19,13 @@ export async function runCanonicalShadowPipeline(session: SessionRecord): Promis
   let ledger = extraction.ledger;
   const diagnostics = [...extraction.diagnostics.errors, ...extraction.diagnostics.warnings];
 
-  if (extraction.diagnostics.errors.length || !ledger.evidence.length || !ledger.requirements.length) {
+  if (
+    extraction.diagnostics.errors.length ||
+    extraction.diagnostics.rejected_atoms.length ||
+    extraction.diagnostics.rejected_requirements.length ||
+    !ledger.evidence.length ||
+    !ledger.requirements.length
+  ) {
     return { ledger, diagnostics, extraction: extraction.diagnostics };
   }
 
