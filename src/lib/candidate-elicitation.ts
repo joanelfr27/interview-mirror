@@ -6,6 +6,8 @@ import {
   type EvidenceOwnership, type AssertionType,
   validateAtomicEvidence, validateRequirementGraph,
 } from "@/lib/canonical-evidence-model";
+import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
+import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
 
 const CLASSIFICATIONS = ["EVIDENCE_GAP","TRANSFERABLE","EXPERIENCE_GAP"] as const;
 
