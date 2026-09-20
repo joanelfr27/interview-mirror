@@ -369,8 +369,10 @@ export async function extractCanonicalShadow(
   session: SessionRecord,
 ): Promise<CanonicalShadowResult> {
   const language = normalizeLanguage(session.preparation_language);
+  const sourceLanguage = detectSourceLanguage(session.cv_text ?? "", "");
+  const jdLanguage = detectSourceLanguage(session.job_description ?? "", "");
   const context: PipelineContext = {
-    source_language: detectSourceLanguage(session.cv_text ?? "", session.job_description ?? ""),
+    source_language: sourceLanguage === jdLanguage ? sourceLanguage : "mixed",
     product_language: language,
     interview_language: language,
   };
@@ -392,7 +394,7 @@ export async function extractCanonicalShadow(
   const jdUsed = new Set<string>();
 
   for (const raw of rawAtoms) {
-    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, language, cvUsed);
+    const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, sourceLanguage, cvUsed);
     if (!span) {
       rejectedAtoms.push(raw.id);
       warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
@@ -422,7 +424,7 @@ export async function extractCanonicalShadow(
       `JD-${session.id}`,
       session.job_description ?? "",
       raw.source_quote,
-      language,
+      jdLanguage,
       jdUsed,
     );
 
@@ -443,7 +445,7 @@ export async function extractCanonicalShadow(
         `JD-${session.id}`,
         session.job_description ?? "",
         rawFacet.source_quote,
-        language,
+        jdLanguage,
         jdUsed,
       );
 
