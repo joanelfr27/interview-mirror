@@ -128,9 +128,17 @@ export async function classifyCandidateElicitation(
     evidence: atom && !validateAtomicEvidence(atom).length ? [...ledger.evidence, atom] : ledger.evidence,
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
-  const graphErrors = validateRequirementGraph(next);
+  const judged = await judgeCanonicalSupport(session, next);
+  let rebuilt = judged.ledger;
+  const objectives = attachDemonstrationObjectives(rebuilt);
+  rebuilt = objectives.ledger;
+  const graphErrors = validateRequirementGraph(rebuilt);
   if (graphErrors.length) {
     throw new Error("Elicited evidence graph failed validation: " + graphErrors.join(" | "));
   }
-  return { ledger: next, elicitation: updatedElicitation, diagnostics };
+  return {
+    ledger: rebuilt,
+    elicitation: rebuilt.candidate_elicitations.find(x => x.id === elicitation.id) ?? updatedElicitation,
+    diagnostics: [...diagnostics, ...judged.diagnostics, ...objectives.diagnostics],
+  };
 }
