@@ -64,17 +64,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (error || !session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
 
   try {
-    const body = await request.json() as { elicitation_id?: string; answer?: string; ledger?: Parameters<typeof classifyCandidateElicitation>[1] };
-    if (!body.elicitation_id || !body.answer?.trim() || !body.ledger) {
-      return NextResponse.json({ error: "elicitation_id, answer and shadow ledger are required." }, { status: 400 });
+    const body = await request.json() as { elicitation_id?: string; answer?: string };
+    if (!body.elicitation_id || !body.answer?.trim()) {
+      return NextResponse.json({ error: "elicitation_id and answer are required." }, { status: 400 });
     }
 
-    const elicitation = body.ledger.candidate_elicitations.find(item => item.id === body.elicitation_id);
-    if (!elicitation) return NextResponse.json({ error: "Elicitation not found in supplied shadow ledger." }, { status: 400 });
+    // Never trust a client-supplied canonical ledger. Recreate the shadow
+    // graph from the authenticated session so source provenance remains
+    // server-derived and tamper-resistant.
+    const initial = await runCanonicalShadowPipeline(session as SessionRecord);
+    const elicitation = initial.ledger.candidate_elicitations.find(
+      item => item.id === body.elicitation_id,
+    );
+
+    if (!elicitation) {
+      return NextResponse.json({ error: "Elicitation not found." }, { status: 400 });
+    }
 
     const result = await classifyCandidateElicitation(
       session as SessionRecord,
-      body.ledger,
+      initial.ledger,
       elicitation,
       body.answer,
     );
