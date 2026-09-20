@@ -1,4 +1,4 @@
-import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence, type CandidateElicitation, type CandidateGapClassification,
@@ -58,7 +58,8 @@ export async function classifyCandidateElicitation(
     messages: [
       {
         role: "system",
-        content: languageInstruction(language) + "\n\n" +
+        content:
+          "You are an internal canonical evidence classifier. Return classification rationale and normalized fields in stable English; preserve the candidate's quoted answer text verbatim. Do not translate the evidence into the product language. " +
           "Classify the candidate's answer only after the candidate has supplied it. " +
           "EVIDENCE_GAP means the answer establishes that the candidate has done the required thing but the CV omitted or failed to document it. " +
           "EXPERIENCE_GAP means the answer establishes that the candidate has not actually done the required thing. " +
