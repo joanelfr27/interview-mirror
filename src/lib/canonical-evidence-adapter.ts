@@ -164,6 +164,7 @@ export function adaptLegacyAnalysisToCanonical(session: SessionRecord): Evidence
         rationale: "Translated from the legacy requirement relation; not a new semantic judgment.",
         confidence: 0.5,
         abstained: false,
+        support_basis: "DOCUMENTED",
       });
     });
   });
