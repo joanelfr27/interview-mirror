@@ -564,3 +564,37 @@ test("facet source mapping preserves a unique phrase occurrence", () => {
   assert.equal(span?.start_offset, 0);
   assert.equal(span?.end_offset, 14);
 });
+
+
+test("field-level grounding rejects an invented actor while allowing the canonical candidate placeholder", () => {
+  const evidence = atom("A1");
+  evidence.subject.actor = "John Doe";
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "I managed finance",
+    start_offset: 0,
+    end_offset: 17,
+    language: "en",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("subject.actor is not grounded")));
+
+  evidence.subject.actor = "candidate";
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
+});
+
+test("third-party verification cannot be asserted without a deterministic source marker", () => {
+  const evidence = atom("A1");
+  evidence.verifiability.has_third_party_entity = true;
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "I managed finance",
+    start_offset: 0,
+    end_offset: 17,
+    language: "en",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("has_third_party_entity")));
+});
