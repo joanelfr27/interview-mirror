@@ -447,17 +447,20 @@ export async function extractCanonicalShadow(
     }
 
     const facets: RequirementFacet[] = [];
+    let facetMappingFailed = false;
     for (const rawFacet of raw.facets) {
       if (!requirementSpan.text.includes(rawFacet.source_quote)) {
-        errors.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote.`);
-        continue;
+        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote.`);
+        facetMappingFailed = true;
+        break;
       }
 
       const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote, "FACET");
 
       if (!facetSpan) {
         warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote could not be mapped uniquely in the JD.`);
-        continue;
+        facetMappingFailed = true;
+        break;
       }
 
       sourceSpans.push(facetSpan);
@@ -469,12 +472,17 @@ export async function extractCanonicalShadow(
       });
     }
 
+    if (facetMappingFailed) {
+      rejectedRequirements.push(raw.id);
+      warnings.push(`Requirement ${raw.id} was rejected because at least one facet failed deterministic source validation.`);
+      continue;
+    }
+
     if (!facets.length) {
       rejectedRequirements.push(raw.id);
       warnings.push(`Requirement ${raw.id} was rejected because no facet survived deterministic source validation.`);
       continue;
     }
-
     const requirement: Requirement = {
       id: raw.id,
       source_span_id: requirementSpan.id,
@@ -515,7 +523,7 @@ export async function extractCanonicalShadow(
     demonstration_objectives: [],
   };
 
-  const graphErrors = validateRequirementGraph(ledger);
+  const graphErrors = validateRequirementGraph(ledger, { allowUnjudgedFacets: true });
   if (graphErrors.length) {
     throw new Error("Canonical extraction graph failed validation: " + graphErrors.join(" | "));
   }
