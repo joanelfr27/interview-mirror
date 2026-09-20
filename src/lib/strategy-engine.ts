@@ -35,10 +35,8 @@ export type ProofObjective = {
   primary_evidence_node_id: string;
   evidence_status: EvidenceStatus;
   evidence_type: EvidenceType;
-  proof_point: string;
+  positioning: string;
   vulnerability: string;
-  mitigation: string;
-  communication_angle: string;
   probing_question: string;
 };
 
@@ -374,10 +372,8 @@ function validateObjectiveShape(o: any): o is ProofObjective {
     && isNonEmptyString(o.primary_evidence_node_id)
     && EVIDENCE_STATUSES.has(o.evidence_status)
     && EVIDENCE_TYPES.has(o.evidence_type)
-    && isNonEmptyString(o.proof_point)
+    && isNonEmptyString(o.positioning)
     && isNonEmptyString(o.vulnerability)
-    && isNonEmptyString(o.mitigation)
-    && isNonEmptyString(o.communication_angle)
     && isNonEmptyString(o.probing_question);
 }
 
@@ -409,12 +405,12 @@ function validatePass1(raw: any, evidenceMap: EvidenceMapNode[], authoritativePl
     if (node.status === "NOT_DOCUMENTED" || node.status === "UNKNOWN") return false;
     if (node.status !== objective.evidence_status || node.type !== objective.evidence_type) return false;
   }
-  const allText = [raw.positioning, ...objectives.flatMap((o) => [o.interviewer_belief, o.why_it_matters, o.proof_point, o.communication_angle, o.mitigation, o.vulnerability])].join(" ");
+  const allText = [raw.positioning, ...objectives.flatMap((o) => [o.interviewer_belief, o.why_it_matters, o.positioning, o.vulnerability])].join(" ");
   if (hasQualificationExperienceMisuse(allText, evidenceMap)) return false;
   if (hasToolClaimMisuse(allText, evidenceMap)) return false;
   if (hasIndustryClaimMisuse(allText, evidenceMap)) return false;
   for (let i = 0; i < objectives.length; i++) for (let j = i + 1; j < objectives.length; j++) {
-    const overlap = semanticOverlap(`${objectives[i].interviewer_belief} ${objectives[i].proof_point}`, `${objectives[j].interviewer_belief} ${objectives[j].proof_point}`);
+    const overlap = semanticOverlap(`${objectives[i].interviewer_belief} ${objectives[i].positioning}`, `${objectives[j].interviewer_belief} ${objectives[j].positioning}`);
     if (overlap >= 0.6) return false;
   }
   return true;
@@ -446,8 +442,8 @@ const PASS1_SCHEMA = {
       id: { type: "string" }, interviewer_belief: { type: "string" }, why_it_matters: { type: "string" }, primary_evidence_node_id: { type: "string" },
       evidence_status: { type: "string", enum: ["PROVEN", "PARTIALLY_PROVEN", "UNKNOWN", "NOT_DOCUMENTED"] },
       evidence_type: { type: "string", enum: ["EXPERIENCE", "RESPONSIBILITY", "ACHIEVEMENT", "QUALIFICATION", "SKILL", "INDUSTRY_EXPERIENCE", "TOOL_OR_SYSTEM"] },
-      proof_point: { type: "string" }, vulnerability: { type: "string" }, mitigation: { type: "string" }, communication_angle: { type: "string" }, probing_question: { type: "string" }
-    }, required: ["id", "interviewer_belief", "why_it_matters", "primary_evidence_node_id", "evidence_status", "evidence_type", "proof_point", "vulnerability", "mitigation", "communication_angle", "probing_question"] } },
+      positioning: { type: "string" }, vulnerability: { type: "string" }, probing_question: { type: "string" }
+    }, required: ["id", "interviewer_belief", "why_it_matters", "primary_evidence_node_id", "evidence_status", "evidence_type", "positioning", "vulnerability", "probing_question"] } },
     likelyQuestions: { type: "array", items: { type: "string" } },
   },
   required: ["positioning", "roleMap", "vulnerabilities", "proofObjectives", "likelyQuestions"],
@@ -514,7 +510,7 @@ async function runPass1(session: SessionRecord, evidenceMap: EvidenceMapNode[], 
     ? `\n\nPREVIOUS PASS 1 VALIDATION FAILED. Regenerate the COMPLETE schema and correct these diagnostics:\n- ${diagnostics.join("\n- ")}`
     : "";
   const systemPrompt =
-    "You are Interview Mirror's internal strategic reasoning engine. The output is never shown to the candidate. The EVIDENCE MAP is the only authoritative source of candidate facts. Never invent a fact, employer, tool, credential, industry, metric, date, scope, or outcome. NOT_DOCUMENTED and UNKNOWN nodes can only be verification points. QUALIFICATION is not employment experience. Produce EXACTLY 3 genuinely distinct proof objectives, each with a different PROVEN or PARTIALLY_PROVEN primary evidence node. Copy evidence_status and evidence_type exactly. Each objective must be built as ONE dependent strategic reasoning chain, not as independent fields. First determine the specific interviewer belief that must be established for this exact job. Then interrogate that belief from the perspective of a skeptical hiring manager: identify the most credible reason the interviewer could doubt it, based on a tension between the role requirement and the candidate evidence. The vulnerability must be derived from the belief and must NOT merely restate the belief or proof objective. Prefer substantive doubts about scope, ownership, scale, complexity, transferability, recency, or decision authority when supported by the CV/JD; do not invent a concern merely to sound insightful. Then select the single PROVEN or PARTIALLY_PROVEN evidence node that gives the strongest strategic leverage against that specific doubt—not simply the first matching node. Ask which documented fact would best survive an interviewer follow-up and most directly support the belief. Then formulate proof_point, mitigation, communication_angle, and probing_question from that same reasoning chain. The output must make clear: what the interviewer needs to believe, why they might hesitate to believe it, what evidence can resolve that hesitation, and how the candidate should position it. Avoid generic interview advice, generic caveats, and repetition between interviewer_belief and vulnerability. A strong objective should reveal a non-obvious but defensible interviewer concern the candidate may not have anticipated. Return the complete schema. Candidate language: " +
+    "You are Interview Mirror's internal strategic reasoning engine. The output is never shown to the candidate. The EVIDENCE MAP is the only authoritative source of candidate facts. Never invent a fact, employer, tool, credential, industry, metric, date, scope, or outcome. NOT_DOCUMENTED and UNKNOWN nodes can only be verification points. QUALIFICATION is not employment experience. Produce EXACTLY 3 genuinely distinct proof objectives, each with a different PROVEN or PARTIALLY_PROVEN primary evidence node. Copy evidence_status and evidence_type exactly. Each objective must be built as ONE dependent strategic reasoning chain, not as independent fields. First determine the specific interviewer belief that must be established for this exact job. Then interrogate that belief from the perspective of a skeptical hiring manager: identify the most credible reason the interviewer could doubt it, based on a tension between the role requirement and the candidate evidence. The vulnerability must be derived from the belief and must NOT merely restate the belief or proof objective. Prefer substantive doubts about scope, ownership, scale, complexity, transferability, recency, or decision authority when supported by the CV/JD; do not invent a concern merely to sound insightful. Then select the single PROVEN or PARTIALLY_PROVEN evidence node that gives the strongest strategic leverage against that specific doubt—not simply the first matching node. Ask which documented fact would best survive an interviewer follow-up and most directly support the belief. Then formulate one candidate-facing positioning from that reasoning chain, plus the probing question. The output must make clear: what the interviewer needs to believe, why they might hesitate to believe it, what evidence can resolve that hesitation, and how the candidate should position it. Avoid generic interview advice, generic caveats, and repetition between interviewer_belief and vulnerability. A strong objective should reveal a non-obvious but defensible interviewer concern the candidate may not have anticipated. Return the complete schema. Candidate language: " +
     (language === "fr" ? "French" : "English") +
     strategicPlanBlock +
     diagnosticBlock;
@@ -557,10 +553,8 @@ export async function generateStrategicAnalysis(session: SessionRecord, authorit
           primary_evidence_node_id: tension.primary_evidence_node_id,
           evidence_status: node.status,
           evidence_type: node.type,
-          proof_point: tension.allowed_positioning,
+          positioning: tension.allowed_positioning,
           vulnerability: tension.interviewer_doubt,
-          mitigation: tension.allowed_positioning,
-          communication_angle: tension.allowed_positioning,
           probing_question: authoritativePlan.likely_questions[index] ?? ("How would you substantiate " + tension.interviewer_belief + "?"),
         };
       }),
