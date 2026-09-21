@@ -89,13 +89,6 @@ function requirementStatus(
     ?? "UNJUDGED";
 }
 
-function unresolvedForRequirement(
-  ledger: EvidenceLedger,
-  requirementId: string,
-): UnresolvedItem[] {
-  return ledger.unresolved_items.filter((item) => item.requirement_id === requirementId);
-}
-
 function buildFacet(
   ledger: EvidenceLedger,
   requirement: Requirement,
@@ -120,6 +113,8 @@ function buildFacet(
 export function buildCanonicalReasoningProjection(
   ledger: EvidenceLedger,
 ): CanonicalReasoningProjection {
+  const ledgerErrors = validateLedgerReferences(ledger);
+  if (ledgerErrors.length) throw new Error(ledgerErrors.join(" | "));
   const requirements = ledger.requirements.map((requirement) => ({
     requirement_id: requirement.id,
     normalized_requirement: requirement.normalized_requirement,
