@@ -672,3 +672,34 @@ test("elicitation classification cannot be overturned by an inconsistent support
   const evidenceGapErrors = validateRequirementGraph(makeLedger("EVIDENCE_GAP", "CONTRADICTORY"));
   assert.ok(evidenceGapErrors.some(e => e.includes("EVIDENCE_GAP elicited evidence cannot be CONTRADICTORY")));
 });
+
+
+test("third-party verification rejects geographic names after French au without an organization marker", () => {
+  const evidence = atom("A1");
+  evidence.verifiability.has_third_party_entity = true;
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "Pilotage réussi d’audits fiscaux en Côte d’Ivoire et au Nigeria sans pénalité ni redressement.",
+    start_offset: 0,
+    end_offset: 94,
+    language: "fr",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("has_third_party_entity")));
+});
+
+test("recency must be a literal temporal phrase in the source quote", () => {
+  const evidence = atom("A1");
+  evidence.time.recency = "récemment";
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "Pilotage réussi d’audits fiscaux en Côte d’Ivoire et au Nigeria sans pénalité ni redressement.",
+    start_offset: 0,
+    end_offset: 94,
+    language: "fr",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("time.recency is not grounded")));
+});
