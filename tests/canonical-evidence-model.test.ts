@@ -245,6 +245,20 @@ test("negated evidence cannot be bound as a demonstration true atom", () => {
 });
 
 
+test("quantifiable metric detection does not treat employment years as metrics", () => {
+  const evidence = atom("A1");
+  evidence.verifiability.has_quantifiable_metric = false;
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "Finance Manager | Aug 2024–Present",
+    start_offset: 0,
+    end_offset: 34,
+    language: "en",
+  };
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
+});
+
 test("Unicode-safe language detection recognizes accented French and English", () => {
   assert.equal(detectSourceLanguage("J'ai piloté la trésorerie et préparé les clôtures.", ""), "fr");
   assert.equal(detectSourceLanguage("I led treasury and prepared the close.", ""), "en");
