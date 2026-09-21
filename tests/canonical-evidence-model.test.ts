@@ -16,7 +16,8 @@ import {
   validateSupportJudgmentAgainstFacet,
   assertCompleteFacetJudgments,
   validateAtomicEvidenceAgainstSource,
-  validateCandidateElicitation
+  validateCandidateElicitation,
+  deriveDeterministicVerifiability
 } from "../src/lib/canonical-evidence-model.ts";
 
 function atom(id: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE"): AtomicEvidence {
@@ -671,4 +672,23 @@ test("elicitation classification cannot be overturned by an inconsistent support
 
   const evidenceGapErrors = validateRequirementGraph(makeLedger("EVIDENCE_GAP", "CONTRADICTORY"));
   assert.ok(evidenceGapErrors.some(e => e.includes("EVIDENCE_GAP elicited evidence cannot be CONTRADICTORY")));
+});
+
+
+test("deterministic verifiability ignores employment years as metrics and geography as third-party entity", () => {
+  const signals = deriveDeterministicVerifiability(
+    "Finance Manager | Aug 2024–Present | Côte d’Ivoire et au Nigeria."
+  );
+  assert.equal(signals.has_quantifiable_metric, false);
+  assert.equal(signals.has_time_anchor, true);
+  assert.equal(signals.has_third_party_entity, false);
+});
+
+test("deterministic verifiability recognizes explicit metric and organization markers", () => {
+  const signals = deriveDeterministicVerifiability(
+    "Led a €2M program with ABC Group in 2024."
+  );
+  assert.equal(signals.has_quantifiable_metric, true);
+  assert.equal(signals.has_time_anchor, true);
+  assert.equal(signals.has_third_party_entity, true);
 });
