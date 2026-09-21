@@ -11,6 +11,7 @@ import {
   type RequirementSalience,
   type SourceSpan,
   validateAtomicEvidence,
+  deriveDeterministicVerifiability,
   validateAtomicEvidenceAgainstSource,
   validateSourceSpan,
   validateSpanBounds,
@@ -229,6 +230,62 @@ export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "F
   };
 }
 
+function exactOrNull(value: string | null | undefined, source: string): string | null {
+  const candidate = value?.trim();
+  return candidate && source.includes(candidate) ? candidate : null;
+}
+
+function exactArrayOrEmpty(values: string[] | undefined, source: string): string[] {
+  return (values ?? []).map(value => value.trim()).filter(value => value && source.includes(value));
+}
+
+function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
+  const actor = raw.actor.trim();
+  const groundedActor =
+    actor && /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
+      ? "candidate"
+      : exactOrNull(actor, source) ?? "candidate";
+
+  const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
+    INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
+    TEAM: /\b(?:we|our|team|teams|nous|notre|nos|équipe|équipes)\b/i,
+    SHARED: /\b(?:shared|co-owned|partagé|partagée|partagés|partagées)\b/i,
+    SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
+  };
+  const ownership = raw.ownership === "UNKNOWN"
+    ? "UNKNOWN"
+    : ownershipMarkers[raw.ownership]?.test(source)
+      ? raw.ownership
+      : "UNKNOWN";
+
+  const deterministic = deriveDeterministicVerifiability(source);
+
+  return {
+    ...raw,
+    actor: groundedActor,
+    ownership,
+    domain: exactOrNull(raw.domain, source),
+    jurisdiction: exactOrNull(raw.jurisdiction, source),
+    situation: exactOrNull(raw.situation, source),
+    tools_or_systems: exactArrayOrEmpty(raw.tools_or_systems, source),
+    standards: exactArrayOrEmpty(raw.standards, source),
+    quantity: exactOrNull(raw.quantity, source),
+    currency: exactOrNull(raw.currency, source),
+    team_size:
+      raw.team_size !== null && source.includes(String(raw.team_size))
+        ? raw.team_size
+        : null,
+    scope: exactOrNull(raw.scope, source),
+    start: exactOrNull(raw.start, source),
+    end: exactOrNull(raw.end, source),
+    recency: exactOrNull(raw.recency, source),
+    outcome: exactOrNull(raw.outcome, source),
+    has_quantifiable_metric: deterministic.has_quantifiable_metric,
+    has_third_party_entity: deterministic.has_third_party_entity,
+    has_time_anchor: deterministic.has_time_anchor,
+  };
+}
+
 function toAtomicEvidence(
   raw: RawCandidateAtom,
   span: SourceSpan,
@@ -427,7 +484,8 @@ export async function extractCanonicalShadow(
       continue;
     }
 
-    const atom = toAtomicEvidence(raw, span);
+    const canonicalRaw = canonicalizeRawCandidateAtom(raw, span.text);
+    const atom = toAtomicEvidence(canonicalRaw, span);
     const atomErrors = [
       ...validateSourceSpan(span),
       ...validateSpanBounds(span, session.cv_text ?? ""),
