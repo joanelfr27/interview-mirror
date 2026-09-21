@@ -523,10 +523,12 @@ export async function extractCanonicalShadow(
   };
 
   const contextErrors = validatePipelineContext(context);
-  const [rawAtoms, rawRequirements] = await Promise.all([
+  const [firstPassAtoms, rawRequirements] = await Promise.all([
     extractAtoms(session.cv_text ?? ""),
     extractRequirements(session.job_description ?? ""),
   ]);
+  const coverageAtoms = await extractCoverageAtoms(session.cv_text ?? "", firstPassAtoms);
+  const rawAtoms = [...firstPassAtoms, ...coverageAtoms];
 
   const sourceSpans: SourceSpan[] = [];
   const atoms: AtomicEvidence[] = [];
