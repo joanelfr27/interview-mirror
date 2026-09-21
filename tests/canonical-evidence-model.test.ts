@@ -247,7 +247,11 @@ test("negated evidence cannot be bound as a demonstration true atom", () => {
 
 test("quantifiable metric detection does not treat employment years as metrics", () => {
   const evidence = atom("A1");
+  evidence.action.normalized_action = "Finance Manager";
+  evidence.action.object = "Manager";
+  evidence.subject.ownership = "UNKNOWN";
   evidence.verifiability.has_quantifiable_metric = false;
+  evidence.verifiability.has_time_anchor = true;
   const span = {
     id: "span-A1",
     document_id: "CV",
