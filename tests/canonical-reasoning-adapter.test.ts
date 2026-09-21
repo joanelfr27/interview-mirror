@@ -85,3 +85,12 @@ const brokenValidation = validateCanonicalReasoningProjection(broken);
 if (brokenValidation.valid) throw new Error("Invalid cross-reference was not rejected.");
 
 console.log("D1 canonical reasoning adapter tests passed.");
+
+const dangling = fixture();
+dangling.demonstration_objectives = [{
+  id: "D1", target_unresolved_item_id: "UNKNOWN", observable_cue: "cue",
+  supporting_true_atom_ids: ["MISSING"], truthfulness_boundary: { permitted_claims: [], prohibited_claims: [] }
+}];
+let rejected = false;
+try { buildCanonicalReasoningProjection(dangling); } catch { rejected = true; }
+if (!rejected) throw new Error("Dangling canonical references were not rejected.");
