@@ -388,6 +388,69 @@ Hard rules:
   return JSON.parse(raw).atoms as RawCandidateAtom[];
 }
 
+
+
+async function extractCoverageAtoms(
+  cv: string,
+  existingAtoms: RawCandidateAtom[],
+): Promise<RawCandidateAtom[]> {
+  const openai = getOpenAI();
+  const response = await openai.chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: responseFormat("canonical_candidate_coverage_atoms", CANDIDATE_SCHEMA),
+    messages: [
+      {
+        role: "system",
+        content: `You are the completeness auditor for Interview Mirror's canonical candidate-evidence extractor.
+
+Your job is NOT to reinterpret existing evidence. Your job is to find explicit, material candidate facts in the raw CV that the first extraction pass failed to represent as atomic evidence.
+
+Coverage is mandatory across the whole CV, not only employment bullets. Inspect and cover, when explicitly present:
+- professional summary/profile claims, including explicit years of experience;
+- header/location facts that can matter to a JD;
+- key skills/capabilities, including named standards, frameworks, tools or systems;
+- education and professional qualifications;
+- languages;
+- employment titles, employers and explicit employment dates when useful as standalone employment atoms;
+- explicit achievements and metrics;
+- every other material explicit proposition not already represented.
+
+Rules:
+- Return ONLY atoms whose source_quote is an exact contiguous substring of the supplied CV.
+- Do not repeat an existing atom or create a broader paraphrase of one.
+- Prefer one small atom per explicit proposition.
+- Every populated field must be literally supported by that atom's source_quote.
+- Do not infer candidate fit, seniority, ownership, geography, citizenship, tools, outcomes or equivalence.
+- If a fact is not explicitly stated, do not create it.
+- For credentials, use CREDENTIAL.
+- For explicit employment title/date facts, use EMPLOYMENT.
+- For explicit skills/capabilities stated as nouns or labels, use STATED.
+- For explicit years of experience, preserve the exact phrase containing the years as the source_quote and set has_quantifiable_metric according to the source text.
+- Existing atoms are supplied only to define what is already covered; do not copy them into the output.
+`
+      },
+      {
+        role: "user",
+        content: `CV SOURCE:
+${cv}
+
+EXISTING ATOMS (DO NOT REPEAT):
+${JSON.stringify(existingAtoms.map(atom => ({
+  source_quote: atom.source_quote,
+  normalized_action: atom.normalized_action,
+  object: atom.object,
+})))}
+`
+      }
+    ]
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error("Empty canonical candidate coverage extraction response.");
+  return JSON.parse(raw).atoms as RawCandidateAtom[];
+}
+
 async function extractRequirements(
   jd: string,
 ): Promise<RawRequirement[]> {
