@@ -302,9 +302,14 @@ export function validateAtomicEvidenceAgainstSource(
     errors.push("has_time_anchor does not match deterministic source evidence.");
   }
 
+  // Keep this conservative: geographic names such as “au Nigeria” are not
+  // third-party entities. Accept explicit organization/legal-form markers, or
+  // an organization name following a relationship preposition that cannot be
+  // confused with the French geographic construction “au + place”.
   const explicitThirdPartyMarker =
-    /\b(?:at|for|with|from|chez|pour|avec|au sein de)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
-    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère)\b/i.test(source);
+    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère|Corporation|Organisation|Organization)\b/i.test(source) ||
+    /\b(?:at|for|with|from|chez|pour|avec)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
+    /\b(?:at|for|with|from)\s+[A-Z]{2,}(?:\b|\s)/.test(source);
   if (value.verifiability.has_third_party_entity && !explicitThirdPartyMarker) {
     errors.push("has_third_party_entity is not supported by deterministic source evidence.");
   }
