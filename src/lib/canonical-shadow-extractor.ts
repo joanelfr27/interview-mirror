@@ -296,18 +296,26 @@ Source-language rule: preserve the language of the supplied CV in normalized fie
 Extract atomic evidence directly from the supplied CV. An atom is ONE explicit proposition that can be traced to one exact source quote.
 
 Hard rules:
-- source_quote must be copied verbatim from the CV.
-- Never summarize multiple unrelated CV statements into one atom.
-- Never infer ownership, scope, scale, outcome, seniority, tool, geography, date or responsibility.
+- source_quote MUST be copied verbatim from the CV, character-for-character apart from trimming surrounding whitespace. Never paraphrase, normalize, merge, or rewrite source_quote.
+- Every populated structured field is an ATOM-LOCAL EXTRACTION, not a semantic summary. The value must be an exact contiguous phrase or literal value that appears inside that atom's source_quote.
+- normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
+- object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
+- actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
+- ownership: use INDIVIDUAL, TEAM, SHARED, or SUPERVISED only when the quote explicitly contains the corresponding ownership marker. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
+- domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied from the same source_quote when present. If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
+- Employment dates must NOT be attached to a responsibility/achievement atom unless those dates occur in that atom's source_quote. If dates are useful, create a separate employment atom whose source_quote contains the dates.
+- Never infer geography from an employer location, role location, or surrounding CV section when it is absent from the atom quote.
+- Never infer seniority, scale, scope, ownership, outcome, tool, standard, domain, jurisdiction, or time from the candidate's job title or from neighboring lines.
+- If the CV does not explicitly state a field in the atom quote, return null, [] or UNKNOWN as appropriate.
 - Mark polarity NEGATED only when the CV explicitly negates the proposition; unmentioned is not negated.
-- If the CV does not explicitly state a field, return null, [] or UNKNOWN as appropriate.
 - Do not use any prior CV analysis, strengths, gaps or strategy.
 - Do not judge candidate fit.
 - Do not claim that an atom proves a capability; extraction only.
-- Keep the normalized action/object faithful to the quote.
-- Extraction confidence measures representation accuracy only.
-- Prefer enough atoms to preserve the candidate's real professional progression, including role, scope, responsibility, action and explicit outcomes when present.
-- Do not create an atom solely because something is plausible for the candidate's job.
+- Extraction confidence measures source representation accuracy only, not candidate fit.
+- Prefer multiple small atoms over one enriched atom. Split role/date facts, responsibilities, tools, metrics, outcomes, and explicit scope into separate atoms when their source quotes differ.
+- has_time_anchor MUST be true only when the atom's source_quote contains an explicit four-digit year. Otherwise false.
+- has_quantifiable_metric MUST be true only when the atom's source_quote contains an explicit numeric/percentage/currency metric; otherwise false.
+- has_third_party_entity MUST be true only when the atom's source_quote itself explicitly names a third-party entity; otherwise false.
 - Every atom must have a source_quote that appears exactly in the supplied CV.
 `
       },
@@ -341,15 +349,18 @@ Source-language rule: preserve the language of the supplied job description in n
 Extract material requirements directly from the supplied job description.
 
 Hard rules:
-- source_quote must be copied verbatim from the JD.
+- source_quote MUST be copied verbatim from the JD, character-for-character apart from trimming surrounding whitespace. Never paraphrase or rewrite it.
+- normalized_requirement is a compact label, but source_quote is always the authoritative employer wording.
 - A requirement is a material capability, responsibility, qualification, context or standard stated by the employer.
-- Decompose each requirement into only the facets actually present or explicitly implied by the same requirement sentence/phrase.
+- Decompose each requirement into only the facets actually present in the same requirement source_quote.
+- Every facet source_quote MUST be an exact contiguous substring of the requirement source_quote. Never synthesize a facet quote.
+- Facet requirement text must remain faithful to its facet source quote and must not introduce facts absent from that quote.
 - Facets are FUNCTION, CONTEXT, SCOPE, SCALE, TOOL_METHOD, LEVEL, OWNERSHIP, STAKEHOLDER, GOVERNANCE and OUTCOME.
 - Do not invent a facet because it is typical for the role.
 - Do not use candidate information.
 - Salience reflects prominence/materiality within the JD, not candidate fit.
-- Each facet source_quote must be an exact substring of the requirement source_quote.
-- Keep normalized requirements concise and faithful.
+- Prefer fewer fully grounded facets over broader inferred decomposition.
+- If an exact source quote cannot be produced, omit that requirement/facet rather than paraphrasing.
 `
       },
       {

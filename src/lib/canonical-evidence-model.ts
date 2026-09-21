@@ -285,8 +285,9 @@ export function validateAtomicEvidenceAgainstSource(
     errors.push("AtomicEvidence NEGATED polarity is not explicitly grounded in the source quote.");
   }
 
-  if (value.assertion.type === "QUANTIFIED" &&
-      !/(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+  const hasQuantifiableMetric = /(?:%|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b|\b(?!19\d{2}\b)(?!20\d{2}\b)\d+(?:[.,]\d+)?\+?\b)/i.test(source);
+
+  if (value.assertion.type === "QUANTIFIED" && !hasQuantifiableMetric) {
     errors.push("QUANTIFIED assertion type requires an explicit metric or amount in the source quote.");
   }
 
@@ -294,7 +295,7 @@ export function validateAtomicEvidenceAgainstSource(
     errors.push("OUTCOME_CLAIM requires an outcome grounded in the source quote.");
   }
 
-  if (value.verifiability.has_quantifiable_metric !== /(?:%|\b\d+(?:[.,]\d+)?\b|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b)/i.test(source)) {
+  if (value.verifiability.has_quantifiable_metric !== hasQuantifiableMetric) {
     errors.push("has_quantifiable_metric does not match deterministic source evidence.");
   }
   if (value.verifiability.has_time_anchor !== /\b(?:19|20)\d{2}\b/.test(source)) {
