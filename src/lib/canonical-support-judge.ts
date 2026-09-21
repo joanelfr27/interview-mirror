@@ -99,10 +99,10 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
     // unless the cited credential explicitly names Finance or Accounting.
     if (item.status === "DIRECT" && facet.type === "LEVEL" &&
-        /master(?:'s|’s)?\\s+degree.*\\b(?:finance|accounting)\\b/i.test(facet.requirement)) {
+        /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
       const citedCredentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
       const hasSpecificField = citedCredentials.some(atom =>
-        /\\b(?:finance|accounting)\\b/i.test(atom.action.object)
+        /\b(?:finance|accounting)\b/i.test(atom.action.object)
       );
       if (citedCredentials.length > 0 && !hasSpecificField) {
         item.status = "PARTIAL";
