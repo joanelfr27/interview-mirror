@@ -95,6 +95,22 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
+    // Deterministic credential-specificity guard: a generic Master's/MBA credential
+    // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
+    // unless the cited credential explicitly names Finance or Accounting.
+    if (item.status === "DIRECT" && facet.type === "LEVEL" &&
+        /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
+      const citedCredentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
+      const hasSpecificField = citedCredentials.some(atom =>
+        /\b(?:finance|accounting)\b/i.test(atom.action.object)
+      );
+      if (citedCredentials.length > 0 && !hasSpecificField) {
+        item.status = "PARTIAL";
+        item.rationale = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
+        item.confidence = Math.min(item.confidence, 0.8);
+      }
+    }
+
     const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     valid.push(item);

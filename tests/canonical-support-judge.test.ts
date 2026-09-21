@@ -49,3 +49,23 @@ test("judge sanitizer preserves valid documented direct support", () => {
   assert.equal(result.judgments[0].status, "DIRECT");
   assert.equal(result.judgments[0].support_basis, "DOCUMENTED");
 });
+
+
+test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
+  l.evidence[0] = {
+    ...l.evidence[0],
+    source_span_id: "S-A1",
+    action: { normalized_action: "MBA", object: "Global Business & Management Studies" },
+    assertion: { type: "CREDENTIAL", polarity: "AFFIRMATIVE" },
+  };
+  l.requirements[0].facets = [{
+    id: "F-1", type: "LEVEL",
+    requirement: "Master's degree in Finance or Accounting is strongly preferred",
+    source_span_id: "S-REQ",
+  }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
