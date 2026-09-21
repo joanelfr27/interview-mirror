@@ -226,6 +226,18 @@ export function detectQuoteLanguage(quote: string, documentLanguage: CanonicalLa
   return quoteLanguage === "mixed" ? documentLanguage : quoteLanguage;
 }
 
+export function deriveDeterministicVerifiability(source: string): VerifiabilitySignals {
+  const has_quantifiable_metric =
+    /(?:%|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b|\b(?!19\d{2}\b)(?!20\d{2}\b)\d+(?:[.,]\d+)?\+?\b)/i.test(source);
+  const has_time_anchor = /\b(?:19|20)\d{2}\b/.test(source);
+  // Conservative by design: geography alone is not a third-party entity.
+  const has_third_party_entity =
+    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère|Corporation|Organisation|Organization)\b/i.test(source) ||
+    /\b(?:at|for|with|from|chez|pour|avec)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
+    /\b(?:at|for|with|from)\s+[A-Z]{2,}(?:\b|\s)/.test(source);
+  return { has_quantifiable_metric, has_third_party_entity, has_time_anchor };
+}
+
 export function validateAtomicEvidenceAgainstSource(
   value: AtomicEvidence,
   sourceSpan: SourceSpan,
@@ -285,7 +297,8 @@ export function validateAtomicEvidenceAgainstSource(
     errors.push("AtomicEvidence NEGATED polarity is not explicitly grounded in the source quote.");
   }
 
-  const hasQuantifiableMetric = /(?:%|[$€£]|\b(?:usd|eur|gbp|cfa|fcfa)\b|\b(?!19\d{2}\b)(?!20\d{2}\b)\d+(?:[.,]\d+)?\+?\b)/i.test(source);
+  const deterministic = deriveDeterministicVerifiability(source);
+  const hasQuantifiableMetric = deterministic.has_quantifiable_metric;
 
   if (value.assertion.type === "QUANTIFIED" && !hasQuantifiableMetric) {
     errors.push("QUANTIFIED assertion type requires an explicit metric or amount in the source quote.");
@@ -298,14 +311,11 @@ export function validateAtomicEvidenceAgainstSource(
   if (value.verifiability.has_quantifiable_metric !== hasQuantifiableMetric) {
     errors.push("has_quantifiable_metric does not match deterministic source evidence.");
   }
-  if (value.verifiability.has_time_anchor !== /\b(?:19|20)\d{2}\b/.test(source)) {
+  if (value.verifiability.has_time_anchor !== deterministic.has_time_anchor) {
     errors.push("has_time_anchor does not match deterministic source evidence.");
   }
 
-  const explicitThirdPartyMarker =
-    /\b(?:at|for|with|from|chez|pour|avec|au sein de)\s+[A-Z][\p{L}&.'’-]+(?:\s+[A-Z][\p{L}&.'’-]+){0,4}/u.test(source) ||
-    /\b(?:Ltd|Inc|LLC|PLC|GmbH|SAS|SA|Group|Groupe|Bank|University|Université|Ministry|Ministère)\b/i.test(source);
-  if (value.verifiability.has_third_party_entity && !explicitThirdPartyMarker) {
+  if (value.verifiability.has_third_party_entity && !deterministic.has_third_party_entity) {
     errors.push("has_third_party_entity is not supported by deterministic source evidence.");
   }
 
