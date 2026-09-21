@@ -374,6 +374,10 @@ Hard rules:
 - has_quantifiable_metric MUST be true only when the atom's source_quote contains an explicit numeric/percentage/currency metric; otherwise false.
 - has_third_party_entity MUST be true only when the atom's source_quote itself explicitly names a third-party entity; otherwise false.
 - Every atom must have a source_quote that appears exactly in the supplied CV.
+- COMPLETENESS GATE: before returning the final atom list, inspect the entire CV, not only employment bullet points. Explicitly check the professional summary/profile, header/location, years-of-experience statements, key skills/capabilities, named tools/systems, standards, education, professional qualifications, languages, employment titles/dates, and explicit achievements/metrics.
+- Every explicit material fact in those sections that could correspond to a JD requirement must be represented by at least one atom, unless it is already represented by another atom with the same source proposition.
+- In particular, do not omit explicit years of experience, named standards (for example IFRS or SYSCOHADA), language abilities, education/credentials, or explicit location facts merely because they are not employment bullets.
+- This is a coverage requirement, not a fit judgment: do not invent facts to fill a missing category.
 `
       },
       {
