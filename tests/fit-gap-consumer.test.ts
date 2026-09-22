@@ -103,3 +103,20 @@ test("D4 validator rejects consumer evidence injection and state tampering",()=>
  validation=validateFitGapConsumerProjection(out2,fresh.fit,fresh.route,fresh.l);
  assert.equal(validation.valid,false);
 });
+
+test("D4 validator rejects tampered requirement fields and facet provenance",()=>{
+ const {l,fit,route}=buildAll();
+ const out=buildFitGapConsumerProjection(fit,route,l);
+ const direct=out.requirements.find(r=>r.requirement_id==="R-DIRECT")!;
+ direct.normalized_requirement="Fabricated requirement.";
+ let validation=validateFitGapConsumerProjection(out,fit,route,l);
+ assert.equal(validation.valid,false);
+ const fresh=buildAll(); const out2=buildFitGapConsumerProjection(fresh.fit,fresh.route,fresh.l);
+ out2.requirements.find(r=>r.requirement_id==="R-DIRECT")!.facets[0]!.evidence[0]!.source_quote="Fabricated.";
+ validation=validateFitGapConsumerProjection(out2,fresh.fit,fresh.route,fresh.l);
+ assert.equal(validation.valid,false);
+ const out3=buildFitGapConsumerProjection(fresh.fit,fresh.route,fresh.l);
+ out3.requirements.find(r=>r.requirement_id==="R-DIRECT")!.gap_classification="EVIDENCE_GAP";
+ validation=validateFitGapConsumerProjection(out3,fresh.fit,fresh.route,fresh.l);
+ assert.equal(validation.valid,false);
+});
