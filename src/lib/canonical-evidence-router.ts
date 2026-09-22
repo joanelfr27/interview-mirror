@@ -179,9 +179,9 @@ export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEv
       facets,
       candidates: candidateEvidenceForRequirement(ledger, requirement.requirement_id, facets),
       unresolved_item_ids: unresolved.map((item) => item.id).sort(),
-      elicitation_ids: unresolved
-        .map((item) => ledger.candidate_elicitations.find((e) => e.unresolved_item_id === item.id)?.id)
-        .filter((id): id is string => Boolean(id))
+      elicitation_ids: ledger.candidate_elicitations
+        .filter((elicitation) => unresolved.some((item) => item.id === elicitation.unresolved_item_id))
+        .map((elicitation) => elicitation.id)
         .sort(),
       demonstration_objective_ids: objectives.map((objective) => objective.id).sort(),
     };
@@ -304,9 +304,13 @@ export function validateCanonicalEvidenceRoute(
       );
     }
 
-    const expectedElicitationIds = requirementUnresolvedItems
-      .map((item) => item.elicitation?.id)
-      .filter((id): id is string => Boolean(id))
+    const expectedElicitationIds = ledger.candidate_elicitations
+      .filter((elicitation) =>
+        requirementUnresolvedItems.some(
+          (item) => item.unresolved_item_id === elicitation.unresolved_item_id,
+        ),
+      )
+      .map((elicitation) => elicitation.id)
       .sort();
     if (JSON.stringify([...requirement.elicitation_ids].sort()) !== JSON.stringify(expectedElicitationIds)) {
       errors.push(
@@ -353,8 +357,10 @@ export function validateCanonicalEvidenceRoute(
     }
 
     for (const elicitationId of requirement.elicitation_ids) {
-      const matches = route.unresolved_items.filter(
-        (item) => unresolvedIds.has(item.unresolved_item_id) && item.elicitation?.id === elicitationId,
+      const matches = ledger.candidate_elicitations.filter(
+        (elicitation) =>
+          elicitation.id === elicitationId &&
+          unresolvedIds.has(elicitation.unresolved_item_id),
       );
       if (matches.length !== 1) {
         errors.push(
