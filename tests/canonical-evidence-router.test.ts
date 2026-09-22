@@ -62,3 +62,31 @@ test("D3 rejects dangling canonical evidence references",()=>{
 
 
 test("D3 keeps mixed direct and transferable facets in VERIFY_GAP",()=>{ const l=fixture(); l.requirements[0]!.facets.push({id:"F-R-DIRECT-2",type:"FUNCTION",requirement:"Another facet",source_span_id:"JD-1"}); l.support_judgments.push({id:"SJ-MIX",requirement_id:"R-DIRECT",facet_id:"F-R-DIRECT-2",status:"ANALOGICAL_TRANSFER",supporting_evidence_ids:["A-TRANSFER"],rationale:"Adjacent.",confidence:.6,abstained:false,support_basis:"DOCUMENTED",analogical_mapping:{shared_dimensions:["x"],unshared_dimensions:["y"]}}); l.requirement_statuses[0]!.status="PARTIAL"; const x=buildCanonicalEvidenceRoute(l).requirements.find(x=>x.requirement_id==="R-DIRECT")!; assert.equal(x.mode,"VERIFY_GAP"); });
+
+
+test("D3 validator rejects TRANSFERABLE routes with mixed facet statuses", () => {
+ const route = buildCanonicalEvidenceRoute(fixture());
+ const transferable = route.requirements.find(x => x.requirement_id === "R-TRANSFER")!;
+ const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!.facets[0]!;
+ transferable.mode = "TRANSFERABLE";
+ transferable.facets.push({ ...direct, facet_id: "F-CROSS-MIXED" });
+ const validation = validateCanonicalEvidenceRoute(route);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /TRANSFERABLE mode requires every facet to be ANALOGICAL_TRANSFER/);
+});
+
+test("D3 validator rejects cross-requirement candidate evidence references", () => {
+ const route = buildCanonicalEvidenceRoute(fixture());
+ const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
+ const transferable = route.requirements.find(x => x.requirement_id === "R-TRANSFER")!;
+ transferable.candidates = [...direct.candidates];
+ const validation = validateCanonicalEvidenceRoute(route);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /not owned by requirement: R-TRANSFER -> A-DIRECT/);
+});
+
+test("D3 builder output is independently accepted by its route validator", () => {
+ const route = buildCanonicalEvidenceRoute(fixture());
+ const validation = validateCanonicalEvidenceRoute(route);
+ assert.deepEqual(validation, { valid: true, errors: [] });
+});
