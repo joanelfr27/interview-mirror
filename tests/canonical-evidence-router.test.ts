@@ -59,3 +59,6 @@ test("D3 rejects dangling canonical evidence references",()=>{
  const l=fixture(); l.support_judgments[0]!.supporting_evidence_ids=["MISSING"];
  assert.throws(()=>buildCanonicalEvidenceRoute(l),/unknown evidence|invalid/i);
 });
+
+
+test("D3 keeps mixed direct and transferable facets in VERIFY_GAP",()=>{ const l=fixture(); l.requirements[0]!.facets.push({id:"F-R-DIRECT-2",type:"FUNCTION",requirement:"Another facet",source_span_id:"JD-1"}); l.support_judgments.push({id:"SJ-MIX",requirement_id:"R-DIRECT",facet_id:"F-R-DIRECT-2",status:"ANALOGICAL_TRANSFER",supporting_evidence_ids:["A-TRANSFER"],rationale:"Adjacent.",confidence:.6,abstained:false,support_basis:"DOCUMENTED",analogical_mapping:{shared_dimensions:["x"],unshared_dimensions:["y"]}}); l.requirement_statuses[0]!.status="PARTIAL"; const x=buildCanonicalEvidenceRoute(l).requirements.find(x=>x.requirement_id==="R-DIRECT")!; assert.equal(x.mode,"VERIFY_GAP"); });
