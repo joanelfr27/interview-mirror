@@ -85,7 +85,7 @@ test("D4 preserves partial, evidence-gap, experience-gap and contradicted states
  transfer.gap_classification="EVIDENCE_GAP"; transfer.fit_state="EVIDENCE_GAP";
  const gap=fit.requirements.find(r=>r.requirement_id==="R-GAP")!;
  gap.gap_classification=null; gap.fit_state="CONTRADICTED";
- assert.throws(()=>buildFitGapConsumerProjection(fit,route,l),/D4 Fit & Gap projection is invalid/);
+ assert.throws(()=>buildFitGapConsumerProjection(fit,route,l),/requirement reasoning is inconsistent/);
  const valid=buildAll();
  const t=valid.fit.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;
  t.requirement_status="UNJUDGED"; t.gap_classification="EVIDENCE_GAP"; t.fit_state="EVIDENCE_GAP";
