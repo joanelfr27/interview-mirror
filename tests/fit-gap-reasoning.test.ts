@@ -186,3 +186,98 @@ test("D2 validates its own output", () => {
   const result = buildFitGapProjection(projection());
   assert.deepEqual(validateFitGapProjection(result), { valid: true, errors: [] });
 });
+
+test("D2 rejects conflicting classifications across multiple unresolved items for one requirement", () => {
+  const source = projection();
+  source.requirements[2].status = "UNRESOLVED";
+  source.unresolved_items.push({
+    unresolved_item_id: "U-3B",
+    requirement_id: "REQ-3",
+    facet_ids: ["FACET-3"],
+    type: "AMBIGUOUS",
+    supporting_evidence: [],
+    contradiction_evidence: [],
+    elicitation: {
+      id: "EL-3B",
+      unresolved_item_id: "U-3B",
+      question: "Can your prior experience transfer?",
+      answer: "Yes, in a different domain.",
+      answer_assertion_type: "ELICITED",
+      classification: "TRANSFERABLE",
+      classification_rationale: "The candidate described relevant but non-identical experience.",
+    },
+  });
+
+  assert.throws(
+    () => buildFitGapProjection(source),
+    /conflicting unresolved-item classifications/i,
+  );
+});
+
+test("D2 rejects reversed conflicting classification order rather than changing the result", () => {
+  const source = projection();
+  source.requirements[2].status = "UNRESOLVED";
+  source.unresolved_items[0].elicitation = {
+    id: "EL-3",
+    unresolved_item_id: "U-3",
+    question: "Can your prior experience transfer?",
+    answer: "Yes, in a different domain.",
+    answer_assertion_type: "ELICITED",
+    classification: "TRANSFERABLE",
+    classification_rationale: "The candidate described relevant but non-identical experience.",
+  };
+  source.unresolved_items.push({
+    unresolved_item_id: "U-3B",
+    requirement_id: "REQ-3",
+    facet_ids: ["FACET-3"],
+    type: "AMBIGUOUS",
+    supporting_evidence: [],
+    contradiction_evidence: [],
+    elicitation: {
+      id: "EL-3B",
+      unresolved_item_id: "U-3B",
+      question: "Have you directly owned this?",
+      answer: "No.",
+      answer_assertion_type: "ELICITED",
+      classification: "EXPERIENCE_GAP",
+      classification_rationale: "The candidate explicitly states they have not owned it.",
+    },
+  });
+
+  const reversed = {
+    ...source,
+    unresolved_items: [...source.unresolved_items].reverse(),
+  };
+
+  assert.throws(
+    () => buildFitGapProjection(reversed),
+    /conflicting unresolved-item classifications/i,
+  );
+});
+
+test("D2 validator rejects requirement status and fit-state mismatches", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[0].fit_state = "UNRESOLVED";
+
+  const validation = validateFitGapProjection(result);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /expected ESTABLISHED/i);
+});
+
+test("D2 validator rejects an invalid projection version", () => {
+  const result = buildFitGapProjection(projection());
+  const invalid = { ...result, version: "not-d2-v1" as "d2-v1" };
+
+  const validation = validateFitGapProjection(invalid);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /version/i);
+});
+
+test("D2 validator rejects empty demonstration objective IDs", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[2].demonstration_objective_ids = [""];
+
+  const validation = validateFitGapProjection(result);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /demonstration objective ID/i);
+});
