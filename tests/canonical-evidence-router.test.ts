@@ -112,14 +112,6 @@ test("D3 validator rejects tampered source span and source quote", () => {
 
 test("D3 validator rejects cross-requirement unresolved, elicitation and objective summary IDs", () => {
  const ledger = fixture();
- ledger.candidate_elicitations.push({
-   id:"EL-GAP-2",
-   unresolved_item_id:"U-GAP",
-   question:"Provide one more boundary example.",
-   answer:"A second elicited answer.",
-   answer_source_span_id:"EL-1",
-   answer_assertion_type:"ELICITED"
- });
  ledger.demonstration_objectives = [{
    id:"OBJ-GAP",
    target_unresolved_item_id:"U-GAP",
@@ -182,7 +174,6 @@ test("D3 validator rejects incomplete per-requirement summary arrays", () => {
 
 test("D3 candidate routing preserves both direct and contradictory classifications for one evidence atom", () => {
  const ledger = fixture();
- ledger.requirement_statuses[0]!.status = "PARTIAL";
  ledger.unresolved_items.push({
    id:"U-DIRECT-CONTRADICTION",
    requirement_id:"R-DIRECT",
@@ -205,12 +196,13 @@ test("D3 candidate routing preserves both direct and contradictory classificatio
 
 test("D3 builder preserves all elicitations for a requirement-local unresolved item", () => {
  const ledger = fixture();
+ ledger.source_spans.push(span("EL-2","ELICIT-SESSION","A second elicited answer."));
  ledger.candidate_elicitations.push({
    id:"EL-GAP-2",
    unresolved_item_id:"U-GAP",
    question:"Provide one more boundary example.",
    answer:"A second elicited answer.",
-   answer_source_span_id:"EL-1",
+   answer_source_span_id:"EL-2",
    answer_assertion_type:"ELICITED"
  });
  const route = buildCanonicalEvidenceRoute(ledger);
