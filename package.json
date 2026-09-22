@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:canonical": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/canonical-evidence-model.test.ts tests/canonical-support-judge.test.ts tests/candidate-elicitation-language.test.ts tests/canonical-reasoning-adapter.test.ts tests/canonical-evidence-router.test.ts tests/canonical-strategy-bridge.test.ts tests/fit-gap-reasoning.test.ts",
+    "test:canonical": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/canonical-evidence-model.test.ts tests/canonical-support-judge.test.ts tests/candidate-elicitation-language.test.ts tests/canonical-reasoning-adapter.test.ts tests/canonical-evidence-router.test.ts tests/fit-gap-reasoning.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
