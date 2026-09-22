@@ -11,12 +11,12 @@ function projection(): CanonicalReasoningProjection {
         requirement_id: "REQ-1",
         normalized_requirement: "Manage a regional finance function",
         category: "EXPERIENCE",
-        salience: "HIGH",
+        salience: "CORE",
         status: "SUPPORTED",
         facets: [
           {
             facet_id: "FACET-1",
-            type: "CAPABILITY",
+            type: "FUNCTION",
             requirement: "Manage regional finance",
             status: "DIRECT",
             evidence: [
@@ -35,7 +35,7 @@ function projection(): CanonicalReasoningProjection {
         requirement_id: "REQ-2",
         normalized_requirement: "Lead a transformation",
         category: "LEADERSHIP",
-        salience: "MEDIUM",
+        salience: "IMPORTANT",
         status: "PARTIAL",
         facets: [
           {
@@ -53,12 +53,12 @@ function projection(): CanonicalReasoningProjection {
         requirement_id: "REQ-3",
         normalized_requirement: "Operate in a regulated environment",
         category: "DOMAIN",
-        salience: "LOW",
+        salience: "SUPPORTING",
         status: "UNRESOLVED",
         facets: [
           {
             facet_id: "FACET-3",
-            type: "DOMAIN",
+            type: "CONTEXT",
             requirement: "Regulated environment",
             status: "NONE",
             evidence: [],
@@ -71,12 +71,12 @@ function projection(): CanonicalReasoningProjection {
         requirement_id: "REQ-4",
         normalized_requirement: "Own a missing capability",
         category: "CAPABILITY",
-        salience: "HIGH",
+        salience: "CORE",
         status: "PARTIAL",
         facets: [
           {
             facet_id: "FACET-4",
-            type: "CAPABILITY",
+            type: "FUNCTION",
             requirement: "Own capability",
             status: "PARTIAL",
             evidence: [],
