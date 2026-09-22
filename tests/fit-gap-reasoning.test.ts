@@ -190,6 +190,15 @@ test("D2 validates its own output", () => {
 test("D2 rejects conflicting classifications across multiple unresolved items for one requirement", () => {
   const source = projection();
   source.requirements[2].status = "UNRESOLVED";
+  source.unresolved_items[0].elicitation = {
+    id: "EL-3",
+    unresolved_item_id: "U-3",
+    question: "Can you provide evidence?",
+    answer: "The experience is not represented in the source material.",
+    answer_assertion_type: "ELICITED",
+    classification: "EVIDENCE_GAP",
+    classification_rationale: "The source material does not contain the evidence.",
+  };
   source.unresolved_items.push({
     unresolved_item_id: "U-3B",
     requirement_id: "REQ-3",
