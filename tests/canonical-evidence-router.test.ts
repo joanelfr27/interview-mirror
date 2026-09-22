@@ -33,7 +33,7 @@ function fixture():EvidenceLedger{
 }
 test("D3 is deterministic and preserves mode boundaries",()=>{
  const a=buildCanonicalEvidenceRoute(fixture()),b=buildCanonicalEvidenceRoute(fixture());
- assert.deepEqual(a,b); assert.deepEqual(validateCanonicalEvidenceRoute(a),{valid:true,errors:[]});
+ assert.deepEqual(a,b); assert.deepEqual(validateCanonicalEvidenceRoute(a, fixture()),{valid:true,errors:[]});
  assert.equal(a.requirements.find(x=>x.requirement_id==="R-DIRECT")?.mode,"DIRECT");
  assert.equal(a.requirements.find(x=>x.requirement_id==="R-TRANSFER")?.mode,"TRANSFERABLE");
  assert.equal(a.requirements.find(x=>x.requirement_id==="R-GAP")?.mode,"VERIFY_GAP");
@@ -70,7 +70,7 @@ test("D3 validator rejects TRANSFERABLE routes with mixed facet statuses", () =>
  const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!.facets[0]!;
  transferable.mode = "TRANSFERABLE";
  transferable.facets.push({ ...direct, facet_id: "F-CROSS-MIXED" });
- const validation = validateCanonicalEvidenceRoute(route);
+ const validation = validateCanonicalEvidenceRoute(route, fixture());
  assert.equal(validation.valid, false);
  assert.match(validation.errors.join(" | "), /TRANSFERABLE mode requires every facet to be ANALOGICAL_TRANSFER/);
 });
@@ -80,13 +80,68 @@ test("D3 validator rejects cross-requirement candidate evidence references", () 
  const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
  const transferable = route.requirements.find(x => x.requirement_id === "R-TRANSFER")!;
  transferable.candidates = [...direct.candidates];
- const validation = validateCanonicalEvidenceRoute(route);
+ const validation = validateCanonicalEvidenceRoute(route, fixture());
  assert.equal(validation.valid, false);
  assert.match(validation.errors.join(" | "), /not owned by requirement: R-TRANSFER -> A-DIRECT/);
 });
 
-test("D3 builder output is independently accepted by its route validator", () => {
- const route = buildCanonicalEvidenceRoute(fixture());
- const validation = validateCanonicalEvidenceRoute(route);
+test("D3 builder output is accepted by its ledger-backed route validator", () => {
+ const ledger = fixture();
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const validation = validateCanonicalEvidenceRoute(route, ledger);
  assert.deepEqual(validation, { valid: true, errors: [] });
+});
+
+test("D3 validator rejects tampered source span and source quote", () => {
+ const ledger = fixture();
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const candidate = route.requirements.find(x => x.requirement_id === "R-DIRECT")!.candidates[0]!;
+ candidate.source_span_id = "CV-2";
+ let validation = validateCanonicalEvidenceRoute(route, ledger);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /source span does not match evidence/);
+
+ const freshLedger = fixture();
+ const fresh = buildCanonicalEvidenceRoute(freshLedger);
+ const freshCandidate = fresh.requirements.find(x => x.requirement_id === "R-DIRECT")!.candidates[0]!;
+ freshCandidate.source_quote = "Fabricated quote.";
+ validation = validateCanonicalEvidenceRoute(fresh, freshLedger);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /source quote does not match source span/);
+});
+
+test("D3 validator rejects cross-requirement unresolved, elicitation and objective summary IDs", () => {
+ const ledger = fixture();
+ ledger.demonstration_objectives = [{
+   id:"OBJ-GAP",
+   target_unresolved_item_id:"U-GAP",
+   observable_cue:"State boundary.",
+   supporting_true_atom_ids:[],
+   truthfulness_boundary:{permitted_claims:["State source facts."], prohibited_claims:["Do not claim mining experience."]}
+ }];
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
+ const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
+ direct.unresolved_item_ids = [...gap.unresolved_item_ids];
+ direct.elicitation_ids = [...gap.elicitation_ids];
+ direct.demonstration_objective_ids = ["OBJ-GAP"];
+ const validation = validateCanonicalEvidenceRoute(route, ledger);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /another requirement|not owned|unresolved item|objective/i);
+});
+
+test("D3 validator rejects VERIFY_GAP when the underlying route is fully DIRECT", () => {
+ const ledger = fixture();
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
+ direct.mode = "VERIFY_GAP";
+ const validation = validateCanonicalEvidenceRoute(route, ledger);
+ assert.equal(validation.valid, false);
+ assert.match(validation.errors.join(" | "), /mode does not match/);
+});
+
+test("D3 candidate set preserves contradiction evidence from unresolved items", () => {
+ const route = buildCanonicalEvidenceRoute(fixture());
+ const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
+ assert.ok(gap.candidates.some(c => c.evidence_id === "A-CONTRADICT" && c.support_status === "CONTRADICTORY"));
 });
