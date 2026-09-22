@@ -8,6 +8,7 @@ import type {
   SupportJudgment,
   UnresolvedItem,
 } from "@/lib/canonical-evidence-model";
+import { validateRequirementGraph } from "@/lib/canonical-evidence-model";
 
 export type CanonicalReasoningEvidenceRef = {
   evidence_id: string;
@@ -110,11 +111,16 @@ function buildFacet(
   };
 }
 
+function validateLedgerReferences(ledger: EvidenceLedger): string[] {
+  return validateRequirementGraph(ledger);
+}
+
 export function buildCanonicalReasoningProjection(
   ledger: EvidenceLedger,
 ): CanonicalReasoningProjection {
   const ledgerErrors = validateLedgerReferences(ledger);
   if (ledgerErrors.length) throw new Error(ledgerErrors.join(" | "));
+
   const requirements = ledger.requirements.map((requirement) => ({
     requirement_id: requirement.id,
     normalized_requirement: requirement.normalized_requirement,
@@ -171,7 +177,10 @@ export function validateCanonicalReasoningProjection(
       if (facetIds.has(facet.facet_id)) errors.push(`Duplicate projected facet: ${facet.facet_id}.`);
       facetIds.add(facet.facet_id);
 
-      if (facet.status !== "UNJUDGED" && !["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"].includes(facet.status)) {
+      if (
+        facet.status !== "UNJUDGED" &&
+        !["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY", "NONE"].includes(facet.status)
+      ) {
         errors.push(`Facet ${facet.facet_id} has an invalid support status.`);
       }
 
@@ -199,7 +208,11 @@ export function validateCanonicalReasoningProjection(
     if (!objective.id || !objective.target_unresolved_item_id) {
       errors.push("Demonstration objective is missing its identity or unresolved target.");
     }
-    if (!projection.unresolved_items.some((item) => item.unresolved_item_id === objective.target_unresolved_item_id)) {
+    if (
+      !projection.unresolved_items.some(
+        (item) => item.unresolved_item_id === objective.target_unresolved_item_id,
+      )
+    ) {
       errors.push(`Demonstration objective ${objective.id} references an unknown unresolved item.`);
     }
   }
