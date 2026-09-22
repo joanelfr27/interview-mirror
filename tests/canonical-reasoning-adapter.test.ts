@@ -51,7 +51,7 @@ function fixture(): EvidenceLedger {
       atom("A2", "SPAN-B", "led", "financial planning"),
       atom("A3", "SPAN-C", "worked", "reporting systems"),
       atom("A4", "SPAN-D", "manage", "mining operations", "NEGATED"),
-      atom("E1", "ELICIT-1", "transferred", "similar reporting experience", "AFFIRMATIVE", "CANDIDATE_ELICITED"),
+      atom("ELICIT-ATOM-ELICIT-1", "ELICIT-1", "transferred", "similar reporting experience", "AFFIRMATIVE", "CANDIDATE_ELICITED"),
     ],
     requirements: [
       {
@@ -221,7 +221,7 @@ elicited.support_judgments.push({
   requirement_id: "R6",
   facet_id: "R6-F1",
   status: "PARTIAL",
-  supporting_evidence_ids: ["E1"],
+  supporting_evidence_ids: ["ELICIT-ATOM-ELICIT-1"],
   rationale: "Candidate self-reported transferable experience.",
   confidence: 0.7,
   abstained: false,
@@ -233,7 +233,7 @@ elicited.unresolved_items.push({
   requirement_id: "R6",
   facet_ids: ["R6-F1"],
   type: "AMBIGUOUS",
-  supporting_evidence_ids: ["E1"],
+  supporting_evidence_ids: ["ELICIT-ATOM-ELICIT-1"],
   contradiction_evidence_ids: [],
   absence_basis: "UNMENTIONED",
   negation_evidence_ids: [],
