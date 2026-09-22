@@ -192,6 +192,9 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
   const facetIds = new Set<string>();
   const facetEvidenceIds = new Set<string>();
   const routeEvidenceIds = new Set<string>();
+  for (const item of route.unresolved_items) {
+    for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) routeEvidenceIds.add(evidence.evidence_id);
+  }
 
   for (const requirement of route.requirements) {
     if (!requirement.requirement_id) errors.push("D3 requirement is missing requirement_id.");
