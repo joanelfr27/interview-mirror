@@ -57,10 +57,23 @@ function classificationForRequirement(
   projection: CanonicalReasoningProjection,
   requirementId: string,
 ): CandidateGapClassification | null {
-  const unresolved = projection.unresolved_items.find(
-    (item) => item.requirement_id === requirementId && item.elicitation?.classification,
-  );
-  return unresolved?.elicitation?.classification ?? null;
+  const classifications = projection.unresolved_items
+    .filter(
+      (item) =>
+        item.requirement_id === requirementId &&
+        item.elicitation?.classification,
+    )
+    .map((item) => item.elicitation!.classification);
+
+  const distinctClassifications = [...new Set(classifications)];
+
+  if (distinctClassifications.length > 1) {
+    throw new Error(
+      `Requirement ${requirementId} has conflicting unresolved-item classifications: ${distinctClassifications.join(", ")}.`,
+    );
+  }
+
+  return distinctClassifications[0] ?? null;
 }
 
 function stateForRequirement(
@@ -128,11 +141,22 @@ export function buildFitGapProjection(
   };
 }
 
+function expectedStateForValidatedRequirement(
+  requirementStatus: RequirementStatus | "UNJUDGED",
+  classification: CandidateGapClassification | null,
+): FitGapState {
+  return stateForRequirement(requirementStatus, classification);
+}
+
 export function validateFitGapProjection(
   projection: FitGapProjection,
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const requirementIds = new Set<string>();
+
+  if (projection.version !== "d2-v1") {
+    errors.push(`Invalid Fit & Gap projection version: ${projection.version}.`);
+  }
 
   for (const requirement of projection.requirements) {
     if (!requirement.requirement_id) {
@@ -160,9 +184,25 @@ export function validateFitGapProjection(
       errors.push(`Requirement ${requirement.requirement_id} has a TRANSFERABLE classification but a different fit state.`);
     }
 
+    const expectedState = expectedStateForValidatedRequirement(
+      requirement.requirement_status,
+      requirement.gap_classification,
+    );
+    if (requirement.fit_state !== expectedState) {
+      errors.push(
+        `Requirement ${requirement.requirement_id} has fit state ${requirement.fit_state}, but expected ${expectedState} from its status/classification.`,
+      );
+    }
+
     for (const unresolvedId of requirement.unresolved_item_ids) {
       if (!unresolvedId) {
         errors.push(`Requirement ${requirement.requirement_id} contains an empty unresolved item ID.`);
+      }
+    }
+
+    for (const objectiveId of requirement.demonstration_objective_ids) {
+      if (!objectiveId) {
+        errors.push(`Requirement ${requirement.requirement_id} contains an empty demonstration objective ID.`);
       }
     }
   }
