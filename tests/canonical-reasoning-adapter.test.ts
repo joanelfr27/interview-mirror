@@ -44,7 +44,7 @@ function fixture(): EvidenceLedger {
       { id: "SPAN-H", document_id: "JD", text: "Systems experience.", start_offset: 0, end_offset: 19, language: "en" },
       { id: "SPAN-I", document_id: "JD", text: "Mining experience.", start_offset: 0, end_offset: 18, language: "en" },
       { id: "SPAN-J", document_id: "JD", text: "Bilingual reporting.", start_offset: 0, end_offset: 19, language: "en" },
-      { id: "ELICIT-1", document_id: "ELICIT-ANSWER-1", text: "I transferred similar reporting experience.", start_offset: 0, end_offset: 42, language: "en" },
+      { id: "ELICIT-1", document_id: "ELICIT-ANSWER-1", text: "I transferred similar reporting experience.", start_offset: 0, end_offset: 43, language: "en" },
     ],
     evidence: [
       atom("A1", "SPAN-A", "managed", "regional reporting"),
