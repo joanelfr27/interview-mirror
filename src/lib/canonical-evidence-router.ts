@@ -127,15 +127,19 @@ function candidateEvidenceForRequirement(
     result.push(...routeEvidence(ledger, unresolvedContradictory, "CONTRADICTORY"));
   }
 
+  // Preserve distinct support classifications for the same atom. A single evidence
+  // atom can legitimately be both directly cited by a facet and cited as contradictory
+  // unresolved evidence; collapsing by evidence_id would erase that contradiction.
   const deduped = new Map<string, CanonicalEvidenceRouteCandidate>();
   for (const candidate of result) {
-    const existing = deduped.get(candidate.evidence_id);
-    if (!existing || (existing.support_status !== "DIRECT" && candidate.support_status === "DIRECT")) {
-      deduped.set(candidate.evidence_id, candidate);
-    }
+    deduped.set(`${candidate.evidence_id}::${candidate.support_status}`, candidate);
   }
 
-  return [...deduped.values()].sort((a, b) => a.evidence_id.localeCompare(b.evidence_id));
+  return [...deduped.values()].sort(
+    (a, b) =>
+      a.evidence_id.localeCompare(b.evidence_id) ||
+      a.support_status.localeCompare(b.support_status),
+  );
 }
 
 export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEvidenceRoute {
@@ -285,9 +289,49 @@ export function validateCanonicalEvidenceRoute(
       }
     }
 
-    const unresolvedIds = new Set(route.unresolved_items
-      .filter((item) => item.requirement_id === requirement.requirement_id)
-      .map((item) => item.unresolved_item_id));
+    const requirementUnresolvedItems = route.unresolved_items.filter(
+      (item) => item.requirement_id === requirement.requirement_id,
+    );
+    const expectedUnresolvedIds = requirementUnresolvedItems
+      .map((item) => item.unresolved_item_id)
+      .sort();
+    const unresolvedIds = new Set(expectedUnresolvedIds);
+
+    if (JSON.stringify([...requirement.unresolved_item_ids].sort()) !== JSON.stringify(expectedUnresolvedIds)) {
+      errors.push(
+        "D3 requirement unresolved_item_ids do not exactly match requirement-local unresolved items: " +
+        requirement.requirement_id,
+      );
+    }
+
+    const expectedElicitationIds = requirementUnresolvedItems
+      .map((item) => item.elicitation?.id)
+      .filter((id): id is string => Boolean(id))
+      .sort();
+    if (JSON.stringify([...requirement.elicitation_ids].sort()) !== JSON.stringify(expectedElicitationIds)) {
+      errors.push(
+        "D3 requirement elicitation_ids do not exactly match requirement-local elicitations: " +
+        requirement.requirement_id,
+      );
+    }
+
+    const expectedObjectiveIds = route.demonstration_objectives
+      .filter((objective) =>
+        requirementUnresolvedItems.some(
+          (item) => item.unresolved_item_id === objective.target_unresolved_item_id,
+        ),
+      )
+      .map((objective) => objective.id)
+      .sort();
+    if (
+      JSON.stringify([...requirement.demonstration_objective_ids].sort()) !==
+      JSON.stringify(expectedObjectiveIds)
+    ) {
+      errors.push(
+        "D3 requirement demonstration_objective_ids do not exactly match requirement-local objectives: " +
+        requirement.requirement_id,
+      );
+    }
 
     for (const unresolvedItemId of requirement.unresolved_item_ids) {
       const unresolvedItem = route.unresolved_items.find((item) => item.unresolved_item_id === unresolvedItemId);
