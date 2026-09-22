@@ -313,4 +313,3 @@ const duplicateObjectives = {
 if (validateCanonicalReasoningProjection(duplicateObjectives).valid) {
   throw new Error("Duplicate demonstration objective id was not rejected.");
 }
-\n
