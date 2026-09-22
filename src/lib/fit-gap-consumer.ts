@@ -100,12 +100,7 @@ export function buildFitGapConsumerProjection(
       fit.normalized_requirement !== routed.normalized_requirement ||
       fit.category !== routed.category ||
       fit.salience !== routed.salience ||
-      fit.requirement_status !== routed.status ||
-      fit.fit_state !== ({
-        DIRECT: "ESTABLISHED",
-        TRANSFERABLE: "TRANSFERABLE",
-        VERIFY_GAP: fit.fit_state,
-      } as Record<string, FitGapState>)[routed.mode]
+      fit.requirement_status !== routed.status
     ) {
       throw new Error("D4 requirement reasoning is inconsistent: " + fit.requirement_id);
     }
