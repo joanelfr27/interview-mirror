@@ -114,11 +114,18 @@ function candidateEvidenceForRequirement(
   const result: CanonicalEvidenceRouteCandidate[] = [];
   for (const facet of facets) result.push(...facet.evidence);
 
-  const unresolved = ledger.unresolved_items
+  const unresolvedSupporting = ledger.unresolved_items
     .filter((item) => item.requirement_id === requirementId)
     .flatMap((item) => item.supporting_evidence_ids);
 
-  if (unresolved.length) result.push(...routeEvidence(ledger, unresolved, "PARTIAL"));
+  const unresolvedContradictory = ledger.unresolved_items
+    .filter((item) => item.requirement_id === requirementId)
+    .flatMap((item) => item.contradiction_evidence_ids);
+
+  if (unresolvedSupporting.length) result.push(...routeEvidence(ledger, unresolvedSupporting, "PARTIAL"));
+  if (unresolvedContradictory.length) {
+    result.push(...routeEvidence(ledger, unresolvedContradictory, "CONTRADICTORY"));
+  }
 
   const deduped = new Map<string, CanonicalEvidenceRouteCandidate>();
   for (const candidate of result) {
@@ -183,7 +190,7 @@ export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEv
     demonstration_objectives: projection.demonstration_objectives,
   };
 
-  const routeValidation = validateCanonicalEvidenceRoute(route);
+  const routeValidation = validateCanonicalEvidenceRoute(route, ledger);
   if (!routeValidation.valid) {
     throw new Error("D3 canonical evidence route is invalid: " + routeValidation.errors.join(" | "));
   }
@@ -191,17 +198,42 @@ export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEv
   return route;
 }
 
-export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): { valid: boolean; errors: string[] } {
+export function validateCanonicalEvidenceRoute(
+  route: CanonicalEvidenceRoute,
+  ledger: EvidenceLedger,
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
+  const evidenceById = new Map(ledger.evidence.map((atom) => [atom.id, atom]));
+  const spanById = new Map(ledger.source_spans.map((span) => [span.id, span]));
+
+  const validateEvidenceProvenance = (
+    evidence: CanonicalEvidenceRouteCandidate | CanonicalReasoningEvidenceRef,
+    context: string,
+  ) => {
+    const atom = evidenceById.get(evidence.evidence_id);
+    if (!atom) {
+      errors.push(`${context} references unknown evidence: ${evidence.evidence_id}`);
+      return;
+    }
+    const span = spanById.get(evidence.source_span_id);
+    if (!span) {
+      errors.push(`${context} references unknown source span: ${evidence.source_span_id}`);
+      return;
+    }
+    if (atom.source_span_id !== span.id) {
+      errors.push(
+        `${context} source span does not match evidence ${evidence.evidence_id}: expected ${atom.source_span_id}, got ${span.id}`,
+      );
+    }
+    if (evidence.source_quote !== span.text) {
+      errors.push(`${context} source quote does not match source span: ${evidence.evidence_id}`);
+    }
+  };
+
   if (route.version !== "d3-v1") errors.push("D3 route version must be d3-v1.");
 
   const requirementIds = new Set<string>();
   const facetIds = new Set<string>();
-  const facetEvidenceIds = new Set<string>();
-  const routeEvidenceIds = new Set<string>();
-  for (const item of route.unresolved_items) {
-    for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) routeEvidenceIds.add(evidence.evidence_id);
-  }
 
   for (const requirement of route.requirements) {
     if (!requirement.requirement_id) errors.push("D3 requirement is missing requirement_id.");
@@ -220,9 +252,9 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
       for (const evidence of facet.evidence) {
         if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
           errors.push("D3 facet contains an invalid evidence reference: " + facet.facet_id);
+        } else {
+          validateEvidenceProvenance(evidence, "D3 facet evidence");
         }
-        facetEvidenceIds.add(evidence.evidence_id);
-        routeEvidenceIds.add(evidence.evidence_id);
       }
     }
 
@@ -240,16 +272,76 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
     for (const candidate of requirement.candidates) {
       if (!candidate.evidence_id || !candidate.source_span_id || !candidate.source_quote.trim()) {
         errors.push("D3 requirement contains an invalid candidate evidence reference: " + requirement.requirement_id);
+      } else {
+        validateEvidenceProvenance(candidate, "D3 requirement candidate");
       }
-      // Candidate evidence must originate from this requirement's own routed
-      // facets or unresolved evidence. A global evidence-ID check would allow
-      // cross-requirement evidence injection.
       if (!requirementEvidenceIds.has(candidate.evidence_id)) {
         errors.push(
           "D3 candidate references evidence not owned by requirement: " +
           requirement.requirement_id +
           " -> " +
           candidate.evidence_id,
+        );
+      }
+    }
+
+    const unresolvedIds = new Set(route.unresolved_items
+      .filter((item) => item.requirement_id === requirement.requirement_id)
+      .map((item) => item.unresolved_item_id));
+
+    for (const unresolvedItemId of requirement.unresolved_item_ids) {
+      const unresolvedItem = route.unresolved_items.find((item) => item.unresolved_item_id === unresolvedItemId);
+      if (!unresolvedItem) {
+        errors.push(
+          "D3 requirement references unknown unresolved item: " +
+          requirement.requirement_id +
+          " -> " +
+          unresolvedItemId,
+        );
+      } else if (unresolvedItem.requirement_id !== requirement.requirement_id) {
+        errors.push(
+          "D3 requirement references unresolved item owned by another requirement: " +
+          requirement.requirement_id +
+          " -> " +
+          unresolvedItemId,
+        );
+      }
+    }
+
+    for (const elicitationId of requirement.elicitation_ids) {
+      const matches = route.unresolved_items.filter(
+        (item) => unresolvedIds.has(item.unresolved_item_id) && item.elicitation?.id === elicitationId,
+      );
+      if (matches.length !== 1) {
+        errors.push(
+          "D3 requirement references an elicitation not owned by its unresolved items: " +
+          requirement.requirement_id +
+          " -> " +
+          elicitationId,
+        );
+      }
+    }
+
+    for (const objectiveId of requirement.demonstration_objective_ids) {
+      const objective = route.demonstration_objectives.find((item) => item.id === objectiveId);
+      if (!objective) {
+        errors.push(
+          "D3 requirement references unknown demonstration objective: " +
+          requirement.requirement_id +
+          " -> " +
+          objectiveId,
+        );
+        continue;
+      }
+      const target = route.unresolved_items.find(
+        (item) => item.unresolved_item_id === objective.target_unresolved_item_id,
+      );
+      if (!target || target.requirement_id !== requirement.requirement_id) {
+        errors.push(
+          "D3 requirement references demonstration objective owned by another requirement: " +
+          requirement.requirement_id +
+          " -> " +
+          objectiveId,
         );
       }
     }
@@ -270,18 +362,43 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
         requirement.requirement_id,
       );
     }
+
+    const expectedMode = modeForRequirement(requirement.status, requirement.facets);
+    if (requirement.mode !== expectedMode) {
+      errors.push(
+        "D3 requirement mode does not match its status/facets: " +
+        requirement.requirement_id +
+        " expected " +
+        expectedMode +
+        " got " +
+        requirement.mode,
+      );
+    }
   }
 
   for (const item of route.unresolved_items) {
     if (!requirementIds.has(item.requirement_id)) {
       errors.push("D3 unresolved item references unknown requirement: " + item.unresolved_item_id);
     }
+    const owningRequirement = route.requirements.find((requirement) => requirement.requirement_id === item.requirement_id);
+    const owningFacetIds = new Set(owningRequirement?.facets.map((facet) => facet.facet_id) ?? []);
     for (const facetId of item.facet_ids) {
-      if (!facetIds.has(facetId)) errors.push("D3 unresolved item references unknown facet: " + facetId);
+      if (!facetIds.has(facetId)) {
+        errors.push("D3 unresolved item references unknown facet: " + facetId);
+      } else if (!owningFacetIds.has(facetId)) {
+        errors.push(
+          "D3 unresolved item references facet owned by another requirement: " +
+          item.unresolved_item_id +
+          " -> " +
+          facetId,
+        );
+      }
     }
     for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) {
       if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
         errors.push("D3 unresolved item contains an invalid evidence reference: " + item.unresolved_item_id);
+      } else {
+        validateEvidenceProvenance(evidence, "D3 unresolved item evidence");
       }
     }
   }
