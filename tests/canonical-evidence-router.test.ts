@@ -172,6 +172,7 @@ test("D3 validator rejects incomplete per-requirement summary arrays", () => {
  assert.deepEqual(gap.demonstration_objective_ids, ["OBJ-GAP"]);
 });
 
+// Regression: one atom may carry distinct direct and contradictory route classifications.
 test("D3 candidate routing preserves both direct and contradictory classifications for one evidence atom", () => {
  const ledger = fixture();
  ledger.unresolved_items.push({
