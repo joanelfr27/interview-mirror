@@ -184,6 +184,15 @@ export function validateFitGapProjection(
       errors.push(`Requirement ${requirement.requirement_id} has a TRANSFERABLE classification but a different fit state.`);
     }
 
+    if (
+      requirement.requirement_status === "SUPPORTED" &&
+      requirement.gap_classification !== null
+    ) {
+      errors.push(
+        `Requirement ${requirement.requirement_id} is SUPPORTED but has gap classification ${requirement.gap_classification}.`,
+      );
+    }
+
     const expectedState = expectedStateForValidatedRequirement(
       requirement.requirement_status,
       requirement.gap_classification,
