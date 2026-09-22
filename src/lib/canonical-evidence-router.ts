@@ -64,17 +64,22 @@ function modeForRequirement(
   status: RequirementStatus | "UNJUDGED",
   facets: CanonicalEvidenceRouteFacet[],
 ): CanonicalEvidenceRouteMode {
-  if (status === "SUPPORTED" && facets.length > 0 && facets.every((facet) => facet.status === "DIRECT")) {
+  const statuses = facets.map((facet) => facet.status);
+  if (status === "SUPPORTED" && facets.length > 0 && statuses.every((value) => value === "DIRECT")) {
     return "DIRECT";
   }
 
-  if (facets.some((facet) => facet.status === "ANALOGICAL_TRANSFER")) {
-    return "TRANSFERABLE";
-  }
+  const hasContradiction = statuses.includes("CONTRADICTORY");
+  const hasDirect = statuses.includes("DIRECT");
+  const hasTransfer = statuses.includes("ANALOGICAL_TRANSFER");
+  const hasOther = statuses.some((value) => value === "PARTIAL" || value === "NONE" || value === "UNJUDGED");
 
-  // PARTIAL, NONE, CONTRADICTORY, UNJUDGED and any mixed requirement are
-  // deliberately fail-closed. They are preparation/verification states, not
-  // proof of the complete target requirement.
+  // TRANSFERABLE is reserved for a genuinely adjacent evidence state. A
+  // contradiction, direct-plus-transfer mix, or unresolved non-transfer facet
+  // keeps the whole requirement in VERIFY_GAP so the route never upgrades a
+  // mixed requirement into a candidate-facing claim.
+  if (!hasContradiction && !hasDirect && hasTransfer && !hasOther) return "TRANSFERABLE";
+
   return "VERIFY_GAP";
 }
 
