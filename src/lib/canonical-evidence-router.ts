@@ -1,4 +1,5 @@
 import type {
+  AtomicEvidence,
   CandidateElicitation,
   DemonstrationObjective,
   EvidenceLedger,
@@ -189,6 +190,7 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
 
   const requirementIds = new Set<string>();
   const facetIds = new Set<string>();
+  const facetEvidenceIds = new Set<string>();
   const routeEvidenceIds = new Set<string>();
   for (const item of route.unresolved_items) {
     for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) routeEvidenceIds.add(evidence.evidence_id);
@@ -212,6 +214,7 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
         if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
           errors.push("D3 facet contains an invalid evidence reference: " + facet.facet_id);
         }
+        facetEvidenceIds.add(evidence.evidence_id);
         routeEvidenceIds.add(evidence.evidence_id);
       }
     }
@@ -220,10 +223,9 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
       if (!candidate.evidence_id || !candidate.source_span_id || !candidate.source_quote.trim()) {
         errors.push("D3 requirement contains an invalid candidate evidence reference: " + requirement.requirement_id);
       }
-      routeEvidenceIds.add(candidate.evidence_id);
-      // Candidate evidence may come from a facet OR from unresolved-item supporting
-      // evidence. It must still be a concrete routed reference; later consumers
-      // must not treat a VERIFY_GAP anchor as proof.
+      // Candidate evidence must originate from a routed facet or unresolved-item
+      // reference. Do not add it to the seen set before checking provenance.
+      // Later consumers must never treat an invented VERIFY_GAP anchor as proof.
       if (!facetEvidenceIds.has(candidate.evidence_id) && !routeEvidenceIds.has(candidate.evidence_id)) {
         errors.push("D3 candidate references evidence not present in the route: " + candidate.evidence_id);
       }
