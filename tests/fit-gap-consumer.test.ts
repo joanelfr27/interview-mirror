@@ -120,3 +120,179 @@ test("D4 validator rejects tampered requirement fields and facet provenance",()=
  validation=validateFitGapConsumerProjection(out3,fresh.fit,fresh.route,fresh.l);
  assert.equal(validation.valid,false);
 });
+
+
+function partialVerifyFixture() {
+ const l=fixture();
+ const requirement=l.requirements.find(r=>r.id==="R-TRANSFER")!;
+ requirement.facets.push({
+   id:"F-R-TRANSFER-CONTEXT",
+   type:"CONTEXT",
+   requirement:"Use target reporting systems in the target environment.",
+   source_span_id:"JD-2",
+ });
+ l.support_judgments.push({
+   id:"SJ-TRANSFER-CONTEXT",
+   requirement_id:"R-TRANSFER",
+   facet_id:"F-R-TRANSFER-CONTEXT",
+   status:"NONE",
+   supporting_evidence_ids:[],
+   rationale:"No documented target-environment evidence.",
+   confidence:0,
+   abstained:true,
+   abstention_reason:"No canonical evidence available.",
+   support_basis:"DOCUMENTED",
+ });
+ l.requirement_statuses.find(r=>r.requirement_id==="R-TRANSFER")!.status="PARTIAL";
+ return buildAll(l);
+}
+
+function classifiedGapFixture(classification:"EVIDENCE_GAP"|"EXPERIENCE_GAP") {
+ const l=fixture();
+ const requirement=l.requirements.find(r=>r.id==="R-TRANSFER")!;
+ const original=l.support_judgments.findIndex(j=>j.requirement_id==="R-TRANSFER");
+ l.support_judgments[original]={
+   id:"SJ-TRANSFER-NONE",
+   requirement_id:"R-TRANSFER",
+   facet_id:"F-R-TRANSFER",
+   status:"NONE",
+   supporting_evidence_ids:[],
+   rationale:"No documented evidence before candidate elicitation.",
+   confidence:0,
+   abstained:true,
+   abstention_reason:"Candidate clarification required.",
+   support_basis:"DOCUMENTED",
+ };
+ l.requirement_statuses.find(r=>r.requirement_id==="R-TRANSFER")!.status="UNRESOLVED";
+ l.unresolved_items.push({
+   id:"U-TRANSFER",
+   requirement_id:"R-TRANSFER",
+   facet_ids:["F-R-TRANSFER"],
+   type:"ABSENT",
+   supporting_evidence_ids:[],
+   contradiction_evidence_ids:[],
+   absence_basis:"UNMENTIONED",
+   negation_evidence_ids:[],
+ });
+ const answer=classification==="EVIDENCE_GAP"
+   ? "I used target reporting systems in a prior role."
+   : "I have not used target reporting systems.";
+ const spanId="SPAN-ELICIT-ELICIT-U-TRANSFER";
+ const atomId="ELICIT-ATOM-ELICIT-U-TRANSFER";
+ l.source_spans.push({
+   id:spanId,
+   document_id:"ELICIT-SESSION",
+   text:answer,
+   start_offset:0,
+   end_offset:answer.length,
+   language:"en",
+ });
+ l.evidence.push({
+   id:atomId,
+   source_span_id:spanId,
+   provenance:{source_type:"CANDIDATE_ELICITED",language:"en",extraction_method:"LLM"},
+   subject:{actor:"candidate",ownership:"INDIVIDUAL"},
+   action:{normalized_action:"used",object:"target reporting systems"},
+   context:{},
+   scale:{},
+   time:{},
+   outcome:null,
+   assertion:{type:"ELICITED",polarity:classification==="EXPERIENCE_GAP"?"NEGATED":"AFFIRMATIVE"},
+   verifiability:{has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false},
+   extraction_confidence:1,
+ });
+ l.candidate_elicitations.push({
+   id:"ELICIT-U-TRANSFER",
+   unresolved_item_id:"U-TRANSFER",
+   question:"Describe your experience with target reporting systems.",
+   answer,
+   answer_source_span_id:spanId,
+   answer_assertion_type:"ELICITED",
+   classification,
+   classification_rationale:classification==="EVIDENCE_GAP"
+     ?"The candidate establishes the required experience that was not documented in the CV."
+     :"The candidate explicitly states that they have not performed the required work.",
+ });
+ l.demonstration_objectives.push({
+   id:"OBJ-U-TRANSFER",
+   target_unresolved_item_id:"U-TRANSFER",
+   observable_cue:classification==="EVIDENCE_GAP"
+     ?"Demonstrate the documented-by-answer experience without extending beyond the elicited evidence."
+     :"State the experience boundary accurately and do not imply direct experience.",
+   supporting_true_atom_ids:classification==="EVIDENCE_GAP"?[atomId]:[],
+   truthfulness_boundary:{
+     permitted_claims:classification==="EVIDENCE_GAP"
+       ?["Use the target reporting systems as described in the candidate answer."]
+       :["State that direct experience is absent."],
+     prohibited_claims:classification==="EVIDENCE_GAP"
+       ?["Invent additional scope, ownership, outcomes or tenure."]
+       :["Claim direct experience with target reporting systems."],
+   },
+   candidate_gap_classification:classification,
+   probe_family:"VERIFY_GAP",
+ });
+ return buildAll(l);
+}
+
+test("D4 gives PARTIAL + VERIFY_GAP its own preparation state",()=>{
+ const {l,fit,route}=partialVerifyFixture();
+ const out=buildFitGapConsumerProjection(fit,route,l);
+ const transfer=out.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;
+ assert.equal(transfer.fit_state,"PARTIAL");
+ assert.equal(transfer.route_mode,"VERIFY_GAP");
+ assert.equal(transfer.preparation_state,"PREPARE_PARTIAL");
+ assert.notEqual(transfer.preparation_state,"READY_TO_DEMONSTRATE");
+});
+
+test("D4 preserves a genuinely constructed EVIDENCE_GAP through D2 -> D3 -> D4",()=>{
+ const {l,fit,route}=classifiedGapFixture("EVIDENCE_GAP");
+ const out=buildFitGapConsumerProjection(fit,route,l);
+ const transfer=out.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;
+ assert.equal(transfer.requirement_status,"UNRESOLVED");
+ assert.equal(transfer.fit_state,"EVIDENCE_GAP");
+ assert.equal(transfer.route_mode,"VERIFY_GAP");
+ assert.equal(transfer.preparation_state,"ELICIT_AND_CLARIFY");
+ assert.deepEqual(transfer.elicitation_ids,["ELICIT-U-TRANSFER"]);
+ assert.deepEqual(transfer.demonstration_objective_ids,["OBJ-U-TRANSFER"]);
+ assert.equal(transfer.candidates.length,0);
+});
+
+test("D4 preserves a genuinely constructed EXPERIENCE_GAP through D2 -> D3 -> D4",()=>{
+ const {l,fit,route}=classifiedGapFixture("EXPERIENCE_GAP");
+ const out=buildFitGapConsumerProjection(fit,route,l);
+ const transfer=out.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;
+ assert.equal(transfer.requirement_status,"UNRESOLVED");
+ assert.equal(transfer.fit_state,"EXPERIENCE_GAP");
+ assert.equal(transfer.route_mode,"VERIFY_GAP");
+ assert.equal(transfer.preparation_state,"VERIFY_BEFORE_INTERVIEW");
+ assert.deepEqual(transfer.elicitation_ids,["ELICIT-U-TRANSFER"]);
+ assert.deepEqual(transfer.demonstration_objective_ids,["OBJ-U-TRANSFER"]);
+});
+
+test("D4 preparation-state mapping is explicitly covered for every state",()=>{
+ const direct=buildAll();
+ const directOut=buildFitGapConsumerProjection(direct.fit,direct.route,direct.l);
+ assert.equal(directOut.requirements.find(r=>r.requirement_id==="R-DIRECT")!.preparation_state,"READY_TO_DEMONSTRATE");
+ assert.equal(directOut.requirements.find(r=>r.requirement_id==="R-TRANSFER")!.preparation_state,"PREPARE_TRANSFER");
+ assert.equal(directOut.requirements.find(r=>r.requirement_id==="R-GAP")!.preparation_state,"DEFEND_BOUNDARY");
+
+ const partial=partialVerifyFixture();
+ assert.equal(buildFitGapConsumerProjection(partial.fit,partial.route,partial.l).requirements.find(r=>r.requirement_id==="R-TRANSFER")!.preparation_state,"PREPARE_PARTIAL");
+
+ const evidenceGap=classifiedGapFixture("EVIDENCE_GAP");
+ assert.equal(buildFitGapConsumerProjection(evidenceGap.fit,evidenceGap.route,evidenceGap.l).requirements.find(r=>r.requirement_id==="R-TRANSFER")!.preparation_state,"ELICIT_AND_CLARIFY");
+
+ const experienceGap=classifiedGapFixture("EXPERIENCE_GAP");
+ assert.equal(buildFitGapConsumerProjection(experienceGap.fit,experienceGap.route,experienceGap.l).requirements.find(r=>r.requirement_id==="R-TRANSFER")!.preparation_state,"VERIFY_BEFORE_INTERVIEW");
+});
+
+test("D4 preserves unresolved -> elicitation -> demonstration-objective associations exactly",()=>{
+ const {l,fit,route}=classifiedGapFixture("EVIDENCE_GAP");
+ const out=buildFitGapConsumerProjection(fit,route,l);
+ const transfer=out.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;
+ assert.deepEqual(transfer.unresolved_item_ids,["U-TRANSFER"]);
+ assert.deepEqual(transfer.elicitation_ids,["ELICIT-U-TRANSFER"]);
+ assert.deepEqual(transfer.demonstration_objective_ids,["OBJ-U-TRANSFER"]);
+ const validation=validateFitGapConsumerProjection(out,fit,route,l);
+ assert.equal(validation.valid,true);
+});
