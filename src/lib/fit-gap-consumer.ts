@@ -15,6 +15,7 @@ export type FitGapPreparationState =
   | "READY_TO_DEMONSTRATE"
   | "PREPARE_TRANSFER"
   | "VERIFY_BEFORE_INTERVIEW"
+  | "PREPARE_PARTIAL"
   | "DEFEND_BOUNDARY"
   | "ELICIT_AND_CLARIFY";
 
@@ -49,6 +50,7 @@ function preparationStateFor(
   if (fitState === "CONTRADICTED") return "DEFEND_BOUNDARY";
   if (fitState === "EVIDENCE_GAP" || fitState === "UNRESOLVED") return "ELICIT_AND_CLARIFY";
   if (fitState === "EXPERIENCE_GAP") return "VERIFY_BEFORE_INTERVIEW";
+  if (fitState === "PARTIAL" && routeMode !== "TRANSFERABLE") return "PREPARE_PARTIAL";
   if (fitState === "TRANSFERABLE" || routeMode === "TRANSFERABLE") return "PREPARE_TRANSFER";
   return "READY_TO_DEMONSTRATE";
 }
