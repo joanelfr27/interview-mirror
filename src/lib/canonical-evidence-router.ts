@@ -1,5 +1,4 @@
 import type {
-  AtomicEvidence,
   CandidateElicitation,
   DemonstrationObjective,
   EvidenceLedger,
@@ -190,7 +189,6 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
 
   const requirementIds = new Set<string>();
   const facetIds = new Set<string>();
-  const facetEvidenceIds = new Set<string>();
   const routeEvidenceIds = new Set<string>();
   for (const item of route.unresolved_items) {
     for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) routeEvidenceIds.add(evidence.evidence_id);
@@ -214,7 +212,6 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
         if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
           errors.push("D3 facet contains an invalid evidence reference: " + facet.facet_id);
         }
-        facetEvidenceIds.add(evidence.evidence_id);
         routeEvidenceIds.add(evidence.evidence_id);
       }
     }
