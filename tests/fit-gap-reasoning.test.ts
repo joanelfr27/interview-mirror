@@ -290,3 +290,51 @@ test("D2 validator rejects empty demonstration objective IDs", () => {
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(" | "), /demonstration objective ID/i);
 });
+
+
+test("D2 rejects SUPPORTED requirements with an EXPERIENCE_GAP classification", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[0].gap_classification = "EXPERIENCE_GAP";
+  result.requirements[0].fit_state = "EXPERIENCE_GAP";
+
+  const validation = validateFitGapProjection(result);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /SUPPORTED.*gap classification EXPERIENCE_GAP/i);
+});
+
+test("D2 rejects SUPPORTED requirements with an EVIDENCE_GAP classification", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[0].gap_classification = "EVIDENCE_GAP";
+  result.requirements[0].fit_state = "EVIDENCE_GAP";
+
+  const validation = validateFitGapProjection(result);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /SUPPORTED.*gap classification EVIDENCE_GAP/i);
+});
+
+test("D2 rejects SUPPORTED requirements with a TRANSFERABLE classification", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[0].gap_classification = "TRANSFERABLE";
+  result.requirements[0].fit_state = "TRANSFERABLE";
+
+  const validation = validateFitGapProjection(result);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(" | "), /SUPPORTED.*gap classification TRANSFERABLE/i);
+});
+
+test("D2 allows PARTIAL requirements with an EXPERIENCE_GAP classification", () => {
+  const result = buildFitGapProjection(projection());
+  result.requirements[1].gap_classification = "EXPERIENCE_GAP";
+  result.requirements[1].fit_state = "EXPERIENCE_GAP";
+
+  const validation = validateFitGapProjection(result);
+  assert.deepEqual(validation, { valid: true, errors: [] });
+});
+
+test("D2 accepts a normal SUPPORTED requirement with no gap classification", () => {
+  const result = buildFitGapProjection(projection());
+  assert.equal(result.requirements[0].requirement_status, "SUPPORTED");
+  assert.equal(result.requirements[0].gap_classification, null);
+  assert.equal(result.requirements[0].fit_state, "ESTABLISHED");
+  assert.deepEqual(validateFitGapProjection(result), { valid: true, errors: [] });
+});
