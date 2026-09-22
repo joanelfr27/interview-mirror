@@ -176,12 +176,19 @@ export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEv
     };
   });
 
-  return {
+  const route: CanonicalEvidenceRoute = {
     version: "d3-v1",
     requirements,
     unresolved_items: projection.unresolved_items,
     demonstration_objectives: projection.demonstration_objectives,
   };
+
+  const routeValidation = validateCanonicalEvidenceRoute(route);
+  if (!routeValidation.valid) {
+    throw new Error("D3 canonical evidence route is invalid: " + routeValidation.errors.join(" | "));
+  }
+
+  return route;
 }
 
 export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): { valid: boolean; errors: string[] } {
@@ -219,15 +226,31 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
       }
     }
 
+    const requirementEvidenceIds = new Set<string>(facets.flatMap((facet) =>
+      facet.evidence.map((evidence) => evidence.evidence_id),
+    ));
+    for (const unresolvedItem of route.unresolved_items.filter(
+      (item) => item.requirement_id === requirement.requirement_id,
+    )) {
+      for (const evidence of [...unresolvedItem.supporting_evidence, ...unresolvedItem.contradiction_evidence]) {
+        requirementEvidenceIds.add(evidence.evidence_id);
+      }
+    }
+
     for (const candidate of requirement.candidates) {
       if (!candidate.evidence_id || !candidate.source_span_id || !candidate.source_quote.trim()) {
         errors.push("D3 requirement contains an invalid candidate evidence reference: " + requirement.requirement_id);
       }
-      // Candidate evidence must originate from a routed facet or unresolved-item
-      // reference. Do not add it to the seen set before checking provenance.
-      // Later consumers must never treat an invented VERIFY_GAP anchor as proof.
-      if (!facetEvidenceIds.has(candidate.evidence_id) && !routeEvidenceIds.has(candidate.evidence_id)) {
-        errors.push("D3 candidate references evidence not present in the route: " + candidate.evidence_id);
+      // Candidate evidence must originate from this requirement's own routed
+      // facets or unresolved evidence. A global evidence-ID check would allow
+      // cross-requirement evidence injection.
+      if (!requirementEvidenceIds.has(candidate.evidence_id)) {
+        errors.push(
+          "D3 candidate references evidence not owned by requirement: " +
+          requirement.requirement_id +
+          " -> " +
+          candidate.evidence_id,
+        );
       }
     }
 
@@ -238,8 +261,14 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
       errors.push("D3 DIRECT mode requires a fully DIRECT/SUPPORTED requirement: " + requirement.requirement_id);
     }
 
-    if (requirement.mode === "TRANSFERABLE" && !requirement.facets.some((facet) => facet.status === "ANALOGICAL_TRANSFER")) {
-      errors.push("D3 TRANSFERABLE mode requires ANALOGICAL_TRANSFER evidence: " + requirement.requirement_id);
+    if (
+      requirement.mode === "TRANSFERABLE" &&
+      !(requirement.facets.length > 0 && requirement.facets.every((facet) => facet.status === "ANALOGICAL_TRANSFER"))
+    ) {
+      errors.push(
+        "D3 TRANSFERABLE mode requires every facet to be ANALOGICAL_TRANSFER: " +
+        requirement.requirement_id,
+      );
     }
   }
 
