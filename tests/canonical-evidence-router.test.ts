@@ -210,4 +210,13 @@ test("D3 builder preserves all elicitations for a requirement-local unresolved i
  const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
  assert.deepEqual(gap.elicitation_ids, ["EL-GAP", "EL-GAP-2"]);
  assert.deepEqual(validateCanonicalEvidenceRoute(route, ledger), { valid:true, errors:[] });
+
+ for (const omittedId of ["EL-GAP", "EL-GAP-2"]) {
+   const tampered = structuredClone(route);
+   const tamperedGap = tampered.requirements.find(x => x.requirement_id === "R-GAP")!;
+   tamperedGap.elicitation_ids = tamperedGap.elicitation_ids.filter(id => id !== omittedId);
+   const validation = validateCanonicalEvidenceRoute(tampered, ledger);
+   assert.equal(validation.valid, false, omittedId);
+   assert.match(validation.errors.join(" | "), /elicitation_ids/);
+ }
 });
