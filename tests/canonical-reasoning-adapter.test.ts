@@ -253,3 +253,64 @@ const elicitedProjection = buildCanonicalReasoningProjection(elicited);
 if (elicitedProjection.unresolved_items.find((item) => item.unresolved_item_id === "UNRESOLVED-R6")?.elicitation?.classification !== "TRANSFERABLE") {
   throw new Error("Elicitation state was not preserved.");
 }
+
+const duplicateUnresolved = {
+  ...projection,
+  unresolved_items: [
+    projection.unresolved_items[0]!,
+    { ...projection.unresolved_items[0]!, requirement_id: "R5" },
+  ],
+};
+if (validateCanonicalReasoningProjection(duplicateUnresolved).valid) {
+  throw new Error("Duplicate unresolved item id was not rejected.");
+}
+
+const invalidUnresolvedEvidence = {
+  ...projection,
+  unresolved_items: [{
+    ...projection.unresolved_items[0]!,
+    supporting_evidence: [{
+      evidence_id: "",
+      source_span_id: "MISSING-SPAN",
+      source_quote: " ",
+    }],
+  }],
+};
+if (validateCanonicalReasoningProjection(invalidUnresolvedEvidence).valid) {
+  throw new Error("Invalid unresolved-item evidence reference was not rejected.");
+}
+
+const invalidUnresolvedType = {
+  ...projection,
+  unresolved_items: [{
+    ...projection.unresolved_items[0]!,
+    type: "INVALID_TYPE" as never,
+  }],
+};
+if (validateCanonicalReasoningProjection(invalidUnresolvedType).valid) {
+  throw new Error("Invalid unresolved-item type was not rejected.");
+}
+
+const duplicateObjectives = {
+  ...projection,
+  demonstration_objectives: [
+    {
+      id: "DUPLICATE",
+      target_unresolved_item_id: "UNRESOLVED-R5",
+      observable_cue: "cue",
+      supporting_true_atom_ids: [],
+      truthfulness_boundary: { permitted_claims: [], prohibited_claims: [] },
+    },
+    {
+      id: "DUPLICATE",
+      target_unresolved_item_id: "UNRESOLVED-R5",
+      observable_cue: "cue",
+      supporting_true_atom_ids: [],
+      truthfulness_boundary: { permitted_claims: [], prohibited_claims: [] },
+    },
+  ],
+};
+if (validateCanonicalReasoningProjection(duplicateObjectives).valid) {
+  throw new Error("Duplicate demonstration objective id was not rejected.");
+}
+\n
