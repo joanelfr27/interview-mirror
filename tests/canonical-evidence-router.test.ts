@@ -145,3 +145,41 @@ test("D3 candidate set preserves contradiction evidence from unresolved items", 
  const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
  assert.ok(gap.candidates.some(c => c.evidence_id === "A-CONTRADICT" && c.support_status === "CONTRADICTORY"));
 });
+
+
+test("D3 validator rejects incomplete per-requirement summary arrays", () => {
+ const ledger = fixture();
+ ledger.demonstration_objectives = [{
+   id:"OBJ-GAP",
+   target_unresolved_item_id:"U-GAP",
+   observable_cue:"State boundary.",
+   supporting_true_atom_ids:[],
+   truthfulness_boundary:{permitted_claims:["State source facts."], prohibited_claims:["Do not claim mining experience."]}
+ }];
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
+
+ for (const field of ["unresolved_item_ids", "elicitation_ids", "demonstration_objective_ids"] as const) {
+   const tampered = structuredClone(route);
+   const target = tampered.requirements.find(x => x.requirement_id === "R-GAP")!;
+   target[field] = [];
+   const validation = validateCanonicalEvidenceRoute(tampered, ledger);
+   assert.equal(validation.valid, false, field);
+   assert.match(validation.errors.join(" | "), new RegExp(field));
+ }
+ assert.deepEqual(gap.unresolved_item_ids, ["U-GAP"]);
+ assert.deepEqual(gap.elicitation_ids, ["EL-GAP"]);
+ assert.deepEqual(gap.demonstration_objective_ids, ["OBJ-GAP"]);
+});
+
+test("D3 candidate routing preserves both direct and contradictory classifications for one evidence atom", () => {
+ const ledger = fixture();
+ ledger.unresolved_items[0]!.contradiction_evidence_ids = ["A-DIRECT"];
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
+ const statuses = direct.candidates
+   .filter(candidate => candidate.evidence_id === "A-DIRECT")
+   .map(candidate => candidate.support_status)
+   .sort();
+ assert.deepEqual(statuses, ["CONTRADICTORY", "DIRECT"]);
+});
