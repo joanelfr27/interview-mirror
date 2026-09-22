@@ -112,6 +112,14 @@ test("D3 validator rejects tampered source span and source quote", () => {
 
 test("D3 validator rejects cross-requirement unresolved, elicitation and objective summary IDs", () => {
  const ledger = fixture();
+ ledger.candidate_elicitations.push({
+   id:"EL-GAP-2",
+   unresolved_item_id:"U-GAP",
+   question:"Provide one more boundary example.",
+   answer:"A second elicited answer.",
+   answer_source_span_id:"EL-1",
+   answer_assertion_type:"ELICITED"
+ });
  ledger.demonstration_objectives = [{
    id:"OBJ-GAP",
    target_unresolved_item_id:"U-GAP",
@@ -192,4 +200,21 @@ test("D3 candidate routing preserves both direct and contradictory classificatio
    .map(candidate => candidate.support_status)
    .sort();
  assert.deepEqual(statuses, ["CONTRADICTORY", "DIRECT"]);
+});
+
+
+test("D3 builder preserves all elicitations for a requirement-local unresolved item", () => {
+ const ledger = fixture();
+ ledger.candidate_elicitations.push({
+   id:"EL-GAP-2",
+   unresolved_item_id:"U-GAP",
+   question:"Provide one more boundary example.",
+   answer:"A second elicited answer.",
+   answer_source_span_id:"EL-1",
+   answer_assertion_type:"ELICITED"
+ });
+ const route = buildCanonicalEvidenceRoute(ledger);
+ const gap = route.requirements.find(x => x.requirement_id === "R-GAP")!;
+ assert.deepEqual(gap.elicitation_ids, ["EL-GAP", "EL-GAP-2"]);
+ assert.deepEqual(validateCanonicalEvidenceRoute(route, ledger), { valid:true, errors:[] });
 });
