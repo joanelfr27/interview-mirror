@@ -14,7 +14,7 @@ function fixture():EvidenceLedger{
  return {
   source_spans:[
    span("CV-1","CV","Managed regional finance."),span("CV-2","CV","Worked on adjacent reporting systems."),span("CV-3","CV","Did not manage mining operations."),
-   span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Use target reporting systems."),span("JD-3","JD","Mining operations experience."),span("EL-1","ELICIT","I can explain the boundary.")
+   span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Use target reporting systems."),span("JD-3","JD","Mining operations experience."),span("EL-1","ELICIT-SESSION","I can explain the boundary.")
   ],
   evidence:[atom("A-DIRECT","CV-1","managed","regional finance"),atom("A-TRANSFER","CV-2","worked","adjacent reporting systems"),atom("A-CONTRADICT","CV-3","manage","mining operations","NEGATED")],
   requirements:[
