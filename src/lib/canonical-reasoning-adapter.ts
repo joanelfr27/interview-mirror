@@ -57,6 +57,15 @@ export type CanonicalReasoningValidation = {
   errors: string[];
 };
 
+const UNRESOLVED_TYPES: UnresolvedItem["type"][] = ["ABSENT", "AMBIGUOUS", "CONFLICTING"];
+const SUPPORT_STATUSES: SupportJudgment["status"][] = [
+  "DIRECT",
+  "PARTIAL",
+  "ANALOGICAL_TRANSFER",
+  "CONTRADICTORY",
+  "NONE",
+];
+
 function evidenceRef(
   ledger: EvidenceLedger,
   evidenceId: string,
@@ -115,6 +124,18 @@ function validateLedgerReferences(ledger: EvidenceLedger): string[] {
   return validateRequirementGraph(ledger);
 }
 
+function validateProjectedEvidence(
+  location: string,
+  evidence: CanonicalReasoningEvidenceRef[],
+  errors: string[],
+): void {
+  for (const ref of evidence) {
+    if (!ref.evidence_id || !ref.source_span_id || !ref.source_quote.trim()) {
+      errors.push(`${location} contains an invalid evidence reference.`);
+    }
+  }
+}
+
 export function buildCanonicalReasoningProjection(
   ledger: EvidenceLedger,
 ): CanonicalReasoningProjection {
@@ -164,6 +185,8 @@ export function validateCanonicalReasoningProjection(
   const errors: string[] = [];
   const requirementIds = new Set<string>();
   const facetIds = new Set<string>();
+  const unresolvedIds = new Set<string>();
+  const demonstrationObjectiveIds = new Set<string>();
 
   for (const requirement of projection.requirements) {
     if (!requirement.requirement_id) errors.push("Requirement projection is missing requirement_id.");
@@ -177,23 +200,23 @@ export function validateCanonicalReasoningProjection(
       if (facetIds.has(facet.facet_id)) errors.push(`Duplicate projected facet: ${facet.facet_id}.`);
       facetIds.add(facet.facet_id);
 
-      if (
-        facet.status !== "UNJUDGED" &&
-        !["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY", "NONE"].includes(facet.status)
-      ) {
+      if (facet.status !== "UNJUDGED" && !SUPPORT_STATUSES.includes(facet.status)) {
         errors.push(`Facet ${facet.facet_id} has an invalid support status.`);
       }
 
-      for (const evidence of facet.evidence) {
-        if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
-          errors.push(`Facet ${facet.facet_id} contains an invalid evidence reference.`);
-        }
-      }
+      validateProjectedEvidence(`Facet ${facet.facet_id}`, facet.evidence, errors);
     }
   }
 
   for (const item of projection.unresolved_items) {
-    if (!item.unresolved_item_id) errors.push("Unresolved projection is missing unresolved_item_id.");
+    if (!item.unresolved_item_id) {
+      errors.push("Unresolved projection is missing unresolved_item_id.");
+    }
+    if (unresolvedIds.has(item.unresolved_item_id)) {
+      errors.push(`Duplicate projected unresolved item: ${item.unresolved_item_id}.`);
+    }
+    unresolvedIds.add(item.unresolved_item_id);
+
     if (!requirementIds.has(item.requirement_id)) {
       errors.push(`Unresolved item ${item.unresolved_item_id} references an unknown requirement.`);
     }
@@ -202,12 +225,30 @@ export function validateCanonicalReasoningProjection(
         errors.push(`Unresolved item ${item.unresolved_item_id} references an unknown facet: ${facetId}.`);
       }
     }
+    if (!UNRESOLVED_TYPES.includes(item.type)) {
+      errors.push(`Unresolved item ${item.unresolved_item_id} has an invalid type.`);
+    }
+
+    validateProjectedEvidence(
+      `Unresolved item ${item.unresolved_item_id} supporting evidence`,
+      item.supporting_evidence,
+      errors,
+    );
+    validateProjectedEvidence(
+      `Unresolved item ${item.unresolved_item_id} contradiction evidence`,
+      item.contradiction_evidence,
+      errors,
+    );
   }
 
   for (const objective of projection.demonstration_objectives) {
     if (!objective.id || !objective.target_unresolved_item_id) {
       errors.push("Demonstration objective is missing its identity or unresolved target.");
     }
+    if (demonstrationObjectiveIds.has(objective.id)) {
+      errors.push(`Duplicate projected demonstration objective: ${objective.id}.`);
+    }
+    demonstrationObjectiveIds.add(objective.id);
     if (
       !projection.unresolved_items.some(
         (item) => item.unresolved_item_id === objective.target_unresolved_item_id,
