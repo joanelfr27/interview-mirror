@@ -190,8 +190,20 @@ export function validateFitGapConsumerProjection(
       continue;
     }
 
-    if (requirement.route_mode !== routed.mode || requirement.fit_state !== fit.fit_state) {
-      errors.push("D4 route mode or fit state diverges from canonical inputs: " + requirement.requirement_id);
+    if (
+      requirement.normalized_requirement !== routed.normalized_requirement ||
+      requirement.category !== routed.category ||
+      requirement.salience !== routed.salience ||
+      requirement.requirement_status !== routed.status ||
+      requirement.fit_state !== fit.fit_state ||
+      requirement.gap_classification !== fit.gap_classification ||
+      requirement.route_mode !== routed.mode
+    ) {
+      errors.push("D4 requirement fields diverge from canonical inputs: " + requirement.requirement_id);
+    }
+
+    if (JSON.stringify(requirement.facets) !== JSON.stringify(routed.facets)) {
+      errors.push("D4 facet projection diverges from D3 route: " + requirement.requirement_id);
     }
     if (!sameIds(requirement.unresolved_item_ids, routed.unresolved_item_ids)) {
       errors.push("D4 unresolved associations diverge: " + requirement.requirement_id);
