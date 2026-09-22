@@ -226,7 +226,7 @@ export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): {
       }
     }
 
-    const requirementEvidenceIds = new Set<string>(facets.flatMap((facet) =>
+    const requirementEvidenceIds = new Set<string>(requirement.facets.flatMap((facet) =>
       facet.evidence.map((evidence) => evidence.evidence_id),
     ));
     for (const unresolvedItem of route.unresolved_items.filter(
