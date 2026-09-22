@@ -135,10 +135,17 @@ export function buildFitGapProjection(
     };
   });
 
-  return {
+  const result: FitGapProjection = {
     version: "d2-v1",
     requirements,
   };
+
+  const resultValidation = validateFitGapProjection(result);
+  if (!resultValidation.valid) {
+    throw new Error(resultValidation.errors.join(" | "));
+  }
+
+  return result;
 }
 
 function expectedStateForValidatedRequirement(
