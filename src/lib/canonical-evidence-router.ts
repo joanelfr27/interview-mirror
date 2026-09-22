@@ -74,12 +74,7 @@ function modeForRequirement(
   const hasTransfer = statuses.includes("ANALOGICAL_TRANSFER");
   const hasOther = statuses.some((value) => value === "PARTIAL" || value === "NONE" || value === "UNJUDGED");
 
-  // TRANSFERABLE is reserved for a genuinely adjacent evidence state. A
-  // contradiction, direct-plus-transfer mix, or unresolved non-transfer facet
-  // keeps the whole requirement in VERIFY_GAP so the route never upgrades a
-  // mixed requirement into a candidate-facing claim.
   if (!hasContradiction && !hasDirect && hasTransfer && !hasOther) return "TRANSFERABLE";
-
   return "VERIFY_GAP";
 }
 
@@ -117,23 +112,18 @@ function candidateEvidenceForRequirement(
   facets: CanonicalEvidenceRouteFacet[],
 ): CanonicalEvidenceRouteCandidate[] {
   const result: CanonicalEvidenceRouteCandidate[] = [];
-  for (const facet of facets) {
-    result.push(...facet.evidence);
-  }
+  for (const facet of facets) result.push(...facet.evidence);
 
   const unresolved = ledger.unresolved_items
     .filter((item) => item.requirement_id === requirementId)
     .flatMap((item) => item.supporting_evidence_ids);
 
-  if (unresolved.length) {
-    result.push(...routeEvidence(ledger, unresolved, "PARTIAL"));
-  }
+  if (unresolved.length) result.push(...routeEvidence(ledger, unresolved, "PARTIAL"));
 
   const deduped = new Map<string, CanonicalEvidenceRouteCandidate>();
   for (const candidate of result) {
     const existing = deduped.get(candidate.evidence_id);
-    if (!existing) deduped.set(candidate.evidence_id, candidate);
-    else if (existing.support_status !== "DIRECT" && candidate.support_status === "DIRECT") {
+    if (!existing || (existing.support_status !== "DIRECT" && candidate.support_status === "DIRECT")) {
       deduped.set(candidate.evidence_id, candidate);
     }
   }
@@ -141,11 +131,7 @@ function candidateEvidenceForRequirement(
   return [...deduped.values()].sort((a, b) => a.evidence_id.localeCompare(b.evidence_id));
 }
 
-export function buildCanonicalEvidenceRoute(
-  ledger: EvidenceLedger,
-): CanonicalEvidenceRoute {
-  // The D3 router accepts the validated E1 ledger only. It does not accept raw
-  // CV/JD text and performs no extraction, inference, ranking, or LLM call.
+export function buildCanonicalEvidenceRoute(ledger: EvidenceLedger): CanonicalEvidenceRoute {
   const projection = buildCanonicalReasoningProjection(ledger);
   const projectionValidation = validateCanonicalReasoningProjection(projection);
   if (!projectionValidation.valid) {
@@ -167,12 +153,9 @@ export function buildCanonicalEvidenceRoute(
       confidence: facet.confidence,
     }));
 
-    const unresolved = ledger.unresolved_items.filter(
-      (item) => item.requirement_id === requirement.requirement_id,
-    );
-
-    const objectives = ledger.demonstration_objectives.filter(
-      (objective) => unresolved.some((item) => item.id === objective.target_unresolved_item_id),
+    const unresolved = ledger.unresolved_items.filter((item) => item.requirement_id === requirement.requirement_id);
+    const objectives = ledger.demonstration_objectives.filter((objective) =>
+      unresolved.some((item) => item.id === objective.target_unresolved_item_id),
     );
 
     return {
@@ -201,15 +184,14 @@ export function buildCanonicalEvidenceRoute(
   };
 }
 
-export function validateCanonicalEvidenceRoute(
-  route: CanonicalEvidenceRoute,
-): { valid: boolean; errors: string[] } {
+export function validateCanonicalEvidenceRoute(route: CanonicalEvidenceRoute): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (route.version !== "d3-v1") errors.push("D3 route version must be d3-v1.");
 
   const requirementIds = new Set<string>();
   const facetIds = new Set<string>();
-  const evidenceIds = new Set<string>();
+  const facetEvidenceIds = new Set<string>();
+  const routeEvidenceIds = new Set<string>();
 
   for (const requirement of route.requirements) {
     if (!requirement.requirement_id) errors.push("D3 requirement is missing requirement_id.");
@@ -229,19 +211,27 @@ export function validateCanonicalEvidenceRoute(
         if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
           errors.push("D3 facet contains an invalid evidence reference: " + facet.facet_id);
         }
-        evidenceIds.add(evidence.evidence_id);
+        facetEvidenceIds.add(evidence.evidence_id);
+        routeEvidenceIds.add(evidence.evidence_id);
       }
     }
 
     for (const candidate of requirement.candidates) {
-      if (!evidenceIds.has(candidate.evidence_id)) {
-        errors.push("D3 candidate references evidence not present on its facets: " + candidate.evidence_id);
+      if (!candidate.evidence_id || !candidate.source_span_id || !candidate.source_quote.trim()) {
+        errors.push("D3 requirement contains an invalid candidate evidence reference: " + requirement.requirement_id);
+      }
+      routeEvidenceIds.add(candidate.evidence_id);
+      // Candidate evidence may come from a facet OR from unresolved-item supporting
+      // evidence. It must still be a concrete routed reference; later consumers
+      // must not treat a VERIFY_GAP anchor as proof.
+      if (!facetEvidenceIds.has(candidate.evidence_id) && !routeEvidenceIds.has(candidate.evidence_id)) {
+        errors.push("D3 candidate references evidence not present in the route: " + candidate.evidence_id);
       }
     }
 
     if (
       requirement.mode === "DIRECT" &&
-      !(requirement.status === "SUPPORTED" && requirement.facets.every((facet) => facet.status === "DIRECT"))
+      !(requirement.status === "SUPPORTED" && requirement.facets.length > 0 && requirement.facets.every((facet) => facet.status === "DIRECT"))
     ) {
       errors.push("D3 DIRECT mode requires a fully DIRECT/SUPPORTED requirement: " + requirement.requirement_id);
     }
@@ -257,6 +247,11 @@ export function validateCanonicalEvidenceRoute(
     }
     for (const facetId of item.facet_ids) {
       if (!facetIds.has(facetId)) errors.push("D3 unresolved item references unknown facet: " + facetId);
+    }
+    for (const evidence of [...item.supporting_evidence, ...item.contradiction_evidence]) {
+      if (!evidence.evidence_id || !evidence.source_span_id || !evidence.source_quote.trim()) {
+        errors.push("D3 unresolved item contains an invalid evidence reference: " + item.unresolved_item_id);
+      }
     }
   }
 
