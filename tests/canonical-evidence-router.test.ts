@@ -174,7 +174,17 @@ test("D3 validator rejects incomplete per-requirement summary arrays", () => {
 
 test("D3 candidate routing preserves both direct and contradictory classifications for one evidence atom", () => {
  const ledger = fixture();
- ledger.unresolved_items[0]!.contradiction_evidence_ids = ["A-DIRECT"];
+ ledger.requirement_statuses[0]!.status = "PARTIAL";
+ ledger.unresolved_items.push({
+   id:"U-DIRECT-CONTRADICTION",
+   requirement_id:"R-DIRECT",
+   facet_ids:["F-R-DIRECT"],
+   type:"CONFLICTING",
+   supporting_evidence_ids:[],
+   contradiction_evidence_ids:["A-DIRECT"],
+   absence_basis:"CONFLICTING_SOURCES",
+   negation_evidence_ids:[]
+ });
  const route = buildCanonicalEvidenceRoute(ledger);
  const direct = route.requirements.find(x => x.requirement_id === "R-DIRECT")!;
  const statuses = direct.candidates
