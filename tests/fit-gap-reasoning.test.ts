@@ -338,3 +338,30 @@ test("D2 accepts a normal SUPPORTED requirement with no gap classification", () 
   assert.equal(result.requirements[0].fit_state, "ESTABLISHED");
   assert.deepEqual(validateFitGapProjection(result), { valid: true, errors: [] });
 });
+
+
+test("D2 builder fail-closes when a SUPPORTED requirement has a stale unresolved gap classification", () => {
+  const source = projection();
+  source.unresolved_items.push({
+    unresolved_item_id: "U-1",
+    requirement_id: "REQ-1",
+    facet_ids: ["FACET-1"],
+    type: "AMBIGUOUS",
+    supporting_evidence: [],
+    contradiction_evidence: [],
+    elicitation: {
+      id: "EL-1",
+      unresolved_item_id: "U-1",
+      question: "Have you directly owned this capability?",
+      answer: "I have not directly owned it.",
+      answer_assertion_type: "ELICITED",
+      classification: "EXPERIENCE_GAP",
+      classification_rationale: "The candidate explicitly states they have not owned it.",
+    },
+  });
+
+  assert.throws(
+    () => buildFitGapProjection(source),
+    /SUPPORTED.*gap classification EXPERIENCE_GAP/i,
+  );
+});
