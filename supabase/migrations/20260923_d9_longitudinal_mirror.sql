@@ -37,3 +37,22 @@ create policy "canonical mirror snapshots owner insert"
   );
 
 revoke update, delete on public.canonical_mirror_snapshots from authenticated;
+
+
+alter table public.canonical_mirror_snapshots
+  add constraint canonical_mirror_snapshots_source_update_ids_nonempty
+  check (cardinality(source_update_ids) > 0);
+
+create or replace function public.prevent_canonical_mirror_snapshot_mutation()
+returns trigger
+language plpgsql
+security invoker
+as $$
+begin
+  raise exception 'canonical_mirror_snapshots is append-only';
+end;
+$$;
+
+create trigger canonical_mirror_snapshots_append_only
+before update or delete on public.canonical_mirror_snapshots
+for each row execute function public.prevent_canonical_mirror_snapshot_mutation();
