@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Journey } from "@/lib/journey";
+import { requiresCandidateHistory, type Journey } from "@/lib/journey";
 
 type Props = {
   hasCandidateHistory: boolean;
@@ -105,11 +105,9 @@ export default function JourneySelector(props: Props) {
         {journeys.map((journey) => {
           const Icon = journey.icon;
           const disabled =
-            journey.id === "continue_upcoming"
-              ? !props.resumableUpcomingSessionId
-              : journey.id === "continue_skills"
-                ? !props.resumableSkillsSessionId
-                : false;
+            (requiresCandidateHistory(journey.id) && !props.hasCandidateHistory) ||
+            (journey.id === "continue_upcoming" && !props.resumableUpcomingSessionId) ||
+            (journey.id === "continue_skills" && !props.resumableSkillsSessionId);
           const selectedState = selected === journey.id;
 
           return (
