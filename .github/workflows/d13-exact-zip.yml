@@ -10,10 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: c0c15a264c6239f5da8e058efc2bc4d553ffb
+          ref: c0c15a264c6239f5da8e058934efc2bc4d553ffb
           fetch-depth: 0
       - name: Verify exact commit
-        run: test "$(git rev-parse HEAD)" = "c0c15a264c6239f5da8e058efc2bc4d553ffb"
+        run: test "$(git rev-parse HEAD)" = "c0c15a264c6239f5da8e058934efc2bc4d553ffb"
       - name: Package exact repository
         run: git archive --format=zip --output=Interview_Mirror_D13_Corrected_c0c15a2.zip HEAD
       - uses: actions/upload-artifact@v4
