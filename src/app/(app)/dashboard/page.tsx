@@ -186,7 +186,7 @@ const coachingProgress = preparationContext.coaching_progress;
                   <div className="flex flex-wrap gap-2">
                     {session.status === "draft" && (
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/prepare?session=${session.id}`}>
+                        <Link href={`/prepare?journey=${session.preparation_purpose === "improve_skills" ? "continue_skills" : "continue_upcoming"}&experienceLanguage=${session.experience_language ?? session.preparation_language ?? "en"}&interviewLanguage=${session.interview_language ?? session.preparation_language ?? "en"}&session=${session.id}`}>
                           <FileText className="h-4 w-4" />
                           Continue
                         </Link>
