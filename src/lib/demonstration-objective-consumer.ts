@@ -56,15 +56,6 @@ function atomFor(ledger: EvidenceLedger, id: string): AtomicEvidence {
   return atom;
 }
 
-function requirementFor(
-  fit: FitGapConsumerProjection,
-  requirementId: string,
-): FitGapConsumerRequirement {
-  const requirement = fit.requirements.find((r) => r.requirement_id === requirementId);
-  if (!requirement) throw new Error("D5 requirement is missing: " + requirementId);
-  return requirement;
-}
-
 function objectiveIdsForRequirement(
   ledger: EvidenceLedger,
   requirementId: string,
@@ -250,6 +241,28 @@ export function validateDemonstrationObjectiveConsumerProjection(
     if (!fitRequirement.unresolved_item_ids.includes(item.unresolved_item_id) ||
         objective.target_unresolved_item_id !== item.unresolved_item_id) {
       errors.push("D5 objective target is not requirement-local: " + item.demonstration_objective_id);
+    }
+
+    if (item.fit_state !== fitRequirement.fit_state) {
+      errors.push("D5 fit state diverges from D4: " + item.demonstration_objective_id);
+    }
+    if (item.gap_classification !== fitRequirement.gap_classification) {
+      errors.push("D5 gap classification diverges from D4: " + item.demonstration_objective_id);
+    }
+    if (item.preparation_state !== fitRequirement.preparation_state) {
+      errors.push("D5 preparation state diverges from D4: " + item.demonstration_objective_id);
+    }
+    if (item.observable_cue !== objective.observable_cue) {
+      errors.push("D5 observable cue diverges from canonical objective: " + item.demonstration_objective_id);
+    }
+    if (JSON.stringify(item.truthfulness_boundary) !== JSON.stringify(objective.truthfulness_boundary)) {
+      errors.push("D5 truthfulness boundary diverges from canonical objective: " + item.demonstration_objective_id);
+    }
+    if (item.candidate_gap_classification !== objective.candidate_gap_classification) {
+      errors.push("D5 candidate gap classification diverges from canonical objective: " + item.demonstration_objective_id);
+    }
+    if (item.probe_family !== objective.probe_family) {
+      errors.push("D5 probe family diverges from canonical objective: " + item.demonstration_objective_id);
     }
 
     const canonicalObjectiveValidation = [
