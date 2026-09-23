@@ -92,6 +92,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         job_description_url: sourceSession.job_description_url,
         preparation_purpose: sourceSession.preparation_purpose,
         preparation_language: sourceSession.preparation_language,
+        experience_language: sourceSession.experience_language,
+        interview_language: sourceSession.interview_language,
         interview_date: sourceSession.interview_date,
         cv_analysis: sourceSession.cv_analysis,
         interview_strategy: sourceSession.interview_strategy,
