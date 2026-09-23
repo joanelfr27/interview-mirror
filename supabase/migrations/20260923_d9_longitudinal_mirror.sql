@@ -1,0 +1,80 @@
+-- D9: longitudinal canonical Mirror persistence boundary.
+-- Append-only snapshots; no production caller is wired by this migration.
+create table if not exists public.canonical_mirror_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  schema_version text not null,
+  source_update_ids text[] not null,
+  mirror_payload jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists canonical_mirror_snapshots_session_created_idx
+  on public.canonical_mirror_snapshots(session_id, created_at desc);
+
+alter table public.canonical_mirror_snapshots enable row level security;
+
+create policy "canonical mirror snapshots owner read"
+  on public.canonical_mirror_snapshots
+  for select
+  using (
+    exists (
+      select 1 from public.sessions s
+      where s.id = canonical_mirror_snapshots.session_id
+      and s.user_id = auth.uid()
+    )
+  );
+
+create policy "canonical mirror snapshots owner insert"
+  on public.canonical_mirror_snapshots
+  for insert
+  with check (
+    exists (
+      select 1 from public.sessions s
+      where s.id = canonical_mirror_snapshots.session_id
+      and s.user_id = auth.uid()
+    )
+  );
+
+revoke update, delete on public.canonical_mirror_snapshots from authenticated;
+
+create or replace function public.is_valid_canonical_mirror_source_update_ids(ids text[])
+returns boolean
+language sql
+immutable
+as $$
+  select ids is not null
+    and cardinality(ids) > 0
+    and array_position(ids, null) is null
+    and not exists (
+      select 1
+      from unnest(ids) as item(id)
+      where btrim(item.id) = ''
+    )
+    and cardinality(ids) = cardinality(array(
+      select distinct item.id
+      from unnest(ids) as item(id)
+    ));
+$$;
+
+alter table public.canonical_mirror_snapshots
+  add constraint canonical_mirror_snapshots_source_update_ids_valid
+  check (public.is_valid_canonical_mirror_source_update_ids(source_update_ids));
+
+create or replace function public.prevent_canonical_mirror_snapshot_mutation()
+returns trigger
+language plpgsql
+security invoker
+as $$
+begin
+  if tg_op = 'DELETE' and pg_trigger_depth() > 1 then
+    return old;
+  end if;
+
+  raise exception 'canonical_mirror_snapshots is append-only';
+end;
+$$;
+
+create trigger canonical_mirror_snapshots_append_only
+before update or delete on public.canonical_mirror_snapshots
+for each row execute function public.prevent_canonical_mirror_snapshot_mutation();
