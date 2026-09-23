@@ -44,6 +44,7 @@ function buildInputs(l:EvidenceLedger) {
   truthfulness_boundary:{permitted_claims:["State source facts."],prohibited_claims:["Do not claim mining experience."]},
   candidate_gap_classification:"EXPERIENCE_GAP",probe_family:"CONTEXT"
  }];
+ l.candidate_elicitations=[{id:"EL-GAP",unresolved_item_id:"U-GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED",classification:"EXPERIENCE_GAP",classification_rationale:"Not the target experience."}];
  const reasoning = buildCanonicalReasoningProjection(l);
  return {reasoning};
 }
