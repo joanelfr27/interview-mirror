@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Journey } from "@/lib/journey";
 
 type Props = {
   hasCandidateHistory: boolean;
@@ -22,13 +23,6 @@ type Props = {
   skillsTitle: string | null;
   focusArea: string | null;
 };
-
-type Journey =
-  | "new_upcoming"
-  | "new_skills"
-  | "continue_upcoming"
-  | "new_opportunity"
-  | "continue_skills";
 
 const journeys: Array<{
   id: Journey;
