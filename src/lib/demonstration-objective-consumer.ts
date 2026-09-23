@@ -12,9 +12,9 @@ import {
 import {
   type FitGapConsumerProjection,
   type FitGapConsumerRequirement,
-  type FitGapProjection,
   validateFitGapConsumerProjection,
 } from "@/lib/fit-gap-consumer";
+import type { FitGapProjection } from "@/lib/fit-gap-reasoning";
 import { validateCanonicalEvidenceRoute, type CanonicalEvidenceRoute } from "@/lib/canonical-evidence-router";
 
 export type DemonstrationObjectiveEvidenceRef = {
@@ -190,6 +190,7 @@ export function buildDemonstrationObjectiveConsumerProjection(
   const resultValidation = validateDemonstrationObjectiveConsumerProjection(
     result,
     fitGapProjection,
+    fitGapReasoning,
     route,
     ledger,
   );
