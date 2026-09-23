@@ -28,10 +28,10 @@ export async function buildIngestedDocument(text: string, sourceType: IngestionS
 }
 
 function isBlockedHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (host === "localhost" || host === "localhost.localdomain" || host === "0.0.0.0" || host === "::1") return true;
   const ipv4 = host.split(".");
-  if (ipv4.length === 4 && ipv4.every((part) => /^\\d{1,3}$/.test(part))) {
+  if (ipv4.length === 4 && ipv4.every((part) => /^\d{1,3}$/.test(part))) {
     const [a, b] = ipv4.map(Number);
     if (a === 127 || a === 10 || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)) return true;
   }
