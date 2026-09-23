@@ -158,6 +158,7 @@ export default function PrepareForm() {
     let text = "";
     if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) text = await file.text();
     else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) text = await extractPdfText(file);
+    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) text = await extractWordText(file);
     if (!text.trim()) {
       toast.error("We could not extract text from this CV. Please paste the CV text instead.");
       return;
