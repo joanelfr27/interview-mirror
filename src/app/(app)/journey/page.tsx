@@ -29,15 +29,11 @@ export default async function JourneyPage() {
   const upcoming = sessions.find(
     (session) => session.preparation_purpose === "upcoming_interview" &&
       session.status !== "completed"
-  ) ?? sessions.find(
-    (session) => session.preparation_purpose === "upcoming_interview"
   );
 
   const skills = sessions.find(
     (session) => session.preparation_purpose === "improve_skills" &&
       session.status !== "completed"
-  ) ?? sessions.find(
-    (session) => session.preparation_purpose === "improve_skills"
   );
 
   return (
