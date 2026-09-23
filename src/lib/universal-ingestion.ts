@@ -47,6 +47,27 @@ export function validateIngestionUrl(raw: string): string {
   return url.toString();
 }
 
+
+export async function extractPdfText(file: File): Promise<string> {
+  let pdfjslib: any = null;
+  try {
+    const mod = await import("pdfjs-dist/legacy/build/pdf");
+    pdfjslib = mod?.default ?? mod;
+  } catch {
+    const mod = await import("pdfjs-dist/build/pdf.mjs");
+    pdfjslib = mod?.default ?? mod;
+  }
+  const loadingTask = pdfjslib.getDocument({ data: await file.arrayBuffer(), disableWorker: true });
+  const pdf = await loadingTask.promise;
+  const content: string[] = [];
+  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
+    const page = await pdf.getPage(pageIndex);
+    const textContent = await page.getTextContent();
+    content.push(textContent.items.map((item: any) => item.str || "").join(" ").trim());
+  }
+  return normalizeDocumentText(content.filter(Boolean).join("\n\n"));
+}
+
 function u16(b: Uint8Array, o: number) { return b[o] | (b[o + 1] << 8); }
 function u32(b: Uint8Array, o: number) { return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0; }
 
