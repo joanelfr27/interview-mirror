@@ -28,6 +28,10 @@ export function isNewJourney(journey: Journey): boolean {
   return journey === "new_upcoming" || journey === "new_skills" || journey === "new_opportunity";
 }
 
+export function requiresCandidateHistory(journey: Journey): boolean {
+  return journey === "continue_upcoming" || journey === "continue_skills" || journey === "new_opportunity";
+}
+
 export function canonicalizeJourneyText(value: string): string {
   return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
