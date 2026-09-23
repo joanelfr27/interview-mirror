@@ -91,20 +91,19 @@ export function buildCanonicalStrategyBridgeProjection(
 
   const fitById = new Map(fitGapConsumer.requirements.map((r) => [r.requirement_id, r]));
   const routeById = new Map(route.requirements.map((r) => [r.requirement_id, r]));
-  const objectiveByRequirement = new Map<string, CanonicalStrategyBridgeBoundary[]>();
-
-  for (const item of objectives.objectives) {
-    const list = objectiveByRequirement.get(item.requirement_id) ?? [];
-    list.push({
-      permitted_claims: [...item.truthfulness_boundary.permitted_claims],
-      prohibited_claims: [...item.truthfulness_boundary.prohibited_claims],
-    });
-    objectiveByRequirement.set(item.requirement_id, list);
-  }
+  const objectiveById = new Map(objectives.objectives.map((item) => [item.demonstration_objective_id, item]));
 
   const requirements = route.requirements.map((r) => {
     const fit = fitById.get(r.requirement_id)!;
-    const boundaries = objectiveByRequirement.get(r.requirement_id) ?? [];
+    const boundaries = r.demonstration_objective_ids.map((objectiveId) => {
+      const objective = objectiveById.get(objectiveId);
+      if (!objective) throw new Error("D6 unknown demonstration objective: " + objectiveId);
+      if (objective.requirement_id !== r.requirement_id) throw new Error("D6 objective crosses requirement ownership: " + objectiveId);
+      return {
+        permitted_claims: [...objective.truthfulness_boundary.permitted_claims],
+        prohibited_claims: [...objective.truthfulness_boundary.prohibited_claims],
+      };
+    });
     return {
       requirement_id: r.requirement_id,
       normalized_requirement: r.normalized_requirement,
