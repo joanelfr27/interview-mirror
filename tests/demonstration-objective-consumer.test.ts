@@ -56,7 +56,7 @@ function buildInputs(l:EvidenceLedger) {
  };
  // Use canonical route/D2 projection built from the ledger-derived reasoning.
  // For the gap objective, D2 needs its classification on the unresolved item.
- reasoning.unresolved_items[2]!.elicitation={id:"EL-GAP",classification:"EXPERIENCE_GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED"};
+ reasoning.unresolved_items[2]!.elicitation={id:"EL-GAP",unresolved_item_id:"U-GAP",classification:"EXPERIENCE_GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED"};
  l.candidate_elicitations=[{id:"EL-GAP",unresolved_item_id:"U-GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED",classification:"EXPERIENCE_GAP",classification_rationale:"Not the target experience."}];
  return {reasoning};
 }
