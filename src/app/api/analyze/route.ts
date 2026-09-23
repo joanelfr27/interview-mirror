@@ -138,6 +138,7 @@ export async function POST(request: Request) {
   const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
   const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, experience_language: language, interview_language: interviewLanguage, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
   let id = sessionId ?? null;
+  let continuationInputsChanged = false;
   if (id) {
     const { data: existingSession, error: existingSessionError } = await supabase
       .from("sessions")
@@ -153,10 +154,10 @@ export async function POST(request: Request) {
     if ((journey === "continue_upcoming" || journey === "continue_skills") && existingSession.status === "completed") {
       return NextResponse.json({ code: "SESSION_NOT_RESUMABLE", error: "Completed preparation sessions cannot be resumed" }, { status: 409 });
     }
-    const contentChanged = canonicalize(existingSession.cv_text ?? "") !== canonicalCv
+    continuationInputsChanged = canonicalize(existingSession.cv_text ?? "") !== canonicalCv
       || canonicalize(existingSession.job_description ?? "") !== canonicalJd;
     const updateFields = isContinuationJourney(journey)
-      ? { ...sessionFields, status: contentChanged ? "analyzed" : existingSession.status }
+      ? { ...sessionFields, status: continuationInputsChanged ? "analyzed" : existingSession.status }
       : sessionFields;
     const { data: updatedSession, error } = await supabase
       .from("sessions")
@@ -172,12 +173,10 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 });
     id = data.id;
   }
-  if (!isContinuationJourney(journey) || (id && (journey === "continue_upcoming" || journey === "continue_skills"))) {
+  if (!isContinuationJourney(journey) || continuationInputsChanged) {
     // Continuation preserves practice history when the preparation inputs are unchanged.
     // If the candidate changed the CV/JD, the prior questions no longer match the analysis.
-    const { data: currentSession } = await supabase.from("sessions").select("cv_text, job_description").eq("id", id).eq("user_id", user.id).maybeSingle();
-    const inputsChanged = canonicalize(currentSession?.cv_text ?? "") !== canonicalCv || canonicalize(currentSession?.job_description ?? "") !== canonicalJd;
-    if (!isContinuationJourney(journey) || inputsChanged) await supabase.from("questions").delete().eq("session_id", id);
+    await supabase.from("questions").delete().eq("session_id", id);
   }
   return NextResponse.json({ sessionId: id, analysis: validatedAnalysis });
 }
