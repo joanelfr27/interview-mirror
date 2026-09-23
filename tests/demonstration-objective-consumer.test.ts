@@ -67,14 +67,14 @@ test("D5 preserves exact provenance and objective boundary",()=>{
 test("D5 rejects cross-requirement objective ownership",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(l);
  bad.demonstration_objectives[0]!.target_unresolved_item_id="U-NOT-HERE";
- assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d3,bad),/unknown|requirement-local|canonical inputs/i);
+ assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,bad),/unknown|requirement-local|canonical inputs/i);
 });
 test("D5 rejects negated supporting evidence",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(l);
  bad.unresolved_items[0]!.supporting_evidence_ids=["A-CONTRA"];
  bad.demonstration_objectives[0]!.target_unresolved_item_id="U-GAP";
  bad.demonstration_objectives[0]!.supporting_true_atom_ids=["A-CONTRA"];
- assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d3,bad),/AFFIRMATIVE|invalid/i);
+ assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,bad),/AFFIRMATIVE|invalid/i);
 });
 test("D5 rejects tampered source quote",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(l);
@@ -86,7 +86,7 @@ test("D5 rejects tampered source quote",()=>{
 test("D5 rejects unknown objective and cross-requirement evidence",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(l);
  bad.demonstration_objectives[0]!.id="OBJ-UNKNOWN";
- assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d3,bad),/objective|unknown/i);
+ assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,bad),/objective|unknown/i);
 });
 test("D5 preserves all canonical objective associations",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
@@ -95,7 +95,7 @@ test("D5 preserves all canonical objective associations",()=>{
 });
 
 test("D5 validator rejects tampered objective-facing fields",()=>{
- const l=ledger(); const {d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
+ const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
  p.objectives[0]!.observable_cue="Invent an unsupported claim.";
  const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d2,d3,l);
  assert.equal(v.valid,false); assert.match(v.errors.join(" | "),/observable cue diverges/i);
