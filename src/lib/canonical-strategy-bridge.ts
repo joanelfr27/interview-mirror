@@ -23,7 +23,15 @@ export type CanonicalStrategyBridgeEvidence = {
   support_status: string;
 };
 
-export type CanonicalStrategyBridgeAction =\n  | "DEMONSTRATE"\n  | "POSITION_TRANSFER"\n  | "VERIFY_GAP"\n  | "DEMONSTRATE_PARTIAL"\n  | "DEFEND_BOUNDARY"\n  | "ELICIT_AND_CLARIFY";\n\nexport type CanonicalStrategyBridgeBoundary = {
+export type CanonicalStrategyBridgeAction =
+  | "DEMONSTRATE"
+  | "POSITION_TRANSFER"
+  | "VERIFY_GAP"
+  | "DEMONSTRATE_PARTIAL"
+  | "DEFEND_BOUNDARY"
+  | "ELICIT_AND_CLARIFY";
+
+export type CanonicalStrategyBridgeBoundary = {
   permitted_claims: string[];
   prohibited_claims: string[];
 };
@@ -47,7 +55,18 @@ export type CanonicalStrategyBridgeProjection = {
   requirements: CanonicalStrategyBridgeRequirement[];
 };
 
-export function strategyActionFor(preparationState: FitGapConsumerProjection["requirements"][number]["preparation_state"]): CanonicalStrategyBridgeAction {\n  switch (preparationState) {\n    case "READY_TO_DEMONSTRATE": return "DEMONSTRATE";\n    case "PREPARE_TRANSFER": return "POSITION_TRANSFER";\n    case "VERIFY_BEFORE_INTERVIEW": return "VERIFY_GAP";\n    case "PREPARE_PARTIAL": return "DEMONSTRATE_PARTIAL";\n    case "DEFEND_BOUNDARY": return "DEFEND_BOUNDARY";\n    case "ELICIT_AND_CLARIFY": return "ELICIT_AND_CLARIFY";\n  }\n}\n\nfunction sameIds(a: string[], b: string[]): boolean {
+export function strategyActionFor(preparationState: FitGapConsumerProjection["requirements"][number]["preparation_state"]): CanonicalStrategyBridgeAction {
+  switch (preparationState) {
+    case "READY_TO_DEMONSTRATE": return "DEMONSTRATE";
+    case "PREPARE_TRANSFER": return "POSITION_TRANSFER";
+    case "VERIFY_BEFORE_INTERVIEW": return "VERIFY_GAP";
+    case "PREPARE_PARTIAL": return "DEMONSTRATE_PARTIAL";
+    case "DEFEND_BOUNDARY": return "DEFEND_BOUNDARY";
+    case "ELICIT_AND_CLARIFY": return "ELICIT_AND_CLARIFY";
+  }
+}
+
+function sameIds(a: string[], b: string[]): boolean {
   return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 }
 
@@ -194,7 +213,8 @@ export function validateCanonicalStrategyBridgeProjection(
     if (item.route_mode !== routeRequirement.mode) errors.push("D6 route mode diverges from D3: " + item.requirement_id);
     if (item.fit_state !== fitRequirement.fit_state) errors.push("D6 fit state diverges from D4: " + item.requirement_id);
     if (item.gap_classification !== fitRequirement.gap_classification) errors.push("D6 gap classification diverges from D4: " + item.requirement_id);
-    if (item.preparation_state !== fitRequirement.preparation_state) errors.push("D6 preparation state diverges from D4: " + item.requirement_id);\n    if (item.strategy_action !== strategyActionFor(fitRequirement.preparation_state)) errors.push("D6 strategy action is not deterministic: " + item.requirement_id);
+    if (item.preparation_state !== fitRequirement.preparation_state) errors.push("D6 preparation state diverges from D4: " + item.requirement_id);
+    if (item.strategy_action !== strategyActionFor(fitRequirement.preparation_state)) errors.push("D6 strategy action is not deterministic: " + item.requirement_id);
     if (!sameIds(item.unresolved_item_ids, routeRequirement.unresolved_item_ids)) errors.push("D6 unresolved associations diverge: " + item.requirement_id);
     if (!sameIds(item.demonstration_objective_ids, routeRequirement.demonstration_objective_ids)) errors.push("D6 objective associations diverge: " + item.requirement_id);
 
