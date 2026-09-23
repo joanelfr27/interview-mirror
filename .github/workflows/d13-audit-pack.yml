@@ -1,0 +1,24 @@
+name: D13 Audit Pack
+
+on:
+  push:
+    branches:
+      - d13-audit-pack-temp
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact audited commit
+        uses: actions/checkout@v4
+        with:
+          ref: 36dd101e050e5ffc0af119615a8304e1d1f10788
+          fetch-depth: 0
+      - name: Create repository ZIP
+        run: |
+          git archive --format=zip --output=Interview_Mirror_D13_Full_Repository_36dd101e.zip 36dd101e050e5ffc0af119615a8304e1d1f10788
+      - name: Upload audit pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: Interview_Mirror_D13_Full_Repository_36dd101e
+          path: Interview_Mirror_D13_Full_Repository_36dd101e.zip
