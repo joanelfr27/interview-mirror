@@ -29,7 +29,7 @@ export async function buildIngestedDocument(text: string, sourceType: IngestionS
 
 function isBlockedHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "localhost.localdomain" || host === "0.0.0.0" || host === "::1") return true;
+  if (host === "localhost" || host === "localhost.localdomain" || host === "0.0.0.0" || host === "::1" || /^::ffff:/i.test(host)) return true;
   const ipv4 = host.split(".");
   if (ipv4.length === 4 && ipv4.every((part) => /^\d{1,3}$/.test(part))) {
     const [a, b] = ipv4.map(Number);
