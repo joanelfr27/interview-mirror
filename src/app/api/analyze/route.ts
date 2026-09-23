@@ -124,8 +124,32 @@ export async function POST(request: Request) {
   const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
   const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, experience_language: language, interview_language: interviewLanguage, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
   let id = sessionId ?? null;
-  if (id) { const { error } = await supabase.from("sessions").update(sessionFields).eq("id", id).eq("user_id", user.id); if (error) return NextResponse.json({ error: error.message }, { status: 500 }); }
-  else { const { data, error } = await supabase.from("sessions").insert({ user_id: user.id, ...sessionFields }).select("id").single(); if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 }); id = data.id; }
+  if (id) {
+    const { data: existingSession, error: existingSessionError } = await supabase
+      .from("sessions")
+      .select("id, preparation_purpose")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (existingSessionError) return NextResponse.json({ error: existingSessionError.message }, { status: 500 });
+    if (!existingSession) return NextResponse.json({ code: "SESSION_NOT_FOUND", error: "Preparation session not found or expired" }, { status: 404 });
+    if (existingSession.preparation_purpose !== preparationPurpose) {
+      return NextResponse.json({ code: "SESSION_PURPOSE_MISMATCH", error: "The selected preparation journey does not match this session" }, { status: 409 });
+    }
+    const { data: updatedSession, error } = await supabase
+      .from("sessions")
+      .update(sessionFields)
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!updatedSession) return NextResponse.json({ code: "SESSION_NOT_FOUND", error: "Preparation session could not be updated" }, { status: 404 });
+  } else {
+    const { data, error } = await supabase.from("sessions").insert({ user_id: user.id, ...sessionFields }).select("id").single();
+    if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 });
+    id = data.id;
+  }
   await supabase.from("questions").delete().eq("session_id", id);
   return NextResponse.json({ sessionId: id, analysis: validatedAnalysis });
 }
