@@ -27,10 +27,21 @@ export async function buildIngestedDocument(text: string, sourceType: IngestionS
   return { text: normalized, sourceType, sourceName, sourceUrl, contentHash: await contentHash(normalized) };
 }
 
+function isBlockedHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\\[|\\]$/g, "");
+  if (host === "localhost" || host === "localhost.localdomain" || host === "0.0.0.0" || host === "::1") return true;
+  if (/^127\\./.test(host) || /^10\\./.test(host) || /^192\\.168\\./.test(host) || /^169\\.254\\./.test(host)) return true;
+  const private172 = host.match(/^172\\.(\\d{1,3})\\./);
+  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
+  if (/^(fc|fd)[0-9a-f]{2}:/i.test(host) || /^fe80:/i.test(host)) return true;
+  return false;
+}
+
 export function validateIngestionUrl(raw: string): string {
   let url: URL;
   try { url = new URL(raw.trim()); } catch { throw new Error("INVALID_URL"); }
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("INVALID_URL_SCHEME");
+  if (isBlockedHost(url.hostname)) throw new Error("BLOCKED_PRIVATE_URL");
   return url.toString();
 }
 
