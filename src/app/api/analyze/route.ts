@@ -1,4 +1,6 @@
 import { createHash } from "crypto";
+
+export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { AI_MODEL, languageInstruction, normalizeLanguage, getOpenAI } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
