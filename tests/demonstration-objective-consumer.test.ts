@@ -103,6 +103,6 @@ test("D5 validator rejects tampered objective-facing fields",()=>{
 
 test("D5 rejects a tampered D4 input projection",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(d4);
- bad.requirements.find(r=>r.requirement_id==="R-GAP")!.fit_state="SUPPORTED";
+ bad.requirements.find(r=>r.requirement_id==="R-GAP")!.fit_state="ESTABLISHED";
  assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(bad,d2,d3,l),/D4.*invalid|fit state|D2/i);
 });
