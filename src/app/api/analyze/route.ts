@@ -101,7 +101,8 @@ export async function POST(request: Request) {
   const title = canonicalize(String(body.title ?? "Interview preparation"));
   const sessionId = body.sessionId as string | null | undefined;
   const preparationPurpose = body.preparationPurpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
-  const language = normalizeLanguage(body.preparation_language);
+  const language = normalizeLanguage(body.experience_language ?? body.preparation_language);
+  const interviewLanguage = normalizeLanguage(body.interview_language ?? body.preparation_language);
   const interviewDate = String(body.interviewDate ?? "").trim();
   const embeddedUrl = extractStandaloneUrl(jobDescription);
   if (!jobDescriptionUrl && embeddedUrl) { jobDescriptionUrl = embeddedUrl; jobDescription = ""; }
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
   try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
   catch { return NextResponse.json({ code: "ANALYSIS_GENERATION_FAILED", error: "We could not produce a reliable Professional Mirror analysis. Please retry." }, { status: 422 }); }
   const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
-  const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
+  const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, experience_language: language, interview_language: interviewLanguage, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
   let id = sessionId ?? null;
   if (id) { const { error } = await supabase.from("sessions").update(sessionFields).eq("id", id).eq("user_id", user.id); if (error) return NextResponse.json({ error: error.message }, { status: 500 }); }
   else { const { data, error } = await supabase.from("sessions").insert({ user_id: user.id, ...sessionFields }).select("id").single(); if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 }); id = data.id; }
