@@ -32,10 +32,6 @@ export function canonicalizeJourneyText(value: string): string {
   return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
 
-export function canonicalizeJourneyText(value: string): string {
-  return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
-}
-
 export function continuationInputsChanged(
   existingCv: string,
   existingJd: string,
