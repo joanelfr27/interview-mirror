@@ -23,6 +23,8 @@ test("accepts only http and https links", () => {
   assert.throws(() => validateIngestionUrl("not-a-url"), /INVALID_URL/);
   assert.throws(() => validateIngestionUrl("http://127.0.0.1:3000"), /BLOCKED_PRIVATE_URL/);
   assert.throws(() => validateIngestionUrl("http://192.168.1.10"), /BLOCKED_PRIVATE_URL/);
+  assert.throws(() => validateIngestionUrl("http://[::ffff:127.0.0.1]/"), /BLOCKED_PRIVATE_URL/);
+  assert.throws(() => validateIngestionUrl("http://127.0.0.1.nip.io/"), /BLOCKED_PRIVATE_URL/);
 });
 
 test("rejects empty and oversized documents", () => {
@@ -46,4 +48,76 @@ test("fails closed after the bounded redirect count", async () => {
   let calls = 0;
   globalThis.fetch = async () => { calls += 1; return new Response(null, { status: 302, headers: { location: "https://example.com/redirect-" + calls } }); };
   try { await assert.rejects(() => fetchLinkedDocument("https://example.com/job"), /LINK_REDIRECT_LIMIT/); assert.equal(calls, 4); } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("fails closed on oversized DOCX XML expansion", async () => {
+  const original = globalThis.DecompressionStream;
+  class FakeStream {
+    getReader() {
+      let done = false;
+      return {
+        read: async () => {
+          if (done) return { done: true, value: undefined };
+          done = true;
+          return { done: false, value: new Uint8Array(2_000_001) };
+        },
+        cancel: async () => {},
+      };
+    }
+  }
+  globalThis.DecompressionStream = class {
+    constructor() {}
+  } as unknown as typeof DecompressionStream;
+  try {
+    const document = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], "large.docx");
+    await assert.rejects(() => extractWordText(document), /INVALID_DOCX/);
+  } finally {
+    globalThis.DecompressionStream = original;
+  }
+});
+
+test("routes linked PDF content through the PDF parser", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00]), {
+    status: 200,
+    headers: { "content-type": "application/pdf" },
+  });
+  try {
+    await assert.rejects(() => fetchLinkedDocument("https://example.com/cv.pdf"), /INVALID_PDF/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("routes linked DOCX content through the Word parser", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00]), {
+    status: 200,
+    headers: { "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+  });
+  try {
+    await assert.rejects(() => fetchLinkedDocument("https://example.com/cv.docx"), /INVALID_DOCX/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("invokes the server URL guard for every redirect hop", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  const guarded: string[] = [];
+  globalThis.fetch = async () => {
+    calls += 1;
+    return calls === 1
+      ? new Response(null, { status: 302, headers: { location: "https://example.com/next" } })
+      : new Response("Candidate CV text", { status: 200, headers: { "content-type": "text/plain" } });
+  };
+  try {
+    const text = await fetchLinkedDocument("https://example.com/start", async (url) => { guarded.push(url.hostname); });
+    assert.equal(text, "Candidate CV text");
+    assert.deepEqual(guarded, ["example.com", "example.com"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
