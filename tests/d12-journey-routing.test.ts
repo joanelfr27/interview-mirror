@@ -12,7 +12,7 @@ test("D12-14: missing or malformed journey fails validation", () => {
   assert.equal(isJourney(undefined), false);
   assert.equal(isJourney(""), false);
   assert.equal(isJourney("upcoming_interview"), false);
-  assert.equal(isJourney("random")), false;
+  assert.equal(isJourney("random"), false);
 });
 
 test("D12: journey mapping preserves the two canonical purposes", () => {
