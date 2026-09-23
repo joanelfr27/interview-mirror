@@ -53,7 +53,7 @@ test("fails closed after the bounded redirect count", async () => {
 
 test("routes linked PDF content through the PDF parser", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00]), {
+  globalThis.fetch = async () => new Response(new Uint8Array([0x01, 0x02, 0x03]), {
     status: 200,
     headers: { "content-type": "application/pdf" },
   });
@@ -66,7 +66,7 @@ test("routes linked PDF content through the PDF parser", async () => {
 
 test("routes linked DOCX content through the Word parser", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x00]), {
+  globalThis.fetch = async () => new Response(new Uint8Array([0x01, 0x02, 0x03]), {
     status: 200,
     headers: { "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
   });
