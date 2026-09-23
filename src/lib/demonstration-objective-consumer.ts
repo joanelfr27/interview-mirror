@@ -12,6 +12,8 @@ import {
 import {
   type FitGapConsumerProjection,
   type FitGapConsumerRequirement,
+  type FitGapProjection,
+  validateFitGapConsumerProjection,
 } from "@/lib/fit-gap-consumer";
 import { validateCanonicalEvidenceRoute, type CanonicalEvidenceRoute } from "@/lib/canonical-evidence-router";
 
@@ -141,12 +143,15 @@ function buildItem(
 
 export function buildDemonstrationObjectiveConsumerProjection(
   fitGapProjection: FitGapConsumerProjection,
+  fitGapReasoning: FitGapProjection,
   route: CanonicalEvidenceRoute,
   ledger: EvidenceLedger,
 ): DemonstrationObjectiveConsumerProjection {
   const inputErrors: string[] = [];
   const graphValidation = validateRequirementGraph(ledger);
   if (graphValidation.length) inputErrors.push(...graphValidation.map((e) => "E1: " + e));
+  const d4Validation = validateFitGapConsumerProjection(fitGapProjection, fitGapReasoning, route, ledger);
+  if (!d4Validation.valid) inputErrors.push(...d4Validation.errors.map((e) => "D4: " + e));
   const routeValidation = validateCanonicalEvidenceRoute(route, ledger);
   if (!routeValidation.valid) inputErrors.push(...routeValidation.errors.map((e) => "D3: " + e));
   if (fitGapProjection.version !== "d4-v1") inputErrors.push("D5 requires the d4-v1 Fit & Gap consumer projection.");
@@ -197,6 +202,7 @@ export function buildDemonstrationObjectiveConsumerProjection(
 export function validateDemonstrationObjectiveConsumerProjection(
   projection: DemonstrationObjectiveConsumerProjection,
   fitGapProjection: FitGapConsumerProjection,
+  fitGapReasoning: FitGapProjection,
   route: CanonicalEvidenceRoute,
   ledger: EvidenceLedger,
 ): { valid: boolean; errors: string[] } {
@@ -204,6 +210,9 @@ export function validateDemonstrationObjectiveConsumerProjection(
 
   const graphValidation = validateRequirementGraph(ledger);
   if (graphValidation.length) errors.push(...graphValidation.map((e) => "E1: " + e));
+
+  const d4Validation = validateFitGapConsumerProjection(fitGapProjection, fitGapReasoning, route, ledger);
+  if (!d4Validation.valid) errors.push(...d4Validation.errors.map((e) => "D4: " + e));
 
   const routeValidation = validateCanonicalEvidenceRoute(route, ledger);
   if (!routeValidation.valid) errors.push(...routeValidation.errors.map((e) => "D3: " + e));
