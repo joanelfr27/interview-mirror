@@ -36,8 +36,8 @@ function isBlockedHost(hostname: string): boolean {
     if (a === 127 || a === 10 || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)) return true;
   }
   if (/^(fc|fd)[0-9a-f]{2}:/i.test(host) || /^fe80:/i.test(host)) return true;
-  if (/^::ffff:(?:127\\.|10\\.|192\\.168\\.|169\\.254\\.|172\\.(?:1[6-9]|2\\d|3[0-1])\\.)/i.test(host)) return true;
-  if (/(?:^|\\.)(?:nip\\.io|xip\\.io|sslip\\.io|localtest\\.me)$/i.test(host)) return true;
+  if (/^::ffff:(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[0-1])\.)/i.test(host)) return true;
+  if (/(?:^|\.)(?:nip\.io|xip\.io|sslip\.io|localtest\.me)$/i.test(host)) return true;
   return false;
 }
 
@@ -154,8 +154,18 @@ export async function fetchLinkedDocument(rawUrl: string, guard?: IngestionUrlGu
       current = new URL(location, current); validateIngestionUrl(current.toString()); if (guard) await guard(current); continue;
     }
     if (!response.ok) throw new Error("LINK_FETCH_FAILED");
-    const type = (response.headers.get("content-type") || "").toLowerCase(); const raw = await response.text();
+    const type = (response.headers.get("content-type") || "").toLowerCase();
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > INGESTION_LIMITS.maxDocumentBytes) throw new Error("DOCUMENT_TOO_LARGE");
+    if (type.includes("application/pdf") || /\\.pdf(?:$|[?#])/i.test(current.pathname)) {
+      return extractPdfText(new File([bytes], "linked.pdf", { type: "application/pdf" }));
+    }
+    if (type.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || /\\.docx(?:$|[?#])/i.test(current.pathname)) {
+      return extractWordText(new File([bytes], "linked.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    }
+    const raw = new TextDecoder().decode(bytes);
     if (type.includes("html")) return normalizeDocumentText(raw.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " "));
+    if (type && !type.startsWith("text/") && type !== "application/json" && type !== "application/xml") throw new Error("UNSUPPORTED_LINK_CONTENT");
     return normalizeDocumentText(raw);
   }
   throw new Error("LINK_FETCH_FAILED");
