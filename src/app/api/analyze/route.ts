@@ -32,6 +32,10 @@ async function tryFetchJobDescription(url: string): Promise<string> { try { cons
 function extractStandaloneUrl(value: string): string | null { const t = value.trim(); if (!/^https?:\/\/\S+$/i.test(t)) return null; try { return new URL(t).toString(); } catch { return null; } }
 function removeUrls(value: string): string { return canonicalize(value.replace(/https?:\/\/\S+/gi, " ")); }
 
+function preparationPurposeForBody(body: Record<string, unknown>): "upcoming_interview" | "improve_skills" {
+  return body.preparationPurpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
+}
+
 function isIngestionSourceType(value: unknown): value is IngestionSourceType {
   return value === "pdf" || value === "word" || value === "link" || value === "paste" || value === "text";
 }
@@ -128,6 +132,10 @@ export async function POST(request: Request) {
   let jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
   let cvDocument: IngestedDocument;
   let jobDescriptionDocument: IngestedDocument | null = null;
+  if (!body.cvDocument) return NextResponse.json({ code: "CANONICAL_CV_REQUIRED", error: "The CV must pass through universal ingestion before analysis" }, { status: 400 });
+  if (preparationPurposeForBody(body) === "upcoming_interview" && !body.jobDescriptionDocument && !String(body.jobDescriptionUrl ?? "").trim() && !String(body.jobDescription ?? "").trim()) {
+    return NextResponse.json({ code: "CANONICAL_JD_REQUIRED", error: "A job description must pass through universal ingestion before analysis" }, { status: 400 });
+  }
   try {
     cvDocument = await canonicalDocumentFromBody(body.cvDocument, rawCvText, "text");
     if (body.jobDescriptionDocument) {
