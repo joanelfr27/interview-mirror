@@ -85,7 +85,7 @@ export function validateCanonicalFeedbackMirrorUpdate(
     errors.push(...validateAtomicEvidenceAgainstSource(item.evidence,item.source_span).map(e=>"D8 evidence grounding: "+e+" ["+item.observation_id+"]"));
     if(item.evidence.assertion.polarity!=="AFFIRMATIVE") errors.push("D8 update cannot silently add negated evidence: "+item.observation_id);
     if(item.claim_boundary==="CANDIDATE_STATED" && item.evidence.provenance.source_type!=="CANDIDATE_ELICITED") errors.push("D8 candidate-stated observation must use candidate-elicited provenance: "+item.observation_id);
-    if(item.claim_boundary==="DOCUMENTED" && item.evidence.provenance.source_type==="CANDIDATE_ELICITED") errors.push("D8 documented observation cannot use candidate-elicited provenance: "+item.observation_id);
+    if(item.claim_boundary==="DOCUMENTED" && item.evidence.provenance.source_type!=="INTERVIEW_TRANSCRIPT") errors.push("D8 documented observation must use interview-transcript provenance: "+item.observation_id);
     const route=requirementRoute(routeIds,item.requirement_id,probeRouting);
     if(route && !route.permitted_claims.length && item.claim_boundary==="CANDIDATE_STATED") errors.push("D8 candidate-stated observation requires an explicit claim boundary: "+item.observation_id);
   }
