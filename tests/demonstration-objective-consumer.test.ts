@@ -56,11 +56,11 @@ function full(l:EvidenceLedger) {
  return {d2,d3,d4};
 }
 test("D5 builds deterministic objective projection",()=>{
- const l=ledger(); const {d2,d3,d4}=full(l); const a=buildDemonstrationObjectiveConsumerProjection(d4,d3,l); const b=buildDemonstrationObjectiveConsumerProjection(d4,d3,l);
+ const l=ledger(); const {d2,d3,d4}=full(l); const a=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l); const b=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
  assert.deepEqual(a,b); assert.equal(a.version,"d5-v1"); assert.equal(a.objectives.length,1);
 });
 test("D5 preserves exact provenance and objective boundary",()=>{
- const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d3,l); const x=p.objectives[0]!;
+ const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l); const x=p.objectives[0]!;
  assert.equal(x.demonstration_objective_id,"OBJ-GAP"); assert.equal(x.fit_state,"EXPERIENCE_GAP"); assert.equal(x.preparation_state,"VERIFY_BEFORE_INTERVIEW");
  assert.deepEqual(x.supporting_true_atoms,[]); assert.deepEqual(x.truthfulness_boundary.prohibited_claims,["Do not claim mining experience."]);
 });
@@ -78,9 +78,9 @@ test("D5 rejects negated supporting evidence",()=>{
 });
 test("D5 rejects tampered source quote",()=>{
  const l=ledger(); const {d2,d3,d4}=full(l); const bad=structuredClone(l);
- const p=buildDemonstrationObjectiveConsumerProjection(d4,d3,l);
+ const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
  p.objectives[0]!.supporting_true_atoms.push({evidence_id:"A-DIRECT",source_span_id:"CV-1",source_quote:"Fabricated"});
- const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d3,bad);
+ const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d2,d3,bad);
  assert.equal(v.valid,false); assert.match(v.errors.join(" | "),/supporting atom associations|canonical evidence|source quote|owned/i);
 });
 test("D5 rejects unknown objective and cross-requirement evidence",()=>{
@@ -89,14 +89,14 @@ test("D5 rejects unknown objective and cross-requirement evidence",()=>{
  assert.throws(()=>buildDemonstrationObjectiveConsumerProjection(d4,d3,bad),/objective|unknown/i);
 });
 test("D5 preserves all canonical objective associations",()=>{
- const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d3,l);
+ const l=ledger(); const {d2,d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
  assert.deepEqual(d4.requirements.find(r=>r.requirement_id==="R-GAP")!.demonstration_objective_ids,["OBJ-GAP"]);
  assert.deepEqual(p.objectives.map(o=>o.demonstration_objective_id),["OBJ-GAP"]);
 });
 
 test("D5 validator rejects tampered objective-facing fields",()=>{
- const l=ledger(); const {d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d3,l);
+ const l=ledger(); const {d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);
  p.objectives[0]!.observable_cue="Invent an unsupported claim.";
- const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d3,l);
+ const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d2,d3,l);
  assert.equal(v.valid,false); assert.match(v.errors.join(" | "),/observable cue diverges/i);
 });
