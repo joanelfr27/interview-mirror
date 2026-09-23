@@ -56,9 +56,11 @@ function isValidAnalysis(value: unknown, cvText?: string, jobDescription?: strin
   const jdSource = jobDescription ? canonicalize(jobDescription) : "";
   const evidenceGrounded = a.evidenceChain.every((item: any) => {
     if (!item || typeof item.jd_requirement !== "string" || !item.jd_requirement.trim() || typeof item.cv_evidence !== "string" || !item.cv_evidence.trim() || typeof item.gap_identified !== "string" || !item.gap_identified.trim() || typeof item.interview_implication !== "string" || !item.interview_implication.trim() || typeof item.actionable_recommendation !== "string" || !item.actionable_recommendation.trim() || generic.test(item.actionable_recommendation)) return false;
-    const jdGrounded = item.jd_requirement === NO_EVIDENCE
-      ? false
-      : groundingOverlap(item.jd_requirement, jdSource) >= 0.20;
+    const jdGrounded = !jdSource
+      ? item.jd_requirement === "NO JOB DESCRIPTION PROVIDED"
+      : item.jd_requirement === NO_EVIDENCE
+        ? false
+        : groundingOverlap(item.jd_requirement, jdSource) >= 0.20;
     const cvGrounded = item.cv_evidence === NO_EVIDENCE
       ? true
       : groundingOverlap(item.cv_evidence, cvSource) >= 0.20;
@@ -74,7 +76,8 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
   const openai = getOpenAI();
   try {
     const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.2, messages: [
-      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's evidence-grounded candidate coach. Your job is to give the candidate a precise diagnostic of how their CV fits this specific job and what the interview is likely to test. The output must feel like expert coaching, not an ATS report or generic AI advice.\n\nCandidate-facing values must be entirely in the selected preparation language. Use short, clear, natural professional language. Avoid jargon, academic wording, consultant-style phrases, and abstract language. Explain practical next steps in terms the candidate can immediately understand. JSON keys remain exactly in English. Return exactly: matchScore, strengths, gaps, keywordAlignment, summary, suggestedFocusAreas, evidenceChain. EvidenceChain objects use exactly: jd_requirement, cv_evidence, gap_identified, interview_implication, actionable_recommendation.\n\nDIAGNOSTIC RULES:\n- Judge each important JD requirement against the CV, not against general knowledge or prior context.\n- Separate direct evidence, transferable/partial evidence, and missing evidence. Never turn a related job title or keyword into proof of a responsibility the CV does not state.\n- Do not inflate the match score. A strong candidate with material industry or responsibility gaps should not receive a near-perfect score.\n- Strengths must say WHAT matches and WHY, using concrete CV evidence.\n- Gaps must identify the specific requirement that is not clearly demonstrated and why it may matter in the interview.\n- KeywordAlignment must contain useful themes or capabilities, never raw filler words such as company, sector, manager, improve, services, or location names.\n- Summary must be 2-3 concise sentences explaining the candidate's strongest fit and most important risks.\n- SuggestedFocusAreas must be 3-5 prioritized preparation actions tied to real CV/JD evidence.\n\nEVIDENCE CHAIN RULES:\n- For every item, identify one concrete JD requirement and one concrete CV passage when evidence exists.\n- When evidence is absent, use exactly "${NO_EVIDENCE}" and say so plainly.\n- State what the interviewer may test because of the evidence or gap.\n- Give one concrete preparation action that references the actual requirement and/or CV evidence.\n- Never invent employers, credentials, responsibilities, metrics, tools, industry experience, dates, stakeholders, or outcomes.\n- Avoid repetitive filler such as 'your CV shows a clear professional story', 'your experience is relevant', 'prepare examples', or 'connect your experience'.` },
+      { role: "system", content: `${languageInstruction(language)}\n\nYou are Interview Mirror's evidence-grounded candidate coach. Your job is to give the candidate a precise diagnostic of how their CV fits this specific job and what the interview is likely to test. The output must feel like expert coaching, not an ATS report or generic AI advice.\n\nCandidate-facing values must be entirely in the selected preparation language. Use short, clear, natural professional language. Avoid jargon, academic wording, consultant-style phrases, and abstract language. Explain practical next steps in terms the candidate can immediately understand. JSON keys remain exactly in English. Return exactly: matchScore, strengths, gaps, keywordAlignment, summary, suggestedFocusAreas, evidenceChain. EvidenceChain objects use exactly: jd_requirement, cv_evidence, gap_identified, interview_implication, actionable_recommendation.\n\nDIAGNOSTIC RULES:\n- When a job description is provided, judge each important JD requirement against the CV, not against general knowledge or prior context.
+- When NO job description is provided, do not invent employer requirements. Set every evidenceChain.jd_requirement to exactly "NO JOB DESCRIPTION PROVIDED" and ground the analysis in the candidate CV, transferable interview competencies, and prior preparation context only.\n- Separate direct evidence, transferable/partial evidence, and missing evidence. Never turn a related job title or keyword into proof of a responsibility the CV does not state.\n- Do not inflate the match score. A strong candidate with material industry or responsibility gaps should not receive a near-perfect score.\n- Strengths must say WHAT matches and WHY, using concrete CV evidence.\n- Gaps must identify the specific requirement that is not clearly demonstrated and why it may matter in the interview.\n- KeywordAlignment must contain useful themes or capabilities, never raw filler words such as company, sector, manager, improve, services, or location names.\n- Summary must be 2-3 concise sentences explaining the candidate's strongest fit and most important risks.\n- SuggestedFocusAreas must be 3-5 prioritized preparation actions tied to real CV/JD evidence.\n\nEVIDENCE CHAIN RULES:\n- For every item, identify one concrete JD requirement and one concrete CV passage when evidence exists. Without a JD, use exactly "NO JOB DESCRIPTION PROVIDED" as jd_requirement.\n- When evidence is absent, use exactly "${NO_EVIDENCE}" and say so plainly.\n- State what the interviewer may test because of the evidence or gap.\n- Give one concrete preparation action that references the actual requirement and/or CV evidence.\n- Never invent employers, credentials, responsibilities, metrics, tools, industry experience, dates, stakeholders, or outcomes.\n- Avoid repetitive filler such as 'your CV shows a clear professional story', 'your experience is relevant', 'prepare examples', or 'connect your experience'.` },
       { role: "user", content: `CV:\n${cvText.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}\n\nPRIOR PREPARATION CONTEXT:\n${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}\n\nAnalyze only the current CV and JD as evidence.` }
     ]});
     const raw = completion.choices[0]?.message?.content;
@@ -100,6 +103,7 @@ export async function POST(request: Request) {
   let jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
   const title = canonicalize(String(body.title ?? "Interview preparation"));
   const sessionId = body.sessionId as string | null | undefined;
+  const journey = String(body.journey ?? "").trim();
   const preparationPurpose = body.preparationPurpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
   const language = normalizeLanguage(body.experience_language ?? body.preparation_language);
   const interviewLanguage = normalizeLanguage(body.interview_language ?? body.preparation_language);
@@ -107,8 +111,13 @@ export async function POST(request: Request) {
   const embeddedUrl = extractStandaloneUrl(jobDescription);
   if (!jobDescriptionUrl && embeddedUrl) { jobDescriptionUrl = embeddedUrl; jobDescription = ""; }
   if (jobDescription) jobDescription = removeUrls(jobDescription);
+  const validJourneys = ["new_upcoming", "new_skills", "continue_upcoming", "new_opportunity", "continue_skills"];
+  if (!validJourneys.includes(journey)) return NextResponse.json({ code: "INVALID_JOURNEY", error: "A valid preparation journey is required" }, { status: 400 });
+  const expectedPurpose = journey === "new_skills" || journey === "continue_skills" ? "improve_skills" : "upcoming_interview";
+  if (preparationPurpose !== expectedPurpose) return NextResponse.json({ code: "JOURNEY_PURPOSE_MISMATCH", error: "The selected preparation journey determines the preparation purpose" }, { status: 409 });
+  if ((journey === "continue_upcoming" || journey === "continue_skills") && !sessionId) return NextResponse.json({ code: "SESSION_REQUIRED", error: "A valid preparation session is required to continue" }, { status: 409 });
+  if (journey === "new_opportunity" && sessionId) return NextResponse.json({ code: "NEW_OPPORTUNITY_REQUIRES_FRESH_SESSION", error: "A new opportunity must start a fresh preparation session" }, { status: 409 });
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
-  if (preparationPurpose === "upcoming_interview" && !interviewDate) return NextResponse.json({ error: "Interview date is required for an upcoming interview" }, { status: 400 });
   if (preparationPurpose === "improve_skills" && interviewDate) return NextResponse.json({ error: "Interview date must be empty when improving interview skills" }, { status: 400 });
   if (!jobDescription && jobDescriptionUrl) { jobDescription = await tryFetchJobDescription(jobDescriptionUrl); if (!jobDescription) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "We could not reliably extract a job description from this link. Please paste the job description or upload the PDF." }, { status: 422 }); }
   if (preparationPurpose === "upcoming_interview" && jobDescription.length < 300) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "The job description is too short to analyze reliably. Please paste the full job description or upload the PDF." }, { status: 422 });
@@ -127,7 +136,7 @@ export async function POST(request: Request) {
   if (id) {
     const { data: existingSession, error: existingSessionError } = await supabase
       .from("sessions")
-      .select("id, preparation_purpose")
+      .select("id, preparation_purpose, status")
       .eq("id", id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -135,6 +144,9 @@ export async function POST(request: Request) {
     if (!existingSession) return NextResponse.json({ code: "SESSION_NOT_FOUND", error: "Preparation session not found or expired" }, { status: 404 });
     if (existingSession.preparation_purpose !== preparationPurpose) {
       return NextResponse.json({ code: "SESSION_PURPOSE_MISMATCH", error: "The selected preparation journey does not match this session" }, { status: 409 });
+    }
+    if ((journey === "continue_upcoming" || journey === "continue_skills") && existingSession.status === "completed") {
+      return NextResponse.json({ code: "SESSION_NOT_RESUMABLE", error: "Completed preparation sessions cannot be resumed" }, { status: 409 });
     }
     const { data: updatedSession, error } = await supabase
       .from("sessions")
