@@ -50,7 +50,7 @@ function u32(b: Uint8Array, o: number) { return (b[o] | (b[o + 1] << 8) | (b[o +
 
 async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") throw new Error("DOCX_DECOMPRESSION_UNAVAILABLE");
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  const buffer = new ArrayBuffer(bytes.byteLength);\n  new Uint8Array(buffer).set(bytes);\n  const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
