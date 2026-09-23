@@ -16,8 +16,8 @@ const atom=(id:string,source_span_id:string,action:string,object:string,polarity
  assertion:{type:"RESPONSIBILITY" as const,polarity},verifiability:{has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false},extraction_confidence:1
 });
 function ledger():EvidenceLedger{return {
- source_spans:[span("CV-1","CV","Managed regional finance."),span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Mining operations experience.")],
- evidence:[atom("A-DIRECT","CV-1","managed","regional finance"),atom("A-CONTRA","CV-1","manage","mining operations","NEGATED")],
+ source_spans:[span("CV-1","CV","Managed regional finance."),span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Mining operations experience."),span("EL-1","ELICIT-session-1","I have done the reporting work.")],
+ evidence:[atom("A-DIRECT","CV-1","managed","regional finance"),atom("A-CONTRA","CV-1","manage","mining operations","NEGATED"),{...atom("ELICIT-ATOM-EL-GAP","EL-1","did not have","mining operations","NEGATED"),provenance:{source_type:"CANDIDATE_ELICITED" as const,language:"en",extraction_method:"LLM" as const},assertion:{type:"ELICITED" as const,polarity:"NEGATED" as const}}],
  requirements:[
  {id:"R-DIRECT",source_span_id:"JD-1",normalized_requirement:"Manage regional finance",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-DIRECT",type:"FUNCTION",requirement:"Manage regional finance",source_span_id:"JD-1"}],extraction_confidence:1},
  {id:"R-GAP",source_span_id:"JD-2",normalized_requirement:"Mining operations experience",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-GAP",type:"CONTEXT",requirement:"Mining operations experience",source_span_id:"JD-2"}],extraction_confidence:1}],
@@ -26,7 +26,7 @@ function ledger():EvidenceLedger{return {
  {id:"SJ-GAP",requirement_id:"R-GAP",facet_id:"F-GAP",status:"CONTRADICTORY",supporting_evidence_ids:["A-CONTRA"],rationale:"Negated.",confidence:.9,abstained:false,support_basis:"DOCUMENTED"}],
  requirement_statuses:[{requirement_id:"R-DIRECT",status:"SUPPORTED"},{requirement_id:"R-GAP",status:"CONTRADICTED"}],
  unresolved_items:[{id:"U-GAP",requirement_id:"R-GAP",facet_ids:["F-GAP"],type:"CONFLICTING",supporting_evidence_ids:[],contradiction_evidence_ids:["A-CONTRA"],absence_basis:"EXPLICIT_CONTRADICTION",negation_evidence_ids:["A-CONTRA"]}],
- candidate_elicitations:[],
+ candidate_elicitations:[{id:"EL-GAP",unresolved_item_id:"U-GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED",classification:"EXPERIENCE_GAP",classification_rationale:"Not the target experience."}],
  demonstration_objectives:[{id:"OBJ-GAP",target_unresolved_item_id:"U-GAP",observable_cue:"State the boundary honestly.",supporting_true_atom_ids:[],truthfulness_boundary:{permitted_claims:["State source facts."],prohibited_claims:["Do not claim mining experience."]},candidate_gap_classification:"EXPERIENCE_GAP",probe_family:"CONTEXT"}]
 };}
 function full(l:EvidenceLedger){const reasoning=buildCanonicalReasoningProjection(l);const d2=buildFitGapProjection(reasoning);const d3=buildCanonicalEvidenceRoute(l);const d4=buildFitGapConsumerProjection(d2,d3,l);const d5=buildDemonstrationObjectiveConsumerProjection(d4,d2,d3,l);const d6=buildCanonicalStrategyBridgeProjection(d4,d2,d3,d5,l);return {d2,d3,d4,d5,d6};}
