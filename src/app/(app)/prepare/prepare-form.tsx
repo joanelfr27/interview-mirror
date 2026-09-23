@@ -99,12 +99,13 @@ export default function PrepareForm() {
     }
     let cancelled = false;
     (async () => {
+      if (!isJourney(journey)) return;
       try {
         const res = await fetch(`/api/sessions/${sessionId}`);
         if (!res.ok) throw new Error("Session not found");
         const data = await res.json();
         if (cancelled) return;
-        const expectedPurpose = purposeForJourney(journey as Parameters<typeof purposeForJourney>[0]);
+        const expectedPurpose = purposeForJourney(journey);
         const loadedPurpose = data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
         if (loadedPurpose !== expectedPurpose) {
           setSessionError("This session does not match the selected preparation journey. Please return to your journey and choose the correct session.");
