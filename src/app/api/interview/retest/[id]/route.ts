@@ -76,7 +76,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       retest_priorities: weaknesses,
     };
 
-    const language = sourceSession.preparation_language === "fr" ? "fr" : "en";
+    const language = sourceSession.interview_language === "fr" ? "fr" : "en";
     const questionsData = await generateInterviewQuestions(sourceSession.cv_analysis, retestStrategy, language);
     if (!isValidQuestionSet(questionsData, retestStrategy)) {
       return NextResponse.json({ error: "The retest questions could not be grounded reliably in the interview strategy." }, { status: 422 });
