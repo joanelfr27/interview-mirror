@@ -153,15 +153,18 @@ export function buildDemonstrationObjectiveConsumerProjection(
   route: CanonicalEvidenceRoute,
   ledger: EvidenceLedger,
 ): DemonstrationObjectiveConsumerProjection {
-  const validation = validateDemonstrationObjectiveConsumerProjection(
-    { version: "d5-v1", objectives: [] },
-    fitGapProjection,
-    route,
-    ledger,
-  );
-  if (!validation.valid) {
-    throw new Error("D5 canonical inputs are invalid: " + validation.errors.join(" | "));
+  const inputErrors: string[] = [];
+  const graphValidation = validateRequirementGraph(ledger);
+  if (graphValidation.length) inputErrors.push(...graphValidation.map((e) => "E1: " + e));
+  const routeValidation = validateCanonicalEvidenceRoute(route, ledger);
+  if (!routeValidation.valid) inputErrors.push(...routeValidation.errors.map((e) => "D3: " + e));
+  if (fitGapProjection.version !== "d4-v1") inputErrors.push("D5 requires the d4-v1 Fit & Gap consumer projection.");
+  const fitIds = new Set(fitGapProjection.requirements.map((r) => r.requirement_id));
+  const routeIds = new Set(route.requirements.map((r) => r.requirement_id));
+  if (fitIds.size !== routeIds.size || [...fitIds].some((id) => !routeIds.has(id))) {
+    inputErrors.push("D5 D2/D3 requirement sets differ.");
   }
+  if (inputErrors.length) throw new Error("D5 canonical inputs are invalid: " + inputErrors.join(" | "));
 
   const byRequirement = new Map(
     fitGapProjection.requirements.map((requirement) => [requirement.requirement_id, requirement]),
