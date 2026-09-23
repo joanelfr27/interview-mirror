@@ -19,8 +19,8 @@ const atom=(id:string,source_span_id:string,action:string,object:string,polarity
 });
 function ledger(): EvidenceLedger {
  return {
-  source_spans:[span("CV-1","CV","Managed regional finance."),span("CV-2","CV","Worked with adjacent systems."),span("CV-3","CV","Did not manage mining operations."),span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Use target systems."),span("JD-3","JD","Mining operations experience."),span("EL-1","ELICIT","I have done the reporting work.")],
-  evidence:[atom("A-DIRECT","CV-1","managed","regional finance"),atom("A-TRANSFER","CV-2","worked","adjacent systems"),atom("A-CONTRA","CV-3","manage","mining operations","NEGATED")],
+  source_spans:[span("CV-1","CV","Managed regional finance."),span("CV-2","CV","Worked with adjacent systems."),span("CV-3","CV","Did not manage mining operations."),span("JD-1","JD","Manage regional finance."),span("JD-2","JD","Use target systems."),span("JD-3","JD","Mining operations experience."),span("EL-1","ELICIT-session-1","I have done the reporting work.")],
+  evidence:[atom("A-DIRECT","CV-1","managed","regional finance"),atom("A-TRANSFER","CV-2","worked","adjacent systems"),atom("A-CONTRA","CV-3","manage","mining operations","NEGATED"),{...atom("ELICIT-ATOM-EL-GAP","EL-1","did not have","mining operations","NEGATED"),provenance:{source_type:"CANDIDATE_ELICITED" as const,language:"en",extraction_method:"LLM" as const},assertion:{type:"ELICITED" as const,polarity:"NEGATED" as const}}],
   requirements:[
    {id:"R-DIRECT",source_span_id:"JD-1",normalized_requirement:"Manage regional finance",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-DIRECT",type:"FUNCTION",requirement:"Manage regional finance",source_span_id:"JD-1"}],extraction_confidence:1},
    {id:"R-TRANSFER",source_span_id:"JD-2",normalized_requirement:"Use target systems",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-TRANSFER",type:"TOOL_METHOD",requirement:"Use target systems",source_span_id:"JD-2"}],extraction_confidence:1},
