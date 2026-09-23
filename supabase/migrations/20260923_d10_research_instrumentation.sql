@@ -35,3 +35,16 @@ create policy "canonical research events owner insert"
   ));
 
 revoke update, delete on public.canonical_research_events from authenticated;
+
+
+alter table public.canonical_research_events
+  add constraint canonical_research_events_contract_check
+  check (
+    btrim(event_id) <> ''
+    and (route_mode is null or route_mode in ('DIRECT','TRANSFERABLE','VERIFY_GAP'))
+    and (preparation_state is null or preparation_state in ('READY_TO_DEMONSTRATE','PREPARE_TRANSFER','VERIFY_BEFORE_INTERVIEW','PREPARE_PARTIAL','DEFEND_BOUNDARY','ELICIT_AND_CLARIFY'))
+    and (probe_mode is null or probe_mode in ('DEMONSTRATION','TRANSFER','PARTIAL','GAP_VERIFICATION','BOUNDARY','ELICITATION'))
+    and (event_name <> 'CANONICAL_VALIDATION_FAILED' or (validation_error_count is not null and validation_error_count >= 1))
+    and (event_name <> 'PROBE_ROUTE_SELECTED' or probe_mode is not null)
+    and (event_name <> 'PREPARATION_ROUTE_SELECTED' or preparation_state is not null)
+  );
