@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
+import { extractWordText } from "@/lib/universal-ingestion";
 
 async function extractPdfText(file: File) {
   let pdfjslib: any = null;
@@ -36,7 +37,8 @@ async function extractPdfText(file: File) {
 }
 
 type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string; historical?: boolean };
-type JobDescriptionMode = "paste" | "pdf" | "link";
+type JobDescriptionMode = "paste" | "pdf" | "word" | "link";
+type CvSourceMode = "paste" | "file" | "link";
 export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,6 +58,8 @@ export default function PrepareForm() {
   const [jobDescription, setJobDescription] = useState("");
   const [jobDescriptionUrl, setJobDescriptionUrl] = useState("");
   const [jobDescriptionMode, setJobDescriptionMode] = useState<JobDescriptionMode>("paste");
+  const [cvSourceMode, setCvSourceMode] = useState<CvSourceMode>("paste");
+  const [cvUrl, setCvUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingSession, setLoadingSession] = useState(Boolean(sessionId));
   const [loadingCvs, setLoadingCvs] = useState(true);
@@ -175,6 +179,18 @@ export default function PrepareForm() {
     } else toast.error("CV loaded, but could not be saved for future sessions");
   }
 
+  async function onCvLink() {
+    if (!cvUrl.trim()) return;
+    try {
+      const res = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: cvUrl.trim() }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not read CV link");
+      setCvText(data.text);
+      setUseNewCv(true); setSelectedCvId(null);
+      toast.success("CV loaded from link");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV link"); }
+  }
+
   async function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -182,16 +198,29 @@ export default function PrepareForm() {
     catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV file"); }
   }
 
-  async function onJobDescriptionPdf(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onJobDescriptionFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text = await extractPdfText(file);
-      if (!text.trim()) throw new Error("No readable text found in the PDF");
+      const lower = file.name.toLowerCase();
+      const text = lower.endsWith(".docx") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ? await extractWordText(file)
+        : await extractPdfText(file);
       setJobDescription(text.trim());
-      setJobDescriptionMode("pdf");
-      toast.success("Job description loaded from PDF");
+      setJobDescriptionMode(lower.endsWith(".docx") ? "word" : "pdf");
+      toast.success("Job description loaded");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read JD PDF"); }
+  }
+
+  async function onJobDescriptionLink() {
+    if (!jobDescriptionUrl.trim()) return;
+    try {
+      const res = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: jobDescriptionUrl.trim() }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not read job description link");
+      setJobDescription(data.text);
+      toast.success("Job description loaded from link");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read job description link"); }
   }
 
   async function onAnalyze(e: React.FormEvent) {
@@ -285,20 +314,28 @@ export default function PrepareForm() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Your CV</CardTitle><CardDescription>Reuse a saved CV or upload a newer version. Your saved CV stays available for future sessions.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Your CV</CardTitle><CardDescription>Use PDF, Word, link, or paste. Your saved CV stays available for future sessions.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
             {savedCvs.length > 0 && <div className="space-y-2"><Label htmlFor="saved-cv">Use an existing CV</Label><select id="saved-cv" value={useNewCv ? "new" : selectedCvId ?? ""} onChange={(e) => e.target.value === "new" ? setUseNewCv(true) : selectSavedCv(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{savedCvs.map((cv) => <option key={cv.id} value={cv.id}>{cv.file_name}</option>)}<option value="new">Upload a new CV</option></select></div>}
-            {(useNewCv || savedCvs.length === 0) && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF or text file · you can also paste below</span></div>}
-            <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Your CV text…" className="min-h-[220px]" required />
+            {(useNewCv || savedCvs.length === 0) && <>
+              <div className="grid grid-cols-3 gap-2">
+                <Button type="button" variant={cvSourceMode === "paste" ? "default" : "outline"} onClick={() => setCvSourceMode("paste")}>Paste</Button>
+                <Button type="button" variant={cvSourceMode === "file" ? "default" : "outline"} onClick={() => setCvSourceMode("file")}>Upload</Button>
+                <Button type="button" variant={cvSourceMode === "link" ? "default" : "outline"} onClick={() => setCvSourceMode("link")}><Link2 className="h-4 w-4" /> Link</Button>
+              </div>
+              {cvSourceMode === "file" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF, Word or text</span></div>}
+              {cvSourceMode === "link" && <div className="flex gap-2"><Input type="url" value={cvUrl} onChange={(e) => setCvUrl(e.target.value)} placeholder="https://..." /><Button type="button" onClick={onCvLink}>Load</Button></div>}
+              {cvSourceMode === "paste" && <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Paste your CV text…" className="min-h-[220px]" required />}
+            </>
           </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Job description</CardTitle><CardDescription>Use the option that is easiest for you. Pasted text and PDF are reliable; links are read when possible and otherwise you will be asked to paste or upload the JD.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste text</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>Upload PDF</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
+            <div className="grid grid-cols-4 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>PDF</Button><Button type="button" variant={jobDescriptionMode === "word" ? "default" : "outline"} onClick={() => setJobDescriptionMode("word")}>Word</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
             {jobDescriptionMode === "paste" && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the full job description here…" className="min-h-[240px]" />}
-            {jobDescriptionMode === "pdf" && <div className="space-y-3"><Label htmlFor="jd-pdf" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD PDF</Label><Input id="jd-pdf" type="file" accept=".pdf,application/pdf" className="hidden" onChange={onJobDescriptionPdf} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
-            {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><p className="text-xs text-muted-foreground">We will try to read the page. If it cannot be read reliably, paste the JD or upload its PDF instead.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
+            {(jobDescriptionMode === "pdf" || jobDescriptionMode === "word") && <div className="space-y-3"><Label htmlFor="jd-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD {jobDescriptionMode === "word" ? "Word" : "PDF"}</Label><Input id="jd-file" type="file" accept={jobDescriptionMode === "word" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,application/pdf"} className="hidden" onChange={onJobDescriptionFile} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
+            {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><div className="flex gap-2"><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><Button type="button" onClick={onJobDescriptionLink}>Load</Button></div><p className="text-xs text-muted-foreground">We will read the page and normalize its text. If it cannot be read reliably, paste or upload the JD.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
           </CardContent>
         </Card>
         <div className="flex justify-end"><Button type="submit" size="lg" disabled={loading}>{loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Analyze with AI</>}</Button></div>
