@@ -58,6 +58,10 @@ create table if not exists public.sessions (
   interview_strategy jsonb,
   language text not null default 'en'
     check (language in ('en', 'fr')),
+  experience_language text not null default 'en'
+    check (experience_language in ('en', 'fr')),
+  interview_language text not null default 'en'
+    check (interview_language in ('en', 'fr')),
   status text not null default 'draft'
     check (status in ('draft', 'analyzed', 'in_progress', 'completed')),
   created_at timestamptz not null default now(),
