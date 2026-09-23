@@ -6,7 +6,7 @@ import { buildFitGapConsumerProjection } from "@/lib/fit-gap-consumer";
 import { buildDemonstrationObjectiveConsumerProjection } from "@/lib/demonstration-objective-consumer";
 import {
   buildCanonicalStrategyBridgeProjection,
-  validateCanonicalStrategyBridgeProjection,
+  validateCanonicalStrategyBridgeProjection,\n  strategyActionFor,
 } from "@/lib/canonical-strategy-bridge";
 import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
 import { buildCanonicalReasoningProjection } from "@/lib/canonical-reasoning-adapter";
@@ -56,3 +56,4 @@ test("D6 rejects cross-requirement evidence",()=>{const l=ledger();const {d2,d3,
 test("D6 rejects tampered source quote",()=>{const l=ledger();const {d2,d3,d4,d5}=full(l);const p=buildCanonicalStrategyBridgeProjection(d4,d2,d3,d5,l);p.requirements[0]!.evidence[0]!.source_quote="Fabricated";const v=validateCanonicalStrategyBridgeProjection(p,d4,d2,d3,d5,l);assert.equal(v.valid,false);assert.match(v.errors.join(" | "),/source quote/i);});
 test("D6 rejects invalid upstream D5",()=>{const l=ledger();const {d2,d3,d4,d5}=full(l);const bad=structuredClone(d5);bad.objectives[0]!.truthfulness_boundary.prohibited_claims=["Claim mining expertise."];assert.throws(()=>buildCanonicalStrategyBridgeProjection(d4,d2,d3,bad,l),/D5|boundaries|invalid/i);});
 test("D6 keeps fit state separate from route mode",()=>{const l=ledger();const {d2,d3,d4,d5}=full(l);const p=buildCanonicalStrategyBridgeProjection(d4,d2,d3,d5,l);const x=p.requirements.find(r=>r.requirement_id==="R-TRANSFER")!;assert.equal(x.route_mode,"VERIFY_GAP");assert.equal(x.fit_state,"PARTIAL");});
+\n\ntest("D6 maps every preparation state to exactly one strategy action",()=>{\n assert.equal(strategyActionFor("READY_TO_DEMONSTRATE"),"DEMONSTRATE");\n assert.equal(strategyActionFor("PREPARE_TRANSFER"),"POSITION_TRANSFER");\n assert.equal(strategyActionFor("VERIFY_BEFORE_INTERVIEW"),"VERIFY_GAP");\n assert.equal(strategyActionFor("PREPARE_PARTIAL"),"DEMONSTRATE_PARTIAL");\n assert.equal(strategyActionFor("DEFEND_BOUNDARY"),"DEFEND_BOUNDARY");\n assert.equal(strategyActionFor("ELICIT_AND_CLARIFY"),"ELICIT_AND_CLARIFY");\n});\n
