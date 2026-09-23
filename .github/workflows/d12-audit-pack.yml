@@ -7,6 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Archive exact D12 audited parent
         env:
           BASE_SHA: 4a53078525d7aabb808a1feff153ce7d533c8cf5
