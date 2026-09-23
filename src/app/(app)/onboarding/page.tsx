@@ -33,7 +33,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { const res = await fetch("/api/user-cvs"); if (res.ok) { const data = await res.json(); if (!cancelled && Array.isArray(data.cvs) && data.cvs.length > 0) { router.replace("/dashboard"); return; } } }
+      try { const res = await fetch("/api/user-cvs"); if (res.ok) { const data = await res.json(); if (!cancelled && Array.isArray(data.cvs) && data.cvs.length > 0) { router.replace("/journey"); return; } } }
       finally { if (!cancelled) setCheckingProfile(false); }
     })();
     return () => { cancelled = true; };
@@ -58,8 +58,8 @@ export default function OnboardingPage() {
     finally { setSavingCv(false); }
   }
 
-  function handleCvContinue() { if (!cvFileName || savingCv) return; router.push("/dashboard"); }
-  function handleManualContinue() { router.push("/prepare"); }
+  function handleCvContinue() { if (!cvFileName || savingCv) return; router.push("/journey"); }
+  function handleManualContinue() { router.push("/journey"); }
   if (checkingProfile) return <div className="flex items-center justify-center py-24 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Loading your profile…</div>;
 
   return (

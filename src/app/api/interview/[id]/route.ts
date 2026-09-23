@@ -53,7 +53,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ ...(updatedSession ?? session), id: sessionId, status: 'in_progress' })
     }
 
-    const language = session.preparation_language === 'fr' ? 'fr' : 'en'
+    const language = session.interview_language === 'fr' ? 'fr' : 'en'
     const questionsData = await generateInterviewQuestions(session.cv_analysis, session.interview_strategy, language)
     if (!isStrategyGroundedQuestionSet(questionsData, session.interview_strategy)) {
       return NextResponse.json({ error: 'The interview questions were not sufficiently grounded in the interview strategy. Please regenerate the strategy and try again.' }, { status: 422 })

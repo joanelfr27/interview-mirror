@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
 
 async function extractPdfText(file: File) {
   let pdfjslib: any = null;
@@ -34,16 +35,18 @@ async function extractPdfText(file: File) {
   return content.filter(Boolean).join("\n\n");
 }
 
-type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string };
+type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string; historical?: boolean };
 type JobDescriptionMode = "paste" | "pdf" | "link";
-type PreparationPurpose = "upcoming_interview" | "improve_skills";
-
 export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
+  const journey = searchParams.get("journey");
+  const initialExperienceLanguage = searchParams.get("experienceLanguage");
+  const initialInterviewLanguage = searchParams.get("interviewLanguage");
   const [title, setTitle] = useState("");
-  const [language, setLanguage] = useState<"en" | "fr">("en");
+  const [experienceLanguage, setExperienceLanguage] = useState<"en" | "fr">("en");
+  const [interviewLanguage, setInterviewLanguage] = useState<"en" | "fr">("en");
   const [purpose, setPurpose] = useState<PreparationPurpose>("upcoming_interview");
   const [interviewDate, setInterviewDate] = useState("");
   const [cvText, setCvText] = useState("");
@@ -56,6 +59,16 @@ export default function PrepareForm() {
   const [loading, setLoading] = useState(false);
   const [loadingSession, setLoadingSession] = useState(Boolean(sessionId));
   const [loadingCvs, setLoadingCvs] = useState(true);
+  const [journeyValidated, setJourneyValidated] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isJourney(journey)) {
+      router.replace("/journey");
+      return;
+    }
+    setJourneyValidated(true);
+  }, [journey, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,10 +79,12 @@ export default function PrepareForm() {
         const data = await res.json();
         if (!cancelled) {
           const cvs = Array.isArray(data.cvs) ? data.cvs : [];
-          setSavedCvs(cvs);
-          if (!sessionId && cvs[0]) {
-            setSelectedCvId(cvs[0].id);
-            setCvText(cvs[0].cv_text ?? "");
+          const historicalCvs = Array.isArray(data.historicalCvs) ? data.historicalCvs : [];
+          const reusableCvs = [...cvs, ...historicalCvs];
+          setSavedCvs(reusableCvs);
+          if (!sessionId && reusableCvs[0]) {
+            setSelectedCvId(reusableCvs[0].id);
+            setCvText(reusableCvs[0].cv_text ?? "");
           }
         }
       } finally {
@@ -86,13 +101,22 @@ export default function PrepareForm() {
     }
     let cancelled = false;
     (async () => {
+      if (!isJourney(journey)) return;
       try {
         const res = await fetch(`/api/sessions/${sessionId}`);
         if (!res.ok) throw new Error("Session not found");
         const data = await res.json();
         if (cancelled) return;
+        const expectedPurpose = purposeForJourney(journey);
+        const loadedPurpose = data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
+        if (loadedPurpose !== expectedPurpose) {
+          setSessionError("This session does not match the selected preparation journey. Please return to your journey and choose the correct session.");
+          return;
+        }
+        setSessionError(null);
         setTitle(data.title ?? "");
-        setLanguage(data.preparation_language === "fr" ? "fr" : "en");
+        setExperienceLanguage(data.experience_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
+        setInterviewLanguage(data.interview_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
         setCvText(data.cv_text ?? "");
@@ -100,6 +124,7 @@ export default function PrepareForm() {
         setJobDescriptionUrl(data.job_description_url ?? "");
         if (data.job_description_url && !data.job_description) setJobDescriptionMode("link");
       } catch {
+        setSessionError("Session not found or expired. Please return to your journey and choose another preparation session.");
         toast.error("Could not load session");
       } finally {
         if (!cancelled) setLoadingSession(false);
@@ -107,6 +132,13 @@ export default function PrepareForm() {
     })();
     return () => { cancelled = true; };
   }, [sessionId]);
+
+  useEffect(() => {
+    if (sessionId) return;
+    if (initialExperienceLanguage === "fr" || initialExperienceLanguage === "en") setExperienceLanguage(initialExperienceLanguage);
+    if (initialInterviewLanguage === "fr" || initialInterviewLanguage === "en") setInterviewLanguage(initialInterviewLanguage);
+    if (isJourney(journey)) setPurpose(purposeForJourney(journey));
+  }, [sessionId, journey, initialExperienceLanguage, initialInterviewLanguage]);
 
   function selectSavedCv(id: string) {
     const cv = savedCvs.find((item) => item.id === id);
@@ -164,8 +196,26 @@ export default function PrepareForm() {
 
   async function onAnalyze(e: React.FormEvent) {
     e.preventDefault();
-    if (purpose === "upcoming_interview" && !interviewDate) {
-      toast.error("Please add your interview date");
+    if (sessionId && sessionError) {
+      toast.error(sessionError);
+      return;
+    }
+    if (!isJourney(journey)) {
+      toast.error("Please choose a preparation journey");
+      router.replace("/journey");
+      return;
+    }
+    const expectedPurpose = purposeForJourney(journey);
+    if (purpose !== expectedPurpose) {
+      toast.error("The preparation journey determines the preparation purpose");
+      return;
+    }
+    if ((journey === "continue_upcoming" || journey === "continue_skills") && !sessionId) {
+      toast.error("A preparation session is required to continue");
+      return;
+    }
+    if (journey === "new_opportunity" && sessionId) {
+      toast.error("A new opportunity must start a fresh preparation session");
       return;
     }
     if (!cvText.trim()) {
@@ -182,9 +232,12 @@ export default function PrepareForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId,
+          sessionId: journey === "new_opportunity" ? null : sessionId,
+          journey,
           title: title || "Interview preparation",
-          preparation_language: language,
+          experience_language: experienceLanguage,
+          interview_language: interviewLanguage,
+          preparation_language: experienceLanguage,
           preparationPurpose: purpose,
           interviewDate: purpose === "upcoming_interview" ? interviewDate : null,
           cvText,
@@ -202,31 +255,33 @@ export default function PrepareForm() {
     } finally { setLoading(false); }
   }
 
+  if (!journeyValidated) return <div className="py-24 text-center text-muted-foreground">Redirecting to your preparation journey…</div>;
   if (loadingSession || loadingCvs) return <div className="flex items-center justify-center py-24 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Loading your preparation context…</div>;
+  if (sessionError) return <div className="mx-auto max-w-2xl py-24 text-center"><h1 className="text-2xl font-semibold text-slate-900">Preparation session unavailable</h1><p className="mt-2 text-muted-foreground">{sessionError}</p><Button type="button" className="mt-6" onClick={() => router.replace("/journey")}>Return to journey</Button></div>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">Prepare your session</h1>
-        <p className="mt-1 text-muted-foreground">Tell Interview Mirror what you are preparing for, choose your CV, and provide the job description.</p>
+        <p className="mt-1 text-muted-foreground">{journey === "new_opportunity" ? "Start a fresh opportunity while keeping your professional continuity." : journey === "continue_upcoming" ? "Continue the preparation you already started." : journey === "continue_skills" ? "Continue your interview-skill coaching path." : "Tell Interview Mirror what you are preparing for, choose your CV, and provide the job description."}</p>
       </div>
       <form onSubmit={onAnalyze} className="space-y-6">
         <Card>
-          <CardHeader><CardTitle>What are you preparing for?</CardTitle><CardDescription>We will tailor the preparation to your goal.</CardDescription></CardHeader>
-          <CardContent className="space-y-3">
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="upcoming_interview" checked={purpose === "upcoming_interview"} onChange={() => setPurpose("upcoming_interview")} className="mt-1" /><span><span className="font-medium">I have an interview coming up</span><span className="block text-sm text-muted-foreground">An interview date is required so we can focus your preparation.</span></span></label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3"><input type="radio" name="purpose" value="improve_skills" checked={purpose === "improve_skills"} onChange={() => setPurpose("improve_skills")} className="mt-1" /><span><span className="font-medium">I want to improve my interview skills</span><span className="block text-sm text-muted-foreground">No interview date is needed.</span></span></label>
-          </CardContent>
+          <CardHeader><CardTitle>Preparation goal</CardTitle><CardDescription>Your selected journey determines this automatically.</CardDescription></CardHeader>
+          <CardContent><div className="rounded-md border bg-muted/30 p-3 text-sm font-medium">{purpose === "improve_skills" ? "Improve my interview skills" : "Prepare for an interview"}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Language</CardTitle><CardDescription>Choose the language for your interview preparation and feedback.</CardDescription></CardHeader>
-          <CardContent><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label><label className="flex items-center gap-2"><input type="radio" name="language" value="fr" checked={language === "fr"} onChange={() => setLanguage("fr")} />Français</label></div></CardContent>
+          <CardHeader><CardTitle>Languages</CardTitle><CardDescription>Your experience language and interview language are independent.</CardDescription></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2"><span className="text-sm font-medium">Experience language</span><select value={experienceLanguage} onChange={(e) => setExperienceLanguage(e.target.value as "en" | "fr")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="en">English</option><option value="fr">Français</option></select></label>
+            <label className="space-y-2"><span className="text-sm font-medium">Interview language</span><select value={interviewLanguage} onChange={(e) => setInterviewLanguage(e.target.value as "en" | "fr")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="en">English</option><option value="fr">Français</option></select></label>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Interview details</CardTitle><CardDescription>Give this preparation a clear label and, when relevant, tell us when the interview is.</CardDescription></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2"><Label htmlFor="title">Session title</Label><Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Financial Controller at Acme" /></div>
-            {purpose === "upcoming_interview" && <div className="space-y-2"><Label htmlFor="interview-date">Interview date</Label><Input id="interview-date" type="date" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} required /></div>}
+            {purpose === "upcoming_interview" && <div className="space-y-2"><Label htmlFor="interview-date">Interview date</Label><Input id="interview-date" type="date" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} /></div>}
           </CardContent>
         </Card>
         <Card>
