@@ -62,6 +62,8 @@ export type SessionRecord = {
   cv_analysis: CvAnalysis | null;
   interview_strategy: InterviewStrategy | null;
   preparation_language?: SessionLanguage | null;
+  experience_language?: SessionLanguage | null;
+  interview_language?: SessionLanguage | null;
   preparation_purpose?: "upcoming_interview" | "improve_skills" | string | null;
   interview_date?: string | null;
   coaching_focus?: string | null;
