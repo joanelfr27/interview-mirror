@@ -42,8 +42,12 @@ export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
+  const journey = searchParams.get("journey");
+  const initialExperienceLanguage = searchParams.get("experienceLanguage");
+  const initialInterviewLanguage = searchParams.get("interviewLanguage");
   const [title, setTitle] = useState("");
-  const [language, setLanguage] = useState<"en" | "fr">("en");
+  const [experienceLanguage, setExperienceLanguage] = useState<"en" | "fr">("en");
+  const [interviewLanguage, setInterviewLanguage] = useState<"en" | "fr">("en");
   const [purpose, setPurpose] = useState<PreparationPurpose>("upcoming_interview");
   const [interviewDate, setInterviewDate] = useState("");
   const [cvText, setCvText] = useState("");
@@ -92,7 +96,8 @@ export default function PrepareForm() {
         const data = await res.json();
         if (cancelled) return;
         setTitle(data.title ?? "");
-        setLanguage(data.preparation_language === "fr" ? "fr" : "en");
+        setExperienceLanguage(data.experience_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
+        setInterviewLanguage(data.interview_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
         setCvText(data.cv_text ?? "");
@@ -107,6 +112,14 @@ export default function PrepareForm() {
     })();
     return () => { cancelled = true; };
   }, [sessionId]);
+
+  useEffect(() => {
+    if (sessionId) return;
+    if (initialExperienceLanguage === "fr" || initialExperienceLanguage === "en") setExperienceLanguage(initialExperienceLanguage);
+    if (initialInterviewLanguage === "fr" || initialInterviewLanguage === "en") setInterviewLanguage(initialInterviewLanguage);
+    if (journey === "new_skills" || journey === "continue_skills") setPurpose("improve_skills");
+    if (journey === "new_upcoming" || journey === "new_opportunity" || journey === "continue_upcoming") setPurpose("upcoming_interview");
+  }, [sessionId, journey, initialExperienceLanguage, initialInterviewLanguage]);
 
   function selectSavedCv(id: string) {
     const cv = savedCvs.find((item) => item.id === id);
@@ -184,7 +197,9 @@ export default function PrepareForm() {
         body: JSON.stringify({
           sessionId,
           title: title || "Interview preparation",
-          preparation_language: language,
+          experience_language: experienceLanguage,
+          interview_language: interviewLanguage,
+          preparation_language: experienceLanguage,
           preparationPurpose: purpose,
           interviewDate: purpose === "upcoming_interview" ? interviewDate : null,
           cvText,
@@ -208,7 +223,7 @@ export default function PrepareForm() {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">Prepare your session</h1>
-        <p className="mt-1 text-muted-foreground">Tell Interview Mirror what you are preparing for, choose your CV, and provide the job description.</p>
+        <p className="mt-1 text-muted-foreground">{journey === "new_opportunity" ? "Start a fresh opportunity while keeping your professional continuity." : journey === "continue_upcoming" ? "Continue the preparation you already started." : journey === "continue_skills" ? "Continue your interview-skill coaching path." : "Tell Interview Mirror what you are preparing for, choose your CV, and provide the job description."}</p>
       </div>
       <form onSubmit={onAnalyze} className="space-y-6">
         <Card>
