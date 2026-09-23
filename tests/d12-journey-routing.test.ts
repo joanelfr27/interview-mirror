@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isJourney, purposeForJourney, JOURNEYS, isContinuationJourney, isNewJourney, continuationInputsChanged, isResumableSessionStatus, continuationResetState } from "../src/lib/journey.ts";
+import { isJourney, purposeForJourney, JOURNEYS, isContinuationJourney, isNewJourney, requiresCandidateHistory, continuationInputsChanged, isResumableSessionStatus, continuationResetState } from "../src/lib/journey.ts";
 
 test("D12: all five frozen journeys are valid", () => {
   assert.equal(JOURNEYS.length, 5);
@@ -21,6 +21,14 @@ test("D12: journey mapping preserves the two canonical purposes", () => {
   assert.equal(purposeForJourney("new_opportunity"), "upcoming_interview");
   assert.equal(purposeForJourney("new_skills"), "improve_skills");
   assert.equal(purposeForJourney("continue_skills"), "improve_skills");
+});
+
+test("D12: returning journeys require candidate history", () => {
+  assert.equal(requiresCandidateHistory("continue_upcoming"), true);
+  assert.equal(requiresCandidateHistory("continue_skills"), true);
+  assert.equal(requiresCandidateHistory("new_opportunity"), true);
+  assert.equal(requiresCandidateHistory("new_upcoming"), false);
+  assert.equal(requiresCandidateHistory("new_skills"), false);
 });
 
 test("D12: new and continuation journey semantics are explicit", () => {
