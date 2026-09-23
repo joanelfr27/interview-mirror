@@ -138,6 +138,33 @@ export async function extractWordText(file: File): Promise<string> {
   return normalizeDocumentText(xmlToText(xml));
 }
 
+async function readResponseBytes(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const declared = Number(response.headers.get("content-length") || "0");
+  if (declared > maxBytes) throw new Error("DOCUMENT_TOO_LARGE");
+  if (!response.body) {
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > maxBytes) throw new Error("DOCUMENT_TOO_LARGE");
+    return bytes;
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    total += result.value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error("DOCUMENT_TOO_LARGE");
+    }
+    chunks.push(result.value);
+  }
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.byteLength; }
+  return output.buffer;
+}
+
 export type IngestionUrlGuard = (url: URL) => Promise<void>;
 
 export async function fetchLinkedDocument(rawUrl: string, guard?: IngestionUrlGuard): Promise<string> {
@@ -155,8 +182,7 @@ export async function fetchLinkedDocument(rawUrl: string, guard?: IngestionUrlGu
     }
     if (!response.ok) throw new Error("LINK_FETCH_FAILED");
     const type = (response.headers.get("content-type") || "").toLowerCase();
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength > INGESTION_LIMITS.maxDocumentBytes) throw new Error("DOCUMENT_TOO_LARGE");
+    const bytes = await readResponseBytes(response, INGESTION_LIMITS.maxDocumentBytes);
     if (type.includes("application/pdf") || /\\.pdf(?:$|[?#])/i.test(current.pathname)) {
       return extractPdfText(new File([bytes], "linked.pdf", { type: "application/pdf" }));
     }
