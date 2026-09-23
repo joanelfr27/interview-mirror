@@ -82,9 +82,9 @@ export default function PrepareForm() {
           const historicalCvs = Array.isArray(data.historicalCvs) ? data.historicalCvs : [];
           const reusableCvs = [...cvs, ...historicalCvs];
           setSavedCvs(reusableCvs);
-          if (!sessionId && cvs[0]) {
-            setSelectedCvId(cvs[0].id);
-            setCvText(cvs[0].cv_text ?? "");
+          if (!sessionId && reusableCvs[0]) {
+            setSelectedCvId(reusableCvs[0].id);
+            setCvText(reusableCvs[0].cv_text ?? "");
           }
         }
       } finally {
