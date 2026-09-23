@@ -38,10 +38,28 @@ create policy "canonical mirror snapshots owner insert"
 
 revoke update, delete on public.canonical_mirror_snapshots from authenticated;
 
+create or replace function public.is_valid_canonical_mirror_source_update_ids(ids text[])
+returns boolean
+language sql
+immutable
+as $$
+  select ids is not null
+    and cardinality(ids) > 0
+    and array_position(ids, null) is null
+    and not exists (
+      select 1
+      from unnest(ids) as item(id)
+      where btrim(item.id) = ''
+    )
+    and cardinality(ids) = cardinality(array(
+      select distinct item.id
+      from unnest(ids) as item(id)
+    ));
+$$;
 
 alter table public.canonical_mirror_snapshots
-  add constraint canonical_mirror_snapshots_source_update_ids_nonempty
-  check (cardinality(source_update_ids) > 0);
+  add constraint canonical_mirror_snapshots_source_update_ids_valid
+  check (public.is_valid_canonical_mirror_source_update_ids(source_update_ids));
 
 create or replace function public.prevent_canonical_mirror_snapshot_mutation()
 returns trigger
@@ -49,6 +67,10 @@ language plpgsql
 security invoker
 as $$
 begin
+  if tg_op = 'DELETE' and pg_trigger_depth() > 1 then
+    return old;
+  end if;
+
   raise exception 'canonical_mirror_snapshots is append-only';
 end;
 $$;
