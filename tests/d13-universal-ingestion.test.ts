@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildIngestedDocument, normalizeDocumentText, validateIngestionUrl } from "../src/lib/universal-ingestion.ts";
+import { buildIngestedDocument, extractWordText, fetchLinkedDocument, normalizeDocumentText, validateIngestionUrl } from "../src/lib/universal-ingestion.ts";
 
 test("normalizes whitespace and line endings", () => {
   assert.equal(normalizeDocumentText(" A\r\n B   C "), "A\n B C");
@@ -28,4 +28,22 @@ test("accepts only http and https links", () => {
 test("rejects empty and oversized documents", () => {
   assert.throws(() => normalizeDocumentText("   "), /NO_READABLE_TEXT/);
   assert.throws(() => normalizeDocumentText("x".repeat(100_001)), /DOCUMENT_TOO_LARGE/);
+});
+
+
+test("rejects malformed Word documents instead of producing fabricated text", async () => {
+  await assert.rejects(() => extractWordText(new File([new Uint8Array([1, 2, 3])], "broken.docx")), /INVALID_DOCX/);
+});
+
+test("revalidates redirect targets and blocks private destinations", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(null, { status: 302, headers: { location: "http://127.0.0.1:3000/internal" } });
+  try { await assert.rejects(() => fetchLinkedDocument("https://example.com/job"), /BLOCKED_PRIVATE_URL/); } finally { globalThis.fetch = originalFetch; }
+});
+
+test("fails closed after the bounded redirect count", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return new Response(null, { status: 302, headers: { location: "https://example.com/redirect-" + calls } }); };
+  try { await assert.rejects(() => fetchLinkedDocument("https://example.com/job"), /LINK_REDIRECT_LIMIT/); assert.equal(calls, 4); } finally { globalThis.fetch = originalFetch; }
 });
