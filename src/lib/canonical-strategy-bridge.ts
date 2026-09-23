@@ -44,6 +44,7 @@ export type CanonicalStrategyBridgeRequirement = {
   fit_state: string;
   gap_classification: FitGapConsumerProjection["requirements"][number]["gap_classification"];
   preparation_state: string;
+  strategy_action: CanonicalStrategyBridgeAction;
   evidence: CanonicalStrategyBridgeEvidence[];
   unresolved_item_ids: string[];
   demonstration_objective_ids: string[];
@@ -112,6 +113,7 @@ export function buildCanonicalStrategyBridgeProjection(
       fit_state: fit.fit_state,
       gap_classification: fit.gap_classification,
       preparation_state: fit.preparation_state,
+      strategy_action: strategyActionFor(fit.preparation_state),
       evidence: r.candidates.map((candidate) => ({
         evidence_id: candidate.evidence_id,
         source_span_id: candidate.source_span_id,
