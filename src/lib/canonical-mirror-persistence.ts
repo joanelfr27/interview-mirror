@@ -12,7 +12,8 @@ export function validateCanonicalMirrorSnapshot(
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!snapshot.session_id.trim()) errors.push("D9 session_id is required.");
-  if (!snapshot.schema_version.trim()) errors.push("D9 schema_version is required.");\n  if (!Array.isArray(snapshot.source_update_ids) || snapshot.source_update_ids.some((id) => typeof id !== "string" || !id.trim())) errors.push("D9 source_update_ids must contain non-empty strings.");
+  if (!snapshot.schema_version.trim()) errors.push("D9 schema_version is required.");
+  if (!Array.isArray(snapshot.source_update_ids) || snapshot.source_update_ids.some((id) => typeof id !== "string" || !id.trim())) errors.push("D9 source_update_ids must contain non-empty strings.");
   if (!Array.isArray(snapshot.source_update_ids)) errors.push("D9 source_update_ids must be an array.");
   if (Array.isArray(snapshot.source_update_ids) && new Set(snapshot.source_update_ids).size !== snapshot.source_update_ids.length) errors.push("D9 source_update_ids must be unique.");
   if (!snapshot.mirror_payload || typeof snapshot.mirror_payload !== "object" || Array.isArray(snapshot.mirror_payload)) {
