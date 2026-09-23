@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
 import { createClient } from "@/lib/supabase/server";
 import { buildIngestedDocument, fetchLinkedDocument } from "@/lib/universal-ingestion";
 import { assertPublicIngestionUrl } from "@/lib/server-ingestion-url";
