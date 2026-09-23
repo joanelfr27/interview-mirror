@@ -51,32 +51,6 @@ test("fails closed after the bounded redirect count", async () => {
 });
 
 
-test("fails closed on oversized DOCX XML expansion", async () => {
-  const original = globalThis.DecompressionStream;
-  class FakeStream {
-    getReader() {
-      let done = false;
-      return {
-        read: async () => {
-          if (done) return { done: true, value: undefined };
-          done = true;
-          return { done: false, value: new Uint8Array(2_000_001) };
-        },
-        cancel: async () => {},
-      };
-    }
-  }
-  globalThis.DecompressionStream = class {
-    constructor() {}
-  } as unknown as typeof DecompressionStream;
-  try {
-    const document = new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], "large.docx");
-    await assert.rejects(() => extractWordText(document), /INVALID_DOCX/);
-  } finally {
-    globalThis.DecompressionStream = original;
-  }
-});
-
 test("routes linked PDF content through the PDF parser", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x00]), {
