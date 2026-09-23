@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { AI_MODEL, languageInstruction, normalizeLanguage, getOpenAI } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
+import { isContinuationJourney, isJourney, isNewJourney, purposeForJourney } from "@/lib/journey";
 import type { AnalysisProvenance, CvAnalysis } from "@/types";
 
 const NO_EVIDENCE = "NO CV EVIDENCE FOUND";
@@ -111,12 +112,11 @@ export async function POST(request: Request) {
   const embeddedUrl = extractStandaloneUrl(jobDescription);
   if (!jobDescriptionUrl && embeddedUrl) { jobDescriptionUrl = embeddedUrl; jobDescription = ""; }
   if (jobDescription) jobDescription = removeUrls(jobDescription);
-  const validJourneys = ["new_upcoming", "new_skills", "continue_upcoming", "new_opportunity", "continue_skills"];
-  if (!validJourneys.includes(journey)) return NextResponse.json({ code: "INVALID_JOURNEY", error: "A valid preparation journey is required" }, { status: 400 });
-  const expectedPurpose = journey === "new_skills" || journey === "continue_skills" ? "improve_skills" : "upcoming_interview";
+  if (!isJourney(journey)) return NextResponse.json({ code: "INVALID_JOURNEY", error: "A valid preparation journey is required" }, { status: 400 });
+  const expectedPurpose = purposeForJourney(journey);
   if (preparationPurpose !== expectedPurpose) return NextResponse.json({ code: "JOURNEY_PURPOSE_MISMATCH", error: "The selected preparation journey determines the preparation purpose" }, { status: 409 });
-  if ((journey === "continue_upcoming" || journey === "continue_skills") && !sessionId) return NextResponse.json({ code: "SESSION_REQUIRED", error: "A valid preparation session is required to continue" }, { status: 409 });
-  if (journey.startsWith("new_") && sessionId) return NextResponse.json({ code: "NEW_JOURNEY_REQUIRES_FRESH_SESSION", error: "A new preparation journey must start a fresh preparation session" }, { status: 409 });
+  if (isContinuationJourney(journey) && !sessionId) return NextResponse.json({ code: "SESSION_REQUIRED", error: "A valid preparation session is required to continue" }, { status: 409 });
+  if (isNewJourney(journey) && sessionId) return NextResponse.json({ code: "NEW_JOURNEY_REQUIRES_FRESH_SESSION", error: "A new preparation journey must start a fresh preparation session" }, { status: 409 });
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
   if (preparationPurpose === "improve_skills" && interviewDate) return NextResponse.json({ error: "Interview date must be empty when improving interview skills" }, { status: 400 });
   if (!jobDescription && jobDescriptionUrl) { jobDescription = await tryFetchJobDescription(jobDescriptionUrl); if (!jobDescription) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "We could not reliably extract a job description from this link. Please paste the job description or upload the PDF." }, { status: 422 }); }
@@ -125,7 +125,12 @@ export async function POST(request: Request) {
   if (parsedInterviewDate && Number.isNaN(parsedInterviewDate.getTime())) return NextResponse.json({ error: "Invalid interview date" }, { status: 400 });
   try { await ensureReusableCv(supabase, user.id, cvText, String(body.fileName ?? "CV")); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to persist CV" }, { status: 500 }); }
   let priorContext: { sessions: unknown[]; coaching_progress: unknown[] } | undefined;
-  if (!sessionId) { const { data, error } = await supabase.rpc("get_candidate_preparation_context", { p_user_id: user.id }); if (!error && data) priorContext = data; }
+  if (!sessionId || journey === "continue_skills") {
+    const { data, error } = await supabase.rpc("get_candidate_preparation_context", { p_user_id: user.id });
+    if (!error && data) priorContext = journey === "continue_skills"
+      ? { ...data, sessions: (data.sessions ?? []).filter((s: { id?: string }) => s.id !== sessionId) }
+      : data;
+  }
   const canonicalCv = canonicalize(cvText); const canonicalJd = canonicalize(jobDescription);
   let analysis: CvAnalysis;
   try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
@@ -136,7 +141,7 @@ export async function POST(request: Request) {
   if (id) {
     const { data: existingSession, error: existingSessionError } = await supabase
       .from("sessions")
-      .select("id, preparation_purpose, status")
+      .select("id, preparation_purpose, status, cv_text, job_description")
       .eq("id", id)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -148,8 +153,10 @@ export async function POST(request: Request) {
     if ((journey === "continue_upcoming" || journey === "continue_skills") && existingSession.status === "completed") {
       return NextResponse.json({ code: "SESSION_NOT_RESUMABLE", error: "Completed preparation sessions cannot be resumed" }, { status: 409 });
     }
-    const updateFields = journey === "continue_upcoming" || journey === "continue_skills"
-      ? { ...sessionFields, status: existingSession.status }
+    const contentChanged = canonicalize(existingSession.cv_text ?? "") !== canonicalCv
+      || canonicalize(existingSession.job_description ?? "") !== canonicalJd;
+    const updateFields = isContinuationJourney(journey)
+      ? { ...sessionFields, status: contentChanged ? "analyzed" : existingSession.status }
       : sessionFields;
     const { data: updatedSession, error } = await supabase
       .from("sessions")
@@ -165,8 +172,12 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 });
     id = data.id;
   }
-  if (journey !== "continue_upcoming" && journey !== "continue_skills") {
-    await supabase.from("questions").delete().eq("session_id", id);
+  if (!isContinuationJourney(journey) || (id && (journey === "continue_upcoming" || journey === "continue_skills"))) {
+    // Continuation preserves practice history when the preparation inputs are unchanged.
+    // If the candidate changed the CV/JD, the prior questions no longer match the analysis.
+    const { data: currentSession } = await supabase.from("sessions").select("cv_text, job_description").eq("id", id).eq("user_id", user.id).maybeSingle();
+    const inputsChanged = canonicalize(currentSession?.cv_text ?? "") !== canonicalCv || canonicalize(currentSession?.job_description ?? "") !== canonicalJd;
+    if (!isContinuationJourney(journey) || inputsChanged) await supabase.from("questions").delete().eq("session_id", id);
   }
   return NextResponse.json({ sessionId: id, analysis: validatedAnalysis });
 }
