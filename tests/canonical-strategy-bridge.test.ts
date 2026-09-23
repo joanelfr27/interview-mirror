@@ -25,7 +25,7 @@ function ledger(): EvidenceLedger {
   requirements:[
    {id:"R-DIRECT",source_span_id:"JD-1",normalized_requirement:"Manage regional finance",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-DIRECT",type:"FUNCTION",requirement:"Manage regional finance",source_span_id:"JD-1"}],extraction_confidence:1},
    {id:"R-TRANSFER",source_span_id:"JD-2",normalized_requirement:"Use target systems",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-TRANSFER",type:"TOOL_METHOD",requirement:"Use target systems",source_span_id:"JD-2"}],extraction_confidence:1},
-   {id:"R-GAP",source_span_id:"JD-3",normalized_requirement:"Mining operations experience",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"id:"F-GAP",type:"CONTEXT",requirement:"Mining operations experience",source_span_id:"JD-3"}],extraction_confidence:1}
+   {id:"R-GAP",source_span_id:"JD-3",normalized_requirement:"Mining operations experience",category:"RESPONSIBILITY",salience:"CORE",facets:[{id:"F-GAP",type:"CONTEXT",requirement:"Mining operations experience",source_span_id:"JD-3"}],extraction_confidence:1}
   ],
   support_judgments:[
    {id:"SJ-DIRECT",requirement_id:"R-DIRECT",facet_id:"F-DIRECT",status:"DIRECT",supporting_evidence_ids:["A-DIRECT"],rationale:"Direct.",confidence:1,abstained:false,support_basis:"DOCUMENTED"},
