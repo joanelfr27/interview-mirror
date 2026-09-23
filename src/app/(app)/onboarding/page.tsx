@@ -59,7 +59,7 @@ export default function OnboardingPage() {
   }
 
   function handleCvContinue() { if (!cvFileName || savingCv) return; router.push("/journey"); }
-  function handleManualContinue() { router.push("/prepare"); }
+  function handleManualContinue() { router.push("/journey"); }
   if (checkingProfile) return <div className="flex items-center justify-center py-24 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Loading your profile…</div>;
 
   return (
