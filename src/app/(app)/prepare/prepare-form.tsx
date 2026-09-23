@@ -60,6 +60,7 @@ export default function PrepareForm() {
   const [loadingSession, setLoadingSession] = useState(Boolean(sessionId));
   const [loadingCvs, setLoadingCvs] = useState(true);
   const [journeyValidated, setJourneyValidated] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isJourney(journey)) {
@@ -103,6 +104,13 @@ export default function PrepareForm() {
         if (!res.ok) throw new Error("Session not found");
         const data = await res.json();
         if (cancelled) return;
+        const expectedPurpose = purposeForJourney(journey as Parameters<typeof purposeForJourney>[0]);
+        const loadedPurpose = data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
+        if (loadedPurpose !== expectedPurpose) {
+          setSessionError("This session does not match the selected preparation journey. Please return to your journey and choose the correct session.");
+          return;
+        }
+        setSessionError(null);
         setTitle(data.title ?? "");
         setExperienceLanguage(data.experience_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
         setInterviewLanguage(data.interview_language === "fr" ? "fr" : data.preparation_language === "fr" ? "fr" : "en");
@@ -113,6 +121,7 @@ export default function PrepareForm() {
         setJobDescriptionUrl(data.job_description_url ?? "");
         if (data.job_description_url && !data.job_description) setJobDescriptionMode("link");
       } catch {
+        setSessionError("Session not found or expired. Please return to your journey and choose another preparation session.");
         toast.error("Could not load session");
       } finally {
         if (!cancelled) setLoadingSession(false);
@@ -184,6 +193,10 @@ export default function PrepareForm() {
 
   async function onAnalyze(e: React.FormEvent) {
     e.preventDefault();
+    if (sessionId && sessionError) {
+      toast.error(sessionError);
+      return;
+    }
     if (purpose === "upcoming_interview" && !interviewDate) {
       toast.error("Please add your interview date");
       return;
@@ -226,6 +239,7 @@ export default function PrepareForm() {
 
   if (!journeyValidated) return <div className="py-24 text-center text-muted-foreground">Redirecting to your preparation journey…</div>;
   if (loadingSession || loadingCvs) return <div className="flex items-center justify-center py-24 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Loading your preparation context…</div>;
+  if (sessionError) return <div className="mx-auto max-w-2xl py-24 text-center"><h1 className="text-2xl font-semibold text-slate-900">Preparation session unavailable</h1><p className="mt-2 text-muted-foreground">{sessionError}</p><Button type="button" className="mt-6" onClick={() => router.replace("/journey")}>Return to journey</Button></div>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
