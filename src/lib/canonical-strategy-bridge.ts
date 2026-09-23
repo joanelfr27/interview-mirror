@@ -47,7 +47,7 @@ export type CanonicalStrategyBridgeProjection = {
   requirements: CanonicalStrategyBridgeRequirement[];
 };
 
-function strategyActionFor(preparationState: FitGapConsumerProjection["requirements"][number]["preparation_state"]): CanonicalStrategyBridgeAction {\n  switch (preparationState) {\n    case "READY_TO_DEMONSTRATE": return "DEMONSTRATE";\n    case "PREPARE_TRANSFER": return "POSITION_TRANSFER";\n    case "VERIFY_BEFORE_INTERVIEW": return "VERIFY_GAP";\n    case "PREPARE_PARTIAL": return "DEMONSTRATE_PARTIAL";\n    case "DEFEND_BOUNDARY": return "DEFEND_BOUNDARY";\n    case "ELICIT_AND_CLARIFY": return "ELICIT_AND_CLARIFY";\n  }\n}\n\nfunction sameIds(a: string[], b: string[]): boolean {
+export function strategyActionFor(preparationState: FitGapConsumerProjection["requirements"][number]["preparation_state"]): CanonicalStrategyBridgeAction {\n  switch (preparationState) {\n    case "READY_TO_DEMONSTRATE": return "DEMONSTRATE";\n    case "PREPARE_TRANSFER": return "POSITION_TRANSFER";\n    case "VERIFY_BEFORE_INTERVIEW": return "VERIFY_GAP";\n    case "PREPARE_PARTIAL": return "DEMONSTRATE_PARTIAL";\n    case "DEFEND_BOUNDARY": return "DEFEND_BOUNDARY";\n    case "ELICIT_AND_CLARIFY": return "ELICIT_AND_CLARIFY";\n  }\n}\n\nfunction sameIds(a: string[], b: string[]): boolean {
   return JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 }
 
