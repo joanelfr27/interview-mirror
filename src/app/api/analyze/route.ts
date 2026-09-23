@@ -157,7 +157,11 @@ export async function POST(request: Request) {
     continuationInputsChanged = canonicalize(existingSession.cv_text ?? "") !== canonicalCv
       || canonicalize(existingSession.job_description ?? "") !== canonicalJd;
     const updateFields = isContinuationJourney(journey)
-      ? { ...sessionFields, status: continuationInputsChanged ? "analyzed" : existingSession.status }
+      ? {
+          ...sessionFields,
+          status: continuationInputsChanged ? "analyzed" : existingSession.status,
+          ...(continuationInputsChanged ? { interview_strategy: null } : {}),
+        }
       : sessionFields;
     const { data: updatedSession, error } = await supabase
       .from("sessions")
