@@ -10,7 +10,7 @@ create table if not exists public.canonical_research_events (
   preparation_state text,
   probe_mode text,
   source_update_id text,
-  validation_error_count integer check (validation_error_count is null or validation_error_count >= 1),
+  validation_error_count integer,
   created_at timestamptz not null default now(),
   unique(session_id, event_id)
 );
