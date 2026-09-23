@@ -2,7 +2,7 @@
 -- Append-only snapshots; no production caller is wired by this migration.
 create table if not exists public.canonical_mirror_snapshots (
   id uuid primary key default gen_random_uuid(),
-  session_id uuid not null,
+  session_id uuid not null references public.sessions(id) on delete cascade,
   schema_version text not null,
   source_update_ids text[] not null default '{}',
   mirror_payload jsonb not null,
