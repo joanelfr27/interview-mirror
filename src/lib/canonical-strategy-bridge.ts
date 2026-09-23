@@ -34,7 +34,7 @@ export type CanonicalStrategyBridgeRequirement = {
   status: RequirementStatus | "UNJUDGED";
   route_mode: "DIRECT" | "TRANSFERABLE" | "VERIFY_GAP";
   fit_state: string;
-  gap_classification: string;
+  gap_classification: FitGapConsumerProjection["requirements"][number]["gap_classification"];
   preparation_state: string;
   evidence: CanonicalStrategyBridgeEvidence[];
   unresolved_item_ids: string[];
