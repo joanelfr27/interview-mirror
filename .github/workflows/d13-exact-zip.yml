@@ -1,0 +1,23 @@
+name: D13 Exact Audit ZIP
+
+on:
+  push:
+    branches: ["d13-exact-zip"]
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c0c15a264c6239f5da8e058efc2bc4d553ffb
+          fetch-depth: 0
+      - name: Verify exact commit
+        run: test "$(git rev-parse HEAD)" = "c0c15a264c6239f5da8e058efc2bc4d553ffb"
+      - name: Package exact repository
+        run: git archive --format=zip --output=Interview_Mirror_D13_Corrected_c0c15a2.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d13-exact-c0c15a2
+          path: Interview_Mirror_D13_Corrected_c0c15a2.zip
+          if-no-files-found: error
