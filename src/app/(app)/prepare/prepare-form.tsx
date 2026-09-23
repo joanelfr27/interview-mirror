@@ -12,44 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
 import { buildIngestedDocument, extractPdfText, extractWordText } from "@/lib/universal-ingestion";
 
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { FileUp, Link2, Loader2, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
-import { extractWordText } from "@/lib/universal-ingestion";
-
-async function extractPdfText(file: File) {
-  let pdfjslib: any = null;
-  try {
-    const mod = await import("pdfjs-dist/legacy/build/pdf");
-    pdfjslib = mod?.default ?? mod;
-  } catch {
-    const mod = await import("pdfjs-dist/build/pdf.mjs");
-    pdfjslib = mod?.default ?? mod;
-  }
-  const arrayBuffer = await file.arrayBuffer();
-  if (pdfjslib.GlobalWorkerOptions) {
-    pdfjslib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjslib.version}/pdf.worker.min.mjs`;
-  }
-  const loadingTask = pdfjslib.getDocument({ data: arrayBuffer, disableWorker: true });
-  const pdf = await loadingTask.promise;
-  const content: string[] = [];
-  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-    const page = await pdf.getPage(pageIndex);
-    const textContent = await page.getTextContent();
-    content.push(textContent.items.map((item: any) => item.str || "").join(" ").trim());
-  }
-  return content.filter(Boolean).join("\n\n");
-}
-
 type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string; historical?: boolean };
 type JobDescriptionMode = "paste" | "pdf" | "word" | "link";
 type CvSourceMode = "paste" | "file" | "link";
