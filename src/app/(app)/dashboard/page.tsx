@@ -154,7 +154,7 @@ const coachingProgress = preparationContext.coaching_progress;
                 </p>
               </div>
               <Button asChild>
-                <Link href="/prepare">
+                <Link href="/journey">
                   Start preparing
                   <ArrowRight className="h-4 w-4" />
                 </Link>
