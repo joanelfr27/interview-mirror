@@ -19,3 +19,11 @@ export function purposeForJourney(journey: Journey): PreparationPurpose {
     ? "improve_skills"
     : "upcoming_interview";
 }
+
+export function isContinuationJourney(journey: Journey): boolean {
+  return journey === "continue_upcoming" || journey === "continue_skills";
+}
+
+export function isNewJourney(journey: Journey): boolean {
+  return journey === "new_upcoming" || journey === "new_skills" || journey === "new_opportunity";
+}
