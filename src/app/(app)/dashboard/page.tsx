@@ -91,7 +91,7 @@ const coachingProgress = preparationContext.coaching_progress;
           </p>
         </div>
         <Button asChild>
-          <Link href="/prepare">
+          <Link href="/journey">
             <Plus className="h-4 w-4" />
             New session
           </Link>
