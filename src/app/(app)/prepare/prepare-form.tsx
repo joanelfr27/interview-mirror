@@ -327,7 +327,7 @@ export default function PrepareForm() {
               {cvSourceMode === "file" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF, Word or text</span></div>}
               {cvSourceMode === "link" && <div className="flex gap-2"><Input type="url" value={cvUrl} onChange={(e) => setCvUrl(e.target.value)} placeholder="https://..." /><Button type="button" onClick={onCvLink}>Load</Button></div>}
               {cvSourceMode === "paste" && <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Paste your CV text…" className="min-h-[220px]" required />}
-            </>
+            </>}
           </CardContent>
         </Card>
         <Card>
