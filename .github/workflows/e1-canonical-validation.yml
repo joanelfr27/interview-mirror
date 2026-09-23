@@ -19,3 +19,10 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
+      - name: Package exact audit repository
+        run: git archive --format=zip --output=Interview_Mirror_D13_Audit_${GITHUB_SHA}.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d13-audit-repository
+          path: Interview_Mirror_D13_Audit_${{ github.sha }}.zip
+          if-no-files-found: error
