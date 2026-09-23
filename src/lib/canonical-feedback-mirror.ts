@@ -81,7 +81,8 @@ export function validateCanonicalFeedbackMirrorUpdate(
     seen.add(item.observation_id);
     if(!routeIds.has(item.requirement_id)) errors.push("D8 observation targets unrouted requirement: "+item.requirement_id);
     if(item.source_span.document_id!=="INTERVIEW") errors.push("D8 feedback source span must be an INTERVIEW span: "+item.observation_id);
-    if(item.evidence.source_span_id!==item.source_span.id) errors.push("D8 evidence/source span mismatch: "+item.observation_id);\n    errors.push(...validateAtomicEvidenceAgainstSource(item.evidence,item.source_span).map(e=>"D8 evidence grounding: "+e+" ["+item.observation_id+"]"));
+    if(item.evidence.source_span_id!==item.source_span.id) errors.push("D8 evidence/source span mismatch: "+item.observation_id);
+    errors.push(...validateAtomicEvidenceAgainstSource(item.evidence,item.source_span).map(e=>"D8 evidence grounding: "+e+" ["+item.observation_id+"]"));
     if(item.evidence.assertion.polarity!=="AFFIRMATIVE") errors.push("D8 update cannot silently add negated evidence: "+item.observation_id);
     if(item.claim_boundary==="CANDIDATE_STATED" && item.evidence.provenance.source_type!=="CANDIDATE_ELICITED") errors.push("D8 candidate-stated observation must use candidate-elicited provenance: "+item.observation_id);
     if(item.claim_boundary==="DOCUMENTED" && item.evidence.provenance.source_type==="CANDIDATE_ELICITED") errors.push("D8 documented observation cannot use candidate-elicited provenance: "+item.observation_id);
