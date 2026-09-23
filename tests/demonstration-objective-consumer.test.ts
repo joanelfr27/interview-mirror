@@ -105,3 +105,10 @@ test("D5 preserves all canonical objective associations",()=>{
  assert.deepEqual(d4.requirements.find(r=>r.requirement_id==="R-GAP")!.demonstration_objective_ids,["OBJ-GAP"]);
  assert.deepEqual(p.objectives.map(o=>o.demonstration_objective_id),["OBJ-GAP"]);
 });
+
+test("D5 validator rejects tampered objective-facing fields",()=>{
+ const l=ledger(); const {d3,d4}=full(l); const p=buildDemonstrationObjectiveConsumerProjection(d4,d3,l);
+ p.objectives[0]!.observable_cue="Invent an unsupported claim.";
+ const v=validateDemonstrationObjectiveConsumerProjection(p,d4,d3,l);
+ assert.equal(v.valid,false); assert.match(v.errors.join(" | "),/observable cue diverges/i);
+});
