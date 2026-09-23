@@ -116,7 +116,7 @@ export async function POST(request: Request) {
   const expectedPurpose = journey === "new_skills" || journey === "continue_skills" ? "improve_skills" : "upcoming_interview";
   if (preparationPurpose !== expectedPurpose) return NextResponse.json({ code: "JOURNEY_PURPOSE_MISMATCH", error: "The selected preparation journey determines the preparation purpose" }, { status: 409 });
   if ((journey === "continue_upcoming" || journey === "continue_skills") && !sessionId) return NextResponse.json({ code: "SESSION_REQUIRED", error: "A valid preparation session is required to continue" }, { status: 409 });
-  if (journey === "new_opportunity" && sessionId) return NextResponse.json({ code: "NEW_OPPORTUNITY_REQUIRES_FRESH_SESSION", error: "A new opportunity must start a fresh preparation session" }, { status: 409 });
+  if (journey.startsWith("new_") && sessionId) return NextResponse.json({ code: "NEW_JOURNEY_REQUIRES_FRESH_SESSION", error: "A new preparation journey must start a fresh preparation session" }, { status: 409 });
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
   if (preparationPurpose === "improve_skills" && interviewDate) return NextResponse.json({ error: "Interview date must be empty when improving interview skills" }, { status: 400 });
   if (!jobDescription && jobDescriptionUrl) { jobDescription = await tryFetchJobDescription(jobDescriptionUrl); if (!jobDescription) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "We could not reliably extract a job description from this link. Please paste the job description or upload the PDF." }, { status: 422 }); }
@@ -148,9 +148,12 @@ export async function POST(request: Request) {
     if ((journey === "continue_upcoming" || journey === "continue_skills") && existingSession.status === "completed") {
       return NextResponse.json({ code: "SESSION_NOT_RESUMABLE", error: "Completed preparation sessions cannot be resumed" }, { status: 409 });
     }
+    const updateFields = journey === "continue_upcoming" || journey === "continue_skills"
+      ? { ...sessionFields, status: existingSession.status }
+      : sessionFields;
     const { data: updatedSession, error } = await supabase
       .from("sessions")
-      .update(sessionFields)
+      .update(updateFields)
       .eq("id", id)
       .eq("user_id", user.id)
       .select("id")
@@ -162,6 +165,8 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ error: error?.message || "Failed to create session" }, { status: 500 });
     id = data.id;
   }
-  await supabase.from("questions").delete().eq("session_id", id);
+  if (journey !== "continue_upcoming" && journey !== "continue_skills") {
+    await supabase.from("questions").delete().eq("session_id", id);
+  }
   return NextResponse.json({ sessionId: id, analysis: validatedAnalysis });
 }
