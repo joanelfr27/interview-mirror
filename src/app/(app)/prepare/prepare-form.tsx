@@ -10,6 +10,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
+import { buildIngestedDocument, extractPdfText, extractWordText } from "@/lib/universal-ingestion";
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FileUp, Link2, Loader2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
 import { extractWordText } from "@/lib/universal-ingestion";
 
 async function extractPdfText(file: File) {
@@ -157,8 +171,8 @@ export default function PrepareForm() {
     const fileNameLower = fileName.toLowerCase();
     let text = "";
     if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) text = await file.text();
-    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) text = await extractPdfText(file);
-    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) text = await extractWordText(file);
+    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) text = (await buildIngestedDocument(await extractPdfText(file), "pdf", fileName)).text;
+    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) text = (await buildIngestedDocument(await extractWordText(file), "word", fileName)).text;
     if (!text.trim()) {
       toast.error("We could not extract text from this CV. Please paste the CV text instead.");
       return;
@@ -205,8 +219,8 @@ export default function PrepareForm() {
     try {
       const lower = file.name.toLowerCase();
       const text = lower.endsWith(".docx") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        ? await extractWordText(file)
-        : await extractPdfText(file);
+        ? (await buildIngestedDocument(await extractWordText(file), "word", file.name)).text
+        : (await buildIngestedDocument(await extractPdfText(file), "pdf", file.name)).text;
       setJobDescription(text.trim());
       setJobDescriptionMode(lower.endsWith(".docx") ? "word" : "pdf");
       toast.success("Job description loaded");
