@@ -198,6 +198,16 @@ export function validateCanonicalStrategyBridgeProjection(
     if (!sameIds(item.unresolved_item_ids, routeRequirement.unresolved_item_ids)) errors.push("D6 unresolved associations diverge: " + item.requirement_id);
     if (!sameIds(item.demonstration_objective_ids, routeRequirement.demonstration_objective_ids)) errors.push("D6 objective associations diverge: " + item.requirement_id);
 
+    const expectedEvidenceKeys = routeRequirement.candidates
+      .map((candidate) => `${candidate.evidence_id}::${candidate.support_status}`)
+      .sort();
+    const actualEvidenceKeys = item.evidence
+      .map((evidence) => `${evidence.evidence_id}::${evidence.support_status}`)
+      .sort();
+    if (JSON.stringify(actualEvidenceKeys) !== JSON.stringify(expectedEvidenceKeys)) {
+      errors.push("D6 evidence set diverges from D3: " + item.requirement_id);
+    }
+
     for (const evidence of item.evidence) {
       const canonical = ledger.evidence.find((e) => e.id === evidence.evidence_id);
       if (!canonical) {
