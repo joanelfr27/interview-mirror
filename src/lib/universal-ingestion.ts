@@ -8,7 +8,7 @@ export type IngestedDocument = {
   contentHash: string;
 };
 
-export const INGESTION_LIMITS = { maxDocumentChars: 100_000, linkTimeoutMs: 12_000, maxRedirects: 3 };
+export const INGESTION_LIMITS = { maxDocumentChars: 100_000, maxDocumentBytes: 12_000_000, maxDocxXmlBytes: 2_000_000, linkTimeoutMs: 12_000, maxRedirects: 3 };
 
 export function normalizeDocumentText(value: string): string {
   const normalized = value.replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
@@ -36,6 +36,8 @@ function isBlockedHost(hostname: string): boolean {
     if (a === 127 || a === 10 || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)) return true;
   }
   if (/^(fc|fd)[0-9a-f]{2}:/i.test(host) || /^fe80:/i.test(host)) return true;
+  if (/^::ffff:(?:127\\.|10\\.|192\\.168\\.|169\\.254\\.|172\\.(?:1[6-9]|2\\d|3[0-1])\\.)/i.test(host)) return true;
+  if (/(?:^|\\.)(?:nip\\.io|xip\\.io|sslip\\.io|localtest\\.me)$/i.test(host)) return true;
   return false;
 }
 
@@ -49,6 +51,9 @@ export function validateIngestionUrl(raw: string): string {
 
 
 export async function extractPdfText(file: File): Promise<string> {
+  if (file.size > INGESTION_LIMITS.maxDocumentBytes) throw new Error("DOCUMENT_TOO_LARGE");
+  const header = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  if (new TextDecoder().decode(header) !== "%PDF-") throw new Error("INVALID_PDF");
   let pdfjslib: any = null;
   try {
     const mod = await import("pdfjs-dist/legacy/build/pdf");
@@ -76,7 +81,23 @@ async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    total += result.value.byteLength;
+    if (total > INGESTION_LIMITS.maxDocxXmlBytes) {
+      await reader.cancel();
+      throw new Error("DOCX_DOCUMENT_TOO_LARGE");
+    }
+    chunks.push(result.value);
+  }
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { output.set(chunk, offset); offset += chunk.byteLength; }
+  return output;
 }
 
 async function unzipEntry(buffer: ArrayBuffer, wanted: string): Promise<Uint8Array> {
@@ -110,12 +131,18 @@ function xmlToText(xml: string): string {
 }
 
 export async function extractWordText(file: File): Promise<string> {
+  if (file.size > INGESTION_LIMITS.maxDocumentBytes) throw new Error("DOCUMENT_TOO_LARGE");
+  const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  if (signature.length < 4 || signature[0] !== 0x50 || signature[1] !== 0x4b || signature[2] !== 0x03 || signature[3] !== 0x04) throw new Error("INVALID_DOCX");
   const xml = new TextDecoder().decode(await unzipEntry(await file.arrayBuffer(), "word/document.xml"));
   return normalizeDocumentText(xmlToText(xml));
 }
 
-export async function fetchLinkedDocument(rawUrl: string): Promise<string> {
+export type IngestionUrlGuard = (url: URL) => Promise<void>;
+
+export async function fetchLinkedDocument(rawUrl: string, guard?: IngestionUrlGuard): Promise<string> {
   let current = new URL(validateIngestionUrl(rawUrl));
+  if (guard) await guard(current);
   for (let redirects = 0; redirects <= INGESTION_LIMITS.maxRedirects; redirects++) {
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), INGESTION_LIMITS.linkTimeoutMs);
     let response: Response;
@@ -124,7 +151,7 @@ export async function fetchLinkedDocument(rawUrl: string): Promise<string> {
     } catch { throw new Error("LINK_FETCH_FAILED"); } finally { clearTimeout(timer); }
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location"); if (!location || redirects === INGESTION_LIMITS.maxRedirects) throw new Error("LINK_REDIRECT_LIMIT");
-      current = new URL(location, current); validateIngestionUrl(current.toString()); continue;
+      current = new URL(location, current); validateIngestionUrl(current.toString()); if (guard) await guard(current); continue;
     }
     if (!response.ok) throw new Error("LINK_FETCH_FAILED");
     const type = (response.headers.get("content-type") || "").toLowerCase(); const raw = await response.text();
