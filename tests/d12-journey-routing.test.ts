@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isJourney, purposeForJourney, JOURNEYS } from "../src/lib/journey";
+import { isJourney, purposeForJourney, JOURNEYS } from "../src/lib/journey.ts";
 
 test("D12: all five frozen journeys are valid", () => {
   assert.equal(JOURNEYS.length, 5);
