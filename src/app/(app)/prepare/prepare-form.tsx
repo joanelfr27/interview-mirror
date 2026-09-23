@@ -234,8 +234,11 @@ export default function PrepareForm() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Language</CardTitle><CardDescription>Choose the language for your interview preparation and feedback.</CardDescription></CardHeader>
-          <CardContent><div className="flex gap-4"><label className="flex items-center gap-2"><input type="radio" name="language" value="en" checked={language === "en"} onChange={() => setLanguage("en")} />English</label><label className="flex items-center gap-2"><input type="radio" name="language" value="fr" checked={language === "fr"} onChange={() => setLanguage("fr")} />Français</label></div></CardContent>
+          <CardHeader><CardTitle>Languages</CardTitle><CardDescription>Your experience language and interview language are independent.</CardDescription></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2"><span className="text-sm font-medium">Experience language</span><select value={experienceLanguage} onChange={(e) => setExperienceLanguage(e.target.value as "en" | "fr")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="en">English</option><option value="fr">Français</option></select></label>
+            <label className="space-y-2"><span className="text-sm font-medium">Interview language</span><select value={interviewLanguage} onChange={(e) => setInterviewLanguage(e.target.value as "en" | "fr")} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="en">English</option><option value="fr">Français</option></select></label>
+          </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Interview details</CardTitle><CardDescription>Give this preparation a clear label and, when relevant, tell us when the interview is.</CardDescription></CardHeader>
