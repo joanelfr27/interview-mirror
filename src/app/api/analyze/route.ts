@@ -4,6 +4,8 @@ import { AI_MODEL, languageInstruction, normalizeLanguage, getOpenAI } from "@/l
 import { createClient } from "@/lib/supabase/server";
 import { continuationInputsChanged, continuationResetState, isContinuationJourney, isJourney, isNewJourney, isResumableSessionStatus, purposeForJourney } from "@/lib/journey";
 import type { AnalysisProvenance, CvAnalysis } from "@/types";
+import { buildIngestedDocument, fetchLinkedDocument, type IngestedDocument, type IngestionSourceType } from "@/lib/universal-ingestion";
+import { assertPublicIngestionUrl } from "@/lib/server-ingestion-url";
 
 const NO_EVIDENCE = "NO CV EVIDENCE FOUND";
 const CONTRACT_VERSION = "v5.1" as const;
@@ -29,6 +31,28 @@ function extractSubstantiveJdText(html: string): string { const structured = ext
 async function tryFetchJobDescription(url: string): Promise<string> { try { const response = await fetch(url.replace(/[),.;]+$/, ""), { headers: { "User-Agent": "InterviewMirror/1.0 (+job-description-import)" }, signal: AbortSignal.timeout(8000), cache: "no-store" }); if (!response.ok) return ""; const contentType = response.headers.get("content-type") ?? ""; if (contentType.includes("application/pdf")) return ""; return extractSubstantiveJdText(await response.text()); } catch { return ""; } }
 function extractStandaloneUrl(value: string): string | null { const t = value.trim(); if (!/^https?:\/\/\S+$/i.test(t)) return null; try { return new URL(t).toString(); } catch { return null; } }
 function removeUrls(value: string): string { return canonicalize(value.replace(/https?:\/\/\S+/gi, " ")); }
+
+function isIngestionSourceType(value: unknown): value is IngestionSourceType {
+  return value === "pdf" || value === "word" || value === "link" || value === "paste" || value === "text";
+}
+
+async function canonicalDocumentFromBody(value: unknown, fallbackText: unknown, fallbackSource: IngestionSourceType): Promise<IngestedDocument> {
+  if (value && typeof value === "object") {
+    const candidate = value as Record<string, unknown>;
+    if (typeof candidate.text === "string" && candidate.text.trim()) {
+      const sourceType = isIngestionSourceType(candidate.sourceType) ? candidate.sourceType : fallbackSource;
+      return buildIngestedDocument(candidate.text, sourceType, typeof candidate.sourceName === "string" ? candidate.sourceName : undefined, typeof candidate.sourceUrl === "string" ? candidate.sourceUrl : undefined);
+    }
+  }
+  if (typeof fallbackText === "string" && fallbackText.trim()) return buildIngestedDocument(fallbackText, fallbackSource);
+  throw new Error("NO_READABLE_TEXT");
+}
+
+async function canonicalLinkedDocument(url: string): Promise<IngestedDocument> {
+  const safeUrl = new URL(url).toString();
+  const text = await fetchLinkedDocument(safeUrl, assertPublicIngestionUrl);
+  return buildIngestedDocument(text, "link", undefined, safeUrl);
+}
 
 function evidenceTokenSet(value: string): Set<string> {
   return new Set(
@@ -99,9 +123,29 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
-  const cvText = canonicalize(String(body.cvText ?? ""));
-  let jobDescription = canonicalize(String(body.jobDescription ?? ""));
+  const rawCvText = typeof body.cvText === "string" ? body.cvText : "";
+  let rawJobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
   let jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
+  let cvDocument: IngestedDocument;
+  let jobDescriptionDocument: IngestedDocument | null = null;
+  try {
+    cvDocument = await canonicalDocumentFromBody(body.cvDocument, rawCvText, "text");
+    if (body.jobDescriptionDocument) {
+      jobDescriptionDocument = await canonicalDocumentFromBody(body.jobDescriptionDocument, "", "text");
+    } else if (rawJobDescription.trim()) {
+      const embedded = extractStandaloneUrl(rawJobDescription);
+      if (embedded && !jobDescriptionUrl) jobDescriptionUrl = embedded;
+      if (embedded && rawJobDescription.trim() === embedded) rawJobDescription = "";
+      if (rawJobDescription.trim()) jobDescriptionDocument = await canonicalDocumentFromBody(null, rawJobDescription, "paste");
+    }
+    if (!jobDescriptionDocument && jobDescriptionUrl) jobDescriptionDocument = await canonicalLinkedDocument(jobDescriptionUrl);
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "INGESTION_FAILED";
+    return NextResponse.json({ code, error: "We could not reliably ingest the CV or job description. Please upload, paste, or provide another source." }, { status: 422 });
+  }
+  const cvText = cvDocument.text;
+  let jobDescription = jobDescriptionDocument?.text ?? "";
+  if (jobDescriptionDocument?.sourceUrl) jobDescriptionUrl = jobDescriptionDocument.sourceUrl;
   const title = canonicalize(String(body.title ?? "Interview preparation"));
   const sessionId = body.sessionId as string | null | undefined;
   const journey = String(body.journey ?? "").trim();
@@ -109,9 +153,6 @@ export async function POST(request: Request) {
   const language = normalizeLanguage(body.experience_language ?? body.preparation_language);
   const interviewLanguage = normalizeLanguage(body.interview_language ?? body.preparation_language);
   const interviewDate = String(body.interviewDate ?? "").trim();
-  const embeddedUrl = extractStandaloneUrl(jobDescription);
-  if (!jobDescriptionUrl && embeddedUrl) { jobDescriptionUrl = embeddedUrl; jobDescription = ""; }
-  if (jobDescription) jobDescription = removeUrls(jobDescription);
   if (!isJourney(journey)) return NextResponse.json({ code: "INVALID_JOURNEY", error: "A valid preparation journey is required" }, { status: 400 });
   const expectedPurpose = purposeForJourney(journey);
   if (preparationPurpose !== expectedPurpose) return NextResponse.json({ code: "JOURNEY_PURPOSE_MISMATCH", error: "The selected preparation journey determines the preparation purpose" }, { status: 409 });
@@ -119,7 +160,7 @@ export async function POST(request: Request) {
   if (isNewJourney(journey) && sessionId) return NextResponse.json({ code: "NEW_JOURNEY_REQUIRES_FRESH_SESSION", error: "A new preparation journey must start a fresh preparation session" }, { status: 409 });
   if (!cvText) return NextResponse.json({ error: "CV is required" }, { status: 400 });
   if (preparationPurpose === "improve_skills" && interviewDate) return NextResponse.json({ error: "Interview date must be empty when improving interview skills" }, { status: 400 });
-  if (!jobDescription && jobDescriptionUrl) { jobDescription = await tryFetchJobDescription(jobDescriptionUrl); if (!jobDescription) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "We could not reliably extract a job description from this link. Please paste the job description or upload the PDF." }, { status: 422 }); }
+
   if (preparationPurpose === "upcoming_interview" && jobDescription.length < 300) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "The job description is too short to analyze reliably. Please paste the full job description or upload the PDF." }, { status: 422 });
   const parsedInterviewDate = interviewDate ? new Date(`${interviewDate}T12:00:00.000Z`) : null;
   if (parsedInterviewDate && Number.isNaN(parsedInterviewDate.getTime())) return NextResponse.json({ error: "Invalid interview date" }, { status: 400 });
@@ -131,7 +172,7 @@ export async function POST(request: Request) {
       ? { ...data, sessions: (data.sessions ?? []).filter((s: { id?: string }) => s.id !== sessionId) }
       : data;
   }
-  const canonicalCv = canonicalize(cvText); const canonicalJd = canonicalize(jobDescription);
+  const canonicalCv = cvDocument.text; const canonicalJd = jobDescriptionDocument?.text ?? "";
   let analysis: CvAnalysis;
   try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
   catch { return NextResponse.json({ code: "ANALYSIS_GENERATION_FAILED", error: "We could not produce a reliable Professional Mirror analysis. Please retry." }, { status: 422 }); }
