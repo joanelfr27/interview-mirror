@@ -21,6 +21,8 @@ test("accepts only http and https links", () => {
   assert.throws(() => validateIngestionUrl("file:///etc/passwd"), /INVALID_URL_SCHEME/);
   assert.throws(() => validateIngestionUrl("javascript:alert(1)"), /INVALID_URL_SCHEME/);
   assert.throws(() => validateIngestionUrl("not-a-url"), /INVALID_URL/);
+  assert.throws(() => validateIngestionUrl("http://127.0.0.1:3000"), /BLOCKED_PRIVATE_URL/);
+  assert.throws(() => validateIngestionUrl("http://192.168.1.10"), /BLOCKED_PRIVATE_URL/);
 });
 
 test("rejects empty and oversized documents", () => {
