@@ -27,3 +27,41 @@ test("D12: new and continuation journey semantics are explicit", () => {
   assert.deepEqual(JOURNEYS.filter(isContinuationJourney), ["continue_upcoming", "continue_skills"]);
   assert.deepEqual(JOURNEYS.filter(isNewJourney), ["new_upcoming", "new_skills", "new_opportunity"]);
 });
+
+test("D12-06: canonical continuation text comparison ignores harmless formatting", () => {
+  assert.equal(
+    continuationInputsChanged("CV\u00a0text  with   spacing", "", "CV text with spacing", ""),
+    false,
+  );
+  assert.equal(
+    continuationInputsChanged("CV text", "same JD", "CV text", "changed JD"),
+    true,
+  );
+});
+
+test("D12-07: completed sessions are not resumable", () => {
+  assert.equal(isResumableSessionStatus("completed"), false);
+  assert.equal(isResumableSessionStatus("draft"), true);
+  assert.equal(isResumableSessionStatus("analyzed"), true);
+});
+
+test("D12-08: unchanged continuation preserves practice state", () => {
+  assert.deepEqual(continuationResetState("analyzed", false), {
+    status: "analyzed",
+    resetStrategy: false,
+    resetQuestions: false,
+  });
+  assert.deepEqual(continuationResetState("in_progress", false), {
+    status: "in_progress",
+    resetStrategy: false,
+    resetQuestions: false,
+  });
+});
+
+test("D12-08: changed CV/JD forces fresh strategy and question state", () => {
+  assert.deepEqual(continuationResetState("completed", true), {
+    status: "analyzed",
+    resetStrategy: true,
+    resetQuestions: true,
+  });
+});
