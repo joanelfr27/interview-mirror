@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { isJourney, purposeForJourney } from "@/lib/journey";
 
 async function extractPdfText(file: File) {
   let pdfjslib: any = null;
@@ -36,8 +37,6 @@ async function extractPdfText(file: File) {
 
 type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string };
 type JobDescriptionMode = "paste" | "pdf" | "link";
-type PreparationPurpose = "upcoming_interview" | "improve_skills";
-
 export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,6 +59,15 @@ export default function PrepareForm() {
   const [loading, setLoading] = useState(false);
   const [loadingSession, setLoadingSession] = useState(Boolean(sessionId));
   const [loadingCvs, setLoadingCvs] = useState(true);
+  const [journeyValidated, setJourneyValidated] = useState(false);
+
+  useEffect(() => {
+    if (!isJourney(journey)) {
+      router.replace("/journey");
+      return;
+    }
+    setJourneyValidated(true);
+  }, [journey, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,8 +125,7 @@ export default function PrepareForm() {
     if (sessionId) return;
     if (initialExperienceLanguage === "fr" || initialExperienceLanguage === "en") setExperienceLanguage(initialExperienceLanguage);
     if (initialInterviewLanguage === "fr" || initialInterviewLanguage === "en") setInterviewLanguage(initialInterviewLanguage);
-    if (journey === "new_skills" || journey === "continue_skills") setPurpose("improve_skills");
-    if (journey === "new_upcoming" || journey === "new_opportunity" || journey === "continue_upcoming") setPurpose("upcoming_interview");
+    if (isJourney(journey)) setPurpose(purposeForJourney(journey));
   }, [sessionId, journey, initialExperienceLanguage, initialInterviewLanguage]);
 
   function selectSavedCv(id: string) {
@@ -217,6 +224,7 @@ export default function PrepareForm() {
     } finally { setLoading(false); }
   }
 
+  if (!journeyValidated) return <div className="py-24 text-center text-muted-foreground">Redirecting to your preparation journey…</div>;
   if (loadingSession || loadingCvs) return <div className="flex items-center justify-center py-24 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />Loading your preparation context…</div>;
 
   return (
