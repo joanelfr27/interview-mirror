@@ -8,7 +8,7 @@ import { buildCanonicalEvidenceRoute } from "@/lib/canonical-evidence-router";
 import { buildFitGapProjection } from "@/lib/fit-gap-reasoning";
 import { buildFitGapConsumerProjection } from "@/lib/fit-gap-consumer";
 import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
-import type { CanonicalReasoningProjection } from "@/lib/canonical-reasoning-adapter";
+import { buildCanonicalReasoningProjection } from "@/lib/canonical-reasoning-adapter";
 
 const span=(id:string,document_id:string,text:string)=>({id,document_id,text,start_offset:0,end_offset:text.length,language:"en"});
 const atom=(id:string,source_span_id:string,action:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE")=>({
@@ -44,20 +44,7 @@ function buildInputs(l:EvidenceLedger) {
   truthfulness_boundary:{permitted_claims:["State source facts."],prohibited_claims:["Do not claim mining experience."]},
   candidate_gap_classification:"EXPERIENCE_GAP",probe_family:"CONTEXT"
  }];
- const reasoning: CanonicalReasoningProjection = {
-  version:"d1-v1",
-  requirements:l.requirements.map(r=>({
-   requirement_id:r.id,normalized_requirement:r.normalized_requirement,category:r.category,salience:r.salience,
-   status:l.requirement_statuses.find(s=>s.requirement_id===r.id)!.status,
-   facets:r.facets.map(f=>({facet_id:f.id,type:f.type,requirement:f.requirement,evidence:[],status:"UNJUDGED",rationale:null,confidence:null}))
-  })),
-  unresolved_items:l.unresolved_items.map(u=>({unresolved_item_id:u.id,requirement_id:u.requirement_id,facet_ids:u.facet_ids,type:u.type,supporting_evidence:[],contradiction_evidence:[],elicitation:null})),
-  demonstration_objectives:l.demonstration_objectives.map(o=>({id:o.id,target_unresolved_item_id:o.target_unresolved_item_id,observable_cue:o.observable_cue,supporting_true_atom_ids:o.supporting_true_atom_ids,truthfulness_boundary:o.truthfulness_boundary,candidate_gap_classification:o.candidate_gap_classification,probe_family:o.probe_family}))
- };
- // Use canonical route/D2 projection built from the ledger-derived reasoning.
- // For the gap objective, D2 needs its classification on the unresolved item.
- reasoning.unresolved_items[0]!.elicitation={id:"EL-GAP",unresolved_item_id:"U-GAP",classification:"EXPERIENCE_GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED"};
- l.candidate_elicitations=[{id:"EL-GAP",unresolved_item_id:"U-GAP",question:"Clarify experience.",answer:"I have done the reporting work.",answer_source_span_id:"EL-1",answer_assertion_type:"ELICITED",classification:"EXPERIENCE_GAP",classification_rationale:"Not the target experience."}];
+ const reasoning = buildCanonicalReasoningProjection(l);
  return {reasoning};
 }
 function full(l:EvidenceLedger) {
