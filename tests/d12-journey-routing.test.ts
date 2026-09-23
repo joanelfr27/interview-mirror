@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isJourney, purposeForJourney, JOURNEYS } from "../src/lib/journey.ts";
+import { isJourney, purposeForJourney, JOURNEYS, isContinuationJourney, isNewJourney } from "../src/lib/journey.ts";
 
 test("D12: all five frozen journeys are valid", () => {
   assert.equal(JOURNEYS.length, 5);
@@ -21,4 +21,9 @@ test("D12: journey mapping preserves the two canonical purposes", () => {
   assert.equal(purposeForJourney("new_opportunity"), "upcoming_interview");
   assert.equal(purposeForJourney("new_skills"), "improve_skills");
   assert.equal(purposeForJourney("continue_skills"), "improve_skills");
+});
+
+test("D12: new and continuation journey semantics are explicit", () => {
+  assert.deepEqual(JOURNEYS.filter(isContinuationJourney), ["continue_upcoming", "continue_skills"]);
+  assert.deepEqual(JOURNEYS.filter(isNewJourney), ["new_upcoming", "new_skills", "new_opportunity"]);
 });
