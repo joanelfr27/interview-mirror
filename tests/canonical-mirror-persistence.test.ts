@@ -93,3 +93,16 @@ test("D15 rejects a Story statement attached to the wrong thread",()=>{
   first.statement_ids.push(unrelated.id);
   assert.equal(validateProfessionalMirror(m,l).valid,false);
 });
+
+
+test("D15 does not create a thread from repeated action alone across unrelated domains",()=>{
+  const s1=d15Span("S1","Managed finance.");
+  const s2=d15Span("S2","Managed recruitment.");
+  const a1=d15Atom("A1","S1","finance");
+  const a2=d15Atom("A2","S2","recruitment");
+  a1.context.domain="finance";
+  a2.context.domain="human resources";
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,0);
+});
