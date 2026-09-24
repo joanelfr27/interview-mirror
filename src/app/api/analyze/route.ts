@@ -28,6 +28,11 @@ function extractStandaloneUrl(value: string): string | null {
     return null;
   }
 }
+
+function isLabelOnlyAroundUrl(value: string, url: string): boolean {
+  const remainder = value.replace(url, "").trim();
+  return /^(?:see\s+(?:the\s+)?(?:role|job(?:\s+description)?|jd)|(?:role|job(?:\s+description)?|jd|url|link)|voir\s+(?:le\s+)?(?:poste|r[ôo]le)|(?:poste|r[ôo]le|offre|lien|url))\s*:\s*$/iu.test(remainder);
+}
 async function ensureReusableCv(supabase: any, userId: string, cvText: string, fileName: string) {
   const existing = await supabase.from("user_cvs").select("id, storage_path").eq("user_id", userId).eq("cv_text", cvText).limit(1).maybeSingle();
   if (existing.error) throw new Error(existing.error.message); if (existing.data) return existing.data;
@@ -149,7 +154,7 @@ export async function POST(request: Request) {
     } else if (rawJobDescription.trim()) {
       const embedded = extractStandaloneUrl(rawJobDescription);
       if (embedded && !jobDescriptionUrl) jobDescriptionUrl = embedded;
-      if (embedded && rawJobDescription.trim() === embedded) rawJobDescription = "";
+      if (embedded && isLabelOnlyAroundUrl(rawJobDescription, embedded)) rawJobDescription = "";
       if (rawJobDescription.trim()) jobDescriptionDocument = await canonicalDocumentFromBody(null, rawJobDescription, "paste");
     }
     if (!jobDescriptionDocument && jobDescriptionUrl) jobDescriptionDocument = await canonicalLinkedDocument(jobDescriptionUrl);
