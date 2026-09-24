@@ -183,10 +183,10 @@ export async function fetchLinkedDocument(rawUrl: string, guard?: IngestionUrlGu
     if (!response.ok) throw new Error("LINK_FETCH_FAILED");
     const type = (response.headers.get("content-type") || "").toLowerCase();
     const bytes = await readResponseBytes(response, INGESTION_LIMITS.maxDocumentBytes);
-    if (type.includes("application/pdf") || /\\.pdf(?:$|[?#])/i.test(current.pathname)) {
+    if (type.includes("application/pdf") || /\.pdf(?:$|[?#])/i.test(current.pathname)) {
       return extractPdfText(new File([bytes], "linked.pdf", { type: "application/pdf" }));
     }
-    if (type.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || /\\.docx(?:$|[?#])/i.test(current.pathname)) {
+    if (type.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || /\.docx(?:$|[?#])/i.test(current.pathname)) {
       return extractWordText(new File([bytes], "linked.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
     }
     const raw = new TextDecoder().decode(bytes);
