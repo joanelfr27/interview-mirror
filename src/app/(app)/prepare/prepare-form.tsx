@@ -10,33 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/journey";
-
-async function extractPdfText(file: File) {
-  let pdfjslib: any = null;
-  try {
-    const mod = await import("pdfjs-dist/legacy/build/pdf");
-    pdfjslib = mod?.default ?? mod;
-  } catch {
-    const mod = await import("pdfjs-dist/build/pdf.mjs");
-    pdfjslib = mod?.default ?? mod;
-  }
-  const arrayBuffer = await file.arrayBuffer();
-  if (pdfjslib.GlobalWorkerOptions) {
-    pdfjslib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjslib.version}/pdf.worker.min.mjs`;
-  }
-  const loadingTask = pdfjslib.getDocument({ data: arrayBuffer, disableWorker: true });
-  const pdf = await loadingTask.promise;
-  const content: string[] = [];
-  for (let pageIndex = 1; pageIndex <= pdf.numPages; pageIndex += 1) {
-    const page = await pdf.getPage(pageIndex);
-    const textContent = await page.getTextContent();
-    content.push(textContent.items.map((item: any) => item.str || "").join(" ").trim());
-  }
-  return content.filter(Boolean).join("\n\n");
-}
+import { buildIngestedDocument, extractPdfText, extractWordText, type IngestedDocument } from "@/lib/universal-ingestion";
 
 type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string; historical?: boolean };
-type JobDescriptionMode = "paste" | "pdf" | "link";
+type JobDescriptionMode = "paste" | "pdf" | "word" | "link";
+type CvSourceMode = "paste" | "file" | "link";
 export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,12 +28,16 @@ export default function PrepareForm() {
   const [purpose, setPurpose] = useState<PreparationPurpose>("upcoming_interview");
   const [interviewDate, setInterviewDate] = useState("");
   const [cvText, setCvText] = useState("");
+  const [cvDocument, setCvDocument] = useState<IngestedDocument | null>(null);
   const [savedCvs, setSavedCvs] = useState<SavedCv[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
   const [useNewCv, setUseNewCv] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
+  const [jobDescriptionDocument, setJobDescriptionDocument] = useState<IngestedDocument | null>(null);
   const [jobDescriptionUrl, setJobDescriptionUrl] = useState("");
   const [jobDescriptionMode, setJobDescriptionMode] = useState<JobDescriptionMode>("paste");
+  const [cvSourceMode, setCvSourceMode] = useState<CvSourceMode>("paste");
+  const [cvUrl, setCvUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingSession, setLoadingSession] = useState(Boolean(sessionId));
   const [loadingCvs, setLoadingCvs] = useState(true);
@@ -85,6 +67,7 @@ export default function PrepareForm() {
           if (!sessionId && reusableCvs[0]) {
             setSelectedCvId(reusableCvs[0].id);
             setCvText(reusableCvs[0].cv_text ?? "");
+            setCvDocument(null);
           }
         }
       } finally {
@@ -120,7 +103,9 @@ export default function PrepareForm() {
         setPurpose(data.preparation_purpose === "improve_skills" ? "improve_skills" : "upcoming_interview");
         setInterviewDate(data.interview_date ? String(data.interview_date).slice(0, 10) : "");
         setCvText(data.cv_text ?? "");
+        setCvDocument(null);
         setJobDescription(data.job_description ?? "");
+        setJobDescriptionDocument(null);
         setJobDescriptionUrl(data.job_description_url ?? "");
         if (data.job_description_url && !data.job_description) setJobDescriptionMode("link");
       } catch {
@@ -146,14 +131,16 @@ export default function PrepareForm() {
     setSelectedCvId(cv.id);
     setUseNewCv(false);
     setCvText(cv.cv_text);
+    setCvDocument(null);
   }
 
   async function saveNewCv(file: File) {
     const fileName = file.name;
     const fileNameLower = fileName.toLowerCase();
     let text = "";
-    if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) text = await file.text();
-    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) text = await extractPdfText(file);
+    if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) { text = (await buildIngestedDocument(await file.text(), "text", fileName)).text; setCvDocument(null); }
+    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) { const document = await buildIngestedDocument(await extractPdfText(file), "pdf", fileName); text = document.text; setCvDocument(document); }
+    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) { const document = await buildIngestedDocument(await extractWordText(file), "word", fileName); text = document.text; setCvDocument(document); }
     if (!text.trim()) {
       toast.error("We could not extract text from this CV. Please paste the CV text instead.");
       return;
@@ -175,6 +162,20 @@ export default function PrepareForm() {
     } else toast.error("CV loaded, but could not be saved for future sessions");
   }
 
+  async function onCvLink() {
+    if (!cvUrl.trim()) return;
+    try {
+      const res = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: cvUrl.trim() }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not read CV link");
+      const document = await buildIngestedDocument(data.text, "link", undefined, cvUrl.trim());
+      setCvText(document.text);
+      setCvDocument(document);
+      setUseNewCv(true); setSelectedCvId(null);
+      toast.success("CV loaded from link");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV link"); }
+  }
+
   async function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -182,16 +183,33 @@ export default function PrepareForm() {
     catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV file"); }
   }
 
-  async function onJobDescriptionPdf(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onJobDescriptionFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const text = await extractPdfText(file);
-      if (!text.trim()) throw new Error("No readable text found in the PDF");
-      setJobDescription(text.trim());
-      setJobDescriptionMode("pdf");
-      toast.success("Job description loaded from PDF");
+      const lower = file.name.toLowerCase();
+      const text = lower.endsWith(".docx") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ? (await buildIngestedDocument(await extractWordText(file), "word", file.name)).text
+        : (await buildIngestedDocument(await extractPdfText(file), "pdf", file.name)).text;
+      const document = await buildIngestedDocument(text, lower.endsWith(".docx") ? "word" : "pdf", file.name);
+      setJobDescription(document.text);
+      setJobDescriptionDocument(document);
+      setJobDescriptionMode(lower.endsWith(".docx") ? "word" : "pdf");
+      toast.success("Job description loaded");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read JD PDF"); }
+  }
+
+  async function onJobDescriptionLink() {
+    if (!jobDescriptionUrl.trim()) return;
+    try {
+      const res = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: jobDescriptionUrl.trim() }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not read job description link");
+      const document = await buildIngestedDocument(data.text, "link", undefined, jobDescriptionUrl.trim());
+      setJobDescription(document.text);
+      setJobDescriptionDocument(document);
+      toast.success("Job description loaded from link");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read job description link"); }
   }
 
   async function onAnalyze(e: React.FormEvent) {
@@ -228,6 +246,21 @@ export default function PrepareForm() {
     }
     setLoading(true);
     try {
+      let canonicalCvDocument = cvDocument;
+      if (!canonicalCvDocument || canonicalCvDocument.text !== cvText) canonicalCvDocument = await buildIngestedDocument(cvText, "text");
+      let canonicalJobDescriptionDocument = jobDescriptionDocument;
+      if (jobDescription.trim() && (!canonicalJobDescriptionDocument || canonicalJobDescriptionDocument.text !== jobDescription)) {
+        canonicalJobDescriptionDocument = await buildIngestedDocument(jobDescription, "paste");
+      }
+      if (purpose === "upcoming_interview" && !canonicalJobDescriptionDocument && jobDescriptionUrl.trim()) {
+        const linkResponse = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: jobDescriptionUrl.trim() }) });
+        const linkData = await linkResponse.json();
+        if (!linkResponse.ok) throw new Error(linkData.error || "Could not read job description link");
+        canonicalJobDescriptionDocument = await buildIngestedDocument(linkData.text, "link", undefined, jobDescriptionUrl.trim());
+        setJobDescription(canonicalJobDescriptionDocument.text);
+        setJobDescriptionDocument(canonicalJobDescriptionDocument);
+      }
+      if (purpose === "upcoming_interview" && !canonicalJobDescriptionDocument) throw new Error("Please provide a readable job description");
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -240,9 +273,11 @@ export default function PrepareForm() {
           preparation_language: experienceLanguage,
           preparationPurpose: purpose,
           interviewDate: purpose === "upcoming_interview" ? interviewDate : null,
-          cvText,
-          jobDescription,
-          jobDescriptionUrl: jobDescriptionUrl.trim() || null,
+          cvText: canonicalCvDocument.text,
+          jobDescription: canonicalJobDescriptionDocument?.text ?? "",
+          cvDocument: canonicalCvDocument,
+          jobDescriptionDocument: canonicalJobDescriptionDocument,
+          jobDescriptionUrl: canonicalJobDescriptionDocument?.sourceUrl ?? (jobDescriptionUrl.trim() || null),
         }),
       });
       const data = await res.json();
@@ -285,20 +320,28 @@ export default function PrepareForm() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle>Your CV</CardTitle><CardDescription>Reuse a saved CV or upload a newer version. Your saved CV stays available for future sessions.</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Your CV</CardTitle><CardDescription>Use PDF, Word, link, or paste. Your saved CV stays available for future sessions.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
             {savedCvs.length > 0 && <div className="space-y-2"><Label htmlFor="saved-cv">Use an existing CV</Label><select id="saved-cv" value={useNewCv ? "new" : selectedCvId ?? ""} onChange={(e) => e.target.value === "new" ? setUseNewCv(true) : selectSavedCv(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{savedCvs.map((cv) => <option key={cv.id} value={cv.id}>{cv.file_name}</option>)}<option value="new">Upload a new CV</option></select></div>}
-            {(useNewCv || savedCvs.length === 0) && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF or text file · you can also paste below</span></div>}
-            <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Your CV text…" className="min-h-[220px]" required />
+            {(useNewCv || savedCvs.length === 0) && <>
+              <div className="grid grid-cols-3 gap-2">
+                <Button type="button" variant={cvSourceMode === "paste" ? "default" : "outline"} onClick={() => setCvSourceMode("paste")}>Paste</Button>
+                <Button type="button" variant={cvSourceMode === "file" ? "default" : "outline"} onClick={() => setCvSourceMode("file")}>Upload</Button>
+                <Button type="button" variant={cvSourceMode === "link" ? "default" : "outline"} onClick={() => setCvSourceMode("link")}><Link2 className="h-4 w-4" /> Link</Button>
+              </div>
+              {cvSourceMode === "file" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF, Word or text</span></div>}
+              {cvSourceMode === "link" && <div className="flex gap-2"><Input type="url" value={cvUrl} onChange={(e) => setCvUrl(e.target.value)} placeholder="https://..." /><Button type="button" onClick={onCvLink}>Load</Button></div>}
+              {cvSourceMode === "paste" && <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setCvDocument(null); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Paste your CV text…" className="min-h-[220px]" required />}
+            </>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader><CardTitle>Job description</CardTitle><CardDescription>Use the option that is easiest for you. Pasted text and PDF are reliable; links are read when possible and otherwise you will be asked to paste or upload the JD.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste text</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>Upload PDF</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
-            {jobDescriptionMode === "paste" && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the full job description here…" className="min-h-[240px]" />}
-            {jobDescriptionMode === "pdf" && <div className="space-y-3"><Label htmlFor="jd-pdf" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD PDF</Label><Input id="jd-pdf" type="file" accept=".pdf,application/pdf" className="hidden" onChange={onJobDescriptionPdf} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
-            {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><p className="text-xs text-muted-foreground">We will try to read the page. If it cannot be read reliably, paste the JD or upload its PDF instead.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
+            <div className="grid grid-cols-4 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>PDF</Button><Button type="button" variant={jobDescriptionMode === "word" ? "default" : "outline"} onClick={() => setJobDescriptionMode("word")}>Word</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
+            {jobDescriptionMode === "paste" && <Textarea value={jobDescription} onChange={(e) => { setJobDescription(e.target.value); setJobDescriptionDocument(null); }} placeholder="Paste the full job description here…" className="min-h-[240px]" />}
+            {(jobDescriptionMode === "pdf" || jobDescriptionMode === "word") && <div className="space-y-3"><Label htmlFor="jd-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD {jobDescriptionMode === "word" ? "Word" : "PDF"}</Label><Input id="jd-file" type="file" accept={jobDescriptionMode === "word" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,application/pdf"} className="hidden" onChange={onJobDescriptionFile} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
+            {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><div className="flex gap-2"><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><Button type="button" onClick={onJobDescriptionLink}>Load</Button></div><p className="text-xs text-muted-foreground">We will read the page and normalize its text. If it cannot be read reliably, paste or upload the JD.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
           </CardContent>
         </Card>
         <div className="flex justify-end"><Button type="submit" size="lg" disabled={loading}>{loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Sparkles className="h-4 w-4" /> Analyze with AI</>}</Button></div>
