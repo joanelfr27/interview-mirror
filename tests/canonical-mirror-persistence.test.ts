@@ -7,6 +7,7 @@ test("D9 rejects duplicate source updates",()=>{const v=validateCanonicalMirrorS
 test("D9 rejects missing identity",()=>{const v=validateCanonicalMirrorSnapshot({session_id:"",schema_version:"",source_update_ids:[],mirror_payload:{}});assert.equal(v.valid,false);});
 
 import { buildProfessionalMirror, validateProfessionalMirror } from "@/lib/professional-mirror";
+import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
 
 const d15Span = (id: string, text: string) => ({ id, document_id: "CV", text, start_offset: 0, end_offset: text.length, language: "en" });
 const d15Atom = (id: string, spanId: string, object: string, polarity: "AFFIRMATIVE" | "NEGATED" = "AFFIRMATIVE") => ({
@@ -17,19 +18,21 @@ const d15Atom = (id: string, spanId: string, object: string, polarity: "AFFIRMAT
   assertion: { type: "RESPONSIBILITY" as const, polarity },
   verifiability: { has_quantifiable_metric: false, has_third_party_entity: false, has_time_anchor: false }, extraction_confidence: 1,
 });
-const d15Ledger = (evidence: ReturnType<typeof d15Atom>[], spans: ReturnType<typeof d15Span>) => ({
-  source_spans: Array.isArray(spans) ? spans : [spans], evidence, requirements: [], support_judgments: [], requirement_statuses: [], unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
+const d15Ledger = (evidence: ReturnType<typeof d15Atom>[], spans: ReturnType<typeof d15Span>[]): EvidenceLedger => ({
+  source_spans: spans, evidence, requirements: [], support_judgments: [], requirement_statuses: [], unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
 });
 
 test("D15 builds an evidence-grounded Mirror", () => {
   const s1 = d15Span("S1", "Managed regional finance."); const s2 = d15Span("S2", "Managed regional finance reporting.");
-  const ledger = d15Ledger([d15Atom("A1", "S1", "regional finance"), d15Atom("A2", "S2", "regional finance")], [s1, s2] as never);
+  const ledger = d15Ledger([d15Atom("A1", "S1", "regional finance"), d15Atom("A2", "S2", "regional finance")], [s1, s2]);
   const mirror = buildProfessionalMirror(ledger);
   assert.equal(mirror.version, "d15-v1"); assert.ok(mirror.threads.length >= 1); assert.ok(mirror.statements.some((x) => x.kind === "PATTERN"));
   assert.equal(validateProfessionalMirror(mirror, ledger).valid, true);
 });
 
 test("D15 excludes negated evidence", () => {
-  const s1 = d15Span("S1", "Did not manage regional finance."); const ledger = d15Ledger([d15Atom("A1", "S1", "regional finance", "NEGATED")], [s1] as never);
-  const mirror = buildProfessionalMirror(ledger); assert.equal(mirror.evidence.length, 0); assert.equal(mirror.statements.length, 0);
+  const s1 = d15Span("S1", "Did not manage regional finance.");
+  const ledger = d15Ledger([d15Atom("A1", "S1", "regional finance", "NEGATED")], [s1]);
+  const mirror = buildProfessionalMirror(ledger);
+  assert.equal(mirror.evidence.length, 0); assert.equal(mirror.statements.length, 0);
 });
