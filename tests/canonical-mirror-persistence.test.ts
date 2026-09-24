@@ -9,7 +9,8 @@ test("D9 rejects duplicate source updates",()=>{const v=validateCanonicalMirrorS
 test("D9 rejects missing identity",()=>{const v=validateCanonicalMirrorSnapshot({session_id:"",schema_version:"",source_update_ids:[],mirror_payload:{}});assert.equal(v.valid,false);});
 
 const d15Span=(id:string,text:string,document_id="CV")=>({id,document_id,text,start_offset:0,end_offset:text.length,language:"en"});
-const d15Atom=(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE")=>({
+type D15TestAtom = ReturnType<typeof makeD15Atom>;
+function makeD15Atom(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE"){ return {
   id,source_span_id:spanId,provenance:{source_type:"CV" as const,language:"en",extraction_method:"LLM" as const},
   subject:{actor:"candidate",ownership:"INDIVIDUAL" as const},
   action:{normalized_action:"managed",object},
@@ -18,8 +19,10 @@ const d15Atom=(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEG
   assertion:{type:"RESPONSIBILITY" as const,polarity},
   verifiability:{has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false},
   extraction_confidence:1,
-});
-const d15Ledger=(evidence:ReturnType<typeof d15Atom>[],spans:ReturnType<typeof d15Span>[]):EvidenceLedger=>({
+  };
+}
+const d15Atom=(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE"): D15TestAtom => makeD15Atom(id,spanId,object,polarity);
+const d15Ledger=(evidence:D15TestAtom[],spans:ReturnType<typeof d15Span>[]):EvidenceLedger=>({
   source_spans:spans,evidence,requirements:[],support_judgments:[],requirement_statuses:[],unresolved_items:[],candidate_elicitations:[],demonstration_objectives:[]
 });
 
