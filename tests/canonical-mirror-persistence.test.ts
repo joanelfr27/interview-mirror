@@ -111,3 +111,62 @@ test("D15 does not create a thread from repeated action alone across unrelated d
   const m=buildProfessionalMirror(l);
   assert.equal(m.threads.length,0);
 });
+
+
+test("D15 fails closed when affirmative evidence is contradicted",()=>{
+  const s1=d15Span("S1","I managed regional finance.");
+  const s2=d15Span("S2","I did not manage regional finance.");
+  const a1=d15Atom("A1","S1","regional finance","AFFIRMATIVE");
+  const a2=d15Atom("A2","S2","regional finance","NEGATED");
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.evidence.length,0);
+  assert.equal(m.threads.length,0);
+});
+
+test("D15 does not connect individual and team ownership",()=>{
+  const s1=d15Span("S1","I managed finance.");
+  const s2=d15Span("S2","Our team managed finance.");
+  const a1=d15Atom("A1","S1","finance");
+  const a2=d15Atom("A2","S2","finance");
+  a2.subject.ownership="TEAM";
+  a1.context.domain="finance"; a2.context.domain="finance";
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,0);
+});
+
+test("D15 ignores generic single-token overlap",()=>{
+  const s1=d15Span("S1","Coordinated the sales team's quarterly offsite.");
+  const s2=d15Span("S2","Rebuilt the data team's ingestion pipeline.");
+  const a1=d15Atom("A1","S1","sales team offsite");
+  const a2=d15Atom("A2","S2","data team ingestion");
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,0);
+});
+
+test("D15 collapses a conservative paraphrase duplicate",()=>{
+  const s1=d15Span("S1","Led a team of 5 engineers.","CV");
+  const s2=d15Span("S2","Managed a five-person engineering group.","LINKEDIN");
+  const a1=d15Atom("A1","S1","team of 5 engineers");
+  const a2=d15Atom("A2","S2","five-person engineering group");
+  a1.action.normalized_action="Led";
+  a2.action.normalized_action="Managed";
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.evidence.length,1);
+  assert.equal(m.threads.length,0);
+});
+
+test("D15 validator rejects forged maturity",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const l=d15Ledger([d15Atom("A1","S1","regional finance")],[s1]);
+  const m=buildProfessionalMirror(l);
+  const fact=m.statements.find((x)=>x.kind==="FACT");
+  assert.ok(fact);
+  fact.maturity="SUSTAINED_STRENGTH";
+  const v=validateProfessionalMirror(m,l);
+  assert.equal(v.valid,false);
+  assert.ok(v.errors.some((e)=>e.includes("maturity")));
+});
