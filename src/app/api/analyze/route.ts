@@ -23,7 +23,7 @@ function extractStandaloneUrl(value: string): string | null {
   try {
     const url = new URL(match[0]);
     if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-    return url.toString();
+    return match[0];
   } catch {
     return null;
   }
