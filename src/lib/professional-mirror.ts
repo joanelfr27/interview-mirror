@@ -39,20 +39,87 @@ export type ProfessionalMirror = {
   story: ProfessionalStory;
 };
 
+const GENERIC_TOKENS = new Set([
+  "team","teams","process","processes","system","systems","data","work","business","project","projects",
+  "function","functions","area","areas","role","roles","group","groups","activity","activities",
+]);
+
+function normalizeClaimToken(value: string): string {
+  const token = value.normalize("NFKC").toLowerCase();
+  const aliases: Record<string,string> = {
+    managed:"lead",manage:"lead",managing:"lead",led:"lead",leadership:"lead",
+    group:"team",groups:"team",team:"team",teams:"team",
+    engineering:"engineer",engineers:"engineer",
+    five:"5",four:"4",three:"3",two:"2",one:"1",
+  };
+  return aliases[token] ?? token;
+}
+
 function tokens(value: string): Set<string> {
-  return new Set(value.normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((x) => x.length >= 4));
+  return new Set(
+    value.normalize("NFKC").toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .map(normalizeClaimToken)
+      .filter((x) => x.length >= 4 && !GENERIC_TOKENS.has(x)),
+  );
+}
+
+function overlapCount(a: string, b: string): number {
+  const left = tokens(a);
+  const right = tokens(b);
+  let count = 0;
+  for (const token of left) if (right.has(token)) count += 1;
+  return count;
 }
 
 function overlap(a: string, b: string): boolean {
-  const left = tokens(a);
-  const right = tokens(b);
-  for (const token of left) if (right.has(token)) return true;
-  return false;
+  return overlapCount(a, b) >= 2;
+}
+
+function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
+  const span = spanFor(ledger, atom);
+  return tokens([
+    atom.action.normalized_action,
+    atom.action.object,
+    atom.context.domain ?? "",
+    ...(atom.context.tools_or_systems ?? []),
+    ...(atom.context.standards ?? []),
+    atom.scale.quantity ?? "",
+    atom.scale.scope ?? "",
+    span?.text ?? "",
+  ].join(" "));
+}
+
+function semanticDuplicate(ledger: EvidenceLedger, a: AtomicEvidence, b: AtomicEvidence): boolean {
+  if (a.context.domain && b.context.domain && !overlap(a.context.domain, b.context.domain)) return false;
+  const left = claimTokens(ledger, a);
+  const right = claimTokens(ledger, b);
+  if (!left.size || !right.size) return false;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared += 1;
+  const similarity = shared / Math.max(left.size, right.size);
+  return similarity >= 0.8;
+}
+
+function contradictionKey(atom: AtomicEvidence): string {
+  return [
+    atom.action.normalized_action,
+    atom.action.object,
+    atom.context.domain ?? "",
+    atom.context.jurisdiction ?? "",
+  ].join("|").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function affirmativeAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
+  const contradictoryKeys = new Set(
+    ledger.evidence
+      .filter((atom) => atom.assertion.polarity === "NEGATED")
+      .map(contradictionKey)
+      .filter(Boolean),
+  );
   return ledger.evidence
     .filter((atom) => atom.assertion.polarity === "AFFIRMATIVE")
+    .filter((atom) => !contradictoryKeys.has(contradictionKey(atom)))
     .filter((atom) => atom.provenance.source_type !== "CANDIDATE_ELICITED")
     .filter((atom) => ledger.source_spans.some((span) => span.id === atom.source_span_id))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -74,17 +141,25 @@ function dedupeKey(ledger: EvidenceLedger, atom: AtomicEvidence): string {
   ].join("|").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function ownershipCompatible(a: AtomicEvidence, b: AtomicEvidence): boolean {
+  return a.subject.ownership === b.subject.ownership;
+}
+
 function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
+  const accepted: AtomicEvidence[] = [];
   const seen = new Set<string>();
-  return affirmativeAtoms(ledger).filter((atom) => {
+  for (const atom of affirmativeAtoms(ledger)) {
     const key = dedupeKey(ledger, atom);
-    if (!key || seen.has(key)) return false;
+    if (!key || seen.has(key)) continue;
+    if (accepted.some((candidate) => semanticDuplicate(ledger, candidate, atom))) continue;
     seen.add(key);
-    return true;
-  });
+    accepted.push(atom);
+  }
+  return accepted;
 }
 
 function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
+  if (!ownershipCompatible(a, b)) return null;
   if (overlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
@@ -101,7 +176,12 @@ function maturity(independentSpanCount: number): MirrorMaturity {
 }
 
 function safeLabel(atom: AtomicEvidence): string {
-  return [atom.action.normalized_action, atom.action.object].filter(Boolean).join(" ").trim();
+  const ownership =
+    atom.subject.ownership === "INDIVIDUAL" ? "Personally" :
+    atom.subject.ownership === "TEAM" ? "As a team" :
+    atom.subject.ownership === "SHARED" ? "Shared ownership" :
+    atom.subject.ownership === "SUPERVISED" ? "Under supervision" : "";
+  return [ownership, atom.action.normalized_action, atom.action.object].filter(Boolean).join(" ").trim();
 }
 
 function buildThreads(atoms: AtomicEvidence[]): CareerThread[] {
@@ -253,6 +333,9 @@ export function validateProfessionalMirror(mirror: ProfessionalMirror, ledger: E
     const uniqueSpans = new Set(statement.evidence_ids.map((id) => evidenceById.get(id)?.source_span_id)
       .filter((id): id is string => Boolean(id)));
     if (statement.kind !== "FACT" && uniqueSpans.size < 2) errors.push(`D15 ${statement.id} needs two distinct source spans.`);
+    if (statement.maturity !== maturity(uniqueSpans.size)) {
+      errors.push(`D15 ${statement.id} maturity does not match its independent source-span count.`);
+    }
     for (const id of statement.evidence_ids) {
       if (!mirrorEvidenceById.has(id)) errors.push(`D15 ${statement.id} references evidence outside the Mirror: ${id}`);
       if (evidenceById.get(id)?.assertion.polarity !== "AFFIRMATIVE") errors.push(`D15 ${statement.id} references non-affirmative evidence: ${id}`);
