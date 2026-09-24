@@ -14,7 +14,10 @@ test("D14 removes the obsolete pdf-parse dependency", () => {
   const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
   assert.equal(pkg.dependencies?.["pdf-parse"], undefined);
   assert.equal(pkg.devDependencies?.["@types/pdf-parse"], undefined);
-  const obsoleteLockEntries = Object.keys(lock.packages ?? {}).filter((key) => key === "node_modules/pdf-parse" || key.startsWith("node_modules/pdf-parse/") || key === "node_modules/@types/pdf-parse");
+  const obsoleteLockEntries = Object.keys(lock.packages ?? {}).filter(
+    (key) => /node_modules\/(?:.*\/)?pdf-parse(?:\/|$)/.test(key)
+      || /node_modules\/(?:.*\/)?@types\/pdf-parse(?:\/|$)/.test(key),
+  );
   assert.deepEqual(obsoleteLockEntries, []);
 });
 
