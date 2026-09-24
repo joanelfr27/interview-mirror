@@ -16,6 +16,18 @@ function canonicalize(value: string): string { return value.normalize("NFKC").re
 function sha256(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
 function cvStoragePath(userId: string, cvText: string): string { return `${userId}/${createHash("sha256").update(cvText).digest("hex").slice(0, 32)}.txt`; }
 
+function extractStandaloneUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) return null;
+
+  try {
+    const url = new URL(match[0]);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 async function ensureReusableCv(supabase: any, userId: string, cvText: string, fileName: string) {
   const existing = await supabase.from("user_cvs").select("id, storage_path").eq("user_id", userId).eq("cv_text", cvText).limit(1).maybeSingle();
   if (existing.error) throw new Error(existing.error.message); if (existing.data) return existing.data;
