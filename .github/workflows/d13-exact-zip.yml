@@ -10,12 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: c0c15a264c6239f5da8e058934efc2bc4d553ffb
           fetch-depth: 0
-      - name: Verify exact commit
-        run: test "$(git rev-parse HEAD)" = "c0c15a264c6239f5da8e058934efc2bc4d553ffb"
-      - name: Package exact repository
-        run: git archive --format=zip --output=Interview_Mirror_D13_Corrected_c0c15a2.zip HEAD
+      - name: Verify corrected D13 commit is present
+        run: git cat-file -e c0c15a264c6239f5da8e058934efc2bc4d553ffb^{commit}
+      - name: Package exact corrected repository
+        run: git archive --format=zip --output=Interview_Mirror_D13_Corrected_c0c15a2.zip c0c15a264c6239f5da8e058934efc2bc4d553ffb
       - uses: actions/upload-artifact@v4
         with:
           name: d13-exact-c0c15a2
