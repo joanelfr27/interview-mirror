@@ -60,7 +60,7 @@ function tokens(value: string): Set<string> {
     value.normalize("NFKC").toLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
       .map(normalizeClaimToken)
-      .filter((x) => x.length >= 4 && !GENERIC_TOKENS.has(x)),
+      .filter((x) => (x.length >= 4 || /^\d+$/.test(x)) && !GENERIC_TOKENS.has(x)),
   );
 }
 
@@ -73,7 +73,7 @@ function overlapCount(a: string, b: string): number {
 }
 
 function overlap(a: string, b: string): boolean {
-  return overlapCount(a, b) >= 2;
+  return overlapCount(a, b) >= 1;
 }
 
 function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
