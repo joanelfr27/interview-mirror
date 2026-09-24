@@ -16,7 +16,7 @@ D15 is a point-in-time projection of the current canonical evidence. It may pers
 - Negated evidence cannot support a positive Mirror claim.
 - Ambiguous or contradictory evidence must fail closed or remain at a lower maturity until clarified.
 - Insufficient evidence fails closed.
-- Strategy remains a separate role-specific experience in D16.
+- Strategy remains a separate role-specific experience in D16.\n- D15 is job-independent: it describes the candidate career whether or not a target job exists.\n- D15 must not evaluate fit to a role or prescribe how the candidate should bridge a role gap.
 
 ## Evidence independence
 D15 must not create a second extraction/canonicalization pipeline.
@@ -73,7 +73,7 @@ D15 does not own historical evolution of the Mirror across future evidence, sess
 - No evidence path means no claim.
 - Negated or candidate-elicited evidence cannot silently become positive documented evidence.
 
-## Non-goals
+## D16 boundary\nD16 consumes the validated D15 Mirror/Story plus a target role capability model. A Job Description is optional enrichment, not a prerequisite for Strategy.\n- With a JD: D16 combines the canonical role capability model with role-specific requirements from the JD.\n- Without a JD: D16 uses the canonical role capability model for the selected target role.\n- D16 determines the bridge between demonstrated career evidence and role requirements: demonstrated, needs stronger demonstration, needs verification, or preparation gap.\n- D16 consolidates D15 evidence rather than repeating the Professional Mirror.\n- D17–D24 turn the resulting bridge into preparation, practice, simulation, feedback, and improvement.\n\n## Non-goals
 - no new extractor
 - no new evidence ontology
 - no replacement of D1–D10
@@ -96,8 +96,8 @@ D15 does not own historical evolution of the Mirror across future evidence, sess
 6. Output is deterministic for identical input.
 7. Story statements trace back to Mirror evidence and valid thread relationships.
 8. Negated evidence cannot support a positive Mirror claim.
-9. No target JD is required or consumed by the D15 projection.
-10. Canonical tests, typecheck and build pass.
+9. No target JD is required or consumed by the D15 projection.\n10. D15 contains no role-fit or gap-bridging logic; that belongs to D16.\n11. D16 can operate with a role capability model when no JD is available.
+12. Canonical tests, typecheck and build pass.
 
 ## Candidate-facing WOW
 The preferred reveal is one high-value, evidence-backed thread that connects concrete career stages the candidate already experienced but may not have consciously connected.
