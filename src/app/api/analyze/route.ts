@@ -16,6 +16,18 @@ function canonicalize(value: string): string { return value.normalize("NFKC").re
 function sha256(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
 function cvStoragePath(userId: string, cvText: string): string { return `${userId}/${createHash("sha256").update(cvText).digest("hex").slice(0, 32)}.txt`; }
 
+function extractStandaloneUrl(value: string): string | null {
+  const match = value.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) return null;
+
+  try {
+    const url = new URL(match[0]);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return match[0];
+  } catch {
+    return null;
+  }
+}
 async function ensureReusableCv(supabase: any, userId: string, cvText: string, fileName: string) {
   const existing = await supabase.from("user_cvs").select("id, storage_path").eq("user_id", userId).eq("cv_text", cvText).limit(1).maybeSingle();
   if (existing.error) throw new Error(existing.error.message); if (existing.data) return existing.data;
@@ -25,14 +37,6 @@ async function ensureReusableCv(supabase: any, userId: string, cvText: string, f
   const { data, error } = await supabase.from("user_cvs").insert({ user_id: userId, file_name: fileName, cv_text: cvText, storage_path: path }).select("id, storage_path").single();
   if (error || !data) throw new Error(error?.message || "Failed to persist CV"); return data;
 }
-
-const BOILERPLATE = ["cookie policy", "cookies", "accept", "reject", "agree & join", "skip to main content", "linkedin respects your privacy", "you can update your choices", "privacy policy", "terms of use", "sign in", "sign up", "follow", "share", "comments"];
-function stripHtml(html: string): string { return html.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<noscript[\s\S]*?<\/noscript>/gi, " ").replace(/<svg[\s\S]*?<\/svg>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&#x27;/gi, "'").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/\s+/g, " ").trim(); }
-function extractStructuredJobPosting(html: string): string { const matches = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]; for (const match of matches) { try { const parsed = JSON.parse(match[1].trim()); const candidates = Array.isArray(parsed) ? parsed : parsed?.['@graph'] ?? [parsed]; for (const item of candidates) { const type = Array.isArray(item?.['@type']) ? item['@type'] : [item?.['@type']]; if (type.some((x: unknown) => String(x).toLowerCase() === "jobposting")) { const parts = [item.title, item.description, item.qualifications, item.responsibilities, item.skills, item.experienceRequirements].filter(Boolean).map(String); const text = canonicalize(parts.join(" ").replace(/<[^>]+>/g, " ")); if (text.length >= 300) return text.slice(0, 16000); } } } catch { /* continue */ } } return ""; }
-function extractSubstantiveJdText(html: string): string { const structured = extractStructuredJobPosting(html); if (structured) return structured; const mainMatch = html.match(/<(?:main|article)[^>]*>([\s\S]*?)<\/(?:main|article)>/i); const raw = stripHtml(mainMatch?.[1] ?? html); if (!raw) return ""; const sentences = raw.split(/(?<=[.!?])\s+/).filter(Boolean); const cleaned = canonicalize(sentences.filter((s) => !BOILERPLATE.some((p) => s.toLocaleLowerCase().includes(p))).join(" ")); const words = cleaned.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)); const substantive = words.filter((w) => w.length >= 4 && !/^(https?|www|linkedin)$/i.test(w)); const hits = BOILERPLATE.reduce((n, p) => n + (raw.toLocaleLowerCase().split(p).length - 1), 0); if (cleaned.length < 300 || substantive.length < 45 || (hits > 0 && hits / Math.max(1, sentences.length) > 0.25)) return ""; return cleaned.slice(0, 16000); }
-async function tryFetchJobDescription(url: string): Promise<string> { try { const response = await fetch(url.replace(/[),.;]+$/, ""), { headers: { "User-Agent": "InterviewMirror/1.0 (+job-description-import)" }, signal: AbortSignal.timeout(8000), cache: "no-store" }); if (!response.ok) return ""; const contentType = response.headers.get("content-type") ?? ""; if (contentType.includes("application/pdf")) return ""; return extractSubstantiveJdText(await response.text()); } catch { return ""; } }
-function extractStandaloneUrl(value: string): string | null { const t = value.trim(); if (!/^https?:\/\/\S+$/i.test(t)) return null; try { return new URL(t).toString(); } catch { return null; } }
-function removeUrls(value: string): string { return canonicalize(value.replace(/https?:\/\/\S+/gi, " ")); }
 
 function preparationPurposeForBody(body: Record<string, unknown>): "upcoming_interview" | "improve_skills" {
   return body.preparationPurpose === "improve_skills" ? "improve_skills" : "upcoming_interview";
