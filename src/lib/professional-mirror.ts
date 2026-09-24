@@ -41,7 +41,7 @@ export type ProfessionalMirror = {
 
 const GENERIC_TOKENS = new Set([
   "team","teams","process","processes","system","systems","data","work","business","project","projects",
-  "function","functions","area","areas","role","roles","group","groups","activity","activities",
+  "function","functions","area","areas","role","roles","group","groups","activity","activities","person","persons",
 ]);
 
 function normalizeClaimToken(value: string): string {
@@ -90,28 +90,50 @@ function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> 
   ].join(" "));
 }
 
-function semanticDuplicate(ledger: EvidenceLedger, a: AtomicEvidence, b: AtomicEvidence): boolean {
-  if (a.context.domain && b.context.domain && !overlap(a.context.domain, b.context.domain)) return false;
+function semanticDuplicate(
+  ledger: EvidenceLedger,
+  a: AtomicEvidence,
+  b: AtomicEvidence,
+): boolean {
+  const actionMatches =
+    normalizeClaimToken(a.action.normalized_action) ===
+    normalizeClaimToken(b.action.normalized_action);
 
-  const leftClaim = claimTokens(ledger, a);
-  const rightClaim = claimTokens(ledger, b);
-  if (!leftClaim.size || !rightClaim.size) return false;
-
-  let sharedClaim = 0;
-  for (const token of leftClaim) if (rightClaim.has(token)) sharedClaim += 1;
-  const claimSimilarity = sharedClaim / Math.max(leftClaim.size, rightClaim.size);
+  if (!actionMatches) return false;
 
   const leftObject = tokens(a.action.object);
   const rightObject = tokens(b.action.object);
-  const objectShared = [...leftObject].filter((token) => rightObject.has(token)).length;
-  const objectSimilarity = Math.max(leftObject.size, rightObject.size) === 0
-    ? 0
-    : objectShared / Math.max(leftObject.size, rightObject.size);
 
-  const actionMatches = normalizeClaimToken(a.action.normalized_action) === normalizeClaimToken(b.action.normalized_action);
-  return actionMatches && (objectSimilarity >= 0.8 || claimSimilarity >= 0.8);
+  if (!leftObject.size || !rightObject.size) return false;
+
+  const objectShared = [...leftObject].filter((token) =>
+    rightObject.has(token),
+  ).length;
+
+  const objectSimilarity =
+    objectShared / Math.max(leftObject.size, rightObject.size);
+
+  if (objectSimilarity < 0.8) return false;
+
+  const leftSpan = spanFor(ledger, a);
+  const rightSpan = spanFor(ledger, b);
+
+  if (!leftSpan || !rightSpan) return false;
+
+  const leftSource = tokens(leftSpan.text);
+  const rightSource = tokens(rightSpan.text);
+
+  if (!leftSource.size || !rightSource.size) return false;
+
+  const sourceShared = [...leftSource].filter((token) =>
+    rightSource.has(token),
+  ).length;
+
+  const sourceSimilarity =
+    sourceShared / Math.max(leftSource.size, rightSource.size);
+
+  return sourceSimilarity >= 0.8;
 }
-
 function contradictionKey(atom: AtomicEvidence): string {
   return [
     atom.action.normalized_action,
