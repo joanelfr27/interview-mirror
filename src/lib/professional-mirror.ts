@@ -92,13 +92,24 @@ function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> 
 
 function semanticDuplicate(ledger: EvidenceLedger, a: AtomicEvidence, b: AtomicEvidence): boolean {
   if (a.context.domain && b.context.domain && !overlap(a.context.domain, b.context.domain)) return false;
-  const left = claimTokens(ledger, a);
-  const right = claimTokens(ledger, b);
-  if (!left.size || !right.size) return false;
-  let shared = 0;
-  for (const token of left) if (right.has(token)) shared += 1;
-  const similarity = shared / Math.max(left.size, right.size);
-  return similarity >= 0.8;
+
+  const leftClaim = claimTokens(ledger, a);
+  const rightClaim = claimTokens(ledger, b);
+  if (!leftClaim.size || !rightClaim.size) return false;
+
+  let sharedClaim = 0;
+  for (const token of leftClaim) if (rightClaim.has(token)) sharedClaim += 1;
+  const claimSimilarity = sharedClaim / Math.max(leftClaim.size, rightClaim.size);
+
+  const leftObject = tokens(a.action.object);
+  const rightObject = tokens(b.action.object);
+  const objectShared = [...leftObject].filter((token) => rightObject.has(token)).length;
+  const objectSimilarity = Math.max(leftObject.size, rightObject.size) === 0
+    ? 0
+    : objectShared / Math.max(leftObject.size, rightObject.size);
+
+  const actionMatches = normalizeClaimToken(a.action.normalized_action) === normalizeClaimToken(b.action.normalized_action);
+  return actionMatches && (objectSimilarity >= 0.8 || claimSimilarity >= 0.8);
 }
 
 function contradictionKey(atom: AtomicEvidence): string {
