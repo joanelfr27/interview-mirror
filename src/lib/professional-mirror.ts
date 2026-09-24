@@ -89,7 +89,7 @@ function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connect
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
-  if (overlap(a.action.normalized_action, b.action.normalized_action)) return "REPEATED_ACTION";
+  if (overlap(a.action.normalized_action, b.action.normalized_action) && a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "REPEATED_ACTION";
   return null;
 }
 
