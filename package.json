@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:canonical": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/canonical-evidence-model.test.ts tests/canonical-support-judge.test.ts tests/candidate-elicitation-language.test.ts tests/canonical-reasoning-adapter.test.ts tests/canonical-evidence-router.test.ts tests/fit-gap-reasoning.test.ts tests/fit-gap-consumer.test.ts tests/demonstration-objective-consumer.test.ts tests/canonical-strategy-bridge.test.ts tests/canonical-probe-router.test.ts tests/canonical-feedback-mirror.test.ts tests/canonical-mirror-persistence.test.ts tests/canonical-research-instrumentation.test.ts tests/d12-journey-routing.test.ts tests/d13-universal-ingestion.test.ts tests/d13-ssrf-guard.test.ts",
+    "test:canonical": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/canonical-evidence-model.test.ts tests/canonical-support-judge.test.ts tests/candidate-elicitation-language.test.ts tests/canonical-reasoning-adapter.test.ts tests/canonical-evidence-router.test.ts tests/fit-gap-reasoning.test.ts tests/fit-gap-consumer.test.ts tests/demonstration-objective-consumer.test.ts tests/canonical-strategy-bridge.test.ts tests/canonical-probe-router.test.ts tests/canonical-feedback-mirror.test.ts tests/canonical-mirror-persistence.test.ts tests/canonical-research-instrumentation.test.ts tests/d12-journey-routing.test.ts tests/d13-universal-ingestion.test.ts tests/d13-ssrf-guard.test.ts tests/d14-canonical-production.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -29,7 +29,6 @@
     "lucide-react": "^0.475.0",
     "next": "^15.2.0",
     "openai": "^4.85.4",
-    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -39,7 +38,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.4.20",
