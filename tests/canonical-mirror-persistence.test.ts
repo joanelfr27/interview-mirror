@@ -2,15 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { validateCanonicalMirrorSnapshot } from "@/lib/canonical-mirror-persistence";
 import { buildProfessionalMirror, validateProfessionalMirror } from "@/lib/professional-mirror";
-import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
+import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 
 test("D9 accepts an append-only canonical snapshot",()=>{const v=validateCanonicalMirrorSnapshot({session_id:"s1",schema_version:"d9-v1",source_update_ids:["u1","u2"],mirror_payload:{requirements:[]}});assert.equal(v.valid,true);});
 test("D9 rejects duplicate source updates",()=>{const v=validateCanonicalMirrorSnapshot({session_id:"s1",schema_version:"d9-v1",source_update_ids:["u1","u1"],mirror_payload:{}});assert.equal(v.valid,false);});
 test("D9 rejects missing identity",()=>{const v=validateCanonicalMirrorSnapshot({session_id:"",schema_version:"",source_update_ids:[],mirror_payload:{}});assert.equal(v.valid,false);});
 
 const d15Span=(id:string,text:string,document_id="CV")=>({id,document_id,text,start_offset:0,end_offset:text.length,language:"en"});
-type D15TestAtom = ReturnType<typeof makeD15Atom>;
-function makeD15Atom(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE"){ return {
+type D15TestAtom = AtomicEvidence;
+function makeD15Atom(id:string,spanId:string,object:string,polarity:"AFFIRMATIVE"|"NEGATED"="AFFIRMATIVE"): AtomicEvidence { return {
   id,source_span_id:spanId,provenance:{source_type:"CV" as const,language:"en",extraction_method:"LLM" as const},
   subject:{actor:"candidate",ownership:"INDIVIDUAL" as const},
   action:{normalized_action:"managed",object},
