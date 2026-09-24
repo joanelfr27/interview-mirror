@@ -14,9 +14,8 @@ test("D14 removes the obsolete pdf-parse dependency", () => {
   const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
   assert.equal(pkg.dependencies?.["pdf-parse"], undefined);
   assert.equal(pkg.devDependencies?.["@types/pdf-parse"], undefined);
-  assert.equal(lock.packages?.["node_modules/pdf-parse"], undefined);
-  assert.equal(lock.packages?.["node_modules/pdf-parse/node_modules/pdfjs-dist"], undefined);
-  assert.equal(lock.packages?.["node_modules/@types/pdf-parse"], undefined);
+  const obsoleteLockEntries = Object.keys(lock.packages ?? {}).filter((key) => key === "node_modules/pdf-parse" || key.startsWith("node_modules/pdf-parse/") || key === "node_modules/@types/pdf-parse");
+  assert.deepEqual(obsoleteLockEntries, []);
 });
 
 test("D14 analysis route has no legacy direct job-description scraper", () => {
