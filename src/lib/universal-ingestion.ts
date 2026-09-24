@@ -1,4 +1,4 @@
-export type IngestionSourceType = "pdf" | "word" | "link" | "paste" | "text";
+export type IngestionSourceType = "pdf" | "word" | "link" | "paste" | "text" | "screenshot";
 
 export type IngestedDocument = {
   text: string;
