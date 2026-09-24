@@ -7,13 +7,6 @@ export async function resolve(specifier, context, nextResolve) {
     const stub = join(dirname(fileURLToPath(import.meta.url)), "openai-test-stub.mjs");
     return nextResolve(pathToFileURL(stub).href, context);
   }
-  if (specifier === "@/lib/supabase/server") {
-  const stub = join(
-    dirname(fileURLToPath(import.meta.url)),
-    "supabase-test-stub.mjs",
-  );
-  return nextResolve(pathToFileURL(stub).href, context);
-}
   if (specifier.startsWith("@/")) {
     const root = dirname(fileURLToPath(import.meta.url));
     const base = join(root, "..", "src", specifier.slice(2));
