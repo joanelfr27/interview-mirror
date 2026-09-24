@@ -1,40 +1,94 @@
 # Interview Mirror
 
-> Transforming professional experience into interview excellence through evidence-driven AI.
+AI-powered interview coaching. Upload your CV, paste a job description, get evidence-first analysis, practice with a tailored simulator, and receive actionable feedback.
 
-## Vision
+## Stack
 
-Interview Mirror is an AI-powered professional intelligence platform that helps professionals discover, understand, and communicate their true professional value.
+- **Next.js 15** (App Router) + TypeScript
+- **Tailwind CSS** + **shadcn/ui**
+- **Supabase** (Auth + Postgres)
+- **OpenAI** (CV analysis, questions, feedback)
 
-Unlike traditional interview preparation tools, Interview Mirror is built on the **Professional Mirror Operating System (PMOS)**, an evidence-first reasoning architecture that separates professional identity from communication coaching.
+## Features
 
-## Core Principles
+- Landing page with brand-forward hero
+- Email/password authentication
+- Dashboard of coaching sessions
+- CV upload / paste + job description
+- AI CV × role analysis
+- Interview simulator
+- Feedback page with scores and coaching notes
+- Responsive blue & white theme
 
-- Evidence before conclusions
-- Never fabricate
-- Every conclusion is explainable
-- Member owns their professional identity
-- AI assists, PMOS decides
+## Setup
 
-## Status
+### 1. Install dependencies
 
-🚧 Under active development.
+```bash
+npm install
+```
 
-Current milestone:
-- Sprint 0 – Engineering Foundation
+### 2. Environment variables
 
-## Repository Structure
+Copy `.env.example` to `.env.local` and fill in:
 
-This repository contains the Interview Mirror platform, including:
+```bash
+cp .env.example .env.local
+```
 
-- Web application
-- API
-- PMOS
-- AI Abstraction Layer
-- Shared packages
-- Infrastructure
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional service role key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `NEXT_PUBLIC_APP_URL` | App URL (e.g. `http://localhost:3000`) |
+
+Without `OPENAI_API_KEY`, analysis / interview / feedback still run using deterministic fallbacks so you can develop the UI offline.
+
+### 3. Database
+
+In the Supabase SQL editor, run:
+
+[`supabase/schema.sql`](supabase/schema.sql)
+
+Enable Email auth in **Authentication → Providers**.
+
+### 4. Run
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Project structure
+
+```
+src/
+  app/
+    (app)/           # Authenticated routes
+      dashboard/
+      prepare/
+      analysis/[id]/
+      interview/[id]/
+      feedback/[id]/
+    api/             # Analyze, interview, feedback, auth
+    login/ signup/
+  components/        # UI + layout
+  lib/               # Supabase, OpenAI, utils
+  types/
+supabase/
+  schema.sql
+```
+
+## Flow
+
+1. Sign up / sign in  
+2. **Prepare** — CV + job description → AI analysis  
+3. Review **Analysis** → start **Interview**  
+4. Answer questions → **Feedback**
 
 ---
 
-© Interview Mirror# interview-mirror
-Interview Mirror – AI-powered professional intelligence platform built on the Professional Mirror Operating System (PMOS).
+© Interview Mirror — Evidence before conclusions. AI assists, you decide.

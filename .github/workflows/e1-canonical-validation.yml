@@ -1,0 +1,28 @@
+name: E1 Canonical Validation
+
+on:
+  push:
+    branches: ["e1-audit-corrections"]
+  pull_request:
+    branches: ["audit-version"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - run: npm run build
+      - name: Package exact audit repository
+        run: git archive --format=zip --output=Interview_Mirror_D13_Audit_${GITHUB_SHA}.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d13-audit-repository
+          path: Interview_Mirror_D13_Audit_${{ github.sha }}.zip
+          if-no-files-found: error
