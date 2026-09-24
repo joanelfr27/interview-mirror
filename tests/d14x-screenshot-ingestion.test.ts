@@ -29,8 +29,16 @@ test("rejects a declared image type with an invalid signature", async () => {
   );
 });
 
+test("rejects a header-only PNG as an incomplete image", async () => {
+  const headerOnlyPng = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  await assert.rejects(
+    () => buildScreenshotSource(headerOnlyPng, "image/png", "screen.png"),
+    /INVALID_IMAGE_SIGNATURE/,
+  );
+});
+
 test("creates a traceable canonical screenshot source", async () => {
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const png = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"));
   const source = await buildScreenshotSource(png, "image/png", "screen.png");
   assert.equal(source.sourceType, "screenshot");
   assert.equal(source.sourceName, "screen.png");
@@ -40,7 +48,8 @@ test("creates a traceable canonical screenshot source", async () => {
 });
 
 test("same bytes produce the same content hash", async () => {
-  const a = await buildScreenshotSource(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), "image/png");
-  const b = await buildScreenshotSource(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), "image/png");
+  const png = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"));
+  const a = await buildScreenshotSource(png, "image/png");
+  const b = await buildScreenshotSource(png, "image/png");
   assert.equal(a.contentHash, b.contentHash);
 });
