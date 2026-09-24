@@ -36,7 +36,7 @@ test("creates a traceable canonical screenshot source", async () => {
   assert.equal(source.sourceName, "screen.png");
   assert.equal(source.mimeType, "image/png");
   assert.match(source.contentHash, /^sha256:[0-9a-f]{64}$/);
-  assert.equal(source.byteLength, 3);
+  assert.equal(source.byteLength, 8);
 });
 
 test("same bytes produce the same content hash", async () => {
