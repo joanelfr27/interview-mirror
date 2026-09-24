@@ -48,7 +48,7 @@ function preparationPurposeForBody(body: Record<string, unknown>): "upcoming_int
 }
 
 function isIngestionSourceType(value: unknown): value is IngestionSourceType {
-  return value === "pdf" || value === "word" || value === "link" || value === "paste" || value === "text";
+  return value === "pdf" || value === "word" || value === "link" || value === "paste" || value === "text" || value === "screenshot";
 }
 
 async function canonicalDocumentFromBody(value: unknown, fallbackText: unknown, fallbackSource: IngestionSourceType): Promise<IngestedDocument> {
