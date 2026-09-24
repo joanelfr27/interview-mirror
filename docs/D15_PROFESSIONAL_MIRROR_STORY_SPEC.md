@@ -41,7 +41,7 @@ Output:
 - Fact / Pattern / Interpretation statements;
 - a concise Story assembled only from supported statements.
 
-Deterministic thread matching may connect evidence through shared object, domain, tool, standard, or repeated action. It must use the canonical evidence fields rather than inventing new facts.
+Deterministic thread matching may connect evidence through shared object, domain, tool, or standard. Repeated action may only reinforce a connection when the same action occurs within a shared domain; action labels alone must never create a career thread. Thread membership establishes a supported connection, not progression or increasing responsibility by itself. Progression claims require distinct career-stage evidence such as grounded time, scope, ownership, or responsibility differences.
 
 The first implementation is deterministic. LLM narrative generation is deferred until evidence-addressability can be validated against the deterministic projection.
 
