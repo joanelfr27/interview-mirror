@@ -73,6 +73,20 @@ test("D15 uses supported evidence connections rather than exact labels only",()=
   assert.equal(m.threads[0].connection_reason,"SHARED_DOMAIN");
 });
 
+test("D15 preserves distinct claims that share a domain and action",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const s2=d15Span("S2","Managed regional tax.");
+  const a1=d15Atom("A1","S1","finance");
+  const a2=d15Atom("A2","S2","tax");
+  a1.context.domain="finance";
+  a2.context.domain="finance";
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.evidence.length,2);
+  assert.equal(m.threads.length,1);
+  assert.equal(m.threads[0].connection_reason,"SHARED_DOMAIN");
+});
+
 test("D15 rejects a Story opening that is not traceable",()=>{
   const s1=d15Span("S1","Managed regional finance.");
   const s2=d15Span("S2","Managed regional finance reporting.");
