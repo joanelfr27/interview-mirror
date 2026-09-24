@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileUp, Link2, Loader2, Sparkles } from "lucide-react";
+import { FileUp, ImageUp, Link2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,8 +13,8 @@ import { isJourney, purposeForJourney, type PreparationPurpose } from "@/lib/jou
 import { buildIngestedDocument, extractPdfText, extractWordText, type IngestedDocument } from "@/lib/universal-ingestion";
 
 type SavedCv = { id: string; file_name: string; cv_text: string; updated_at: string; historical?: boolean };
-type JobDescriptionMode = "paste" | "pdf" | "word" | "link";
-type CvSourceMode = "paste" | "file" | "link";
+type JobDescriptionMode = "paste" | "pdf" | "word" | "link" | "screenshot";
+type CvSourceMode = "paste" | "file" | "link" | "screenshot";
 export default function PrepareForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -138,7 +138,19 @@ export default function PrepareForm() {
     const fileName = file.name;
     const fileNameLower = fileName.toLowerCase();
     let text = "";
-    if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) { text = (await buildIngestedDocument(await file.text(), "text", fileName)).text; setCvDocument(null); }
+    if (file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(fileNameLower)) {
+      const form = new FormData();
+      form.set("source", "screenshot");
+      form.set("file", file);
+      form.set("language", experienceLanguage);
+      const response = await fetch("/api/ingest", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not read CV screenshot");
+      const document = data as IngestedDocument;
+      text = document.text;
+      setCvDocument(document);
+    }
+    else if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) { text = (await buildIngestedDocument(await file.text(), "text", fileName)).text; setCvDocument(null); }
     else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) { const document = await buildIngestedDocument(await extractPdfText(file), "pdf", fileName); text = document.text; setCvDocument(document); }
     else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) { const document = await buildIngestedDocument(await extractWordText(file), "word", fileName); text = document.text; setCvDocument(document); }
     if (!text.trim()) {
@@ -188,6 +200,21 @@ export default function PrepareForm() {
     if (!file) return;
     try {
       const lower = file.name.toLowerCase();
+      if (file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(lower)) {
+        const form = new FormData();
+        form.set("source", "screenshot");
+        form.set("file", file);
+        form.set("language", experienceLanguage);
+        const response = await fetch("/api/ingest", { method: "POST", body: form });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not read JD screenshot");
+        const document = data as IngestedDocument;
+        setJobDescription(document.text);
+        setJobDescriptionDocument(document);
+        setJobDescriptionMode("screenshot");
+        toast.success("Job description screenshot loaded");
+        return;
+      }
       const text = lower.endsWith(".docx") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ? (await buildIngestedDocument(await extractWordText(file), "word", file.name)).text
         : (await buildIngestedDocument(await extractPdfText(file), "pdf", file.name)).text;
@@ -324,12 +351,14 @@ export default function PrepareForm() {
           <CardContent className="space-y-4">
             {savedCvs.length > 0 && <div className="space-y-2"><Label htmlFor="saved-cv">Use an existing CV</Label><select id="saved-cv" value={useNewCv ? "new" : selectedCvId ?? ""} onChange={(e) => e.target.value === "new" ? setUseNewCv(true) : selectSavedCv(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">{savedCvs.map((cv) => <option key={cv.id} value={cv.id}>{cv.file_name}</option>)}<option value="new">Upload a new CV</option></select></div>}
             {(useNewCv || savedCvs.length === 0) && <>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <Button type="button" variant={cvSourceMode === "paste" ? "default" : "outline"} onClick={() => setCvSourceMode("paste")}>Paste</Button>
                 <Button type="button" variant={cvSourceMode === "file" ? "default" : "outline"} onClick={() => setCvSourceMode("file")}>Upload</Button>
                 <Button type="button" variant={cvSourceMode === "link" ? "default" : "outline"} onClick={() => setCvSourceMode("link")}><Link2 className="h-4 w-4" /> Link</Button>
+                <Button type="button" variant={cvSourceMode === "screenshot" ? "default" : "outline"} onClick={() => setCvSourceMode("screenshot")}><ImageUp className="h-4 w-4" /> Screenshot</Button>
               </div>
               {cvSourceMode === "file" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Upload CV</Label><Input id="cv-file" type="file" accept=".txt,.md,.pdf,.docx,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PDF, Word or text</span></div>}
+              {cvSourceMode === "screenshot" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="cv-screenshot" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm hover:bg-accent"><ImageUp className="h-4 w-4" /> Upload CV screenshot</Label><Input id="cv-screenshot" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onCvFileChange} /><span className="text-xs text-muted-foreground">PNG, JPEG or WebP</span></div>}
               {cvSourceMode === "link" && <div className="flex gap-2"><Input type="url" value={cvUrl} onChange={(e) => setCvUrl(e.target.value)} placeholder="https://..." /><Button type="button" onClick={onCvLink}>Load</Button></div>}
               {cvSourceMode === "paste" && <Textarea value={cvText} onChange={(e) => { setCvText(e.target.value); setCvDocument(null); setUseNewCv(true); setSelectedCvId(null); }} placeholder="Paste your CV text…" className="min-h-[220px]" required />}
             </>}
@@ -338,9 +367,10 @@ export default function PrepareForm() {
         <Card>
           <CardHeader><CardTitle>Job description</CardTitle><CardDescription>Use the option that is easiest for you. Pasted text and PDF are reliable; links are read when possible and otherwise you will be asked to paste or upload the JD.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-4 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>PDF</Button><Button type="button" variant={jobDescriptionMode === "word" ? "default" : "outline"} onClick={() => setJobDescriptionMode("word")}>Word</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button></div>
+            <div className="grid grid-cols-5 gap-2"><Button type="button" variant={jobDescriptionMode === "paste" ? "default" : "outline"} onClick={() => setJobDescriptionMode("paste")}>Paste</Button><Button type="button" variant={jobDescriptionMode === "pdf" ? "default" : "outline"} onClick={() => setJobDescriptionMode("pdf")}>PDF</Button><Button type="button" variant={jobDescriptionMode === "word" ? "default" : "outline"} onClick={() => setJobDescriptionMode("word")}>Word</Button><Button type="button" variant={jobDescriptionMode === "link" ? "default" : "outline"} onClick={() => setJobDescriptionMode("link")}><Link2 className="h-4 w-4" /> Link</Button><Button type="button" variant={jobDescriptionMode === "screenshot" ? "default" : "outline"} onClick={() => setJobDescriptionMode("screenshot")}><ImageUp className="h-4 w-4" /> Screenshot</Button></div>
             {jobDescriptionMode === "paste" && <Textarea value={jobDescription} onChange={(e) => { setJobDescription(e.target.value); setJobDescriptionDocument(null); }} placeholder="Paste the full job description here…" className="min-h-[240px]" />}
             {(jobDescriptionMode === "pdf" || jobDescriptionMode === "word") && <div className="space-y-3"><Label htmlFor="jd-file" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><FileUp className="h-4 w-4" /> Choose JD {jobDescriptionMode === "word" ? "Word" : "PDF"}</Label><Input id="jd-file" type="file" accept={jobDescriptionMode === "word" ? ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" : ".pdf,application/pdf"} className="hidden" onChange={onJobDescriptionFile} />{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[240px]" />}</div>}
+            {jobDescriptionMode === "screenshot" && <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><Label htmlFor="jd-screenshot" className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm hover:bg-accent"><ImageUp className="h-4 w-4" /> Upload JD screenshot</Label><Input id="jd-screenshot" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onJobDescriptionFile} /><span className="text-xs text-muted-foreground">PNG, JPEG or WebP</span></div>}
             {jobDescriptionMode === "link" && <div className="space-y-3"><Label htmlFor="jd-url">Job posting link</Label><div className="flex gap-2"><Input id="jd-url" type="url" value={jobDescriptionUrl} onChange={(e) => setJobDescriptionUrl(e.target.value)} placeholder="https://company.com/jobs/financial-controller" /><Button type="button" onClick={onJobDescriptionLink}>Load</Button></div><p className="text-xs text-muted-foreground">We will read the page and normalize its text. If it cannot be read reliably, paste or upload the JD.</p>{jobDescription && <Textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} className="min-h-[180px]" placeholder="Optional: paste the JD here as a fallback…" />}</div>}
           </CardContent>
         </Card>
