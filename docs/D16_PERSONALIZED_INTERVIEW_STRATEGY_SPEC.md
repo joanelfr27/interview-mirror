@@ -38,6 +38,26 @@ A JD is enrichment, not a prerequisite.
 
 Assessment Context may include interview stage/type, interviewer role, expected format, relevant seniority, behavioral/technical/case/presentation/panel modality, and employer-provided instructions. UNKNOWN is valid. Missing context must never be invented.
 
+## Role Intelligence → Canonical Requirements
+
+Role Intelligence is a normalization and context layer, not a new evidence or requirement ontology. It consumes the Role Capability Model, optional JD, and optional Assessment Context and resolves them into the canonical requirement identities consumed by the existing D1–D4 reasoning path.
+
+- Role Capability Model provides the authoritative role baseline and baseline requirement criticality.
+- A JD may enrich or modify employer-specific context and criticality only through deterministic, validated rules; JD wording is not itself ground truth.
+- Assessment Context may modify the relevance of a requirement to the stated assessment context, but must not invent a role requirement or baseline criticality.
+- Every canonical requirement must have a stable `requirement_id`, source/provenance, and deterministic reproducibility.
+- If an existing canonical requirement-generation/normalization path exists in D1–D4, D16 must reuse it rather than create a parallel path.
+- Ambiguous or unsupported requirement identity/criticality must remain unresolved or fail closed; it must not be completed by LLM inference.
+
+### Criticality derivation
+
+Criticality is authoritative only when traceable to validated Role Capability Model data and deterministic contextual rules. The derivation must be reproducible from:
+1. Role Capability Model baseline criticality;
+2. validated JD-specific modifiers, where explicitly supported; and
+3. Assessment Context relevance, where applicable.
+
+D16 must preserve the distinction between role importance and assessment relevance. Assessment Context may change preparation priority without inventing baseline role criticality. The exact implementation rule must be specified in the typed D16 contract and tested before implementation. LLM output may extract or normalize semantics, but may not assign final criticality.
+
 ## Canonical requirement reasoning
 
 D16 reuses canonical requirement identities and D1–D4 reasoning.
@@ -51,11 +71,18 @@ Canonical information remains authoritative:
 
 D16 may add presentation-level concepts such as preparation priority or interview vulnerability, but these do not replace canonical states.
 
+These presentation-level concepts are derived fields only:
+- **preparation_priority** is deterministically derived from validated requirement status, criticality, evidence relationship, contextual delta, contradiction state, and Assessment Context; it is not a new evidence state.
+- **interview_vulnerability** identifies a validated exposure created by the relationship between role requirement, candidate evidence, contextual delta, contradiction, and assessment context; it is not a diagnosis of candidate ability.
+- **truthfulness/defense boundary** is constrained by canonical support/status and cited evidence. It states what the candidate can credibly claim and where transfer/uncertainty must be disclosed. It may be phrased by the LLM but may never widen, upgrade, or contradict canonical evidence.
+
+Deterministic validation owns these derived fields. The LLM may explain or phrase them only within their validated inputs.
+
 ## Strategic Tensions
 
 A Strategic Tension is a role-specific preparation issue where requirement importance, evidence relationship, contextual delta, and assessment context create meaningful interview exposure.
 
-Selection must be deterministic and reproducible from validated inputs. Candidate-facing output is normally compressed to 1–3 high-leverage tensions; internal downstream payloads may retain the fuller validated assessment.
+Selection must be deterministic and reproducible from validated inputs. Candidate-facing output is normally compressed to 1–3 high-leverage tensions; internal downstream payloads may retain the fuller validated assessment. Zero tensions is valid when no candidate meets the deterministic eligibility criteria; D16 must never manufacture a tension merely to fill the UI.
 
 Selection must consider, as applicable:
 - canonical requirement/status;
@@ -65,7 +92,7 @@ Selection must consider, as applicable:
 - Assessment Context;
 - contradiction state.
 
-The exact ordering/scoring formula is deliberately not frozen here; it must be adversarially reviewed before implementation. The LLM may explain a validated tension but may not invent or independently select one.
+The exact ordering/scoring formula is deliberately not frozen here; it must be adversarially reviewed before implementation. Before implementation, the deterministic procedure must define: candidate eligibility, exclusion rules, priority ordering, deterministic tie-breakers, and the 0–3 candidate-facing cap. No LLM-generated ordering is authoritative. The LLM may explain a validated tension but may not invent or independently select one.
 
 ## Grey-area rule
 
@@ -92,7 +119,9 @@ Every surfaced D16 insight must map to an action:
 
 Every downstream action retains:
 - canonical requirement_id;
-- supporting evidence/provenance IDs where applicable;
+- an explicit evidence-reference mode;
+- supporting evidence/provenance IDs when the action asserts or relies on candidate evidence;
+- an explicit canonical no-evidence state/reason when no candidate evidence exists, rather than silently omitting evidence;
 - canonical support/status;
 - criticality;
 - Assessment Context;
@@ -106,8 +135,10 @@ Every downstream action retains:
 D16 fails closed when:
 - requirement_id is missing or unknown;
 - evidence/provenance IDs are forged or mismatched;
-- D15 input is stale;
+- any material dependency is stale: canonical evidence/D15, Role Capability Model, JD, or Assessment Context;
 - unsupported criticality is asserted;
+- preparation_priority or interview_vulnerability is asserted without deterministic grounding;
+- truthfulness/defense boundary exceeds or contradicts canonical evidence;
 - contradiction is ignored;
 - output lacks grounding;
 - an action cannot be traced to a validated D16 finding;
@@ -133,7 +164,7 @@ D16 never mutates D15 directly. New evidence must enter the canonical evidence a
 
 No-JD mode is first-class:
 
-Role Capability Model + validated D15 + known Assessment Context → D16.
+Role Capability Model + validated D15 + Assessment Context (which may be UNKNOWN) → D16.
 
 D16 must preserve uncertainty rather than pretending an inferred JD exists.
 
@@ -142,7 +173,11 @@ D16 must preserve uncertainty rather than pretending an inferred JD exists.
 Deterministic code owns:
 - canonical IDs and provenance;
 - state validation;
-- criticality validation;
+- canonical requirement identity validation;
+- criticality derivation and validation;
+- preparation_priority and interview_vulnerability derivation/validation;
+- evidence-reference applicability and no-evidence representation;
+- staleness validation across every material dependency;
 - tension candidate selection;
 - stale-state checks;
 - output/action integrity.
@@ -223,7 +258,19 @@ At minimum:
 - LLM attempts to invent a tension;
 - LLM attempts to resolve a contradiction;
 - D16 attempts to ask candidate questions;
-- candidate-facing output exceeding 1–3 tensions.
+- candidate-facing output exceeding 3 tensions;
+- zero tensions when no validated tension qualifies is accepted;
+- D16 with no JD and UNKNOWN Assessment Context;
+- deterministic Role Intelligence → Canonical Requirements identity and provenance;
+- criticality derivation and contextual modification;
+- stale canonical evidence/D15, Role Capability Model, JD, and Assessment Context each fail closed;
+- evidence asserted without valid evidence/provenance IDs;
+- no-evidence requirements represented explicitly without fabricated evidence;
+- unsupported preparation_priority/interview_vulnerability/truthfulness boundaries;
+- French evidence with French interview language;
+- French evidence with English interview language;
+- mixed French/English evidence and English/French JD or interview language;
+- source language does not alter canonical reasoning, support/status, criticality, or tension selection.
 
 ## Implementation sequence
 
