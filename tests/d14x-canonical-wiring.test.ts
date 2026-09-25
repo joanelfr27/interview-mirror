@@ -23,6 +23,7 @@ test("CV and JD screenshot UI both use the canonical screenshot source path", ()
   assert.match(form, /form\.set\("source", "screenshot"\)/);
   assert.match(form, /fetch\("\/api\/ingest", \{ method: "POST", body: form \}\)/);
   assert.match(ingest, /buildIngestedDocument\(text, "screenshot", screenshot\.sourceName\)/);
+  assert.match(ingest, /sourceContentHash: screenshot\.contentHash/);
   assert.match(analyze, /value === "screenshot"/);
 });
 
