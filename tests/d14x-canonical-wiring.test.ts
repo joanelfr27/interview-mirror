@@ -25,6 +25,15 @@ test("CV and JD screenshot UI both use the canonical screenshot source path", ()
   assert.match(ingest, /buildIngestedDocument\(text, "screenshot", screenshot\.sourceName\)/);
   assert.match(ingest, /sourceContentHash: screenshot\.contentHash/);
   assert.match(analyze, /value === "screenshot"/);
+  assert.match(analyze, /cv_source_content_hash/);
+  assert.match(analyze, /jd_source_content_hash/);
+  assert.match(analyze, /sourceHashes\?\.cv/);
+  assert.match(analyze, /sourceHashes\?\.jd/);
+});
+
+test("bare job-description URLs are recognized without a label", () => {
+  const analyze = fs.readFileSync(path.join(root, "src/app/api/analyze/route.ts"), "utf8");
+  assert.match(analyze, /if \(!remainder\) return true;/);
 });
 
 test("D14x does not introduce a screenshot-specific downstream evidence architecture", () => {
