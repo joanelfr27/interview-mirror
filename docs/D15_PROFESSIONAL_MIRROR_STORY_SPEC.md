@@ -90,10 +90,15 @@ D15 does not own historical evolution of the Mirror across future evidence, sess
 
 ## D16 boundary
 
-D16 is the role-specific interview-preparation strategy layer. It consumes the validated D15 Mirror/Story plus Role Intelligence:
-- Role Capability Model;
-- optional Job Description;
-- optional Assessment Context.
+D16 is the role-specific interview-preparation strategy layer. It consumes:
+- validated D15 Professional Mirror/Story;
+- validated D6 Canonical Strategy Bridge projection (with D1–D5 outputs validated upstream);
+- Role Intelligence:
+  - Role Capability Model;
+  - optional Job Description;
+  - optional Assessment Context.
+
+D16 reuses the validated D6 projection rather than deriving a parallel strategy graph.
 
 With a JD:
 D15 Mirror/Story + Role Capability Model + JD + Assessment Context → D16 Strategy.
