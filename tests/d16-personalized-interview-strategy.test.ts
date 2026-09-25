@@ -186,6 +186,64 @@ describe("D16 personalized interview strategy", () => {
     assert.ok(bridgeValidation.errors.some((e) => e.includes("D6 bridge requirements must be an array")));
   });
 
+  it("fails closed on malformed nested evidence and context structures", () => {
+    const cases: D16Inputs[] = [
+      { ...fixture(), canonical_requirements: [null as never] },
+      { ...fixture(), bridge: { ...fixture().bridge, requirements: [null as never] } },
+      { ...fixture(), bridge: { ...fixture().bridge, requirements: [{ ...fixture().bridge.requirements[0], evidence: null as never }] } },
+      { ...fixture(), mirror: { ...fixture().mirror, evidence: null as never } },
+      { ...fixture(), ledger: { ...fixture().ledger, evidence: null as never } },
+      { ...fixture(), ledger: { ...fixture().ledger, source_spans: null as never } },
+      { ...fixture({ assessment_context: { version: "assessment-context-v1", context_id: "A1", requirement_relevance: {} } }), assessment_context: { version: "assessment-context-v1", context_id: "A1", requirement_relevance: null as never } },
+    ];
+    for (const malformed of cases) {
+      assert.doesNotThrow(() => validateD16Inputs(malformed));
+      assert.equal(validateD16Inputs(malformed).valid, false);
+    }
+  });
+
+  it("rejects tampered derived tension and action fields", () => {
+    const input = fixture();
+    const strategy = buildD16Strategy(input);
+
+    const priorityTamper = structuredClone(strategy);
+    priorityTamper.tensions[0].preparation_priority = 99;
+    assert.equal(validateD16Strategy(priorityTamper, input).valid, false);
+
+    const vulnerabilityTamper = structuredClone(strategy);
+    vulnerabilityTamper.tensions[0].interview_vulnerability = "The candidate is weak.";
+    assert.equal(validateD16Strategy(vulnerabilityTamper, input).valid, false);
+
+    const provenanceTamper = structuredClone(strategy);
+    provenanceTamper.tensions[0].evidence_provenance_ids = ["FORGED-SPAN"];
+    assert.equal(validateD16Strategy(provenanceTamper, input).valid, false);
+
+    const actionTamper = structuredClone(strategy);
+    actionTamper.actions[0].practice_target = "Claim the experience regardless of evidence.";
+    assert.equal(validateD16Strategy(actionTamper, input).valid, false);
+  });
+
+  it("requires the exact deterministic three-action dispatch per selected tension", () => {
+    const input = fixture();
+    const strategy = buildD16Strategy(input);
+    strategy.actions = strategy.actions.slice(0, -1);
+    assert.equal(validateD16Strategy(strategy, input).valid, false);
+  });
+
+  it("fails closed when strategy or strategy collections are malformed", () => {
+    const input = fixture();
+    assert.doesNotThrow(() => validateD16Strategy(null as unknown as D16Strategy, input));
+    assert.equal(validateD16Strategy(null as unknown as D16Strategy, input).valid, false);
+
+    const malformedTensions = { ...buildD16Strategy(input), tensions: null } as unknown as D16Strategy;
+    assert.doesNotThrow(() => validateD16Strategy(malformedTensions, input));
+    assert.equal(validateD16Strategy(malformedTensions, input).valid, false);
+
+    const malformedActions = { ...buildD16Strategy(input), actions: null } as unknown as D16Strategy;
+    assert.doesNotThrow(() => validateD16Strategy(malformedActions, input));
+    assert.equal(validateD16Strategy(malformedActions, input).valid, false);
+  });
+
   it("keeps no-JD mode valid", () => {
     const strategy = buildD16Strategy(fixture({ jd_present: false }));
     assert.equal(strategy.jd_present, false);
