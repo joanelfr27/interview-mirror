@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildD16Strategy, validateD16Inputs, validateD16Strategy, type D16Inputs } from "@/lib/d16-personalized-interview-strategy";
+import { buildD16Strategy, validateD16Inputs, validateD16Strategy, type D16Inputs, type D16Strategy } from "@/lib/d16-personalized-interview-strategy";
 
 function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
   const canonical = [
