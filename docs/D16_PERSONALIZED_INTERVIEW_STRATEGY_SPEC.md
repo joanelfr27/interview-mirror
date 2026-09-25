@@ -13,9 +13,8 @@ D16 is not a career report, generic fit score, second Professional Mirror, or in
 ## Canonical flow
 D1–D10 Canonical Evidence
 → D15 Validated Mirror/Story
-→ Role Intelligence
-→ Canonical Requirements
-→ existing D1–D4 support/gap reasoning
+→ Role Intelligence / existing canonical requirement graph
+→ D6 Canonical Strategy Bridge
 → Strategic Tension Filter
 → D16 Validation Gate
 → Action Dispatcher
@@ -38,16 +37,44 @@ A JD is enrichment, not a prerequisite.
 
 Assessment Context may include interview stage/type, interviewer role, expected format, relevant seniority, behavioral/technical/case/presentation/panel modality, and employer-provided instructions. UNKNOWN is valid. Missing context must never be invented.
 
-## Role Intelligence → Canonical Requirements
+## Role Intelligence and the Existing Canonical Strategy Foundation
 
-Role Intelligence is a normalization and context layer, not a new evidence or requirement ontology. It consumes the Role Capability Model, optional JD, and optional Assessment Context and resolves them into the canonical requirement identities consumed by the existing D1–D4 reasoning path.
+Role Intelligence is a normalization/context layer, not a new evidence, requirement, fit/gap, or strategy ontology. D16 must build on the existing canonical requirement graph and D6 strategy bridge already established by D1–D6.
+
+The existing architecture is authoritative in this order:
+
+1. D1–D3 establish canonical requirement identities, provenance, support/status and evidence relationships.
+2. D4 derives the existing canonical fit/gap and preparation states.
+3. D5 derives demonstration objectives and truthfulness boundaries.
+4. D6 projects those validated inputs into the canonical strategy bridge.
+
+D16 consumes those validated identities and states; it does not regenerate them.
 
 - Role Capability Model provides the authoritative role baseline and baseline requirement criticality.
-- A JD may enrich or modify employer-specific context and criticality only through deterministic, validated rules; JD wording is not itself ground truth.
-- Assessment Context may modify the relevance of a requirement to the stated assessment context, but must not invent a role requirement or baseline criticality.
-- Every canonical requirement must have a stable `requirement_id`, source/provenance, and deterministic reproducibility.
-- If an existing canonical requirement-generation/normalization path exists in D1–D4, D16 must reuse it rather than create a parallel path.
+- A JD may enrich employer-specific context and criticality only through deterministic, validated rules; JD wording is not itself ground truth.
+- Assessment Context may modify assessment relevance and preparation priority, but must not invent a role requirement or baseline criticality.
+- Every requirement entering D16 must resolve to an existing canonical `requirement_id` with traceable source/provenance.
+- If a JD or Role Capability Model introduces a requirement not present in the canonical graph, D16 must use the existing canonical requirement-normalization path to reconcile it or leave it unresolved/fail closed; it must not create a parallel D16 requirement graph.
+- D16 must reuse the D6 Canonical Strategy Bridge rather than recreate its evidence routing, fit/gap state, preparation state, or truthfulness-boundary logic.
 - Ambiguous or unsupported requirement identity/criticality must remain unresolved or fail closed; it must not be completed by LLM inference.
+
+### D6 → D16 contract
+
+D6 is the canonical deterministic strategy foundation. D16 is the strategic prioritisation layer above it.
+
+D6 supplies, at minimum:
+- `requirement_id`;
+- canonical requirement text and provenance;
+- requirement status and route mode;
+- canonical fit/gap state and gap classification;
+- canonical preparation state and deterministic strategy action;
+- requirement-local evidence/provenance;
+- unresolved item associations;
+- demonstration-objective associations and truthfulness boundaries.
+
+D16 may select, compress, contextualize and explain these validated items, but must not change them. Any D16 field that appears to restate a D6 value must validate exactly against D6.
+
+D16 must not use the legacy V23 EvidenceMap, V23 `PROVEN/PARTIALLY_PROVEN/UNKNOWN/NOT_DOCUMENTED` status model, or another competing proof ontology as an authoritative source. Legacy adapters may remain temporarily for compatibility, but D16 truth is canonical D1–D6 truth.
 
 ### Criticality derivation
 
@@ -56,7 +83,15 @@ Criticality is authoritative only when traceable to validated Role Capability Mo
 2. validated JD-specific modifiers, where explicitly supported; and
 3. Assessment Context relevance, where applicable.
 
-D16 must preserve the distinction between role importance and assessment relevance. Assessment Context may change preparation priority without inventing baseline role criticality. The exact implementation rule must be specified in the typed D16 contract and tested before implementation. LLM output may extract or normalize semantics, but may not assign final criticality.
+For V1, D16 must preserve two distinct values:
+- **role_criticality** — the validated baseline importance of the requirement in the Role Capability Model, optionally modified only by an explicitly supported deterministic JD rule;
+- **assessment_relevance** — the validated relevance of that requirement to the stated Assessment Context.
+
+Assessment relevance may change preparation priority, but may not silently overwrite role criticality.
+
+If no validated deterministic modifier exists for a JD or Assessment Context, the baseline role criticality remains unchanged and the contextual input is represented separately. UNKNOWN context therefore cannot increase or decrease baseline criticality.
+
+The exact typed values, modifier whitelist, precedence rules, and deterministic tie-breakers must be frozen in the implementation contract before implementation. LLM output may extract or normalize semantics, but may not assign final criticality.
 
 ## Canonical requirement reasoning
 
@@ -92,7 +127,9 @@ Selection must consider, as applicable:
 - Assessment Context;
 - contradiction state.
 
-The exact ordering/scoring formula is deliberately not frozen here; it must be adversarially reviewed before implementation. Before implementation, the deterministic procedure must define: candidate eligibility, exclusion rules, priority ordering, deterministic tie-breakers, and the 0–3 candidate-facing cap. No LLM-generated ordering is authoritative. The LLM may explain a validated tension but may not invent or independently select one.
+The deterministic procedure must define, before implementation: candidate eligibility, exclusion rules, priority ordering, deterministic tie-breakers, and the 0–3 candidate-facing cap. The procedure must operate only on validated D6 inputs plus Role Capability Model and Assessment Context metadata. No LLM-generated ordering is authoritative. The LLM may explain a validated tension but may not invent or independently select one.
+
+V1 must not introduce a second scoring ontology. If a numeric priority score is used internally, it is an implementation detail for deterministic ordering only and must not become a candidate-facing fit/proof score or replace canonical D1–D6 states.
 
 ## Grey-area rule
 
@@ -119,7 +156,11 @@ Every surfaced D16 insight must map to an action:
 
 Every downstream action retains:
 - canonical requirement_id;
-- an explicit evidence-reference mode;
+- an explicit evidence-reference mode, with V1 values:
+  - `SUPPORTED_EVIDENCE` — the action asserts or relies on one or more validated candidate evidence/provenance references;
+  - `NO_CANDIDATE_EVIDENCE` — the requirement is valid but no candidate evidence supports the action; a canonical reason/status must be carried;
+  - `MIXED_EVIDENCE` — the action relies on both supported evidence and an explicit unresolved/contradictory relationship;
+- evidence-reference mode is deterministic from the referenced canonical D6 state and evidence associations; it is not LLM-selected;
 - supporting evidence/provenance IDs when the action asserts or relies on candidate evidence;
 - an explicit canonical no-evidence state/reason when no candidate evidence exists, rather than silently omitting evidence;
 - canonical support/status;
@@ -217,7 +258,9 @@ D20 owns actual interview questioning, probing, challenge and simulation.
 
 D21 owns evaluation of answers against preparation targets and truthfulness boundaries.
 
-D16 may identify likely probe families as practice targets, but it must not conduct the probe.
+D16 may identify a probe family or practice target at the level of *what should be tested* (for example, scale, ownership, impact or transfer), but it must not generate or own the actual interview question set.
+
+Existing V23 `likely_questions`, `likelyDifficultQuestions`, and similar question-generation outputs are therefore not D16 outputs. They must be retired from the D16 contract and ultimately owned by D20.
 
 ## Candidate experience
 
@@ -274,8 +317,9 @@ At minimum:
 
 ## Implementation sequence
 
-1. Freeze this specification after Claude/Gemini adversarial review.
-2. Define typed D16 contracts.
+1. Reconcile this specification against the existing D1–D6 strategy architecture.
+2. Freeze this specification after Claude/Gemini adversarial review.
+3. Define typed D16 contracts.
 3. Implement deterministic assessment and validation.
 4. Implement Action Dispatcher.
 5. Add D17/D20/D21 handoff tests.
@@ -283,7 +327,7 @@ At minimum:
 7. Run canonical suite, typecheck and build.
 8. Run CodeRabbit.
 9. Perform independent adversarial audit against the exact commit.
-10. Update the Master Research & Product Record only after the implementation audit passes.
+11. Update the Master Research & Product Record only after the implementation audit passes.
 
 ## Second WOW
 
