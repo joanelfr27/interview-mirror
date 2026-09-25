@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { CanonicalStrategyBridgeProjection, CanonicalStrategyBridgeRequirement } from "@/lib/canonical-strategy-bridge";
 import { validateCanonicalStrategyBridgeProjection } from "@/lib/canonical-strategy-bridge";
@@ -22,6 +23,14 @@ export type AssessmentContext = {
   requirement_relevance: Record<string, "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN">;
 };
 
+export type D16DependencySnapshot = {
+  version: "d16-dependency-snapshot-v1";
+  d15_fingerprint: string;
+  rcm_fingerprint: string;
+  jd_fingerprint: string | null;
+  assessment_context_fingerprint: string | null;
+};
+
 export type D16Inputs = {
   mirror: ProfessionalMirror;
   bridge: CanonicalStrategyBridgeProjection;
@@ -30,6 +39,8 @@ export type D16Inputs = {
   assessment_context?: AssessmentContext;
   canonical_requirements: Array<{ id: string; normalized_requirement: string }>;
   jd_present: boolean;
+  jd_fingerprint: string | null;
+  dependency_snapshot: D16DependencySnapshot;
 };
 
 export type ContextualDelta = {
@@ -90,6 +101,7 @@ export type D16Strategy = {
   jd_present: boolean;
   tensions: StrategicTension[];
   actions: D16Action[];
+  dependency_snapshot: D16DependencySnapshot;
 };
 
 const STATUS_PRIORITY: Record<StrategicTension["canonical_status"], number> = {
@@ -105,6 +117,20 @@ function nonBlank(value: unknown): value is string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return "[" + value.map(stableSerialize).join(",") + "]";
+  if (isRecord(value)) return "{" + Object.keys(value).sort().map((key) => JSON.stringify(key) + ":" + stableSerialize(value[key])).join(",") + "}";
+  return JSON.stringify(value) ?? "null";
+}
+
+function fingerprint(value: unknown): string {
+  return "sha256:" + createHash("sha256").update(stableSerialize(value), "utf8").digest("hex");
+}
+
+export function buildD16DependencySnapshot(input: { mirror: ProfessionalMirror; role_capability_model: RoleCapabilityModel; jd_fingerprint: string | null; assessment_context?: AssessmentContext }): D16DependencySnapshot {
+  return { version: "d16-dependency-snapshot-v1", d15_fingerprint: fingerprint(input.mirror), rcm_fingerprint: fingerprint(input.role_capability_model), jd_fingerprint: input.jd_fingerprint, assessment_context_fingerprint: input.assessment_context ? fingerprint(input.assessment_context) : null };
 }
 
 function canonicalRequirementIds(items: Array<{ id: string }>): string[] {
@@ -149,13 +175,18 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
   };
   const delta = (terms: string[][]) => terms.some((variants) => containsTerm(right, variants) && !containsTerm(evidenceText, variants));
   return {
-    scope: delta([["scope"], ["regional"], ["global"], ["multi-country"], ["multiple"]]),
-    ownership: delta([["ownership"], ["own"], ["manage", "managed", "managing", "management", "lead", "led", "leading"], ["accountable"]]),
-    complexity: delta([["complex"], ["transformation"], ["integration"], ["advanced"]]),
-    seniority: delta([["senior"], ["director"], ["head"], ["manager"]]),
-    scale: delta([["large"], ["million"], ["multi-site"], ["enterprise"]]),
-    domain: delta([["industry"], ["sector"], ["domain"], ["regulated"]]),
+    scope: delta([["scope", "périmètre", "perimetre"], ["regional", "régional", "régionale"], ["global", "mondial", "mondiale"], ["multi-country", "multi-pays"], ["multiple", "plusieurs"]]),
+    ownership: delta([["ownership", "propriété"], ["own", "posséder", "possède"], ["manage", "managed", "managing", "management", "lead", "led", "leading", "gérer", "géré", "gérée", "gestion", "diriger", "dirigé", "dirigée"], ["accountable", "responsable", "redevable"]]),
+    complexity: delta([["complex", "complexe"], ["transformation"], ["integration", "intégration"], ["advanced", "avancé", "avancée"]]),
+    seniority: delta([["senior"], ["director", "directeur", "directrice"], ["head", "responsable", "chef"], ["manager", "gestionnaire"]]),
+    scale: delta([["large", "grand", "grande"], ["million"], ["multi-site", "multi-sites"], ["enterprise", "entreprise"]]),
+    domain: delta([["industry", "industrie"], ["sector", "secteur"], ["domain", "domaine"], ["regulated", "réglementé", "réglementée"]]),
   };
+}
+
+function evidenceStrength(tension: StrategicTension): number {
+  const modeRank: Record<D16EvidenceReferenceMode, number> = { SUPPORTED_EVIDENCE: 3, MIXED_EVIDENCE: 2, NO_CANDIDATE_EVIDENCE: 0 };
+  return modeRank[tension.evidence_reference_mode];
 }
 
 function deltaCount(delta: ContextualDelta): number {
@@ -224,6 +255,8 @@ function compareTensions(a: StrategicTension, b: StrategicTension): number {
     ({ HIGH: 3, MEDIUM: 2, LOW: 1, UNKNOWN: 0 }[b.assessment_relevance] - { HIGH: 3, MEDIUM: 2, LOW: 1, UNKNOWN: 0 }[a.assessment_relevance]) ||
     deltaCount(b.contextual_delta) - deltaCount(a.contextual_delta) ||
     Number(b.contradiction_present) - Number(a.contradiction_present) ||
+    evidenceStrength(b) - evidenceStrength(a) ||
+    b.evidence_provenance_ids.length - a.evidence_provenance_ids.length ||
     a.requirement_id.localeCompare(b.requirement_id)
   );
 }
@@ -236,6 +269,8 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   const mirror = input.mirror;
   const rcm = input.role_capability_model;
   const ledger = input.ledger;
+  if (typeof input.jd_fingerprint !== "string" && input.jd_fingerprint !== null) errors.push("D16 jd_fingerprint must be a string or null.");
+  if (!isRecord(input.dependency_snapshot)) errors.push("D16 dependency snapshot must be an object.");
 
   if (!isRecord(bridge)) errors.push("D16 D6 bridge must be an object.");
   if (!isRecord(mirror)) errors.push("D16 D15 mirror must be an object.");
@@ -250,6 +285,9 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   }
 
   if (errors.length) return { valid: false, errors };
+
+  if (input.jd_present !== Boolean(input.jd_fingerprint)) errors.push("D16 JD presence does not match JD fingerprint state.");
+  if (input.dependency_snapshot.version !== "d16-dependency-snapshot-v1") errors.push("D16 dependency snapshot version is invalid.");
 
   if (bridge.version !== "d6-v1") errors.push("D16 requires D6 version d6-v1.");
   if (mirror.version !== "d15-v1") errors.push("D16 requires D15 version d15-v1.");
@@ -359,6 +397,9 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
     }
   }
 
+  const expectedSnapshot = buildD16DependencySnapshot(input);
+  if (JSON.stringify(input.dependency_snapshot) !== JSON.stringify(expectedSnapshot)) errors.push("D16 material dependency snapshot is stale or mismatched.");
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -407,7 +448,7 @@ export function buildD16Strategy(input: D16Inputs): D16Strategy {
     .map((tension, index) => ({ ...tension, preparation_priority: index + 1 }));
 
   const actions = dispatchD16Actions(tensions, input.assessment_context);
-  return { version: D16_VERSION, d6_version: "d6-v1", role_capability_model_version: "rcm-v1", jd_present: input.jd_present, tensions, actions };
+  return { version: D16_VERSION, d6_version: "d6-v1", role_capability_model_version: "rcm-v1", jd_present: input.jd_present, tensions, actions, dependency_snapshot: input.dependency_snapshot };
 }
 
 export function dispatchD16Actions(tensions: StrategicTension[], assessment_context?: AssessmentContext): D16Action[] {
@@ -483,6 +524,7 @@ export function validateD16Strategy(strategy: D16Strategy, input: D16Inputs): { 
     errors.push("D16 actions do not match the deterministic Action Dispatcher projection.");
   }
   if (strategy.jd_present !== input.jd_present) errors.push("D16 jd_present diverges from input.");
+  if (JSON.stringify(strategy.dependency_snapshot) !== JSON.stringify(input.dependency_snapshot)) errors.push("D16 strategy dependency snapshot diverges from input.");
 
   return { valid: errors.length === 0, errors };
 }
