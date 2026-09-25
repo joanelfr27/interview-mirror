@@ -129,12 +129,16 @@ function provenanceIds(item: CanonicalStrategyBridgeRequirement, ledger: Evidenc
     .sort();
 }
 
-function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequirement, rcm: RoleCapabilityModel): ContextualDelta {
+function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequirement, rcm: RoleCapabilityModel, mirror: ProfessionalMirror): ContextualDelta {
   const capability = rcm.requirements.find((r) => r.canonical_requirement_id === item.requirement_id);
   const roleText = capability?.normalized_requirement ?? requirement;
-  const left = requirement.toLowerCase();
+  const evidenceText = mirror.evidence
+    .filter((e) => item.evidence.some((candidate) => candidate.evidence_id === e.evidence_id))
+    .map((e) => e.source_quote)
+    .join(" ")
+    .toLowerCase();
   const right = roleText.toLowerCase();
-  const delta = (terms: string[]) => terms.some((term) => right.includes(term) && !left.includes(term));
+  const delta = (terms: string[]) => terms.some((term) => right.includes(term) && !evidenceText.includes(term));
   return {
     scope: delta(["scope", "regional", "global", "multi-country", "multiple"]),
     ownership: delta(["ownership", "own", "lead", "accountable"]),
@@ -229,18 +233,6 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   const bridgeIds = canonicalRequirementIds(input.bridge.requirements);
   if (JSON.stringify(canonicalIds) !== JSON.stringify(bridgeIds)) errors.push("D16 canonical requirement set diverges from D6.");
 
-  const d6Result = validateCanonicalStrategyBridgeProjection(
-    input.bridge,
-    { version: "d6-v1", requirements: [] } as never,
-    { version: "d2-v1", requirements: [] } as never,
-    { version: "d5-v1", objectives: [] } as never,
-    input.ledger,
-  );
-  // The full D6 validator requires D2-D5 upstream projections. D16 therefore
-  // performs its own immutable D6 identity checks below and does not treat an
-  // unavailable upstream fixture as valid evidence.
-  void d6Result;
-
   const bridgeSeen = new Set<string>();
   for (const item of input.bridge.requirements) {
     if (bridgeSeen.has(item.requirement_id)) errors.push("D16 duplicate D6 requirement: " + item.requirement_id);
@@ -286,7 +278,7 @@ export function buildD16Strategy(input: D16Inputs): D16Strategy {
   const tensions = input.bridge.requirements
     .map((item) => {
       const rcm = input.role_capability_model.requirements.find((r) => r.canonical_requirement_id === item.requirement_id)!;
-      const delta = contextualDelta(item.normalized_requirement, item, input.role_capability_model);
+      const delta = contextualDelta(item.normalized_requirement, item, input.role_capability_model, input.mirror);
       const assessment = relevant(item, input.assessment_context);
       const mode = modeFor(item);
       const evidence_reference_mode = evidenceMode(item, input.mirror);
