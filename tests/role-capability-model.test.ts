@@ -1,5 +1,4 @@
-import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, expect, it } from "node:test";
 import {
   ROLE_CAPABILITY_MODEL_VERSION,
   roleCapabilityCriticalityOrder,
@@ -46,16 +45,17 @@ const validModel: RoleCapabilityModel = {
 
 describe("Role Capability Model v1", () => {
   it("uses deterministic criticality ordering", () => {
-    assert.ok(roleCapabilityCriticalityOrder("CRITICAL") > roleCapabilityCriticalityOrder("IMPORTANT"));
-    assert.ok(roleCapabilityCriticalityOrder("IMPORTANT") > roleCapabilityCriticalityOrder("SUPPORTING"));
+    expect(roleCapabilityCriticalityOrder("CRITICAL")).toBeGreaterThan(
+      roleCapabilityCriticalityOrder("IMPORTANT"),
+    );
+    expect(roleCapabilityCriticalityOrder("IMPORTANT")).toBeGreaterThan(
+      roleCapabilityCriticalityOrder("SUPPORTING"),
+    );
   });
 
   it("accepts a fully sourced canonical model", () => {
-    assert.deepEqual(validateRoleCapabilityModel(validModel), []);
-    assert.deepEqual(
-      validateRoleCapabilityModelAgainstCanonicalRequirements(validModel, canonicalRequirements),
-      [],
-    );
+    expect(validateRoleCapabilityModel(validModel)).toEqual([]);
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(validModel, canonicalRequirements)).toEqual([]);
   });
 
   it("fails closed on duplicate identities and missing source versions", () => {
@@ -73,9 +73,9 @@ describe("Role Capability Model v1", () => {
     };
 
     const errors = validateRoleCapabilityModel(invalid);
-    assert.ok(errors.some((error) => error.includes("Duplicate capability_id")));
-    assert.ok(errors.some((error) => error.includes("Duplicate canonical_requirement_id")));
-    assert.ok(errors.some((error) => error.includes("Missing source_version")));
+    expect(errors.some((error) => error.includes("Duplicate capability_id"))).toBe(true);
+    expect(errors.some((error) => error.includes("Duplicate canonical_requirement_id"))).toBe(true);
+    expect(errors.some((error) => error.includes("Missing source_version"))).toBe(true);
   });
 
   it("rejects runtime source types outside the frozen allowlist", () => {
@@ -85,10 +85,9 @@ describe("Role Capability Model v1", () => {
         ...validModel.requirements[0],
         source: { ...validModel.requirements[0].source, source_type: "JD_INFERRED" },
       }],
-    };
+    } as RoleCapabilityModel;
 
-    const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
-    assert.ok(errors.some((error) => error.includes("Unsupported source_type")));
+    expect(validateRoleCapabilityModel(invalid).some((error) => error.includes("Unsupported source_type"))).toBe(true);
   });
 
   it("fails closed when an RCM requirement ID is not in the canonical graph", () => {
@@ -96,9 +95,8 @@ describe("Role Capability Model v1", () => {
       ...validModel,
       requirements: [{ ...validModel.requirements[0], canonical_requirement_id: "req-missing" }],
     };
-    assert.deepEqual(
-      validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements),
-      ["Unknown canonical_requirement_id for regional-finance: req-missing"],
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements)).toContain(
+      "Unknown canonical_requirement_id for regional-finance: req-missing",
     );
   });
 
@@ -107,9 +105,8 @@ describe("Role Capability Model v1", () => {
       ...validModel,
       requirements: [{ ...validModel.requirements[0], normalized_requirement: "Different requirement" }],
     };
-    assert.deepEqual(
-      validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements),
-      ["RCM normalized_requirement diverges from canonical requirement req-regional-finance."],
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements)).toContain(
+      "RCM normalized_requirement diverges from canonical requirement req-regional-finance.",
     );
   });
 
@@ -117,9 +114,10 @@ describe("Role Capability Model v1", () => {
     const invalid = {
       ...validModel,
       version: "rcm-v2",
-    };
+    } as RoleCapabilityModel;
 
-    const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
-    assert.ok(errors.includes("Unsupported Role Capability Model version: rcm-v2"));
+    expect(validateRoleCapabilityModel(invalid)).toContain(
+      "Unsupported Role Capability Model version: rcm-v2",
+    );
   });
 });
