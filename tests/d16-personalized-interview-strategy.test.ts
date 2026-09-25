@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildD16Strategy, validateD16Inputs, validateD16Strategy, type D16Inputs, type D16Strategy } from "@/lib/d16-personalized-interview-strategy";
+import { buildD16DependencySnapshot, buildD16Strategy, validateD16Inputs, validateD16Strategy, type D16Inputs, type D16Strategy } from "@/lib/d16-personalized-interview-strategy";
 
 function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
   const canonical = [
@@ -37,7 +37,9 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
     requirements: [], support_judgments: [], requirement_statuses: [], unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
   };
   const mirror = { version: "d15-v1" as const, evidence: evidence.map((e) => ({ evidence_id: e.evidence_id, source_span_id: e.source_span_id, source_quote: e.source_quote, source_type: e.source_type })), threads: [], statements: [], story: { opening: "x", opening_statement_id: null, threads: [] } };
-  return { mirror, bridge, role_capability_model: rcm, ledger, canonical_requirements: canonical, jd_present: false, ...overrides } as D16Inputs;
+  const input = { mirror, bridge, role_capability_model: rcm, ledger, canonical_requirements: canonical, jd_present: false, jd_fingerprint: null, dependency_snapshot: null, ...overrides } as D16Inputs;
+  input.dependency_snapshot = buildD16DependencySnapshot(input);
+  return input;
 }
 
 describe("D16 personalized interview strategy", () => {
@@ -116,6 +118,79 @@ describe("D16 personalized interview strategy", () => {
     const tampered = structuredClone(strategy);
     tampered.actions[0].assessment_context!.context_id = "FORGED";
     assert.equal(validateD16Strategy(tampered, input).valid, false);
+  });
+
+  it("fails closed when a material dependency becomes stale", () => {
+    const input = fixture();
+    const snapshot = input.dependency_snapshot;
+
+    const changedMirror = structuredClone(input);
+    changedMirror.mirror.evidence[0].source_quote = "Changed evidence.";
+    assert.equal(validateD16Inputs(changedMirror).valid, false);
+
+    const changedRcm = structuredClone(input);
+    changedRcm.role_capability_model.requirements[0].baseline_criticality = "SUPPORTING";
+    assert.equal(validateD16Inputs(changedRcm).valid, false);
+
+    const changedJd = { ...input, jd_present: true, jd_fingerprint: "sha256:changed" };
+    assert.equal(validateD16Inputs(changedJd).valid, false);
+
+    const withAssessment = fixture({ assessment_context: { version: "assessment-context-v1", context_id: "A1", requirement_relevance: { "REQ-B": "HIGH" } } });
+    const changedAssessment = structuredClone(withAssessment);
+    changedAssessment.assessment_context!.context_id = "A2";
+    assert.equal(validateD16Inputs(changedAssessment).valid, false);
+
+    assert.deepEqual(input.dependency_snapshot, snapshot);
+  });
+
+  it("uses deterministic evidence strength and provenance as a final ordering tie-break", () => {
+    const input = fixture();
+    input.canonical_requirements[2] = { id: "REQ-C", normalized_requirement: "Advanced treasury management" };
+    input.bridge.requirements[2] = {
+      ...input.bridge.requirements[2],
+      normalized_requirement: "Advanced treasury management",
+      status: "PARTIAL" as const,
+      route_mode: "TRANSFERABLE" as const,
+      fit_state: "PARTIAL",
+      gap_classification: "TRANSFERABLE",
+      preparation_state: "PREPARE_PARTIAL",
+      strategy_action: "DEMONSTRATE_PARTIAL" as const,
+      evidence: [],
+    };
+    input.role_capability_model.requirements[2] = {
+      ...input.role_capability_model.requirements[2],
+      normalized_requirement: "Advanced treasury management",
+      baseline_criticality: "CRITICAL" as const,
+    };
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    const partials = strategy.tensions.filter((t) => t.canonical_status === "PARTIAL");
+    assert.equal(partials[0].requirement_id, "REQ-B");
+    assert.equal(partials[1].requirement_id, "REQ-C");
+  });
+
+  it("handles French contextual vocabulary without creating a false delta", () => {
+    const input = fixture();
+    const frenchQuote = "Gère les rapports financiers régionaux.";
+    input.canonical_requirements = [{ id: "REQ-A", normalized_requirement: "Gérer les rapports financiers régionaux" }];
+    input.bridge.requirements = [{
+      ...input.bridge.requirements[0],
+      normalized_requirement: "Gérer les rapports financiers régionaux",
+      route_mode: "TRANSFERABLE" as const,
+      evidence: [{ ...input.bridge.requirements[0].evidence[0], source_quote: frenchQuote }],
+    }];
+    input.role_capability_model.requirements = [{
+      ...input.role_capability_model.requirements[0],
+      normalized_requirement: "Gérer les rapports financiers régionaux",
+    }];
+    input.mirror.evidence = [{ ...input.mirror.evidence[0], source_quote: frenchQuote }];
+    input.ledger.source_spans = [{ ...input.ledger.source_spans[0], text: frenchQuote }];
+    input.ledger.evidence = [{ ...input.ledger.evidence[0], source_span_id: "SPAN-A" }];
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find((t) => t.requirement_id === "REQ-A");
+    assert.equal(tension?.contextual_delta.ownership, false);
+    assert.equal(tension?.contextual_delta.scope, false);
   });
 
   it("pins D6 and RCM versions and rejects invalid strategy state", () => {
