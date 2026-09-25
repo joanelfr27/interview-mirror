@@ -228,7 +228,14 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   if (input.bridge.version !== "d6-v1") errors.push("D16 requires D6 version d6-v1.");
   if (input.mirror.version !== "d15-v1") errors.push("D16 requires D15 version d15-v1.");
   if (input.role_capability_model.version !== "rcm-v1") errors.push("D16 requires RCM version rcm-v1.");
-  if (!Array.isArray(input.canonical_requirements)) errors.push("D16 canonical requirements must be an array.");
+  if (!Array.isArray(input.canonical_requirements)) {
+    errors.push("D16 canonical requirements must be an array.");
+    return { valid: false, errors };
+  }
+  if (!input.bridge || !Array.isArray(input.bridge.requirements)) {
+    errors.push("D16 D6 bridge requirements must be an array.");
+    return { valid: false, errors };
+  }
 
   const rcmErrors = validateRoleCapabilityModelAgainstCanonicalRequirements(input.role_capability_model, input.canonical_requirements);
   errors.push(...rcmErrors.map((e) => "RCM: " + e));
