@@ -191,6 +191,8 @@ describe("D16 personalized interview strategy", () => {
       { ...fixture(), canonical_requirements: [null as never] },
       { ...fixture(), bridge: { ...fixture().bridge, requirements: [null as never] } },
       { ...fixture(), bridge: { ...fixture().bridge, requirements: [{ ...fixture().bridge.requirements[0], evidence: null as never }] } },
+      { ...fixture(), bridge: { ...fixture().bridge, requirements: [{ ...fixture().bridge.requirements[0], evidence: [null as never] }] } },
+      { ...fixture(), bridge: { ...fixture().bridge, requirements: [{ ...fixture().bridge.requirements[0], evidence: [{ ...fixture().bridge.requirements[0].evidence[0], source_quote: "" }] }] } },
       { ...fixture(), mirror: { ...fixture().mirror, evidence: null as never } },
       { ...fixture(), ledger: { ...fixture().ledger, evidence: null as never } },
       { ...fixture(), ledger: { ...fixture().ledger, source_spans: null as never } },
