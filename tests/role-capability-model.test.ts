@@ -84,10 +84,16 @@ describe("Role Capability Model v1", () => {
   });
 
   it("fails closed when an RCM requirement ID is not in the canonical graph", () => {
-    const invalid = { ...validModel, requirements: [{ ...validModel.requirements[0], canonical_requirement_id: "req-missing" }] };
-    assert.deepEqual(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements), [
-      "Unknown canonical_requirement_id for regional-finance: req-missing",
-    ]);
+    const invalid = {
+      ...validModel,
+      requirements: [
+        { ...validModel.requirements[0], canonical_requirement_id: "req-missing" },
+        validModel.requirements[1],
+      ],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements);
+    assert.ok(errors.includes("Unknown canonical_requirement_id for regional-finance: req-missing"));
+    assert.equal(errors.length, 1);
   });
 
   it("fails closed when a canonical requirement has no RCM mapping", () => {
@@ -100,10 +106,16 @@ describe("Role Capability Model v1", () => {
   });
 
   it("fails closed when RCM normalized text diverges from the canonical requirement", () => {
-    const invalid = { ...validModel, requirements: [{ ...validModel.requirements[0], normalized_requirement: "Different requirement" }] };
-    assert.deepEqual(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements), [
-      "RCM normalized_requirement diverges from canonical requirement req-regional-finance.",
-    ]);
+    const invalid = {
+      ...validModel,
+      requirements: [
+        { ...validModel.requirements[0], normalized_requirement: "Different requirement" },
+        validModel.requirements[1],
+      ],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements);
+    assert.ok(errors.includes("RCM normalized_requirement diverges from canonical requirement req-regional-finance."));
+    assert.equal(errors.length, 1);
   });
 
   it("fails closed on malformed runtime model shapes", () => {
