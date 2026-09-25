@@ -31,6 +31,7 @@ function extractStandaloneUrl(value: string): string | null {
 
 function isLabelOnlyAroundUrl(value: string, url: string): boolean {
   const remainder = value.replace(url, "").trim();
+  if (!remainder) return true;
   return /^(?:see\s+(?:the\s+)?(?:role|job(?:\s+description)?|jd)|(?:role|job(?:\s+description)?|jd|url|link)|voir\s+(?:le\s+)?(?:poste|r[ôo]le)|(?:poste|r[ôo]le|offre|lien|url))\s*:\s*$/iu.test(remainder);
 }
 async function ensureReusableCv(supabase: any, userId: string, cvText: string, fileName: string) {
@@ -135,7 +136,16 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
   }
 }
 
-function buildProvenance(language: "en" | "fr", cvText: string, jobDescription: string): AnalysisProvenance { return { preparation_language: language, jd_content_hash: sha256(jobDescription), cv_content_hash: sha256(cvText), contract_version: CONTRACT_VERSION }; }
+function buildProvenance(language: "en" | "fr", cvText: string, jobDescription: string, sourceHashes?: { cv?: string; jd?: string }): AnalysisProvenance {
+  return {
+    preparation_language: language,
+    jd_content_hash: sha256(jobDescription),
+    cv_content_hash: sha256(cvText),
+    ...(sourceHashes?.cv ? { cv_source_content_hash: sourceHashes.cv } : {}),
+    ...(sourceHashes?.jd ? { jd_source_content_hash: sourceHashes.jd } : {}),
+    contract_version: CONTRACT_VERSION,
+  };
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -199,7 +209,7 @@ export async function POST(request: Request) {
   let analysis: CvAnalysis;
   try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
   catch { return NextResponse.json({ code: "ANALYSIS_GENERATION_FAILED", error: "We could not produce a reliable Professional Mirror analysis. Please retry." }, { status: 422 }); }
-  const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
+  const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd, { cv: cvDocument.sourceContentHash, jd: jobDescriptionDocument?.sourceContentHash }) } satisfies CvAnalysis;
   const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, experience_language: language, interview_language: interviewLanguage, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
   let id = sessionId ?? null;
   let inputsChanged = false;
