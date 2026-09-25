@@ -17,6 +17,9 @@ D15 is a point-in-time projection of the current canonical evidence. It may pers
 - Ambiguous or contradictory evidence must fail closed or remain at a lower maturity until clarified.
 - Insufficient evidence fails closed.
 - Strategy remains a separate role-specific experience in D16.\n- D15 is job-independent: it describes the candidate career whether or not a target job exists.\n- D15 must not evaluate fit to a role or prescribe how the candidate should bridge a role gap.
+- Evidence may originate in French, English, or a mixture of languages. Source language must not create separate career facts, duplicate threads, or alter evidence strength, ownership, scope, outcome interpretation, or career-stage reasoning.
+- Semantic normalization may reconcile equivalent evidence across languages, but must not add information absent from the source.
+- The validated Mirror and Story are language-independent evidence projections; presentation language is a separate UX concern.
 
 ## Evidence independence
 D15 must not create a second extraction/canonicalization pipeline.
@@ -44,6 +47,18 @@ Output:
 Deterministic thread matching may connect evidence through shared object, domain, tool, or standard. Repeated action may only reinforce a connection when the same action occurs within a shared domain; action labels alone must never create a career thread. Thread membership establishes a supported connection, not progression or increasing responsibility by itself. Progression claims require distinct career-stage evidence such as grounded time, scope, ownership, or responsibility differences.
 
 The first implementation is deterministic. LLM narrative generation is deferred until evidence-addressability can be validated against the deterministic projection.
+
+### Multilingual Evidence Invariant
+
+French and English source evidence must enter the same canonical evidence path and the same D15 projection. Equivalent facts expressed in different languages may contribute to the same canonical career thread when the underlying evidence supports that connection. Language normalization must never upgrade ownership, scope, outcome, seniority, or responsibility beyond what the source supports.
+
+D15 must remain behaviorally consistent when:
+- experience evidence is French and the target interview language is French;
+- experience evidence is French and the target interview language is English;
+- experience evidence is English and the target interview language is French;
+- evidence is mixed French/English.
+
+Interview language affects downstream presentation and practice framing, not the canonical Mirror/Story reasoning.
 
 ## Candidate experience
 The entry experience is intentionally minimal:
@@ -126,7 +141,10 @@ D16 output is an action-oriented contract for D17/D20/D21, not a second Professi
 6. Output is deterministic for identical input.
 7. Story statements trace back to Mirror evidence and valid thread relationships.
 8. Negated evidence cannot support a positive Mirror claim.
-9. No target JD is required or consumed by the D15 projection.\n10. D15 contains no role-fit or gap-bridging logic; that belongs to D16.\n11. D16 can operate with a role capability model when no JD is available.
+9. No target JD is required or consumed by the D15 projection.
+10. D15 reasoning is invariant to source language; multilingual evidence does not create a parallel evidence or career-thread pipeline.
+11. Language normalization cannot upgrade evidence strength, ownership, scope, outcome, or responsibility.
+12. Equivalent multilingual evidence can be reconciled without duplicate career facts when canonical evidence supports equivalence.\n10. D15 contains no role-fit or gap-bridging logic; that belongs to D16.\n11. D16 can operate with a role capability model when no JD is available.
 12. Canonical tests, typecheck and build pass.
 
 ## Candidate-facing WOW
