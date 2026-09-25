@@ -138,14 +138,14 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
     .join(" ")
     .toLowerCase();
   const right = roleText.toLowerCase();
-  const delta = (terms: string[]) => terms.some((term) => right.includes(term) && !evidenceText.includes(term));
+  const containsTerm = (text: string, variants: string[]) => {\n    const escaped = variants.map((variant) => variant.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\  const delta = (terms: string[]) => terms.some((term) => right.includes(term) && !evidenceText.includes(term));")).join("|");\n    return new RegExp("\\\\b(?:" + escaped + ")\\\\b", "i").test(text);\n  };\n  const delta = (terms: string[][]) => terms.some((variants) => containsTerm(right, variants) && !containsTerm(evidenceText, variants));
   return {
-    scope: delta(["scope", "regional", "global", "multi-country", "multiple"]),
-    ownership: delta(["ownership", "own", "lead", "accountable"]),
-    complexity: delta(["complex", "transformation", "integration", "advanced"]),
-    seniority: delta(["senior", "director", "head", "manager"]),
-    scale: delta(["large", "million", "multi-site", "enterprise"]),
-    domain: delta(["industry", "sector", "domain", "regulated"]),
+    scope: delta([["scope"], ["regional"], ["global"], ["multi-country"], ["multiple"]]),
+    ownership: delta([["ownership"], ["own"], ["lead", "led", "leading"], ["accountable"]]),
+    complexity: delta([[["complex"], ["transformation"], ["integration"], ["advanced"]]]),
+    seniority: delta([[["senior"], ["director"], ["head"], ["manager"]]]),
+    scale: delta([[["large"], ["million"], ["multi-site"], ["enterprise"]]]),
+    domain: delta([[["industry"], ["sector"], ["domain"], ["regulated"]]]),
   };
 }
 
@@ -211,7 +211,7 @@ function boundariesFor(item: CanonicalStrategyBridgeRequirement) {
 function compareTensions(a: StrategicTension, b: StrategicTension): number {
   return (
     STATUS_PRIORITY[b.canonical_status] - STATUS_PRIORITY[a.canonical_status] ||
-    roleCapabilityCriticalityOrder(b.role_criticality) * -1 + roleCapabilityCriticalityOrder(a.role_criticality) ||
+    roleCapabilityCriticalityOrder(b.role_criticality) - roleCapabilityCriticalityOrder(a.role_criticality) ||
     ({ HIGH: 3, MEDIUM: 2, LOW: 1, UNKNOWN: 0 }[b.assessment_relevance] - { HIGH: 3, MEDIUM: 2, LOW: 1, UNKNOWN: 0 }[a.assessment_relevance]) ||
     deltaCount(b.contextual_delta) - deltaCount(a.contextual_delta) ||
     Number(b.contradiction_present) - Number(a.contradiction_present) ||
