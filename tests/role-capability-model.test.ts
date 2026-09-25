@@ -117,6 +117,56 @@ describe("Role Capability Model v1", () => {
     }
   });
 
+  it("rejects whitespace-only requirement fields", () => {
+    const invalid = {
+      ...validModel,
+      requirements: [
+        {
+          ...validModel.requirements[0],
+          capability_id: "   ",
+          normalized_requirement: "   ",
+          canonical_requirement_id: "   ",
+        },
+      ],
+    };
+    const errors = validateRoleCapabilityModel(invalid);
+    assert.ok(errors.some((error) => error.includes("Empty capability_id")));
+    assert.ok(errors.some((error) => error.includes("Empty normalized_requirement")));
+    assert.ok(errors.some((error) => error.includes("Missing canonical_requirement_id")));
+  });
+
+  it("rejects malformed and duplicate canonical requirements", () => {
+    const duplicateCanonical = [
+      ...canonicalRequirements,
+      { id: "req-regional-finance", normalized_requirement: "Different requirement" },
+    ];
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(
+      validModel,
+      duplicateCanonical,
+    );
+    assert.ok(errors.some((error) => error.includes("Duplicate canonical requirement ID: req-regional-finance")));
+
+    const blankCanonical = [
+      { id: "req-blank", normalized_requirement: "   " },
+    ];
+    const blankErrors = validateRoleCapabilityModelAgainstCanonicalRequirements(
+      {
+        ...validModel,
+        requirements: [
+          {
+            ...validModel.requirements[0],
+            canonical_requirement_id: "req-blank",
+            normalized_requirement: "   ",
+          },
+        ],
+      },
+      blankCanonical,
+    );
+    assert.ok(blankErrors.some((error) =>
+      error.includes("Canonical requirement must contain valid id and normalized_requirement fields."),
+    ));
+  });
+
   it("rejects an unsupported model version", () => {
     const invalid = { ...validModel, version: "rcm-v2" };
     const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
