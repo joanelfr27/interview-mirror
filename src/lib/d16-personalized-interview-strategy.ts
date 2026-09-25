@@ -145,7 +145,7 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
   const delta = (terms: string[][]) => terms.some((variants) => containsTerm(right, variants) && !containsTerm(evidenceText, variants));
   return {
     scope: delta([["scope"], ["regional"], ["global"], ["multi-country"], ["multiple"]]),
-    ownership: delta([["ownership"], ["own"], ["lead", "led", "leading"], ["accountable"]]),
+    ownership: delta([["ownership"], ["own"], ["manage", "managed", "managing", "management"], ["lead", "led", "leading"], ["accountable"]]),
     complexity: delta([["complex"], ["transformation"], ["integration"], ["advanced"]]),
     seniority: delta([["senior"], ["director"], ["head"], ["manager"]]),
     scale: delta([["large"], ["million"], ["multi-site"], ["enterprise"]]),
@@ -225,6 +225,15 @@ function compareTensions(a: StrategicTension, b: StrategicTension): number {
 
 export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { valid: false, errors: ["D16 input must be an object."] };
+  }
+  if (!input.bridge || typeof input.bridge !== "object" || Array.isArray(input.bridge)) errors.push("D16 D6 bridge must be an object.");
+  if (!input.mirror || typeof input.mirror !== "object" || Array.isArray(input.mirror)) errors.push("D16 D15 mirror must be an object.");
+  if (!input.role_capability_model || typeof input.role_capability_model !== "object" || Array.isArray(input.role_capability_model)) errors.push("D16 RCM must be an object.");
+  if (!input.ledger || typeof input.ledger !== "object" || Array.isArray(input.ledger)) errors.push("D16 evidence ledger must be an object.");
+  if (input.assessment_context !== undefined && (!input.assessment_context || typeof input.assessment_context !== "object" || Array.isArray(input.assessment_context))) errors.push("D16 Assessment Context must be an object.");
+  if (errors.length) return { valid: false, errors };
   if (input.bridge.version !== "d6-v1") errors.push("D16 requires D6 version d6-v1.");
   if (input.mirror.version !== "d15-v1") errors.push("D16 requires D15 version d15-v1.");
   if (input.role_capability_model.version !== "rcm-v1") errors.push("D16 requires RCM version rcm-v1.");
@@ -273,6 +282,8 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
 
   if (input.assessment_context) {
     if (input.assessment_context.version !== "assessment-context-v1" || !nonBlank(input.assessment_context.context_id)) errors.push("D16 Assessment Context is malformed.");
+    const allowedAssessmentKeys = new Set(["version", "context_id", "requirement_relevance"]);
+    for (const key of Object.keys(input.assessment_context)) if (!allowedAssessmentKeys.has(key)) errors.push("D16 Assessment Context contains an unsupported field: " + key);
     for (const [id, value] of Object.entries(input.assessment_context.requirement_relevance)) {
       if (!bridgeSeen.has(id)) errors.push("D16 Assessment Context references unknown requirement: " + id);
       if (!["HIGH", "MEDIUM", "LOW", "UNKNOWN"].includes(value)) errors.push("D16 Assessment Context relevance is invalid: " + id);
@@ -318,6 +329,10 @@ export function buildD16Strategy(input: D16Inputs): D16Strategy {
       } satisfies StrategicTension;
     })
     .filter((x): x is StrategicTension => Boolean(x))
+    .reduce((unique, tension) => {
+      if (!unique.some((item) => item.requirement_id === tension.requirement_id)) unique.push(tension);
+      return unique;
+    }, [] as StrategicTension[])
     .sort(compareTensions)
     .slice(0, 3)
     .map((tension, index) => ({ ...tension, preparation_priority: index + 1 }));
