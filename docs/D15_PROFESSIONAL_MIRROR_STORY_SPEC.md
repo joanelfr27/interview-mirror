@@ -101,10 +101,10 @@ D16 is the role-specific interview-preparation strategy layer. It consumes:
 D16 reuses the validated D6 projection rather than deriving a parallel strategy graph.
 
 With a JD:
-D15 Mirror/Story + Role Capability Model + JD + Assessment Context → D16 Strategy.
+D15 Mirror/Story + validated D6 Canonical Strategy Bridge + Role Capability Model + JD + Assessment Context → D16 Strategy.
 
 Without a JD:
-D15 Mirror/Story + Role Capability Model + Assessment Context → D16 Strategy.
+D15 Mirror/Story + validated D6 Canonical Strategy Bridge + Role Capability Model + Assessment Context → D16 Strategy.
 
 D16 reuses the existing D1–D4 canonical requirement/support/gap reasoning. It does not create a second evidence ontology, generic fit score, or replacement evidence pipeline.
 
