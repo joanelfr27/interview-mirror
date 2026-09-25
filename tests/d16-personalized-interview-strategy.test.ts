@@ -55,6 +55,7 @@ describe("D16 personalized interview strategy", () => {
     input.bridge.requirements = [input.bridge.requirements[0]];
     input.canonical_requirements = [input.canonical_requirements[0]];
     input.role_capability_model.requirements = [input.role_capability_model.requirements[0]];
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
     const strategy = buildD16Strategy(input);
     assert.equal(strategy.tensions.length, 0);
   });
@@ -205,6 +206,7 @@ describe("D16 personalized interview strategy", () => {
     input.bridge.requirements = [input.bridge.requirements[0]];
     input.canonical_requirements = [input.canonical_requirements[0]];
     input.role_capability_model.requirements = [input.role_capability_model.requirements[0]];
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
     const strategy = buildD16Strategy(input);
     assert.equal(strategy.tensions.length, 0);
   });
@@ -261,6 +263,7 @@ describe("D16 personalized interview strategy", () => {
     input.bridge.requirements = [{ ...input.bridge.requirements[0], normalized_requirement: "Manage regional financial reporting", route_mode: "TRANSFERABLE" as const }];
     input.role_capability_model.requirements = [{ ...input.role_capability_model.requirements[0], normalized_requirement: "Manage regional financial reporting" }];
     input.canonical_requirements[0] = { id: "REQ-A", normalized_requirement: "Manage regional financial reporting" };
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
     const strategy = buildD16Strategy(input);
     const tension = strategy.tensions.find((t) => t.requirement_id === "REQ-A");
     assert.equal(tension?.contextual_delta.ownership, false);
