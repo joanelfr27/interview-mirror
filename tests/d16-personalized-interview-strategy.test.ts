@@ -96,8 +96,26 @@ describe("D16 personalized interview strategy", () => {
       assert.deepEqual(action.evidence_ids, tension.evidence_ids);
       assert.equal(action.canonical_status, tension.canonical_status);
       assert.equal(action.role_criticality, tension.role_criticality);
+      assert.equal(action.assessment_context, null);
       assert.ok(["PREP", "PRACTICE", "EVALUATION"].includes(action.dispatcher));
     }
+  });
+
+  it("propagates the exact validated Assessment Context to every action", () => {
+    const assessment_context = {
+      version: "assessment-context-v1" as const,
+      context_id: "A1",
+      requirement_relevance: { "REQ-B": "HIGH" as const, "REQ-D": "UNKNOWN" as const },
+    };
+    const input = fixture({ assessment_context });
+    const strategy = buildD16Strategy(input);
+    for (const action of strategy.actions) {
+      assert.deepEqual(action.assessment_context, assessment_context);
+    }
+
+    const tampered = structuredClone(strategy);
+    tampered.actions[0].assessment_context!.context_id = "FORGED";
+    assert.equal(validateD16Strategy(tampered, input).valid, false);
   });
 
   it("pins D6 and RCM versions and rejects invalid strategy state", () => {
