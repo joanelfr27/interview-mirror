@@ -27,7 +27,7 @@ D1–D10 Canonical Evidence
 Required:
 - validated D15 Professional Mirror/Story;
 - Role Capability Model;
-- canonical D1–D4 requirement/support/gap outputs.
+- validated D6 Canonical Strategy Bridge projection (with D1–D5 outputs validated upstream).
 
 Optional:
 - Job Description;
@@ -51,7 +51,8 @@ The existing architecture is authoritative in this order:
 D16 consumes those validated identities and states; it does not regenerate them.
 
 - Role Capability Model provides the authoritative role baseline and baseline requirement criticality.
-- A JD may enrich employer-specific context and criticality only through deterministic, validated rules; JD wording is not itself ground truth.
+- A JD may enrich employer-specific context and requirement identity only through deterministic, validated rules; JD wording is not itself ground truth.
+- **V1 does not permit a JD or Assessment Context to numerically modify Role Capability Model baseline criticality.** They may affect requirement reconciliation and assessment relevance respectively. Any future criticality modifier must be introduced as an explicitly versioned deterministic rule and separately audited.
 - Assessment Context may modify assessment relevance and preparation priority, but must not invent a role requirement or baseline criticality.
 - Every requirement entering D16 must resolve to an existing canonical `requirement_id` with traceable source/provenance.
 - If a JD or Role Capability Model introduces a requirement not present in the canonical graph, D16 must use the existing canonical requirement-normalization path to reconcile it or leave it unresolved/fail closed; it must not create a parallel D16 requirement graph.
@@ -80,18 +81,17 @@ D16 must not use the legacy V23 EvidenceMap, V23 `PROVEN/PARTIALLY_PROVEN/UNKNOW
 
 Criticality is authoritative only when traceable to validated Role Capability Model data and deterministic contextual rules. The derivation must be reproducible from:
 1. Role Capability Model baseline criticality;
-2. validated JD-specific modifiers, where explicitly supported; and
-3. Assessment Context relevance, where applicable.
+2. assessment relevance from validated Assessment Context.
 
-For V1, D16 must preserve two distinct values:
-- **role_criticality** — the validated baseline importance of the requirement in the Role Capability Model, optionally modified only by an explicitly supported deterministic JD rule;
+For V1, there is no JD criticality modifier. D16 must preserve two distinct values:
+- **role_criticality** — the validated baseline importance of the requirement in the Role Capability Model, unchanged by JD or Assessment Context in V1;
 - **assessment_relevance** — the validated relevance of that requirement to the stated Assessment Context.
 
 Assessment relevance may change preparation priority, but may not silently overwrite role criticality.
 
 If no validated deterministic modifier exists for a JD or Assessment Context, the baseline role criticality remains unchanged and the contextual input is represented separately. UNKNOWN context therefore cannot increase or decrease baseline criticality.
 
-The exact typed values, modifier whitelist, precedence rules, and deterministic tie-breakers must be frozen in the implementation contract before implementation. LLM output may extract or normalize semantics, but may not assign final criticality.
+The typed values and deterministic tie-breakers must be frozen in the implementation contract before implementation. A future JD criticality modifier, if introduced, requires a separate versioned rule and tests. LLM output may extract or normalize semantics, but may not assign final criticality.
 
 ## Canonical requirement reasoning
 
