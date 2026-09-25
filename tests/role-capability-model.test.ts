@@ -1,0 +1,197 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  ROLE_CAPABILITY_MODEL_VERSION,
+  roleCapabilityCriticalityOrder,
+  validateRoleCapabilityModel,
+  validateRoleCapabilityModelAgainstCanonicalRequirements,
+  type RoleCapabilityModel,
+} from "@/lib/role-capability-model";
+
+const canonicalRequirements = [
+  { id: "req-regional-finance", normalized_requirement: "Regional finance leadership" },
+  { id: "req-reporting", normalized_requirement: "Financial reporting" },
+];
+
+const validModel: RoleCapabilityModel = {
+  version: ROLE_CAPABILITY_MODEL_VERSION,
+  model_id: "finance-manager-v1",
+  role_family: "FINANCE_MANAGEMENT",
+  role_title: "Finance Manager",
+  requirements: [
+    {
+      capability_id: "regional-finance",
+      normalized_requirement: "Regional finance leadership",
+      baseline_criticality: "CRITICAL",
+      source: {
+        source_type: "ROLE_TEMPLATE",
+        source_id: "finance-manager",
+        source_version: "2026-09",
+      },
+      canonical_requirement_id: "req-regional-finance",
+    },
+    {
+      capability_id: "reporting",
+      normalized_requirement: "Financial reporting",
+      baseline_criticality: "IMPORTANT",
+      source: {
+        source_type: "ROLE_TEMPLATE",
+        source_id: "finance-manager",
+        source_version: "2026-09",
+      },
+      canonical_requirement_id: "req-reporting",
+    },
+  ],
+};
+
+describe("Role Capability Model v1", () => {
+  it("uses deterministic criticality ordering", () => {
+    assert.ok(roleCapabilityCriticalityOrder("CRITICAL") > roleCapabilityCriticalityOrder("IMPORTANT"));
+    assert.ok(roleCapabilityCriticalityOrder("IMPORTANT") > roleCapabilityCriticalityOrder("SUPPORTING"));
+  });
+
+  it("accepts a fully sourced canonical model", () => {
+    assert.deepEqual(validateRoleCapabilityModel(validModel), []);
+    assert.deepEqual(validateRoleCapabilityModelAgainstCanonicalRequirements(validModel, canonicalRequirements), []);
+  });
+
+  it("fails closed on duplicate identities and missing source versions", () => {
+    const invalid: RoleCapabilityModel = {
+      ...validModel,
+      requirements: [
+        validModel.requirements[0],
+        {
+          ...validModel.requirements[1],
+          capability_id: validModel.requirements[0].capability_id,
+          canonical_requirement_id: validModel.requirements[0].canonical_requirement_id,
+          source: { ...validModel.requirements[1].source, source_version: "" },
+        },
+      ],
+    };
+    const errors = validateRoleCapabilityModel(invalid);
+    assert.ok(errors.some((error) => error.includes("Duplicate capability_id")));
+    assert.ok(errors.some((error) => error.includes("Duplicate canonical_requirement_id")));
+    assert.ok(errors.some((error) => error.includes("Missing source_version")));
+  });
+
+  it("rejects runtime source types outside the frozen allowlist", () => {
+    const invalid = {
+      ...validModel,
+      requirements: [{ ...validModel.requirements[0], source: { ...validModel.requirements[0].source, source_type: "JD_INFERRED" } }],
+    };
+    const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
+    assert.ok(errors.some((error) => error.includes("Unsupported source_type")));
+  });
+
+  it("fails closed when an RCM requirement ID is not in the canonical graph", () => {
+    const invalid = {
+      ...validModel,
+      requirements: [
+        { ...validModel.requirements[0], canonical_requirement_id: "req-missing" },
+        validModel.requirements[1],
+      ],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements);
+    assert.ok(errors.includes("Unknown canonical_requirement_id for regional-finance: req-missing"));
+    assert.ok(errors.includes("Missing RCM requirement for canonical requirement req-regional-finance."));
+    assert.equal(errors.length, 2);
+  });
+
+  it("fails closed when a canonical requirement has no RCM mapping", () => {
+    const incomplete = {
+      ...validModel,
+      requirements: [validModel.requirements[0]],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(incomplete, canonicalRequirements);
+    assert.ok(errors.some((error) => error.includes("Missing RCM requirement for canonical requirement req-reporting.")));
+  });
+
+  it("fails closed when RCM normalized text diverges from the canonical requirement", () => {
+    const invalid = {
+      ...validModel,
+      requirements: [
+        { ...validModel.requirements[0], normalized_requirement: "Different requirement" },
+        validModel.requirements[1],
+      ],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements);
+    assert.ok(errors.includes("RCM normalized_requirement diverges from canonical requirement req-regional-finance."));
+    assert.equal(errors.length, 1);
+  });
+
+  it("fails closed on malformed runtime model shapes", () => {
+    const malformedModels: unknown[] = [
+      null,
+      undefined,
+      {},
+      { ...validModel, requirements: undefined },
+      { ...validModel, requirements: {} },
+      { ...validModel, model_id: undefined },
+      { ...validModel, requirements: [{ ...validModel.requirements[0], source: undefined }] },
+    ];
+
+    for (const malformed of malformedModels) {
+      assert.doesNotThrow(() => validateRoleCapabilityModel(malformed));
+      assert.ok(validateRoleCapabilityModel(malformed).length > 0);
+      assert.doesNotThrow(() =>
+        validateRoleCapabilityModelAgainstCanonicalRequirements(malformed as unknown as RoleCapabilityModel, canonicalRequirements),
+      );
+    }
+  });
+
+  it("rejects whitespace-only requirement fields", () => {
+    const invalid = {
+      ...validModel,
+      requirements: [
+        {
+          ...validModel.requirements[0],
+          capability_id: "   ",
+          normalized_requirement: "   ",
+          canonical_requirement_id: "   ",
+        },
+      ],
+    };
+    const errors = validateRoleCapabilityModel(invalid);
+    assert.ok(errors.some((error) => error.includes("Empty capability_id")));
+    assert.ok(errors.some((error) => error.includes("Empty normalized_requirement")));
+    assert.ok(errors.some((error) => error.includes("Missing canonical_requirement_id")));
+  });
+
+  it("rejects malformed and duplicate canonical requirements", () => {
+    const duplicateCanonical = [
+      ...canonicalRequirements,
+      { id: "req-regional-finance", normalized_requirement: "Different requirement" },
+    ];
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(
+      validModel,
+      duplicateCanonical,
+    );
+    assert.ok(errors.some((error) => error.includes("Duplicate canonical requirement ID: req-regional-finance")));
+
+    const blankCanonical = [
+      { id: "req-blank", normalized_requirement: "   " },
+    ];
+    const blankErrors = validateRoleCapabilityModelAgainstCanonicalRequirements(
+      {
+        ...validModel,
+        requirements: [
+          {
+            ...validModel.requirements[0],
+            canonical_requirement_id: "req-blank",
+            normalized_requirement: "   ",
+          },
+        ],
+      },
+      blankCanonical,
+    );
+    assert.ok(blankErrors.some((error) =>
+      error.includes("Canonical requirement must contain valid id and normalized_requirement fields."),
+    ));
+  });
+
+  it("rejects an unsupported model version", () => {
+    const invalid = { ...validModel, version: "rcm-v2" };
+    const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
+    assert.ok(errors.includes("Unsupported Role Capability Model version: rcm-v2"));
+  });
+});

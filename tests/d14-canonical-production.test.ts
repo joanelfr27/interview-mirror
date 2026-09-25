@@ -37,3 +37,11 @@ test("D14 analysis route retains canonical input gates", () => {
   assert.match(source, /CANONICAL_JD_REQUIRED/);
   assert.match(source, /canonicalDocumentFromBody/);
 });
+
+
+test("D16 blocks the legacy candidate-facing strategy route until authoritative cutover is enabled", () => {
+  const source = fs.readFileSync(path.join(root, "src/app/api/strategy/[id]/route.ts"), "utf8");
+  assert.match(source, /D16_PRODUCTION_CUTOVER_ENABLED/);
+  assert.doesNotMatch(source, /runStrategyEngineV23Lite\s*\(/);
+  assert.match(source, /D16_PRODUCTION_CUTOVER_REQUIRED/);
+});
