@@ -175,8 +175,8 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
   };
   const delta = (terms: string[][]) => terms.some((variants) => containsTerm(right, variants) && !containsTerm(evidenceText, variants));
   return {
-    scope: delta([["scope", "périmètre", "perimetre"], ["regional", "régional", "régionale"], ["global", "mondial", "mondiale"], ["multi-country", "multi-pays"], ["multiple", "plusieurs"]]),
-    ownership: delta([["ownership", "propriété"], ["own", "posséder", "possède"], ["manage", "managed", "managing", "management", "lead", "led", "leading", "gérer", "géré", "gérée", "gestion", "diriger", "dirigé", "dirigée"], ["accountable", "responsable", "redevable"]]),
+    scope: delta([["scope", "périmètre", "perimetre"], ["regional", "régional", "régionale", "régionaux", "régionales"], ["global", "mondial", "mondiale"], ["multi-country", "multi-pays"], ["multiple", "plusieurs"]]),
+    ownership: delta([["ownership", "propriété"], ["own", "posséder", "possède", "possèdent"], ["manage", "managed", "managing", "management", "lead", "led", "leading", "gérer", "géré", "gérée", "gestion", "diriger", "dirigé", "dirigée"], ["accountable", "responsable", "redevable"]]),
     complexity: delta([["complex", "complexe"], ["transformation"], ["integration", "intégration"], ["advanced", "avancé", "avancée"]]),
     seniority: delta([["senior"], ["director", "directeur", "directrice"], ["head", "responsable", "chef"], ["manager", "gestionnaire"]]),
     scale: delta([["large", "grand", "grande"], ["million"], ["multi-site", "multi-sites"], ["enterprise", "entreprise"]]),
