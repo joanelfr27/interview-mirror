@@ -134,6 +134,44 @@ describe("D16 personalized interview strategy", () => {
     assert.equal(partials[1].role_criticality, "IMPORTANT");
   });
 
+  it("fails closed on malformed top-level D16 dependencies", () => {
+    const input = fixture();
+    for (const key of ["bridge", "mirror", "role_capability_model", "ledger"] as const) {
+      const malformed = { ...input, [key]: null } as unknown as D16Inputs;
+      assert.doesNotThrow(() => validateD16Inputs(malformed));
+      assert.equal(validateD16Inputs(malformed).valid, false);
+    }
+    const malformedAssessment = { ...input, assessment_context: [] } as unknown as D16Inputs;
+    assert.doesNotThrow(() => validateD16Inputs(malformedAssessment));
+    assert.equal(validateD16Inputs(malformedAssessment).valid, false);
+    assert.doesNotThrow(() => validateD16Inputs(null as unknown as D16Inputs));
+    assert.equal(validateD16Inputs(null as unknown as D16Inputs).valid, false);
+  });
+
+  it("rejects unsupported Assessment Context fields", () => {
+    const input = fixture({
+      assessment_context: {
+        version: "assessment-context-v1",
+        context_id: "A1",
+        requirement_relevance: { "REQ-B": "HIGH" },
+      },
+    });
+    (input.assessment_context as any).unexpected = "ignored";
+    const validation = validateD16Inputs(input);
+    assert.equal(validation.valid, false);
+    assert.ok(validation.errors.some((e) => e.includes("unsupported field")));
+  });
+
+  it("recognizes common ownership verb variants for contextual delta", () => {
+    const input = fixture();
+    input.canonical_requirements[0] = { id: "REQ-A", normalized_requirement: "Manage regional financial reporting" };
+    input.bridge.requirements[0] = { ...input.bridge.requirements[0], normalized_requirement: "Manage regional financial reporting" };
+    input.role_capability_model.requirements[0] = { ...input.role_capability_model.requirements[0], normalized_requirement: "Manage regional financial reporting" };
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find((t) => t.requirement_id === "REQ-A");
+    assert.equal(tension?.contextual_delta.ownership, true);
+  });
+
   it("fails closed when canonical or D6 requirements are not arrays", () => {
     const input = fixture();
     const malformedCanonical = { ...input, canonical_requirements: "invalid" } as unknown as D16Inputs;
