@@ -270,6 +270,7 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   const rcm = input.role_capability_model;
   const ledger = input.ledger;
   if (typeof input.jd_fingerprint !== "string" && input.jd_fingerprint !== null) errors.push("D16 jd_fingerprint must be a string or null.");
+  if (typeof input.jd_fingerprint === "string" && !nonBlank(input.jd_fingerprint)) errors.push("D16 jd_fingerprint must be nonblank.");
   if (!isRecord(input.dependency_snapshot)) errors.push("D16 dependency snapshot must be an object.");
 
   if (!isRecord(bridge)) errors.push("D16 D6 bridge must be an object.");
