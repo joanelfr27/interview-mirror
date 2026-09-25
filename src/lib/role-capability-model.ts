@@ -199,6 +199,16 @@ export function validateRoleCapabilityModelAgainstCanonicalRequirements(
     });
   }
 
+  const rcmRequirementIds = new Set<string>();
+  for (const requirement of candidate.requirements) {
+    if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) continue;
+    const id = (requirement as Record<string, unknown>).canonical_requirement_id;
+    if (typeof id === "string" && id.trim()) rcmRequirementIds.add(id);
+  }
+  for (const id of canonicalById.keys()) {
+    if (!rcmRequirementIds.has(id)) errors.push(`Missing RCM requirement for canonical requirement ${id}.`);
+  }
+
   for (const requirement of candidate.requirements) {
     if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
       continue;
