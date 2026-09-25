@@ -202,6 +202,9 @@ export default function PrepareForm() {
   async function onJobDescriptionFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setJobDescription("");
+    setJobDescriptionDocument(null);
+    setJobDescriptionUrl("");
     try {
       const lower = file.name.toLowerCase();
       if (file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(lower)) {
