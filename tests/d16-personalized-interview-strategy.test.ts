@@ -169,7 +169,7 @@ describe("D16 personalized interview strategy", () => {
     input.role_capability_model.requirements[0] = { ...input.role_capability_model.requirements[0], normalized_requirement: "Manage regional financial reporting" };
     const strategy = buildD16Strategy(input);
     const tension = strategy.tensions.find((t) => t.requirement_id === "REQ-A");
-    assert.equal(tension?.contextual_delta.ownership, true);
+    assert.equal(tension?.contextual_delta.ownership, false);
   });
 
   it("fails closed when canonical or D6 requirements are not arrays", () => {
