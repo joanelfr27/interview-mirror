@@ -80,6 +80,7 @@ export type D16Action = {
   prep_objective: string;
   practice_target: string;
   truthfulness_boundary: StrategicTension["truthfulness_boundary"];
+  assessment_context: AssessmentContext | null;
 };
 
 export type D16Strategy = {
@@ -405,11 +406,11 @@ export function buildD16Strategy(input: D16Inputs): D16Strategy {
     .slice(0, 3)
     .map((tension, index) => ({ ...tension, preparation_priority: index + 1 }));
 
-  const actions = dispatchD16Actions(tensions);
+  const actions = dispatchD16Actions(tensions, input.assessment_context);
   return { version: D16_VERSION, d6_version: "d6-v1", role_capability_model_version: "rcm-v1", jd_present: input.jd_present, tensions, actions };
 }
 
-export function dispatchD16Actions(tensions: StrategicTension[]): D16Action[] {
+export function dispatchD16Actions(tensions: StrategicTension[], assessment_context?: AssessmentContext): D16Action[] {
   return tensions.flatMap((tension) => {
     const common = {
       requirement_id: tension.requirement_id,
@@ -423,6 +424,11 @@ export function dispatchD16Actions(tensions: StrategicTension[]): D16Action[] {
       prep_objective: tension.prep_objective,
       practice_target: tension.practice_target,
       truthfulness_boundary: tension.truthfulness_boundary,
+      assessment_context: assessment_context ? {
+        version: assessment_context.version,
+        context_id: assessment_context.context_id,
+        requirement_relevance: { ...assessment_context.requirement_relevance },
+      } : null,
     };
     return [
       { id: tension.id + "-PREP", dispatcher: "PREP" as const, ...common },
