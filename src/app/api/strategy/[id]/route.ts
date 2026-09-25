@@ -72,6 +72,10 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   };
 }
 
+async function generateStrategy(_session: SessionRecord): Promise<InterviewStrategy> {
+  throw new Error("D16 production cutover required.");
+}
+
 function hasCurrentEngineVersion(strategy: unknown): boolean {
   return Boolean(strategy && typeof strategy === "object" && (strategy as any)._strategy_engine_version === STRATEGY_ENGINE_VERSION);
 }
