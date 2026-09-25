@@ -320,13 +320,13 @@ At minimum:
 1. Reconcile this specification against the existing D1–D6 strategy architecture.
 2. Freeze this specification after Claude/Gemini adversarial review.
 3. Define typed D16 contracts.
-3. Implement deterministic assessment and validation.
-4. Implement Action Dispatcher.
-5. Add D17/D20/D21 handoff tests.
-6. Add no-JD and Assessment Context tests.
-7. Run canonical suite, typecheck and build.
-8. Run CodeRabbit.
-9. Perform independent adversarial audit against the exact commit.
+4. Implement deterministic assessment and validation.
+5. Implement Action Dispatcher.
+6. Add D17/D20/D21 handoff tests.
+7. Add no-JD and Assessment Context tests.
+8. Run canonical suite, typecheck and build.
+9. Run CodeRabbit.
+10. Perform independent adversarial audit against the exact commit.
 11. Update the Master Research & Product Record only after the implementation audit passes.
 
 ## Second WOW
