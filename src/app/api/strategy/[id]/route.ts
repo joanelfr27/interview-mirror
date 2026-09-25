@@ -9,7 +9,7 @@ import { STRATEGY_ENGINE_VERSION } from "@/lib/strategy-engine-version";
 export const maxDuration = 60;
 
 /** D16 production cutover gate. V23 must not remain candidate-authoritative. */
-export const D16_PRODUCTION_CUTOVER_ENABLED = false;
+const D16_PRODUCTION_CUTOVER_ENABLED = false;
 
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
