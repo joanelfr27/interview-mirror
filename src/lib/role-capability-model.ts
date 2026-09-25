@@ -41,12 +41,14 @@ const CRITICALITY_ORDER: Record<RoleCapabilityCriticality, number> = {
   SUPPORTING: 1,
 };
 
+/** Returns the deterministic ordering value for a role capability criticality. */
 export function roleCapabilityCriticalityOrder(
   criticality: RoleCapabilityCriticality,
 ): number {
   return CRITICALITY_ORDER[criticality];
 }
 
+/** Validates the structural and provenance contract of an RCM v1 model. */
 export function validateRoleCapabilityModel(
   model: RoleCapabilityModel,
 ): string[] {
@@ -105,7 +107,7 @@ export function validateRoleCapabilityModel(
 /** Validates RCM requirement IDs and normalized text against the canonical D1–D3 requirement graph. */
 export function validateRoleCapabilityModelAgainstCanonicalRequirements(
   model: RoleCapabilityModel,
-  canonicalRequirements: readonly Requirement[],
+  canonicalRequirements: readonly Pick<Requirement, "id" | "normalized_requirement">[],
 ): string[] {
   const errors = validateRoleCapabilityModel(model);
   const canonicalById = new Map(canonicalRequirements.map((requirement) => [requirement.id, requirement]));
