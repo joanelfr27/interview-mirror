@@ -49,60 +49,105 @@ export function roleCapabilityCriticalityOrder(
 }
 
 /** Validates the structural and provenance contract of an RCM v1 model. */
-export function validateRoleCapabilityModel(
-  model: RoleCapabilityModel,
-): string[] {
+export function validateRoleCapabilityModel(model: unknown): string[] {
   const errors: string[] = [];
 
-  if (model.version !== ROLE_CAPABILITY_MODEL_VERSION) {
-    errors.push(`Unsupported Role Capability Model version: ${model.version}`);
+  if (!model || typeof model !== "object" || Array.isArray(model)) {
+    return ["Role Capability Model must be an object."];
   }
-  if (!model.model_id.trim()) errors.push("Role Capability Model model_id is required.");
-  if (!model.role_family.trim()) errors.push("Role Capability Model role_family is required.");
-  if (!model.role_title.trim()) errors.push("Role Capability Model role_title is required.");
+
+  const candidate = model as Record<string, unknown>;
+
+  if (candidate.version !== ROLE_CAPABILITY_MODEL_VERSION) {
+    errors.push(`Unsupported Role Capability Model version: ${String(candidate.version)}`);
+  }
+
+  for (const [field, label] of [
+    ["model_id", "model_id"],
+    ["role_family", "role_family"],
+    ["role_title", "role_title"],
+  ] as const) {
+    if (typeof candidate[field] !== "string" || !candidate[field].trim()) {
+      errors.push(`Role Capability Model ${label} is required.`);
+    }
+  }
+
+  if (!Array.isArray(candidate.requirements)) {
+    errors.push("Role Capability Model requirements must be an array.");
+    return errors;
+  }
 
   const capabilityIds = new Set<string>();
   const requirementIds = new Set<string>();
 
-  for (const requirement of model.requirements) {
-    if (capabilityIds.has(requirement.capability_id)) {
-      errors.push(`Duplicate capability_id: ${requirement.capability_id}`);
-    }
-    capabilityIds.add(requirement.capability_id);
-
-    if (requirementIds.has(requirement.canonical_requirement_id)) {
-      errors.push(`Duplicate canonical_requirement_id: ${requirement.canonical_requirement_id}`);
-    }
-    requirementIds.add(requirement.canonical_requirement_id);
-
-    if (!requirement.capability_id.trim()) errors.push("Empty capability_id.");
-    if (!requirement.normalized_requirement.trim()) {
-      errors.push(`Empty normalized_requirement for ${requirement.capability_id}.`);
-    }
-    if (!requirement.canonical_requirement_id.trim()) {
-      errors.push(`Missing canonical_requirement_id for ${requirement.capability_id}.`);
-    }
-    if (!ROLE_CAPABILITY_SOURCE_TYPES.has(requirement.source.source_type)) {
-      errors.push(`Unsupported source_type for ${requirement.capability_id}: ${requirement.source.source_type}`);
+  for (const requirement of candidate.requirements) {
+    if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
+      errors.push("Role Capability Model requirement must be an object.");
+      continue;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(CRITICALITY_ORDER, requirement.baseline_criticality)) {
+    const item = requirement as Record<string, unknown>;
+    const capabilityId = typeof item.capability_id === "string" ? item.capability_id : "";
+    const normalizedRequirement =
+      typeof item.normalized_requirement === "string" ? item.normalized_requirement : "";
+    const canonicalRequirementId =
+      typeof item.canonical_requirement_id === "string" ? item.canonical_requirement_id : "";
+
+    if (capabilityId && capabilityIds.has(capabilityId)) {
+      errors.push(`Duplicate capability_id: ${capabilityId}`);
+    }
+    if (capabilityId) capabilityIds.add(capabilityId);
+
+    if (canonicalRequirementId && requirementIds.has(canonicalRequirementId)) {
+      errors.push(`Duplicate canonical_requirement_id: ${canonicalRequirementId}`);
+    }
+    if (canonicalRequirementId) requirementIds.add(canonicalRequirementId);
+
+    if (!capabilityId) errors.push("Empty capability_id.");
+    if (!normalizedRequirement) {
+      errors.push(`Empty normalized_requirement for ${capabilityId}.`);
+    }
+    if (!canonicalRequirementId) {
+      errors.push(`Missing canonical_requirement_id for ${capabilityId}.`);
+    }
+
+    const source = item.source;
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      errors.push(`Missing source for ${capabilityId}.`);
+      continue;
+    }
+
+    const sourceRecord = source as Record<string, unknown>;
+    const sourceType = sourceRecord.source_type;
+    const sourceId = sourceRecord.source_id;
+    const sourceVersion = sourceRecord.source_version;
+
+    if (
+      typeof sourceType !== "string" ||
+      !ROLE_CAPABILITY_SOURCE_TYPES.has(sourceType as RoleCapabilitySourceType)
+    ) {
+      errors.push(`Unsupported source_type for ${capabilityId}: ${String(sourceType)}`);
+    }
+
+    if (
+      typeof item.baseline_criticality !== "string" ||
+      !Object.prototype.hasOwnProperty.call(CRITICALITY_ORDER, item.baseline_criticality)
+    ) {
       errors.push(
-        `Unsupported baseline criticality for ${requirement.capability_id}: ${requirement.baseline_criticality}`,
+        `Unsupported baseline criticality for ${capabilityId}: ${String(item.baseline_criticality)}`,
       );
     }
 
-    if (!requirement.source.source_id.trim()) {
-      errors.push(`Missing source_id for ${requirement.capability_id}.`);
+    if (typeof sourceId !== "string" || !sourceId.trim()) {
+      errors.push(`Missing source_id for ${capabilityId}.`);
     }
-    if (!requirement.source.source_version.trim()) {
-      errors.push(`Missing source_version for ${requirement.capability_id}.`);
+    if (typeof sourceVersion !== "string" || !sourceVersion.trim()) {
+      errors.push(`Missing source_version for ${capabilityId}.`);
     }
   }
 
   return errors;
 }
-
 
 /** Validates RCM requirement IDs and normalized text against the canonical D1–D3 requirement graph. */
 export function validateRoleCapabilityModelAgainstCanonicalRequirements(
