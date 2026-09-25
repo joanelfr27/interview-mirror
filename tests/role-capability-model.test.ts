@@ -91,7 +91,8 @@ describe("Role Capability Model v1", () => {
         validModel.requirements[1],
       ],
     };
-    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements);
+    const canonicalGraph = [canonicalRequirements[0]];
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalGraph);
     assert.ok(errors.includes("Unknown canonical_requirement_id for regional-finance: req-missing"));
     assert.equal(errors.length, 1);
   });
