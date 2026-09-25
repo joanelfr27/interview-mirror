@@ -56,7 +56,11 @@ async function canonicalDocumentFromBody(value: unknown, fallbackText: unknown, 
     const candidate = value as Record<string, unknown>;
     if (typeof candidate.text === "string" && candidate.text.trim()) {
       const sourceType = isIngestionSourceType(candidate.sourceType) ? candidate.sourceType : fallbackSource;
-      return buildIngestedDocument(candidate.text, sourceType, typeof candidate.sourceName === "string" ? candidate.sourceName : undefined, typeof candidate.sourceUrl === "string" ? candidate.sourceUrl : undefined);
+      const document = await buildIngestedDocument(candidate.text, sourceType, typeof candidate.sourceName === "string" ? candidate.sourceName : undefined, typeof candidate.sourceUrl === "string" ? candidate.sourceUrl : undefined);
+      if (sourceType === "screenshot" && typeof candidate.sourceContentHash === "string") {
+        return { ...document, sourceContentHash: candidate.sourceContentHash };
+      }
+      return document;
     }
   }
   if (typeof fallbackText === "string" && fallbackText.trim()) return buildIngestedDocument(fallbackText, fallbackSource);
