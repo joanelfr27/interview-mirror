@@ -112,7 +112,7 @@ describe("Role Capability Model v1", () => {
       assert.doesNotThrow(() => validateRoleCapabilityModel(malformed));
       assert.ok(validateRoleCapabilityModel(malformed).length > 0);
       assert.doesNotThrow(() =>
-        validateRoleCapabilityModelAgainstCanonicalRequirements(malformed, canonicalRequirements),
+        validateRoleCapabilityModelAgainstCanonicalRequirements(malformed as unknown as RoleCapabilityModel, canonicalRequirements),
       );
     }
   });
