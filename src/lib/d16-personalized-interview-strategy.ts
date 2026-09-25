@@ -146,10 +146,10 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
   return {
     scope: delta([["scope"], ["regional"], ["global"], ["multi-country"], ["multiple"]]),
     ownership: delta([["ownership"], ["own"], ["lead", "led", "leading"], ["accountable"]]),
-    complexity: delta([[["complex"], ["transformation"], ["integration"], ["advanced"]]]),
-    seniority: delta([[["senior"], ["director"], ["head"], ["manager"]]]),
-    scale: delta([[["large"], ["million"], ["multi-site"], ["enterprise"]]]),
-    domain: delta([[["industry"], ["sector"], ["domain"], ["regulated"]]]),
+    complexity: delta([["complex"], ["transformation"], ["integration"], ["advanced"]]),
+    seniority: delta([["senior"], ["director"], ["head"], ["manager"]]),
+    scale: delta([["large"], ["million"], ["multi-site"], ["enterprise"]]),
+    domain: delta([["industry"], ["sector"], ["domain"], ["regulated"]]),
   };
 }
 
