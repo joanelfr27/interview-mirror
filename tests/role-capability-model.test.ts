@@ -97,6 +97,26 @@ describe("Role Capability Model v1", () => {
     ]);
   });
 
+  it("fails closed on malformed runtime model shapes", () => {
+    const malformedModels: unknown[] = [
+      null,
+      undefined,
+      {},
+      { ...validModel, requirements: undefined },
+      { ...validModel, requirements: {} },
+      { ...validModel, model_id: undefined },
+      { ...validModel, requirements: [{ ...validModel.requirements[0], source: undefined }] },
+    ];
+
+    for (const malformed of malformedModels) {
+      assert.doesNotThrow(() => validateRoleCapabilityModel(malformed));
+      assert.ok(validateRoleCapabilityModel(malformed).length > 0);
+      assert.doesNotThrow(() =>
+        validateRoleCapabilityModelAgainstCanonicalRequirements(malformed, canonicalRequirements),
+      );
+    }
+  });
+
   it("rejects an unsupported model version", () => {
     const invalid = { ...validModel, version: "rcm-v2" };
     const errors = validateRoleCapabilityModel(invalid as unknown as RoleCapabilityModel);
