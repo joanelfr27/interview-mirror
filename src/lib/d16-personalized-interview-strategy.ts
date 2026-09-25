@@ -300,7 +300,7 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   errors.push(...rcmErrors.map((e) => "RCM: " + e));
 
   const canonicalIds = canonicalRequirementIds(input.canonical_requirements);
-  const bridgeIds = canonicalRequirementIds(bridge.requirements as Array<{ requirement_id: string }>.map((r) => ({ id: r.requirement_id })));
+  const bridgeIds = [...new Set(bridge.requirements.map((r) => r.requirement_id))].sort();
   if (JSON.stringify(canonicalIds) !== JSON.stringify(bridgeIds)) errors.push("D16 canonical requirement set diverges from D6.");
 
   const bridgeSeen = new Set<string>();
