@@ -10,7 +10,7 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
     { id: "REQ-D", normalized_requirement: "Strategic transformation leadership" },
   ];
   const evidence = [
-    { evidence_id: "EV-A", source_span_id: "SPAN-A", source_quote: "Led financial reporting.", source_type: "CV" as const },
+    { evidence_id: "EV-A", source_span_id: "SPAN-A", source_quote: "Led regional financial reporting for multiple countries.", source_type: "CV" as const },
     { evidence_id: "EV-B", source_span_id: "SPAN-B", source_quote: "Supported treasury processes.", source_type: "CV" as const },
   ];
   const bridge = {
