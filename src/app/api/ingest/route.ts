@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       const language = normalizeLanguage(form.get("language"));
       const text = await extractScreenshotText(bytes, screenshot.mimeType, language);
       const document = await buildIngestedDocument(text, "screenshot", screenshot.sourceName);
-      return NextResponse.json(document);
+      return NextResponse.json({ ...document, sourceContentHash: screenshot.contentHash });
     }
 
     const body = await request.json();
