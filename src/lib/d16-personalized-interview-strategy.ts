@@ -102,6 +102,10 @@ function nonBlank(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
 function canonicalRequirementIds(items: Array<{ id: string }>): string[] {
   return [...new Set(items.map((item) => item.id))].sort();
 }
@@ -145,7 +149,7 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
   const delta = (terms: string[][]) => terms.some((variants) => containsTerm(right, variants) && !containsTerm(evidenceText, variants));
   return {
     scope: delta([["scope"], ["regional"], ["global"], ["multi-country"], ["multiple"]]),
-    ownership: delta([["ownership"], ["own"], ["manage", "managed", "managing", "management"], ["lead", "led", "leading"], ["accountable"]]),
+    ownership: delta([["ownership"], ["own"], ["manage", "managed", "managing", "management", "lead", "led", "leading"], ["accountable"]]),
     complexity: delta([["complex"], ["transformation"], ["integration"], ["advanced"]]),
     seniority: delta([["senior"], ["director"], ["head"], ["manager"]]),
     scale: delta([["large"], ["million"], ["multi-site"], ["enterprise"]]),
@@ -225,36 +229,82 @@ function compareTensions(a: StrategicTension, b: StrategicTension): number {
 
 export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return { valid: false, errors: ["D16 input must be an object."] };
+  if (!isRecord(input)) return { valid: false, errors: ["D16 input must be an object."] };
+
+  const bridge = input.bridge;
+  const mirror = input.mirror;
+  const rcm = input.role_capability_model;
+  const ledger = input.ledger;
+
+  if (!isRecord(bridge)) errors.push("D16 D6 bridge must be an object.");
+  if (!isRecord(mirror)) errors.push("D16 D15 mirror must be an object.");
+  if (!isRecord(rcm)) errors.push("D16 RCM must be an object.");
+  if (!isRecord(ledger)) errors.push("D16 evidence ledger must be an object.");
+  if (input.assessment_context !== undefined && !isRecord(input.assessment_context)) {
+    errors.push("D16 Assessment Context must be an object.");
   }
-  if (!input.bridge || typeof input.bridge !== "object" || Array.isArray(input.bridge)) errors.push("D16 D6 bridge must be an object.");
-  if (!input.mirror || typeof input.mirror !== "object" || Array.isArray(input.mirror)) errors.push("D16 D15 mirror must be an object.");
-  if (!input.role_capability_model || typeof input.role_capability_model !== "object" || Array.isArray(input.role_capability_model)) errors.push("D16 RCM must be an object.");
-  if (!input.ledger || typeof input.ledger !== "object" || Array.isArray(input.ledger)) errors.push("D16 evidence ledger must be an object.");
-  if (input.assessment_context !== undefined && (!input.assessment_context || typeof input.assessment_context !== "object" || Array.isArray(input.assessment_context))) errors.push("D16 Assessment Context must be an object.");
-  if (errors.length) return { valid: false, errors };
-  if (input.bridge.version !== "d6-v1") errors.push("D16 requires D6 version d6-v1.");
-  if (input.mirror.version !== "d15-v1") errors.push("D16 requires D15 version d15-v1.");
-  if (input.role_capability_model.version !== "rcm-v1") errors.push("D16 requires RCM version rcm-v1.");
+  if (typeof input.jd_present !== "boolean") errors.push("D16 jd_present must be boolean.");
   if (!Array.isArray(input.canonical_requirements)) {
     errors.push("D16 canonical requirements must be an array.");
-    return { valid: false, errors };
   }
-  if (!input.bridge || !Array.isArray(input.bridge.requirements)) {
+
+  if (errors.length) return { valid: false, errors };
+
+  if (bridge.version !== "d6-v1") errors.push("D16 requires D6 version d6-v1.");
+  if (mirror.version !== "d15-v1") errors.push("D16 requires D15 version d15-v1.");
+  if (rcm.version !== "rcm-v1") errors.push("D16 requires RCM version rcm-v1.");
+
+  if (!Array.isArray(bridge.requirements)) {
     errors.push("D16 D6 bridge requirements must be an array.");
     return { valid: false, errors };
   }
+  if (!Array.isArray(mirror.evidence)) {
+    errors.push("D16 D15 mirror evidence must be an array.");
+    return { valid: false, errors };
+  }
+  if (!Array.isArray(ledger.evidence)) {
+    errors.push("D16 evidence ledger evidence must be an array.");
+    return { valid: false, errors };
+  }
+  if (!Array.isArray(ledger.source_spans)) {
+    errors.push("D16 evidence ledger source_spans must be an array.");
+    return { valid: false, errors };
+  }
 
-  const rcmErrors = validateRoleCapabilityModelAgainstCanonicalRequirements(input.role_capability_model, input.canonical_requirements);
+  for (const requirement of input.canonical_requirements) {
+    if (!isRecord(requirement) || !nonBlank(requirement.id) || !nonBlank(requirement.normalized_requirement)) {
+      errors.push("D16 canonical requirement must contain valid id and normalized_requirement fields.");
+    }
+  }
+  for (const item of bridge.requirements) {
+    if (!isRecord(item)) {
+      errors.push("D16 D6 requirement must be an object.");
+      continue;
+    }
+    if (!Array.isArray(item.evidence)) {
+      errors.push("D16 D6 requirement evidence must be an array: " + String(item.requirement_id));
+    }
+  }
+  for (const evidence of mirror.evidence) {
+    if (!isRecord(evidence)) errors.push("D16 D15 mirror evidence must be an object.");
+  }
+  for (const evidence of ledger.evidence) {
+    if (!isRecord(evidence)) errors.push("D16 evidence ledger evidence must be an object.");
+  }
+  for (const span of ledger.source_spans) {
+    if (!isRecord(span)) errors.push("D16 evidence ledger source span must be an object.");
+  }
+  if (errors.length) return { valid: false, errors };
+
+  const rcmErrors = validateRoleCapabilityModelAgainstCanonicalRequirements(rcm, input.canonical_requirements);
   errors.push(...rcmErrors.map((e) => "RCM: " + e));
 
   const canonicalIds = canonicalRequirementIds(input.canonical_requirements);
-  const bridgeIds = canonicalRequirementIds(input.bridge.requirements.map((r) => ({ id: r.requirement_id })));
+  const bridgeIds = canonicalRequirementIds(bridge.requirements as Array<{ requirement_id: string }>.map((r) => ({ id: r.requirement_id })));
   if (JSON.stringify(canonicalIds) !== JSON.stringify(bridgeIds)) errors.push("D16 canonical requirement set diverges from D6.");
 
   const bridgeSeen = new Set<string>();
-  for (const item of input.bridge.requirements) {
+  for (const item of bridge.requirements) {
     if (bridgeSeen.has(item.requirement_id)) errors.push("D16 duplicate D6 requirement: " + item.requirement_id);
     bridgeSeen.add(item.requirement_id);
     if (!nonBlank(item.requirement_id) || !nonBlank(item.normalized_requirement)) errors.push("D16 D6 requirement identity/text is blank.");
@@ -265,11 +315,12 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
     if (item.status === "UNJUDGED") errors.push("D16 refuses UNJUDGED requirements: " + item.requirement_id);
   }
 
-  const mirrorEvidence = new Map(input.mirror.evidence.map((e) => [e.evidence_id, e]));
-  const ledgerEvidence = new Map(input.ledger.evidence.map((e) => [e.id, e]));
-  const spans = new Map(input.ledger.source_spans.map((s) => [s.id, s]));
-  for (const item of input.bridge.requirements) {
+  const mirrorEvidence = new Map(mirror.evidence.map((e) => [e.evidence_id, e]));
+  const ledgerEvidence = new Map(ledger.evidence.map((e) => [e.id, e]));
+  const spans = new Map(ledger.source_spans.map((s) => [s.id, s]));
+  for (const item of bridge.requirements) {
     for (const evidence of item.evidence) {
+      if (!isRecord(evidence)) continue;
       const mirrorRef = mirrorEvidence.get(evidence.evidence_id);
       const atom = ledgerEvidence.get(evidence.evidence_id);
       const span = spans.get(evidence.source_span_id);
@@ -281,12 +332,17 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
   }
 
   if (input.assessment_context) {
-    if (input.assessment_context.version !== "assessment-context-v1" || !nonBlank(input.assessment_context.context_id)) errors.push("D16 Assessment Context is malformed.");
-    const allowedAssessmentKeys = new Set(["version", "context_id", "requirement_relevance"]);
-    for (const key of Object.keys(input.assessment_context)) if (!allowedAssessmentKeys.has(key)) errors.push("D16 Assessment Context contains an unsupported field: " + key);
-    for (const [id, value] of Object.entries(input.assessment_context.requirement_relevance)) {
-      if (!bridgeSeen.has(id)) errors.push("D16 Assessment Context references unknown requirement: " + id);
-      if (!["HIGH", "MEDIUM", "LOW", "UNKNOWN"].includes(value)) errors.push("D16 Assessment Context relevance is invalid: " + id);
+    const assessment = input.assessment_context;
+    if (assessment.version !== "assessment-context-v1" || !nonBlank(assessment.context_id)) errors.push("D16 Assessment Context is malformed.");
+    if (!isRecord(assessment.requirement_relevance)) {
+      errors.push("D16 Assessment Context requirement_relevance must be an object.");
+    } else {
+      const allowedAssessmentKeys = new Set(["version", "context_id", "requirement_relevance"]);
+      for (const key of Object.keys(assessment)) if (!allowedAssessmentKeys.has(key)) errors.push("D16 Assessment Context contains an unsupported field: " + key);
+      for (const [id, value] of Object.entries(assessment.requirement_relevance)) {
+        if (!bridgeSeen.has(id)) errors.push("D16 Assessment Context references unknown requirement: " + id);
+        if (!["HIGH", "MEDIUM", "LOW", "UNKNOWN"].includes(value)) errors.push("D16 Assessment Context relevance is invalid: " + id);
+      }
     }
   }
 
@@ -366,51 +422,50 @@ export function dispatchD16Actions(tensions: StrategicTension[]): D16Action[] {
 
 export function validateD16Strategy(strategy: D16Strategy, input: D16Inputs): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
+  if (!isRecord(strategy)) return { valid: false, errors: ["D16 strategy must be an object."] };
+  if (!Array.isArray(strategy.tensions)) errors.push("D16 tensions must be an array.");
+  if (!Array.isArray(strategy.actions)) errors.push("D16 actions must be an array.");
   if (strategy.version !== D16_VERSION) errors.push("D16 strategy version is invalid.");
   if (strategy.d6_version !== "d6-v1") errors.push("D16 strategy must pin D6 d6-v1.");
   if (strategy.role_capability_model_version !== "rcm-v1") errors.push("D16 strategy must pin RCM rcm-v1.");
-  if (strategy.tensions.length > 3) errors.push("D16 candidate-facing tension count exceeds 3.");
+  if (errors.length) return { valid: false, errors };
+
   const inputValidation = validateD16Inputs(input);
   errors.push(...inputValidation.errors);
-  const canonical = new Set(input.bridge.requirements.map((r) => r.requirement_id));
+  if (!inputValidation.valid) return { valid: false, errors };
 
+  if (strategy.tensions.length > 3) errors.push("D16 candidate-facing tension count exceeds 3.");
+
+  const canonicalTensions = new Set(input.bridge.requirements.map((r) => r.requirement_id));
   const seen = new Set<string>();
   for (const tension of strategy.tensions) {
+    if (!isRecord(tension)) {
+      errors.push("D16 tension must be an object.");
+      continue;
+    }
+    if (!nonBlank(tension.requirement_id)) {
+      errors.push("D16 tension requirement_id is blank.");
+      continue;
+    }
     if (seen.has(tension.requirement_id)) errors.push("D16 duplicate tension requirement: " + tension.requirement_id);
     seen.add(tension.requirement_id);
-    if (!canonical.has(tension.requirement_id)) errors.push("D16 tension references unknown requirement: " + tension.requirement_id);
-    const source = input.bridge.requirements.find((r) => r.requirement_id === tension.requirement_id);
-    if (!source) continue;
-    const expectedMode = modeFor(source);
-    if (tension.mode !== expectedMode) errors.push("D16 tension mode is not canonical: " + tension.requirement_id);
-    if (tension.canonical_status !== source.status) errors.push("D16 tension status is not canonical: " + tension.requirement_id);
-    const rcm = input.role_capability_model.requirements.find((r) => r.canonical_requirement_id === tension.requirement_id);
-    if (!rcm || tension.role_criticality !== rcm.baseline_criticality) errors.push("D16 criticality is not canonical: " + tension.requirement_id);
-    const expectedEvidence = evidenceMode(source, input.mirror);
-    if (tension.evidence_reference_mode !== expectedEvidence) errors.push("D16 evidence mode is not deterministic: " + tension.requirement_id);
-    const expectedIds = evidenceIds(source, input.mirror);
-    if (JSON.stringify(tension.evidence_ids) !== JSON.stringify(expectedIds)) errors.push("D16 evidence IDs are not traceable: " + tension.requirement_id);
-    if (tension.canonical_status === "SUPPORTED" && tension.preparation_priority < 1) errors.push("D16 unsupported preparation priority: " + tension.requirement_id);
-    if (!nonBlank(tension.interview_vulnerability)) errors.push("D16 vulnerability is empty: " + tension.requirement_id);
-    if (tension.interview_vulnerability.toLowerCase().includes("weakness") || tension.interview_vulnerability.toLowerCase().includes("incompet")) errors.push("D16 vulnerability uses diagnostic language: " + tension.requirement_id);
-    if (tension.evidence_reference_mode === "MIXED_EVIDENCE" && !tension.contradiction_present) errors.push("D16 mixed evidence must retain contradiction state: " + tension.requirement_id);
-    if (!tension.truthfulness_boundary.permitted_claims.length && !tension.truthfulness_boundary.prohibited_claims.length) errors.push("D16 truthfulness boundary is empty: " + tension.requirement_id);
-  }
-
-  const expectedOrder = [...strategy.tensions].sort(compareTensions).map((t) => t.requirement_id);
-  if (JSON.stringify(expectedOrder) !== JSON.stringify(strategy.tensions.map((t) => t.requirement_id))) errors.push("D16 tension ordering is not deterministic.");
-
-  for (const action of strategy.actions) {
-    const tension = strategy.tensions.find((t) => t.requirement_id === action.requirement_id);
-    if (!tension) errors.push("D16 action is untraceable: " + action.id);
-    else {
-      if (action.evidence_reference_mode !== tension.evidence_reference_mode) errors.push("D16 action evidence mode diverges: " + action.id);
-      if (JSON.stringify(action.evidence_ids) !== JSON.stringify(tension.evidence_ids)) errors.push("D16 action evidence diverges: " + action.id);
-      if (action.canonical_status !== tension.canonical_status) errors.push("D16 action status diverges: " + action.id);
-      if (action.role_criticality !== tension.role_criticality) errors.push("D16 action criticality diverges: " + action.id);
+    if (!canonicalTensions.has(tension.requirement_id)) errors.push("D16 tension references unknown requirement: " + tension.requirement_id);
+    if (!isRecord(tension.truthfulness_boundary) ||
+        !Array.isArray(tension.truthfulness_boundary.permitted_claims) ||
+        !Array.isArray(tension.truthfulness_boundary.prohibited_claims)) {
+      errors.push("D16 truthfulness boundary is malformed: " + tension.requirement_id);
     }
-    if (!["PREP", "PRACTICE", "EVALUATION"].includes(action.dispatcher)) errors.push("D16 action dispatcher invalid: " + action.id);
   }
+
+  const expected = buildD16Strategy(input);
+  if (JSON.stringify(strategy.tensions) !== JSON.stringify(expected.tensions)) {
+    errors.push("D16 tensions do not match the deterministic canonical projection.");
+  }
+  if (JSON.stringify(strategy.actions) !== JSON.stringify(expected.actions)) {
+    errors.push("D16 actions do not match the deterministic Action Dispatcher projection.");
+  }
+  if (strategy.jd_present !== input.jd_present) errors.push("D16 jd_present diverges from input.");
 
   return { valid: errors.length === 0, errors };
 }
+
