@@ -69,7 +69,7 @@ describe("D16 personalized interview strategy", () => {
     const input = fixture();
     input.bridge.requirements[1].evidence = [
       { evidence_id: "EV-B", source_span_id: "SPAN-B", source_quote: "Supported treasury processes.", support_status: "PARTIAL" },
-      { evidence_id: "EV-A", source_span_id: "SPAN-A", source_quote: "Managed regional financial reporting for multiple countries.", support_status: "CONTRADICTORY" },
+      { evidence_id: "EV-A", source_span_id: "SPAN-A", source_quote: "Led regional financial reporting for multiple countries.", support_status: "CONTRADICTORY" },
     ];
     const strategy = buildD16Strategy(input);
     assert.equal(strategy.tensions.find((t) => t.requirement_id === "REQ-B")?.evidence_reference_mode, "MIXED_EVIDENCE");
@@ -114,6 +114,37 @@ describe("D16 personalized interview strategy", () => {
     input.role_capability_model.requirements = [input.role_capability_model.requirements[0]];
     const strategy = buildD16Strategy(input);
     assert.equal(strategy.tensions.length, 0);
+  });
+
+  it("ranks higher criticality first within the same canonical status", () => {
+    const input = fixture();
+    input.bridge.requirements[2] = {
+      ...input.bridge.requirements[2],
+      status: "PARTIAL" as const,
+      route_mode: "TRANSFERABLE" as const,
+      fit_state: "PARTIAL",
+      gap_classification: "TRANSFERABLE",
+      preparation_state: "PREPARE_PARTIAL",
+      strategy_action: "DEMONSTRATE_PARTIAL" as const,
+    };
+    const strategy = buildD16Strategy(input);
+    const partials = strategy.tensions.filter((t) => t.canonical_status === "PARTIAL");
+    assert.deepEqual(partials.map((t) => t.requirement_id), ["REQ-B", "REQ-C"]);
+    assert.equal(partials[0].role_criticality, "CRITICAL");
+    assert.equal(partials[1].role_criticality, "IMPORTANT");
+  });
+
+  it("fails closed when canonical or D6 requirements are not arrays", () => {
+    const input = fixture();
+    const malformedCanonical = { ...input, canonical_requirements: "invalid" } as unknown as D16Inputs;
+    const canonicalValidation = validateD16Inputs(malformedCanonical);
+    assert.equal(canonicalValidation.valid, false);
+    assert.ok(canonicalValidation.errors.some((e) => e.includes("canonical requirements must be an array")));
+
+    const malformedBridge = { ...input, bridge: { ...input.bridge, requirements: "invalid" } } as unknown as D16Inputs;
+    const bridgeValidation = validateD16Inputs(malformedBridge);
+    assert.equal(bridgeValidation.valid, false);
+    assert.ok(bridgeValidation.errors.some((e) => e.includes("D6 bridge requirements must be an array")));
   });
 
   it("keeps no-JD mode valid", () => {
