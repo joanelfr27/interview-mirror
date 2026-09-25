@@ -2,12 +2,14 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { normalizeLanguage } from "@/lib/openai";
 import { buildEvidenceMap, isValidStrategy } from "@/lib/strategy-engine";
-import { runStrategyEngineV23Lite } from "@/lib/strategy-engine-v23-lite";
 import { createClient } from "@/lib/supabase/server";
 import type { InterviewStrategy, SessionRecord, CvAnalysis } from "@/types";
 import { STRATEGY_ENGINE_VERSION } from "@/lib/strategy-engine-version";
 
 export const maxDuration = 60;
+
+/** D16 production cutover gate. V23 must not remain candidate-authoritative. */
+export const D16_PRODUCTION_CUTOVER_ENABLED = false;
 
 function canonicalize(value: string): string { return value.normalize("NFKC").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
 function hash(value: string): string { return `sha256:${createHash("sha256").update(canonicalize(value), "utf8").digest("hex")}`; }
@@ -70,10 +72,6 @@ function fallbackStrategy(session: SessionRecord): InterviewStrategy {
   };
 }
 
-async function generateStrategy(session: SessionRecord): Promise<InterviewStrategy> {
-  return runStrategyEngineV23Lite(session);
-}
-
 function hasCurrentEngineVersion(strategy: unknown): boolean {
   return Boolean(strategy && typeof strategy === "object" && (strategy as any)._strategy_engine_version === STRATEGY_ENGINE_VERSION);
 }
@@ -88,6 +86,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { data: session, error } = await supabase.from("sessions").select("*").eq("id", id).eq("user_id", user.id).single();
   if (error || !session) return NextResponse.json({ error: "Session not found" }, { status: 404 });
   const record = session as SessionRecord;
+  if (!D16_PRODUCTION_CUTOVER_ENABLED) {
+    return NextResponse.json({
+      code: "D16_PRODUCTION_CUTOVER_REQUIRED",
+      error: "The legacy strategy engine is disabled. D16 production integration must be enabled before an interview strategy can be generated.",
+    }, { status: 503 });
+  }
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
   if (!hasValidProvenance(record.cv_analysis, record)) return NextResponse.json({ code: "ANALYSIS_PROVENANCE_INVALID", error: "The Professional Mirror analysis must be refreshed before an interview strategy can be generated." }, { status: 422 });
   const evidenceMap = buildEvidenceMap(record);
