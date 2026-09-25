@@ -90,6 +90,15 @@ describe("Role Capability Model v1", () => {
     ]);
   });
 
+  it("fails closed when a canonical requirement has no RCM mapping", () => {
+    const incomplete = {
+      ...validModel,
+      requirements: [validModel.requirements[0]],
+    };
+    const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(incomplete, canonicalRequirements);
+    assert.ok(errors.some((error) => error.includes("Missing RCM requirement for canonical requirement req-reporting.")));
+  });
+
   it("fails closed when RCM normalized text diverges from the canonical requirement", () => {
     const invalid = { ...validModel, requirements: [{ ...validModel.requirements[0], normalized_requirement: "Different requirement" }] };
     assert.deepEqual(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements), [
