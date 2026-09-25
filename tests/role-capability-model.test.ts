@@ -91,10 +91,11 @@ describe("Role Capability Model v1", () => {
         validModel.requirements[1],
       ],
     };
-    const canonicalGraph = [canonicalRequirements[0]];
+    const canonicalGraph = [canonicalRequirements[0], canonicalRequirements[1]];
     const errors = validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalGraph);
     assert.ok(errors.includes("Unknown canonical_requirement_id for regional-finance: req-missing"));
-    assert.equal(errors.length, 1);
+    assert.ok(errors.includes("Missing RCM requirement for canonical requirement req-regional-finance."));
+    assert.equal(errors.length, 2);
   });
 
   it("fails closed when a canonical requirement has no RCM mapping", () => {
