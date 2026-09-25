@@ -73,7 +73,37 @@ D15 does not own historical evolution of the Mirror across future evidence, sess
 - No evidence path means no claim.
 - Negated or candidate-elicited evidence cannot silently become positive documented evidence.
 
-## D16 boundary\nD16 consumes the validated D15 Mirror/Story plus a target role capability model. A Job Description is optional enrichment, not a prerequisite for Strategy.\n- With a JD: D16 combines the canonical role capability model with role-specific requirements from the JD.\n- Without a JD: D16 uses the canonical role capability model for the selected target role.\n- D16 determines the bridge between demonstrated career evidence and role requirements: demonstrated, needs stronger demonstration, needs verification, or preparation gap.\n- D16 consolidates D15 evidence rather than repeating the Professional Mirror.\n- D17–D24 turn the resulting bridge into preparation, practice, simulation, feedback, and improvement.\n\n## Non-goals
+## D16 boundary
+
+D16 is the role-specific interview-preparation strategy layer. It consumes the validated D15 Mirror/Story plus Role Intelligence:
+- Role Capability Model;
+- optional Job Description;
+- optional Assessment Context.
+
+With a JD:
+D15 Mirror/Story + Role Capability Model + JD + Assessment Context → D16 Strategy.
+
+Without a JD:
+D15 Mirror/Story + Role Capability Model + Assessment Context → D16 Strategy.
+
+D16 reuses the existing D1–D4 canonical requirement/support/gap reasoning. It does not create a second evidence ontology, generic fit score, or replacement evidence pipeline.
+
+D16 identifies:
+- the role requirements that matter most;
+- where canonical evidence is direct, partial, unresolved, or contradicted;
+- where contextual differences may create an interview vulnerability;
+- the few strategic tensions that should shape preparation;
+- concrete preparation, practice, and feedback actions.
+
+D16 identifies grey areas; it does not interrogate them. Normal interview grey areas are intentionally preserved as simulation material. D20 owns questioning/probing and D21 owns performance evaluation.
+
+D16 must not mutate D15. New evidence must enter through the canonical evidence architecture and trigger the appropriate D15 revalidation. Material changes to canonical evidence/D15, Role Capability Model, JD, or Assessment Context invalidate stale D16 output.
+
+Assessment Context may contain known interview stage/type, interviewer role, expected format, seniority where relevant, case/presentation/technical/behavioral modality, and employer-provided instructions. UNKNOWN is valid; D16 must never invent missing context.
+
+D16 output is an action-oriented contract for D17/D20/D21, not a second Professional Mirror and not a report.
+
+## Non-goals
 - no new extractor
 - no new evidence ontology
 - no replacement of D1–D10
