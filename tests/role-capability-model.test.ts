@@ -55,7 +55,7 @@ describe("Role Capability Model v1", () => {
 
   it("accepts a fully sourced canonical model", () => {
     expect(validateRoleCapabilityModel(validModel)).toEqual([]);
-    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(validModel, canonicalRequirements as any)).toEqual([]);
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(validModel, canonicalRequirements)).toEqual([]);
   });
 
   it("fails closed on duplicate identities and missing source versions", () => {
@@ -95,7 +95,7 @@ describe("Role Capability Model v1", () => {
       ...validModel,
       requirements: [{ ...validModel.requirements[0], canonical_requirement_id: "req-missing" }],
     };
-    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements as any)).toContain(
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements)).toContain(
       "Unknown canonical_requirement_id for regional-finance: req-missing",
     );
   });
@@ -105,7 +105,7 @@ describe("Role Capability Model v1", () => {
       ...validModel,
       requirements: [{ ...validModel.requirements[0], normalized_requirement: "Different requirement" }],
     };
-    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements as any)).toContain(
+    expect(validateRoleCapabilityModelAgainstCanonicalRequirements(invalid, canonicalRequirements)).toContain(
       "RCM normalized_requirement diverges from canonical requirement req-regional-finance.",
     );
   });
