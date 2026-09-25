@@ -10,8 +10,8 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
     { id: "REQ-D", normalized_requirement: "Strategic transformation leadership" },
   ];
   const evidence = [
-    { id: "EV-A", source_span_id: "SPAN-A", source_quote: "Managed regional financial reporting for multiple countries.", source_type: "CV" as const },
-    { id: "EV-B", source_span_id: "SPAN-B", source_quote: "Supported treasury processes.", source_type: "CV" as const },
+    { evidence_id: "EV-A", source_span_id: "SPAN-A", source_quote: "Managed regional financial reporting for multiple countries.", source_type: "CV" as const },
+    { evidence_id: "EV-B", source_span_id: "SPAN-B", source_quote: "Supported treasury processes.", source_type: "CV" as const },
   ];
   const bridge = {
     version: "d6-v1" as const,
@@ -37,7 +37,7 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
     requirements: [], support_judgments: [], requirement_statuses: [], unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
   };
   const mirror = { version: "d15-v1" as const, evidence, threads: [], statements: [], story: { opening: "x", opening_statement_id: null, threads: [] } };
-  return { mirror, bridge, role_capability_model: rcm, ledger, canonical_requirements: canonical, jd_present: false, ...overrides };
+  return { mirror, bridge, role_capability_model: rcm, ledger, canonical_requirements: canonical, jd_present: false, ...overrides } as D16Inputs;
 }
 
 describe("D16 personalized interview strategy", () => {
