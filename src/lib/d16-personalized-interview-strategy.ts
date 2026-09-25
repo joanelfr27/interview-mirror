@@ -283,6 +283,18 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
     }
     if (!Array.isArray(item.evidence)) {
       errors.push("D16 D6 requirement evidence must be an array: " + String(item.requirement_id));
+    } else {
+      for (const evidence of item.evidence) {
+        if (
+          !isRecord(evidence) ||
+          !nonBlank(evidence.evidence_id) ||
+          !nonBlank(evidence.source_span_id) ||
+          !nonBlank(evidence.source_quote) ||
+          !nonBlank(evidence.support_status)
+        ) {
+          errors.push("D16 D6 requirement evidence must contain valid evidence_id, source_span_id, source_quote and support_status fields: " + String(item.requirement_id));
+        }
+      }
     }
   }
   for (const evidence of mirror.evidence) {
