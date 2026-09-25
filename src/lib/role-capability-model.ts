@@ -1,3 +1,5 @@
+import type { Requirement } from "@/lib/canonical-evidence-model";
+
 export type RoleCapabilityCriticality = "CRITICAL" | "IMPORTANT" | "SUPPORTING";
 
 export const ROLE_CAPABILITY_MODEL_VERSION = "rcm-v1" as const;
@@ -26,6 +28,12 @@ export type RoleCapabilityModel = {
   role_title: string;
   requirements: RoleCapabilityModelRequirement[];
 };
+
+const ROLE_CAPABILITY_SOURCE_TYPES = new Set<RoleCapabilitySourceType>([
+  "ROLE_LIBRARY",
+  "ROLE_TEMPLATE",
+  "ADMIN_CURATED",
+]);
 
 const CRITICALITY_ORDER: Record<RoleCapabilityCriticality, number> = {
   CRITICAL: 3,
@@ -72,6 +80,10 @@ export function validateRoleCapabilityModel(
     if (!requirement.canonical_requirement_id.trim()) {
       errors.push(`Missing canonical_requirement_id for ${requirement.capability_id}.`);
     }
+    if (!ROLE_CAPABILITY_SOURCE_TYPES.has(requirement.source.source_type)) {
+      errors.push(`Unsupported source_type for ${requirement.capability_id}: ${requirement.source.source_type}`);
+    }
+
     if (!Object.prototype.hasOwnProperty.call(CRITICALITY_ORDER, requirement.baseline_criticality)) {
       errors.push(
         `Unsupported baseline criticality for ${requirement.capability_id}: ${requirement.baseline_criticality}`,
@@ -83,6 +95,33 @@ export function validateRoleCapabilityModel(
     }
     if (!requirement.source.source_version.trim()) {
       errors.push(`Missing source_version for ${requirement.capability_id}.`);
+    }
+  }
+
+  return errors;
+}
+
+
+/** Validates RCM requirement IDs and normalized text against the canonical D1–D3 requirement graph. */
+export function validateRoleCapabilityModelAgainstCanonicalRequirements(
+  model: RoleCapabilityModel,
+  canonicalRequirements: readonly Requirement[],
+): string[] {
+  const errors = validateRoleCapabilityModel(model);
+  const canonicalById = new Map(canonicalRequirements.map((requirement) => [requirement.id, requirement]));
+
+  for (const requirement of model.requirements) {
+    const canonical = canonicalById.get(requirement.canonical_requirement_id);
+    if (!canonical) {
+      errors.push(
+        `Unknown canonical_requirement_id for ${requirement.capability_id}: ${requirement.canonical_requirement_id}`,
+      );
+      continue;
+    }
+    if (requirement.normalized_requirement !== canonical.normalized_requirement) {
+      errors.push(
+        `RCM normalized_requirement diverges from canonical requirement ${canonical.id}.`,
+      );
     }
   }
 
