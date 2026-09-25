@@ -191,6 +191,10 @@ export default function PrepareForm() {
   async function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setCvText("");
+    setCvDocument(null);
+    setSelectedCvId(null);
+    setUseNewCv(true);
     try { await saveNewCv(file); }
     catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV file"); }
   }
@@ -223,7 +227,7 @@ export default function PrepareForm() {
       setJobDescriptionDocument(document);
       setJobDescriptionMode(lower.endsWith(".docx") ? "word" : "pdf");
       toast.success("Job description loaded");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read JD PDF"); }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read job description file"); }
   }
 
   async function onJobDescriptionLink() {
