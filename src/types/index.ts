@@ -11,6 +11,8 @@ export type AnalysisProvenance = {
   preparation_language: SessionLanguage;
   jd_content_hash: string;
   cv_content_hash: string;
+  cv_source_content_hash?: string;
+  jd_source_content_hash?: string;
   contract_version: "v5.1";
 };
 
