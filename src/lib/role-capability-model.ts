@@ -103,11 +103,11 @@ export function validateRoleCapabilityModel(model: unknown): string[] {
     }
     if (canonicalRequirementId) requirementIds.add(canonicalRequirementId);
 
-    if (!capabilityId) errors.push("Empty capability_id.");
-    if (!normalizedRequirement) {
+    if (!capabilityId.trim()) errors.push("Empty capability_id.");
+    if (!normalizedRequirement.trim()) {
       errors.push(`Empty normalized_requirement for ${capabilityId}.`);
     }
-    if (!canonicalRequirementId) {
+    if (!canonicalRequirementId.trim()) {
       errors.push(`Missing canonical_requirement_id for ${capabilityId}.`);
     }
 
@@ -178,8 +178,18 @@ export function validateRoleCapabilityModelAgainstCanonicalRequirements(
     }
 
     const item = requirement as Record<string, unknown>;
-    if (typeof item.id !== "string" || !item.id.trim() || typeof item.normalized_requirement !== "string") {
+    if (
+      typeof item.id !== "string" ||
+      !item.id.trim() ||
+      typeof item.normalized_requirement !== "string" ||
+      !item.normalized_requirement.trim()
+    ) {
       errors.push("Canonical requirement must contain valid id and normalized_requirement fields.");
+      continue;
+    }
+
+    if (canonicalById.has(item.id)) {
+      errors.push(`Duplicate canonical requirement ID: ${item.id}`);
       continue;
     }
 
