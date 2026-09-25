@@ -59,6 +59,49 @@ D16 consumes those validated identities and states; it does not regenerate them.
 - D16 must reuse the D6 Canonical Strategy Bridge rather than recreate its evidence routing, fit/gap state, preparation state, or truthfulness-boundary logic.
 - Ambiguous or unsupported requirement identity/criticality must remain unresolved or fail closed; it must not be completed by LLM inference.
 
+### Role Capability Model contract — V1 freeze
+
+The Role Capability Model (RCM) is a versioned role-baseline artifact. It is not an LLM-generated per-session analysis and it is not a second requirement graph.
+
+V1 contract:
+
+```ts
+type RoleCapabilityCriticality = "CRITICAL" | "IMPORTANT" | "SUPPORTING";
+
+type RoleCapabilityModelRequirement = {
+  capability_id: string;
+  normalized_requirement: string;
+  baseline_criticality: RoleCapabilityCriticality;
+  source: {
+    source_type: "ROLE_LIBRARY" | "ROLE_TEMPLATE" | "ADMIN_CURATED";
+    source_id: string;
+    source_version: string;
+  };
+  canonical_requirement_id: string;
+};
+
+type RoleCapabilityModel = {
+  version: "rcm-v1";
+  model_id: string;
+  role_family: string;
+  role_title: string;
+  requirements: RoleCapabilityModelRequirement[];
+};
+```
+
+Rules:
+- `baseline_criticality` is the authoritative V1 role-criticality input and has deterministic ordering `CRITICAL > IMPORTANT > SUPPORTING`.
+- `canonical_requirement_id` is mandatory before an RCM requirement can enter D16. The RCM source may propose a capability, but D1–D3 canonical normalization owns the final canonical requirement identity.
+- `source.source_version` is mandatory so criticality is reproducible and stale RCM inputs can be detected.
+- Duplicate `capability_id` or duplicate `canonical_requirement_id` entries within one model fail validation.
+- Unknown criticality, missing provenance, missing canonical identity, or conflicting mappings fail closed.
+- The RCM must be validated independently before D16 consumes it. D16 does not infer, score, or repair the RCM.
+- A raw RCM requirement that cannot be reconciled to an existing canonical requirement remains unresolved and cannot silently become a new D16 requirement.
+- The RCM is immutable for the lifetime of a D16 projection. A model/version change makes the D16 projection stale.
+- JD and Assessment Context do not modify `baseline_criticality` in V1.
+
+D16 therefore consumes a validated **RCM projection**, not an unconstrained Role Capability Model object. That projection must expose the canonical requirement ID, baseline criticality, and RCM provenance/version for every requirement used by D16.
+
 ### D6 → D16 contract
 
 D6 is the canonical deterministic strategy foundation. D16 is the strategic prioritisation layer above it.
@@ -112,6 +155,18 @@ These presentation-level concepts are derived fields only:
 - **truthfulness/defense boundary** is constrained by canonical support/status and cited evidence. It states what the candidate can credibly claim and where transfer/uncertainty must be disclosed. It may be phrased by the LLM but may never widen, upgrade, or contradict canonical evidence.
 
 Deterministic validation owns these derived fields. The LLM may explain or phrase them only within their validated inputs.
+
+### Precedence rule: canonical status before strategic priority
+
+Strategic tension selection follows this deterministic order:
+
+1. **Canonical identity gate:** the requirement must resolve to a validated D1–D6 `requirement_id`.
+2. **Canonical status gate:** D6 support/status and contradiction state determine what the candidate can legitimately claim. Role criticality never upgrades `UNRESOLVED`, `CONTRADICTED`, `PARTIAL`, or another canonical state.
+3. **Criticality/context ordering:** after the canonical state is fixed, `role_criticality` and `assessment_relevance` determine strategic priority.
+4. **Evidence/context tie-breakers:** validated evidence strength/provenance, contextual delta, contradiction exposure, and deterministic requirement-ID ordering break remaining ties.
+5. **Candidate-facing compression:** only after deterministic selection may the result be compressed to 0–3 tensions.
+
+A `CRITICAL` requirement with `CONTRADICTED` or `UNRESOLVED` status therefore remains a high-priority **exposure**, not a proven capability. Criticality changes attention; it never changes evidence truth.
 
 ## Strategic Tensions
 
@@ -171,6 +226,19 @@ Every downstream action retains:
 - practice target;
 - truthfulness/defense boundary.
 
+### Mixed-evidence presentation rule
+
+`MIXED_EVIDENCE` is never rendered or described as equivalent to `SUPPORTED_EVIDENCE`.
+
+Before candidate-facing output:
+- the unresolved/contradictory component must be explicitly preserved;
+- the action must state what is supported and what remains unresolved/contradictory;
+- any allowed positioning must remain inside the supported portion;
+- the practice/evaluation handoff must retain the mixed mode;
+- candidate-facing UI must use the same explicit boundary language used for contradiction/uncertainty, rather than a generic “supported” presentation.
+
+A validator must reject a candidate-facing action whose evidence-reference mode is `MIXED_EVIDENCE` but whose wording/metadata presents the requirement as fully established.
+
 ## Validation Gate
 
 D16 fails closed when:
@@ -186,6 +254,12 @@ D16 fails closed when:
 - Assessment Context is presented as known when it is UNKNOWN.
 
 Validation occurs before Action Dispatcher execution.
+
+### D6 version pin
+
+V1 targets `CanonicalStrategyBridgeProjection.version === "d6-v1"`.
+
+D16 must reject an unsupported D6 version rather than attempting structural compatibility or silently accepting a future projection shape. A future `d6-v2` requires an explicit D16 contract update, migration decision, and adversarial regression suite before it can become an accepted input.
 
 ## Staleness and mutation
 
@@ -208,6 +282,18 @@ No-JD mode is first-class:
 Role Capability Model + validated D15 + Assessment Context (which may be UNKNOWN) → D16.
 
 D16 must preserve uncertainty rather than pretending an inferred JD exists.
+
+### Non-diagnostic language constraint
+
+`interview_vulnerability` is a description of interview exposure, not a judgment about the candidate's ability, personality, intelligence, competence, confidence, or fitness.
+
+Candidate-facing phrasing must:
+- describe the requirement/evidence relationship or what an interviewer may need to establish;
+- use neutral, evidence-bound language such as “not yet established”, “scope remains to be demonstrated”, or “this may be tested”;
+- never state or imply that the candidate “struggles”, “is weak”, “cannot”, “lacks ability”, or similar person-level judgments;
+- remain valid even when Assessment Context is UNKNOWN.
+
+The deterministic validator should reject known person-level diagnostic patterns in `interview_vulnerability` output.
 
 ## LLM boundary
 
@@ -237,6 +323,21 @@ The LLM must not:
 - select unsupported tensions;
 - silently resolve contradictions;
 - interrogate the candidate as an evidence-recovery loop.
+
+## Legacy strategy cutover and single-source-of-truth gate
+
+The existing `/api/strategy/[id]` route and V23 strategy engines are legacy compatibility infrastructure, not D16.
+
+D16 V1 has a hard candidate-facing cutover gate:
+- before D16 is released to candidates, the strategy route must consume the validated D16 projection/action contract;
+- the legacy V23 route may remain temporarily only as an explicitly labelled compatibility/shadow path and must never be presented as the D16 strategy;
+- there must be exactly one candidate-facing authoritative strategy source for a session;
+- V23 `StrategyPlan`, V23 `EvidenceMap`, V23 proof-status ontology, and V23 `likely_questions` remain legacy structures and cannot be treated as D16 truth;
+- no session may persist both a legacy strategy and a D16 strategy under the same authoritative field without an explicit versioned ownership rule;
+- the D16 release PR must include a route-level regression test proving that candidate-facing strategy generation cannot silently fall back to V23 when D16 cutover is enabled;
+- if D16 cannot be generated or validated, the system must fail closed or use an explicitly labelled non-D16 compatibility response; it must not silently substitute an ungrounded legacy strategy.
+
+The implementation sequence therefore includes a mandatory **legacy cutover decision** before D16 becomes candidate-facing. This is a release gate, not an optional future cleanup.
 
 ## D15 boundary
 
@@ -318,16 +419,18 @@ At minimum:
 ## Implementation sequence
 
 1. Reconcile this specification against the existing D1–D6 strategy architecture.
-2. Freeze this specification after Claude/Gemini adversarial review.
-3. Define typed D16 contracts.
-4. Implement deterministic assessment and validation.
-5. Implement Action Dispatcher.
-6. Add D17/D20/D21 handoff tests.
-7. Add no-JD and Assessment Context tests.
-8. Run canonical suite, typecheck and build.
-9. Run CodeRabbit.
-10. Perform independent adversarial audit against the exact commit.
-11. Update the Master Research & Product Record only after the implementation audit passes.
+2. Freeze the Role Capability Model (`rcm-v1`) and D6 (`d6-v1`) input contracts.
+3. Freeze this specification after Claude/Gemini adversarial review.
+4. Define typed D16 contracts.
+5. Implement deterministic assessment and validation.
+6. Implement Action Dispatcher.
+7. Add D17/D20/D21 handoff tests.
+8. Add no-JD and Assessment Context tests.
+9. Add legacy-strategy cutover regression tests.
+10. Run canonical suite, typecheck and build.
+11. Run CodeRabbit.
+12. Perform independent adversarial audit against the exact commit.
+13. Update the Master Research & Product Record only after the implementation audit passes.
 
 ## Second WOW
 
