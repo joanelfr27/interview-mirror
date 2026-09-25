@@ -36,7 +36,7 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
     evidence: evidence.map((e) => ({ id: e.id, source_span_id: e.source_span_id, provenance: { source_type: e.source_type, language: "en", extraction_method: "PARSER" as const }, subject: { actor: "candidate", ownership: "INDIVIDUAL" as const }, action: { normalized_action: "managed", object: "financial reporting" }, context: {}, scale: {}, time: {}, outcome: null, assertion: { type: "RESPONSIBILITY" as const, polarity: "AFFIRMATIVE" as const }, verifiability: { has_quantifiable_metric: false, has_third_party_entity: false, has_time_anchor: false }, extraction_confidence: 1 })),
     requirements: [], support_judgments: [], requirement_statuses: [], unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
   };
-  const mirror = { version: "d15-v1" as const, evidence, threads: [], statements: [], story: { opening: "x", opening_statement_id: null, threads: [] } };
+  const mirror = { version: "d15-v1" as const, evidence: evidence.map((e) => ({ evidence_id: e.evidence_id, source_span_id: e.source_span_id, source_quote: e.source_quote, source_type: e.source_type })), threads: [], statements: [], story: { opening: "x", opening_statement_id: null, threads: [] } };
   return { mirror, bridge, role_capability_model: rcm, ledger, canonical_requirements: canonical, jd_present: false, ...overrides } as D16Inputs;
 }
 
