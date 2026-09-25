@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FileUp, ImageUp, Link2, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -31,6 +31,8 @@ export default function PrepareForm() {
   const [cvDocument, setCvDocument] = useState<IngestedDocument | null>(null);
   const [savedCvs, setSavedCvs] = useState<SavedCv[]>([]);
   const [selectedCvId, setSelectedCvId] = useState<string | null>(null);
+  const cvUploadRequestRef = useRef(0);
+  const jdUploadRequestRef = useRef(0);
   const [useNewCv, setUseNewCv] = useState(false);
   const [jobDescription, setJobDescription] = useState("");
   const [jobDescriptionDocument, setJobDescriptionDocument] = useState<IngestedDocument | null>(null);
@@ -134,25 +136,28 @@ export default function PrepareForm() {
     setCvDocument(null);
   }
 
-  async function saveNewCv(file: File) {
+  async function saveNewCv(file: File, requestId: number) {
     const fileName = file.name;
     const fileNameLower = fileName.toLowerCase();
     let text = "";
+    let document: IngestedDocument | null = null;
     if (file.type.startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(fileNameLower)) {
       const form = new FormData();
       form.set("source", "screenshot");
       form.set("file", file);
       form.set("language", experienceLanguage);
       const response = await fetch("/api/ingest", { method: "POST", body: form });
+      if (requestId !== cvUploadRequestRef.current) return;
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not read CV screenshot");
-      const document = data as IngestedDocument;
+      document = data as IngestedDocument;
       text = document.text;
-      setCvDocument(document);
     }
-    else if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) { text = (await buildIngestedDocument(await file.text(), "text", fileName)).text; setCvDocument(null); }
-    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) { const document = await buildIngestedDocument(await extractPdfText(file), "pdf", fileName); text = document.text; setCvDocument(document); }
-    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) { const document = await buildIngestedDocument(await extractWordText(file), "word", fileName); text = document.text; setCvDocument(document); }
+    else if (file.type === "text/plain" || fileNameLower.endsWith(".txt") || fileNameLower.endsWith(".md")) { document = await buildIngestedDocument(await file.text(), "text", fileName); text = document.text; }
+    else if (file.type === "application/pdf" || fileNameLower.endsWith(".pdf")) { document = await buildIngestedDocument(await extractPdfText(file), "pdf", fileName); text = document.text; }
+    else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || fileNameLower.endsWith(".docx")) { document = await buildIngestedDocument(await extractWordText(file), "word", fileName); text = document.text; }
+    if (requestId !== cvUploadRequestRef.current) return;
+    setCvDocument(document);
     if (!text.trim()) {
       toast.error("We could not extract text from this CV. Please paste the CV text instead.");
       return;
@@ -165,8 +170,10 @@ export default function PrepareForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fileName, cvText: text }),
     });
+    if (requestId !== cvUploadRequestRef.current) return;
     if (res.ok) {
       const saved = await res.json();
+      if (requestId !== cvUploadRequestRef.current) return;
       setSavedCvs((current) => [saved, ...current]);
       setSelectedCvId(saved.id);
       setUseNewCv(false);
@@ -191,17 +198,21 @@ export default function PrepareForm() {
   async function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const requestId = ++cvUploadRequestRef.current;
     setCvText("");
     setCvDocument(null);
     setSelectedCvId(null);
     setUseNewCv(true);
-    try { await saveNewCv(file); }
-    catch (error) { toast.error(error instanceof Error ? error.message : "Could not read CV file"); }
+    try { await saveNewCv(file, requestId); }
+    catch (error) {
+      if (requestId === cvUploadRequestRef.current) toast.error(error instanceof Error ? error.message : "Could not read CV file");
+    }
   }
 
   async function onJobDescriptionFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const requestId = ++jdUploadRequestRef.current;
     setJobDescription("");
     setJobDescriptionDocument(null);
     setJobDescriptionUrl("");
@@ -213,24 +224,30 @@ export default function PrepareForm() {
         form.set("file", file);
         form.set("language", experienceLanguage);
         const response = await fetch("/api/ingest", { method: "POST", body: form });
+        if (requestId !== jdUploadRequestRef.current) return;
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Could not read JD screenshot");
         const document = data as IngestedDocument;
+        if (requestId !== jdUploadRequestRef.current) return;
         setJobDescription(document.text);
         setJobDescriptionDocument(document);
         setJobDescriptionMode("screenshot");
         toast.success("Job description screenshot loaded");
         return;
       }
+      if (requestId !== jdUploadRequestRef.current) return;
       const text = lower.endsWith(".docx") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         ? (await buildIngestedDocument(await extractWordText(file), "word", file.name)).text
         : (await buildIngestedDocument(await extractPdfText(file), "pdf", file.name)).text;
       const document = await buildIngestedDocument(text, lower.endsWith(".docx") ? "word" : "pdf", file.name);
+      if (requestId !== jdUploadRequestRef.current) return;
       setJobDescription(document.text);
       setJobDescriptionDocument(document);
       setJobDescriptionMode(lower.endsWith(".docx") ? "word" : "pdf");
       toast.success("Job description loaded");
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not read job description file"); }
+    } catch (error) {
+      if (requestId === jdUploadRequestRef.current) toast.error(error instanceof Error ? error.message : "Could not read job description file");
+    }
   }
 
   async function onJobDescriptionLink() {
