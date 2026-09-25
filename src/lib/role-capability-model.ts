@@ -151,21 +151,74 @@ export function validateRoleCapabilityModel(model: unknown): string[] {
 
 /** Validates RCM requirement IDs and normalized text against the canonical D1–D3 requirement graph. */
 export function validateRoleCapabilityModelAgainstCanonicalRequirements(
-  model: RoleCapabilityModel,
-  canonicalRequirements: readonly Pick<Requirement, "id" | "normalized_requirement">[],
+  model: unknown,
+  canonicalRequirements: unknown,
 ): string[] {
   const errors = validateRoleCapabilityModel(model);
-  const canonicalById = new Map(canonicalRequirements.map((requirement) => [requirement.id, requirement]));
 
-  for (const requirement of model.requirements) {
-    const canonical = canonicalById.get(requirement.canonical_requirement_id);
+  if (!model || typeof model !== "object" || Array.isArray(model)) {
+    return errors;
+  }
+
+  const candidate = model as Record<string, unknown>;
+  if (!Array.isArray(candidate.requirements)) {
+    return errors;
+  }
+
+  if (!Array.isArray(canonicalRequirements)) {
+    errors.push("Canonical requirements must be an array.");
+    return errors;
+  }
+
+  const canonicalById = new Map<string, { id: string; normalized_requirement: string }>();
+  for (const requirement of canonicalRequirements) {
+    if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
+      errors.push("Canonical requirement must be an object.");
+      continue;
+    }
+
+    const item = requirement as Record<string, unknown>;
+    if (typeof item.id !== "string" || !item.id.trim() || typeof item.normalized_requirement !== "string") {
+      errors.push("Canonical requirement must contain valid id and normalized_requirement fields.");
+      continue;
+    }
+
+    canonicalById.set(item.id, {
+      id: item.id,
+      normalized_requirement: item.normalized_requirement,
+    });
+  }
+
+  for (const requirement of candidate.requirements) {
+    if (!requirement || typeof requirement !== "object" || Array.isArray(requirement)) {
+      continue;
+    }
+
+    const item = requirement as Record<string, unknown>;
+    const capabilityId =
+      typeof item.capability_id === "string" ? item.capability_id : "";
+    const canonicalRequirementId =
+      typeof item.canonical_requirement_id === "string"
+        ? item.canonical_requirement_id
+        : "";
+    const normalizedRequirement =
+      typeof item.normalized_requirement === "string"
+        ? item.normalized_requirement
+        : "";
+
+    if (!canonicalRequirementId) {
+      continue;
+    }
+
+    const canonical = canonicalById.get(canonicalRequirementId);
     if (!canonical) {
       errors.push(
-        `Unknown canonical_requirement_id for ${requirement.capability_id}: ${requirement.canonical_requirement_id}`,
+        `Unknown canonical_requirement_id for ${capabilityId}: ${canonicalRequirementId}`,
       );
       continue;
     }
-    if (requirement.normalized_requirement !== canonical.normalized_requirement) {
+
+    if (normalizedRequirement !== canonical.normalized_requirement) {
       errors.push(
         `RCM normalized_requirement diverges from canonical requirement ${canonical.id}.`,
       );
