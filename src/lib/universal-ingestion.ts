@@ -1,4 +1,4 @@
-export type IngestionSourceType = "pdf" | "word" | "link" | "paste" | "text";
+export type IngestionSourceType = "pdf" | "word" | "link" | "paste" | "text" | "screenshot";
 
 export type IngestedDocument = {
   text: string;
@@ -6,6 +6,8 @@ export type IngestedDocument = {
   sourceName?: string;
   sourceUrl?: string;
   contentHash: string;
+  /** SHA-256 of the original source bytes when the source is a binary modality such as a screenshot. */
+  sourceContentHash?: string;
 };
 
 export const INGESTION_LIMITS = { maxDocumentChars: 100_000, maxDocumentBytes: 12_000_000, maxDocxXmlBytes: 2_000_000, linkTimeoutMs: 12_000, maxRedirects: 3 };
