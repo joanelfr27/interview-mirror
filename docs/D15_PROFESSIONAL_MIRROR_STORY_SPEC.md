@@ -144,8 +144,10 @@ D16 output is an action-oriented contract for D17/D20/D21, not a second Professi
 9. No target JD is required or consumed by the D15 projection.
 10. D15 reasoning is invariant to source language; multilingual evidence does not create a parallel evidence or career-thread pipeline.
 11. Language normalization cannot upgrade evidence strength, ownership, scope, outcome, or responsibility.
-12. Equivalent multilingual evidence can be reconciled without duplicate career facts when canonical evidence supports equivalence.\n10. D15 contains no role-fit or gap-bridging logic; that belongs to D16.\n11. D16 can operate with a role capability model when no JD is available.
-12. Canonical tests, typecheck and build pass.
+12. Equivalent multilingual evidence can be reconciled without duplicate career facts when canonical evidence supports equivalence.
+13. D15 contains no role-fit or gap-bridging logic; that belongs to D16.
+14. D16 can operate with a role capability model when no JD is available.
+15. Canonical tests, typecheck and build pass.
 
 ## Candidate-facing WOW
 The preferred reveal is one high-value, evidence-backed thread that connects concrete career stages the candidate already experienced but may not have consciously connected.
