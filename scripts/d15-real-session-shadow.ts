@@ -3,6 +3,13 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import {
+  buildD16DependencySnapshot,
+  buildD16Strategy,
+  validateD16Strategy,
+  type D16Strategy,
+} from "@/lib/d16-personalized-interview-strategy";
+import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,6 +42,21 @@ const supabase = createClient(url, serviceRoleKey, {
 
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+\nfunction buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
+  return {
+    version: "rcm-v1",
+    model_id: "d16-shadow-runtime",
+    role_family: "shadow-runtime",
+    role_title: roleTitle || "Runtime Shadow Role",
+    requirements: requirements.map((requirement, index) => ({
+      capability_id: "D16-SHADOW-CAP-" + String(index + 1),
+      normalized_requirement: requirement.normalized_requirement,
+      baseline_criticality: index === 0 ? "CRITICAL" : index === 1 ? "IMPORTANT" : "SUPPORTING",
+      source: { source_type: "ADMIN_CURATED", source_id: "d16-shadow-runtime", source_version: "1" },
+      canonical_requirement_id: requirement.id,
+    })),
+  };
 }
 
 const { data, error } = await supabase
@@ -70,7 +92,7 @@ const report = {
   run: {
     mode: "D15_REAL_SESSION_SHADOW",
     writes_performed: false,
-    sessions_requested: chosen.length,
+    sessions_requested: chosen.length,\n    d15_d16_connected_flow: true,\n    d16_strategy_validation: "REQUIRED",
     distinct_cv_count: new Set(chosen.map((row) => fingerprint(row.cv_text))).size,
     distinct_jd_count: new Set(chosen.map((row) => fingerprint(row.job_description))).size,
     selected_session_fingerprints: chosen.map((row) => ({
@@ -111,6 +133,27 @@ for (const row of chosen) {
 
   try {
     const result = await runD16ShadowRuntimeIntegration(session);
+    const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
+      id: requirement.id,
+      normalized_requirement: requirement.normalized_requirement,
+    }));
+    const roleCapabilityModel = buildShadowRoleCapabilityModel(canonicalRequirements, row.title);
+    const d16Input = {
+      mirror: result.d15,
+      bridge: result.d6,
+      role_capability_model: roleCapabilityModel,
+      ledger: result.ledger,
+      canonical_requirements: canonicalRequirements,
+      jd_present: Boolean(row.job_description.trim()),
+      jd_fingerprint: "sha256:" + createHash("sha256").update(row.job_description, "utf8").digest("hex"),
+      dependency_snapshot: null as never,
+    };
+    d16Input.dependency_snapshot = buildD16DependencySnapshot(d16Input);
+    const d16 = buildD16Strategy(d16Input);
+    const d16Validation = validateD16Strategy(d16, d16Input);
+    if (!d16Validation.valid) {
+      throw new Error("D16 strategy validation failed: " + d16Validation.errors.join(" | "));
+    }
     const domains = result.ledger.evidence
       .map((atom) => atom.context.domain)
       .filter((value): value is string => Boolean(value?.trim()));
@@ -132,6 +175,14 @@ for (const row of chosen) {
         acc[statement.maturity] = (acc[statement.maturity] ?? 0) + 1;
         return acc;
       }, {}),
+      d16_version: d16.version,
+      d16_d6_version: d16.d6_version,
+      d16_role_capability_model_version: d16.role_capability_model_version,
+      d16_tensions: d16.tensions.length,
+      d16_actions: d16.actions.length,
+      d16_tension_requirement_ids: d16.tensions.map((tension) => tension.requirement_id),
+      d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
+      d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
     });
   } catch (caught) {
