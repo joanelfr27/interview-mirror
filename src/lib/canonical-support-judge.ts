@@ -50,6 +50,31 @@ const SCHEMA = {
   required: ["judgments"],
 } as const;
 
+function summarizeFacetResponse(raw: RawJudgment[], facets: EvidenceLedger["requirements"][number]["facets"]) {
+  const expected = new Set(facets.map(facet => facet.id));
+  const seen = new Set<string>();
+  let duplicateCount = 0;
+  let unknownCount = 0;
+  let validExpectedCount = 0;
+
+  for (const item of raw) {
+    if (seen.has(item.facet_id)) duplicateCount += 1;
+    seen.add(item.facet_id);
+    if (expected.has(item.facet_id)) validExpectedCount += 1;
+    else unknownCount += 1;
+  }
+
+  return {
+    expected_facets: facets.length,
+    raw_judgments: raw.length,
+    unique_facet_ids: seen.size,
+    valid_expected_judgments: validExpectedCount,
+    unknown_facet_ids: unknownCount,
+    duplicate_facet_ids: duplicateCount,
+    missing_facets: Math.max(0, facets.length - [...expected].filter(id => seen.has(id)).length),
+  };
+}
+
 function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
@@ -203,7 +228,12 @@ export async function judgeCanonicalSupport(
     rawJudgments = parsed.judgments ?? [];
     const retryCompletenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
     if (retryCompletenessErrors.length) {
-      throw new Error("Canonical support judgment response was incomplete or structurally invalid after one retry: " + retryCompletenessErrors.join(" | "));
+      const summary = summarizeFacetResponse(rawJudgments, facets);
+      throw new Error(
+        "Canonical support judgment response was incomplete or structurally invalid after one retry: " +
+        retryCompletenessErrors.join(" | ") +
+        " | response_metrics=" + JSON.stringify(summary),
+      );
     }
   }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
