@@ -368,19 +368,9 @@ Hard rules:
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
 - actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
-- ownership: use INDIVIDUAL, TEAM, SHARED, or SUPERVISED only when the quote explicitly contains the corresponding ownership marker. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
-- Apply this ownership rule exactly:
-export const OWNERSHIP_EXTRACTION_RULE = `
-Ownership is a property of the proposition's asserted action, not of a word appearing anywhere in the quote.
-- First determine whether an explicit ownership marker attaches to the same action/proposition represented by this atom.
-- A first-person or possessive marker elsewhere in the sentence is not sufficient by itself.
-- Do NOT treat phrases such as "my manager", "my predecessor", or "my colleague" as candidate ownership merely because they contain "my".
-- Do NOT treat an assignment or reporting relationship such as "my manager assigned this responsibility to me" as INDIVIDUAL ownership unless the quote explicitly establishes that the candidate owned the asserted action.
-- When an explicit ownership marker genuinely attaches to the atom's asserted action, preserve that ownership signal; otherwise return UNKNOWN.
-- Do not infer ownership from job titles, managerial titles, grammatical proximity alone, or typical responsibilities.
-- Do not invent or upgrade ownership beyond what the quote explicitly establishes.
-`;
-
+- ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
+- OWNERSHIP RULE:
+${OWNERSHIP_EXTRACTION_RULE}
 - domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied from the same source_quote when present. If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
 - Employment dates must NOT be attached to a responsibility/achievement atom unless those dates occur in that atom's source_quote. If dates are useful, create a separate employment atom whose source_quote contains the dates.
 - Never infer geography from an employer location, role location, or surrounding CV section when it is absent from the atom quote.
