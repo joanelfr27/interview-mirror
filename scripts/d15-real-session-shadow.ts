@@ -60,6 +60,7 @@ function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normal
 }
 
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
+const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
 }
@@ -69,11 +70,15 @@ const seenCv = new Set<string>();
 const seenJd = new Set<string>();
 
 for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
-  const { data, error } = await supabase
+  let sessionQuery = supabase
     .from("sessions")
     .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
     .not("cv_text", "is", null)
-    .not("job_description", "is", null)
+    .not("job_description", "is", null);
+
+  if (statusFilter) sessionQuery = sessionQuery.eq("status", statusFilter);
+
+  const { data, error } = await sessionQuery
     .order("created_at", { ascending: false })
     .range(offset, offset + 499);
 
