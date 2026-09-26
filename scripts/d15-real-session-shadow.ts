@@ -7,6 +7,7 @@ import {
   buildD16DependencySnapshot,
   buildD16Strategy,
   validateD16Strategy,
+  type D16Inputs,
 } from "@/lib/d16-personalized-interview-strategy";
 import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { SessionRecord } from "@/types";
@@ -139,7 +140,7 @@ for (const row of chosen) {
       normalized_requirement: requirement.normalized_requirement,
     }));
     const roleCapabilityModel = buildShadowRoleCapabilityModel(canonicalRequirements, row.title);
-    const d16Input = {
+    const d16InputBase: Omit<D16Inputs, "dependency_snapshot"> = {
       mirror: result.d15,
       bridge: result.d6,
       role_capability_model: roleCapabilityModel,
@@ -147,9 +148,11 @@ for (const row of chosen) {
       canonical_requirements: canonicalRequirements,
       jd_present: Boolean(row.job_description.trim()),
       jd_fingerprint: "sha256:" + createHash("sha256").update(row.job_description, "utf8").digest("hex"),
-      dependency_snapshot: null as never,
     };
-    d16Input.dependency_snapshot = buildD16DependencySnapshot(d16Input);
+    const d16Input: D16Inputs = {
+      ...d16InputBase,
+      dependency_snapshot: buildD16DependencySnapshot(d16InputBase),
+    };
     const d16 = buildD16Strategy(d16Input);
     const d16Validation = validateD16Strategy(d16, d16Input);
     if (!d16Validation.valid) {
