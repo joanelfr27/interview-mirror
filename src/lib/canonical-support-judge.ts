@@ -148,6 +148,17 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.abstention_reason = "Positive ownership support requires explicit non-UNKNOWN ownership evidence.";
     }
 
+    // Positive OUTCOME support requires explicit outcome evidence.
+    // Missing outcome is absence of evidence, not a positive outcome claim.
+    if (positiveFunctionalStatus && facet.type === "OUTCOME" && citedAtoms.every(atom => !atom.outcome?.trim())) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain an explicit outcome sufficient for positive outcome support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive outcome support requires explicit outcome evidence.";
+    }
+
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
     // unless the cited credential explicitly names Finance or Accounting.
