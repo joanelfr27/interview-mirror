@@ -552,17 +552,15 @@ export async function extractCanonicalShadow(
     let facetMappingFailed = false;
     for (const rawFacet of raw.facets) {
       if (!requirementSpan.text.includes(rawFacet.source_quote)) {
-        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote.`);
-        facetMappingFailed = true;
-        break;
+        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote; facet omitted.`);
+        continue;
       }
 
       const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote, "FACET");
 
       if (!facetSpan) {
-        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote could not be mapped uniquely in the JD.`);
-        facetMappingFailed = true;
-        break;
+        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote could not be mapped uniquely in the JD; facet omitted.`);
+        continue;
       }
 
       sourceSpans.push(facetSpan);
