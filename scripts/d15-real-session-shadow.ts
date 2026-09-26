@@ -214,7 +214,7 @@ for (const row of chosen) {
         d16_action_count: d16.actions.length,
         d16_actions_with_truth_boundaries: d16.actions.filter((action) => action.truthfulness_boundary.permitted_claims.length > 0 || action.truthfulness_boundary.prohibited_claims.length > 0).length,
         d16_actions_with_evidence_when_available: d16.actions.filter((action) => action.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE" || action.evidence_ids.length > 0).length,
-        source_language: result.pipeline_context.source_language,
+        cv_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("CV-")).map((span) => span.language))],
         jd_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("JD-")).map((span) => span.language))],
       },
     });
