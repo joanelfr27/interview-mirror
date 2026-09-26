@@ -43,6 +43,14 @@ test("judge sanitizer reports positive judgment without evidence as a hard error
   assert.ok(result.errors.some(error => error.includes("positive status without cited evidence")));
 });
 
+test("DIRECT FUNCTION support rejects atoms with UNKNOWN action or object", () => {
+  const l = ledger();
+  l.evidence[0].action.normalized_action = "UNKNOWN";
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+});
+
 test("judge sanitizer preserves valid documented direct support", () => {
   const result = sanitizeJudgments([raw("DIRECT", ["A1"])], ledger());
   assert.equal(result.errors.length, 0);
