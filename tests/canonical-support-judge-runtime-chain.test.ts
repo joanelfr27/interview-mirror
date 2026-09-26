@@ -26,7 +26,7 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
   try {
     await assert.rejects(
       () => runD16ShadowRuntimeIntegration(session),
-    (caught: unknown) => {
+      (caught: unknown) => {
       assert.ok(caught instanceof CanonicalSupportJudgmentError);
       assert.equal(caught.diagnostic.parsed_successfully, true);
       assert.equal(caught.diagnostic.requirement_count, 1);
