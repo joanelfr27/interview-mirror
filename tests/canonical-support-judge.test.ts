@@ -24,7 +24,7 @@ function ledger(): EvidenceLedger {
       verifiability: { has_quantifiable_metric: false, has_third_party_entity: false, has_time_anchor: false },
       extraction_confidence: 1,
     }],
-    requirements: [requirement], support_judgments: [],
+    requirements: [{ ...requirement, facets: requirement.facets.map(facet => ({ ...facet })) }], support_judgments: [],
     requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
     unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
   };
