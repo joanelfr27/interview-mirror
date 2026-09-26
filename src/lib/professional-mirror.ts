@@ -219,21 +219,6 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   return accepted;
 }
 
-function mirrorEvidenceAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
-  // Collapse exact duplicate imports, but retain distinct source spans even when
-  // their claims are semantically similar. Downstream D6/D16 references may
-  // legitimately point to those distinct canonical evidence nodes.
-  const accepted: AtomicEvidence[] = [];
-  const seen = new Set<string>();
-  for (const atom of affirmativeAtoms(ledger)) {
-    const key = dedupeKey(ledger, atom);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    accepted.push(atom);
-  }
-  return accepted;
-}
-
 function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
   if (!ownershipCompatible(a, b)) return null;
   if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
@@ -321,8 +306,7 @@ function buildThreads(atoms: AtomicEvidence[]): CareerThread[] {
 
 export function buildProfessionalMirror(ledger: EvidenceLedger): ProfessionalMirror {
   const atoms = independentAtoms(ledger);
-  const evidenceAtoms = mirrorEvidenceAtoms(ledger);
-  const evidence: MirrorEvidenceRef[] = evidenceAtoms.flatMap((atom) => {
+  const evidence: MirrorEvidenceRef[] = atoms.flatMap((atom) => {
     const span = spanFor(ledger, atom);
     return span ? [{ evidence_id: atom.id, source_span_id: span.id, source_quote: span.text, source_type: atom.provenance.source_type }] : [];
   });
