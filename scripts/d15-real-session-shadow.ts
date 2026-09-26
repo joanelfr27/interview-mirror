@@ -59,34 +59,40 @@ function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normal
   };
 }
 
-const { data, error } = await supabase
-  .from("sessions")
-  .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
-  .not("cv_text", "is", null)
-  .not("job_description", "is", null)
-  .order("created_at", { ascending: false })
-  .limit(500);
-
-if (error) throw new Error("Supabase session query failed: " + error.message);
-
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
 const seenJd = new Set<string>();
 
-for (const row of (data ?? []) as SessionRow[]) {
-  if (!row.cv_text?.trim() || !row.job_description?.trim()) continue;
-  const cvKey = fingerprint(row.cv_text);
-  const jdKey = fingerprint(row.job_description);
-  if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
-  seenCv.add(cvKey);
-  seenJd.add(jdKey);
-  chosen.push(row);
-  if (chosen.length === 15) break;
+for (let offset = 0; chosen.length < 15; offset += 500) {
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
+    .not("cv_text", "is", null)
+    .not("job_description", "is", null)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + 499);
+
+  if (error) throw new Error("Supabase session query failed: " + error.message);
+  if (!data?.length) break;
+
+  for (const row of data as SessionRow[]) {
+    if (!row.cv_text?.trim() || !row.job_description?.trim()) continue;
+    const cvKey = fingerprint(row.cv_text);
+    const jdKey = fingerprint(row.job_description);
+    if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
+    seenCv.add(cvKey);
+    seenJd.add(jdKey);
+    chosen.push(row);
+    if (chosen.length === 15) break;
+  }
+
+  if (data.length < 500) break;
 }
 
 if (chosen.length < 15) {
-  throw new Error(`Expected at least 15 distinct CV/JD sessions, found ${chosen.length}.`);
+  throw new Error(`Expected at least 15 distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
 }
+
 
 const report = {
   run: {
