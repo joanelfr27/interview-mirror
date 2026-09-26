@@ -38,7 +38,7 @@ function fingerprint(value: string): string {
 
 const { data, error } = await supabase
   .from("sessions")
-  .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,experience_language,interview_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
+  .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
   .not("cv_text", "is", null)
   .not("job_description", "is", null)
   .order("created_at", { ascending: false })
