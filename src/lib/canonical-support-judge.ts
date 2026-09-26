@@ -176,6 +176,17 @@ export async function judgeCanonicalSupport(
   let parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
   let rawJudgments = parsed.judgments ?? [];
   const facets = ledger.requirements.flatMap(r => r.facets);
+  const expectedFacetIds = new Set(facets.map(facet => facet.id));
+  const returnedFacetIds = rawJudgments.map(item => item.facet_id);
+  const validReturnedFacetIds = [...new Set(returnedFacetIds)].filter(id => expectedFacetIds.has(id));
+  const unknownReturnedFacetIds = [...new Set(returnedFacetIds)].filter(id => !expectedFacetIds.has(id));
+  const duplicateReturnedFacetIds = [...new Set(returnedFacetIds.filter((id, index) => returnedFacetIds.indexOf(id) !== index))];
+  const completenessDiagnostics =
+    "facet_diagnostic expected=" + facets.length +
+    " returned=" + rawJudgments.length +
+    " valid_unique=" + validReturnedFacetIds.length +
+    " unknown_unique=" + unknownReturnedFacetIds.length +
+    " duplicate_unique=" + duplicateReturnedFacetIds.length;
   const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
 
   // The first structured response can occasionally omit the required facet set on
@@ -203,7 +214,17 @@ export async function judgeCanonicalSupport(
     rawJudgments = parsed.judgments ?? [];
     const retryCompletenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
     if (retryCompletenessErrors.length) {
-      throw new Error("Canonical support judgment response was incomplete or structurally invalid after one retry: " + retryCompletenessErrors.join(" | "));
+      const retryReturnedFacetIds = rawJudgments.map(item => item.facet_id);
+      const retryValidReturnedFacetIds = [...new Set(retryReturnedFacetIds)].filter(id => expectedFacetIds.has(id));
+      const retryUnknownReturnedFacetIds = [...new Set(retryReturnedFacetIds)].filter(id => !expectedFacetIds.has(id));
+      const retryDuplicateReturnedFacetIds = [...new Set(retryReturnedFacetIds.filter((id, index) => retryReturnedFacetIds.indexOf(id) !== index))];
+      const retryDiagnostics =
+        "retry_facet_diagnostic expected=" + facets.length +
+        " returned=" + rawJudgments.length +
+        " valid_unique=" + retryValidReturnedFacetIds.length +
+        " unknown_unique=" + retryUnknownReturnedFacetIds.length +
+        " duplicate_unique=" + retryDuplicateReturnedFacetIds.length;
+      throw new Error("Canonical support judgment response was incomplete or structurally invalid after one retry: " + retryCompletenessErrors.join(" | ") + " | " + completenessDiagnostics + " | " + retryDiagnostics);
     }
   }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
