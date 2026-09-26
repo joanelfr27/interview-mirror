@@ -36,6 +36,7 @@ import {
   type ProfessionalMirror,
 } from "@/lib/professional-mirror";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
+import type { CanonicalShadowResult } from "@/lib/canonical-shadow-extractor";
 
 export type D16ShadowRuntimeResult = {
   ledger: EvidenceLedger;
@@ -46,6 +47,7 @@ export type D16ShadowRuntimeResult = {
   d6: CanonicalStrategyBridgeProjection;
   d15: ProfessionalMirror;
   diagnostics: string[];
+  extraction_diagnostics: CanonicalShadowResult["diagnostics"];
 };
 
 export async function runD16ShadowRuntimeIntegration(
@@ -162,5 +164,5 @@ export async function runD16ShadowRuntimeIntegration(
     "D16 shadow runtime: D6 evidence references remain canonical.",
   );
 
-  return { ledger: shadow.ledger, d2, d3, d4, d5, d6, d15, diagnostics };
+  return { ledger: shadow.ledger, d2, d3, d4, d5, d6, d15, diagnostics, extraction_diagnostics: shadow.extraction };
 }
