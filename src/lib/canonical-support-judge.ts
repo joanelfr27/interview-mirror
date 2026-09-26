@@ -54,7 +54,8 @@ export class CanonicalSupportJudgmentError extends Error {
     this.diagnostic = diagnostic;
   }
 }
-\nconst STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
+
+const STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
 const SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
