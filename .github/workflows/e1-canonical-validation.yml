@@ -2,7 +2,7 @@ name: E1 Canonical Validation
 
 on:
   push:
-    branches: ["e1-audit-corrections"]
+    branches: ["e1-audit-corrections", "fix/e1-extractor-grounding-contract"]
   pull_request:
     branches: ["audit-version"]
 
