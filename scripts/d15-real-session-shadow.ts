@@ -423,12 +423,6 @@ for (const row of chosen) {
   }
 }
 
-await writeFile(
-  "d15-real-session-shadow-report.json",
-  JSON.stringify(report, null, 2),
-  "utf8",
-);
-
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 console.log(JSON.stringify(report, null, 2));
 
