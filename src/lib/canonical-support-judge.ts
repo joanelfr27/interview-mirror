@@ -202,6 +202,7 @@ export async function judgeCanonicalSupport(
   let rawJudgments = parsed.judgments ?? [];
   const facets = ledger.requirements.flatMap(r => r.facets);
   const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+  const firstResponseMetrics = completenessErrors.length ? summarizeFacetResponse(rawJudgments, facets) : null;
 
   // The first structured response can occasionally omit the required facet set on
   // real sessions. Retry exactly once with an explicit facet-ID checklist before
@@ -232,7 +233,8 @@ export async function judgeCanonicalSupport(
       throw new Error(
         "Canonical support judgment response was incomplete or structurally invalid after one retry: " +
         retryCompletenessErrors.join(" | ") +
-        " | response_metrics=" + JSON.stringify(summary),
+        " | first_response_metrics=" + JSON.stringify(firstResponseMetrics) +
+        " | retry_response_metrics=" + JSON.stringify(summary),
       );
     }
   }
