@@ -59,7 +59,7 @@ function ownershipBucket(atomQuote: string, surroundingQuote: string): "A" | "B"
   const markerInAtom = ownershipMarkerInText(atomQuote);
   const markerInSurrounding = ownershipMarkerInText(surroundingQuote);
   if (!markerInAtom) return markerInSurrounding ? "B" : "C";
-  const competingRelationship = /(?:\b(?:worked|work|reported|report|reports|managed|manage|led|lead|supervised|supervision)\b.{0,80}\b(?:team|manager|supervisor|cfo|director|head|boss|management)\b|\b(?:led by|managed by|under the supervision of|under supervision|report(?:ed)? to|rattach[ée]?(?:e)?\s+à|sous supervision|dirig[ée]?\s+par|équipe dirig[ée]?\s+par)\b)/i;
+  const competingRelationship = /\b(?:led by|managed by|under (?:the )?supervision(?: of)?|report(?:ed|s)? to|rattach[ée]?e?\s+à|sous supervision|dirig[ée]?e?\s+par|équipe dirig[ée]?e?\s+par|team led by)\b/i;
   return competingRelationship.test(atomQuote) ? "D" : "A";
 }
 
