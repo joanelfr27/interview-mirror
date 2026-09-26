@@ -26,6 +26,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
         continue-on-error: false
+      - name: D15-D16 WOW multilingual validation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D15_RUNTIME_SESSION_COUNT: "10"
+          D15_RUNTIME_STATUS_FILTER: "e1-d16-wow-validation"
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+        continue-on-error: false
       - uses: actions/upload-artifact@v4
         if: always()
         with:
