@@ -62,8 +62,8 @@ for (const row of (data ?? []) as SessionRow[]) {
   if (chosen.length === 15) break;
 }
 
-if (chosen.length < 3) {
-  throw new Error(`Expected at least 3 distinct CV sessions, found ${chosen.length}.`);
+if (chosen.length < 15) {
+  throw new Error(`Expected at least 15 distinct CV/JD sessions, found ${chosen.length}.`);
 }
 
 const report = {
