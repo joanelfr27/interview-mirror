@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import { diagnoseProfessionalMirrorConnections } from "@/lib/professional-mirror";
 import {
   buildD16DependencySnapshot,
   buildD16Strategy,
@@ -205,6 +206,7 @@ for (const row of chosen) {
       d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
+      d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
       wow: {
         thread_count: result.d15.threads.length,
         non_fact_statement_count: result.d15.statements.filter((statement) => statement.kind !== "FACT").length,
