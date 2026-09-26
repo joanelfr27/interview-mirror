@@ -201,6 +201,17 @@ function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connect
   return null;
 }
 
+/**
+ * Instrumentation-only oracle for diagnostics. Keep `connection` private so
+ * this does not become part of the Professional Mirror public contract.
+ */
+export function diagnosticConnectionReason(
+  a: AtomicEvidence,
+  b: AtomicEvidence,
+): CareerThread["connection_reason"] | null {
+  return connection(a, b);
+}
+
 function maturity(independentSpanCount: number): MirrorMaturity {
   if (independentSpanCount >= 3) return "SUSTAINED_STRENGTH";
   if (independentSpanCount === 2) return "SUPPORTED_CONCLUSION";
