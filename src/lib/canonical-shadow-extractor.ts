@@ -292,7 +292,11 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
 }
 
 function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
-  const actor = raw.actor.trim();
+  // Apply outcome grounding before canonical validation so an LLM cannot
+  // classify an atom as OUTCOME_CLAIM when its outcome is not actually
+  // present in the source quote.
+  const groundedRaw = downgradeUngroundedOutcomeClaim(raw, source);
+  const actor = groundedRaw.actor.trim();
   const groundedActor =
     actor && /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
       ? "candidate"
@@ -313,7 +317,7 @@ function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): Ra
   const deterministic = deriveDeterministicVerifiability(source);
 
   return {
-    ...raw,
+    ...groundedRaw,
     actor: groundedActor,
     ownership,
     normalized_action: exactOrUnknown(raw.normalized_action, source),
