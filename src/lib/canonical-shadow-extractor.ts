@@ -217,6 +217,34 @@ function findExactSpan(
     cursor = index + Math.max(1, target.length);
   }
 
+  // LLMs can collapse PDF/CV line breaks or repeated spaces even when preserving the source wording.
+  // Recover only whitespace-equivalent spans; never normalize the stored evidence text itself.
+  const whitespaceParts = target.split(/\s+/u).filter(Boolean).map(part =>
+    part.replace(/[.*+?^$()|[\]\\]/g, "\\  return null;
+}
+
+export function spanWithinParent")
+  );
+  if (whitespaceParts.length) {
+    const whitespacePattern = new RegExp(whitespaceParts.join("\\s+"), "gu");
+    for (const match of document.matchAll(whitespacePattern)) {
+      const index = match.index ?? -1;
+      const matchedText = match[0] ?? "";
+      if (index < 0 || !matchedText) continue;
+      const key = index + ":" + (index + matchedText.length);
+      if (used.has(key)) continue;
+      used.add(key);
+      return {
+        id: `SPAN-${documentId}-${spanKind}-${index}-${index + matchedText.length}`,
+        document_id: documentId,
+        text: matchedText,
+        start_offset: index,
+        end_offset: index + matchedText.length,
+        language,
+      };
+    }
+  }
+
   return null;
 }
 
