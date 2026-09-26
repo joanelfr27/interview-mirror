@@ -19,8 +19,6 @@ type SessionRow = {
   cv_analysis: SessionRecord["cv_analysis"];
   interview_strategy: SessionRecord["interview_strategy"];
   preparation_language: SessionRecord["preparation_language"];
-  experience_language: SessionRecord["experience_language"];
-  interview_language: SessionRecord["interview_language"];
   preparation_purpose: SessionRecord["preparation_purpose"];
   interview_date: string | null;
   coaching_focus: string | null;
@@ -88,8 +86,6 @@ for (const row of chosen) {
     cv_analysis: row.cv_analysis,
     interview_strategy: row.interview_strategy,
     preparation_language: row.preparation_language,
-    experience_language: row.experience_language,
-    interview_language: row.interview_language,
     preparation_purpose: row.preparation_purpose,
     interview_date: row.interview_date,
     coaching_focus: row.coaching_focus,
