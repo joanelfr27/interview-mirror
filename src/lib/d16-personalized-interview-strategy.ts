@@ -245,7 +245,36 @@ function objectiveFor(item: CanonicalStrategyBridgeRequirement, evidence: D16Evi
 function boundariesFor(item: CanonicalStrategyBridgeRequirement) {
   const permitted = [...new Set(item.boundaries.flatMap((b) => b.permitted_claims))].sort();
   const prohibited = [...new Set(item.boundaries.flatMap((b) => b.prohibited_claims))].sort();
-  return { permitted_claims: permitted, prohibited_claims: prohibited };
+  if (permitted.length || prohibited.length) {
+    return { permitted_claims: permitted, prohibited_claims: prohibited };
+  }
+
+  const supportedEvidence = item.evidence
+    .filter((e) => e.support_status === "DIRECT" || e.support_status === "PARTIAL" || e.support_status === "ANALOGICAL_TRANSFER")
+    .map((e) => e.source_quote.trim())
+    .filter(Boolean);
+
+  const fallbackPermitted = supportedEvidence.map(
+    (quote) => "You may state only what is explicitly supported by: " + quote,
+  );
+  const fallbackProhibited = [
+    "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+  ];
+
+  if (item.status === "UNRESOLVED" || !supportedEvidence.length) {
+    fallbackProhibited.unshift("Do not claim the requirement is fully established.");
+  }
+  if (item.status === "PARTIAL" || item.route_mode === "TRANSFERABLE") {
+    fallbackProhibited.push("Do not describe partial or transferable evidence as fully established direct experience.");
+  }
+  if (item.status === "CONTRADICTED") {
+    fallbackProhibited.push("Do not claim the requirement is established while the documented evidence remains contradictory.");
+  }
+
+  return {
+    permitted_claims: [...new Set(fallbackPermitted)].sort(),
+    prohibited_claims: [...new Set(fallbackProhibited)].sort(),
+  };
 }
 
 function compareTensions(a: StrategicTension, b: StrategicTension): number {
