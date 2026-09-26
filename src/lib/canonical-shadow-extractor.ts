@@ -349,14 +349,7 @@ async function extractAtoms(
   cv: string,
 ): Promise<RawCandidateAtom[]> {
   const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
-    model: AI_MODEL,
-    temperature: 0,
-    response_format: responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA),
-    messages: [
-      {
-        role: "system",
-        content: `You are the canonical candidate-evidence extractor for Interview Mirror.
+  const systemPrompt = `You are the canonical candidate-evidence extractor for Interview Mirror.
 
 Source-language rule: preserve the language of the supplied CV in normalized fields. Do not translate, rewrite into the preparation language, or mix languages. Source quotes must remain verbatim. The preparation/product language is irrelevant to this canonical extraction layer.
 
@@ -390,12 +383,19 @@ ${OWNERSHIP_EXTRACTION_RULE}
 - Every explicit material fact in those sections that could correspond to a JD requirement must be represented by at least one atom, unless it is already represented by another atom with the same source proposition.
 - In particular, do not omit explicit years of experience, named standards (for example IFRS or SYSCOHADA), language abilities, education/credentials, or explicit location facts merely because they are not employment bullets.
 - This is a coverage requirement, not a fit judgment: do not invent facts to fill a missing category.
-`
-      },
-      {
-        role: "user",
-        content: `CV SOURCE:\n${cv}`
-      }
+`;
+  if (process.env.D16_OWNERSHIP_PROMPT_PROBE === "1") {
+    console.log("OWNERSHIP_PROMPT_PROBE_SYSTEM_PROMPT_BEGIN");
+    console.log(systemPrompt);
+    console.log("OWNERSHIP_PROMPT_PROBE_SYSTEM_PROMPT_END");
+  }
+  const response = await openai.chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA),
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `CV SOURCE:\n${cv}` }
     ]
   });
 
@@ -660,4 +660,10 @@ export async function extractCanonicalShadow(
     source_spans: uniqueSourceSpans,
     diagnostics,
   };
+}
+
+
+/** Temporary D16 mechanical probe; remove after Track-B instrument check. */
+export async function diagnosticExtractAtomsProbe(cv: string): Promise<RawCandidateAtom[]> {
+  return extractAtoms(cv);
 }
