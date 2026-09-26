@@ -43,12 +43,15 @@ test("judge sanitizer reports positive judgment without evidence as a hard error
   assert.ok(result.errors.some(error => error.includes("positive status without cited evidence")));
 });
 
-test("DIRECT FUNCTION support rejects atoms with UNKNOWN action or object", () => {
-  const l = ledger();
-  l.evidence[0].action.normalized_action = "UNKNOWN";
-  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
-  assert.equal(result.judgments[0].status, "NONE");
-  assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+test("positive FUNCTION support rejects atoms with UNKNOWN action or object", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.evidence[0].action.normalized_action = "UNKNOWN";
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
 });
 
 test("judge sanitizer preserves valid documented direct support", () => {
@@ -57,7 +60,6 @@ test("judge sanitizer preserves valid documented direct support", () => {
   assert.equal(result.judgments[0].status, "DIRECT");
   assert.equal(result.judgments[0].support_basis, "DOCUMENTED");
 });
-
 
 test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
   const l = ledger();
