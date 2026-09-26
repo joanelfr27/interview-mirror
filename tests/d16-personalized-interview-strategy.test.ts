@@ -84,6 +84,14 @@ describe("D16 personalized interview strategy", () => {
     assert.throws(() => buildD16Strategy(input), /forged or missing evidence/);
   });
 
+  it("accepts canonical D6 evidence that D15 intentionally omitted by deduplication", () => {
+    const input = fixture();
+    input.mirror.evidence = input.mirror.evidence.filter((e) => e.evidence_id !== "EV-A");
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const validation = validateD16Inputs(input);
+    assert.equal(validation.valid, true);
+  });
+
   it("fails closed on unknown requirements and malformed assessment context", () => {
     const input = fixture({ assessment_context: { version: "assessment-context-v1", context_id: "A1", requirement_relevance: { "UNKNOWN": "HIGH" } } });
     const validation = validateD16Inputs(input);
