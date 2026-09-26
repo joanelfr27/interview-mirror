@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import {
   diagnoseProfessionalMirrorConnections,
   diagnosticSignalOverlap,
@@ -418,6 +419,9 @@ for (const row of chosen) {
       ...base,
       outcome: "FAIL",
       error: caught instanceof Error ? caught.message : String(caught),
+      ...(caught instanceof CanonicalSupportJudgmentError
+        ? { support_judge_diagnostic: caught.diagnostic }
+        : {}),
     });
   }
 }
