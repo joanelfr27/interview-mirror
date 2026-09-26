@@ -110,7 +110,7 @@ describe("D16 personalized interview strategy", () => {
       "You may state only what is explicitly supported by: Led regional financial reporting for multiple countries.",
     ]);
     assert.deepEqual(tension.truthfulness_boundary.prohibited_claims, [
-      "Claiming transformation leadership",
+      "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
     ]);
     for (const action of strategy.actions.filter((item) => item.requirement_id === "REQ-A")) {
       assert.deepEqual(action.truthfulness_boundary, tension.truthfulness_boundary);
