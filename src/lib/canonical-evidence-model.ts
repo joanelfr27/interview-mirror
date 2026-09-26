@@ -247,7 +247,8 @@ export function validateAtomicEvidenceAgainstSource(
 
   const requireExact = (label: string, raw: string | undefined | null) => {
     const value = raw?.trim();
-    if (value && !source.includes(value)) {
+    if (!value || value === "UNKNOWN") return;
+    if (!source.includes(value)) {
       errors.push(`AtomicEvidence.${label} is not grounded in its source quote.`);
     }
   };
