@@ -81,7 +81,7 @@ describe("D16 personalized interview strategy", () => {
   it("fails closed on forged evidence references", () => {
     const input = fixture();
     input.bridge.requirements[0].evidence[0].evidence_id = "FORGED";
-    assert.throws(() => buildD16Strategy(input), /forged or missing evidence/);
+    assert.throws(() => buildD16Strategy(input), /forged or missing (?:canonical )?evidence/);
   });
 
   it("accepts canonical D6 evidence that D15 intentionally omitted by deduplication", () => {
