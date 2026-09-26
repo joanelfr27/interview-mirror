@@ -179,6 +179,14 @@ function canonicalize(value: string): string {
 
 
 
+function quoteMismatchDiagnostic(document: string, quote: string): string {
+  const normalizedDocument = canonicalize(document);
+  const normalizedQuote = canonicalize(quote);
+  const whitespaceNormalizedMatch = Boolean(normalizedQuote) && normalizedDocument.includes(normalizedQuote);
+  const caseInsensitiveMatch = Boolean(normalizedQuote) && normalizedDocument.toLocaleLowerCase().includes(normalizedQuote.toLocaleLowerCase());
+  return "quote_diagnostic whitespace_normalized_match=" + whitespaceNormalizedMatch + " case_insensitive_match=" + caseInsensitiveMatch + " quote_chars=" + quote.length;
+}
+
 function findExactSpan(
   documentId: string,
   document: string,
@@ -207,6 +215,31 @@ function findExactSpan(
       };
     }
     cursor = index + Math.max(1, target.length);
+  }
+
+  // LLMs can collapse PDF/CV line breaks or repeated spaces even when preserving the source wording.
+  // Recover only whitespace-equivalent spans; never normalize the stored evidence text itself.
+  const whitespaceParts = target.split(/\s+/u).filter(Boolean).map(part =>
+    part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  );
+  if (whitespaceParts.length) {
+    const whitespacePattern = new RegExp(whitespaceParts.join("\\s+"), "gu");
+    for (const match of document.matchAll(whitespacePattern)) {
+      const index = match.index ?? -1;
+      const matchedText = match[0] ?? "";
+      if (index < 0 || !matchedText) continue;
+      const key = index + ":" + (index + matchedText.length);
+      if (used.has(key)) continue;
+      used.add(key);
+      return {
+        id: `SPAN-${documentId}-${spanKind}-${index}-${index + matchedText.length}`,
+        document_id: documentId,
+        text: matchedText,
+        start_offset: index,
+        end_offset: index + matchedText.length,
+        language,
+      };
+    }
   }
 
   return null;
@@ -484,7 +517,7 @@ export async function extractCanonicalShadow(
     const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
-      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
+      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring. ${quoteMismatchDiagnostic(session.cv_text ?? "", raw.source_quote)}`);
       continue;
     }
 
@@ -500,7 +533,18 @@ export async function extractCanonicalShadow(
 
     if (atomErrors.length) {
       rejectedAtoms.push(raw.id);
+      const groundingDiagnostic = [
+        "object_present=" + Boolean(raw.object?.trim()),
+        "object_exact=" + Boolean(raw.object?.trim() && span.text.includes(raw.object.trim())),
+        "object_ws_normalized=" + Boolean(raw.object?.trim() && canonicalize(span.text).includes(canonicalize(raw.object.trim()))),
+        "outcome_present=" + Boolean(raw.outcome?.trim()),
+        "outcome_exact=" + Boolean(raw.outcome?.trim() && span.text.includes(raw.outcome.trim())),
+        "outcome_ws_normalized=" + Boolean(raw.outcome?.trim() && canonicalize(span.text).includes(canonicalize(raw.outcome.trim()))),
+        "action_exact=" + Boolean(raw.normalized_action?.trim() && span.text.includes(raw.normalized_action.trim())),
+        "action_ws_normalized=" + Boolean(raw.normalized_action?.trim() && canonicalize(span.text).includes(canonicalize(raw.normalized_action.trim()))),
+      ].join(" ");
       errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}`));
+      warnings.push(`[E1 grounding diagnostic ${raw.id}] ${groundingDiagnostic}`);
       continue;
     }
 

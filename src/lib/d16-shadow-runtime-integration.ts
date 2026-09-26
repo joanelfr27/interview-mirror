@@ -56,7 +56,7 @@ export async function runD16ShadowRuntimeIntegration(
 
   const graphErrors = validateRequirementGraph(shadow.ledger);
   if (graphErrors.length) {
-    throw new Error("D16 shadow ledger validation failed: " + graphErrors.join(" | "));
+    throw new Error("D16 shadow ledger validation failed: " + graphErrors.join(" | ") + (shadow.diagnostics.length ? " | upstream_diagnostics=" + shadow.diagnostics.join(" || ") : ""));
   }
 
   const d2 = buildCanonicalReasoningProjection(shadow.ledger);
