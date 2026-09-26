@@ -170,12 +170,42 @@ export async function judgeCanonicalSupport(
     ],
   });
 
-  const raw = response.choices[0]?.message?.content;
+  let raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical support judgment response.");
-  const parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
-  const rawJudgments = parsed.judgments ?? [];
-  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
+
+  let parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+  let rawJudgments = parsed.judgments ?? [];
+  const facets = ledger.requirements.flatMap(r => r.facets);
+  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+
+  // The first structured response can occasionally omit the required facet set on
+  // real sessions. Retry exactly once with an explicit facet-ID checklist before
+  // failing closed; never synthesize missing judgments locally.
+  if (completenessErrors.length) {
+    const retryResponse = await openai.chat.completions.create({
+      model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments_retry", SCHEMA),
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content:
+            "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) +
+            "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements) +
+            "\n\nCOMPLETENESS REQUIREMENT:\n" +
+            "The previous response did not return a complete facet set. Return exactly one judgment for every facet ID below, including NONE/abstained when evidence is insufficient. Do not omit any facet and do not invent evidence. Required facet IDs:\n" +
+            JSON.stringify(facets.map(facet => facet.id)),
+        },
+      ],
+    });
+    raw = retryResponse.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty canonical support judgment retry response.");
+    parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+    rawJudgments = parsed.judgments ?? [];
+    const retryCompletenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+    if (retryCompletenessErrors.length) {
+      throw new Error("Canonical support judgment response was incomplete or structurally invalid after one retry: " + retryCompletenessErrors.join(" | "));
+    }
+  }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
