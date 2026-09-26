@@ -20,7 +20,7 @@ describe("E1 candidate extractor prompt contract", () => {
       "If assertion_type is OUTCOME_CLAIM, outcome MUST be non-null",
     ));
     assert.ok(CANDIDATE_EXTRACTION_SYSTEM_PROMPT.includes(
-      "outcome MUST be an exact contiguous phrase from that same source_quote.",
+      "outcome MUST be non-null and MUST be an exact contiguous phrase from that same source_quote.",
     ));
     assert.ok(CANDIDATE_EXTRACTION_SYSTEM_PROMPT.includes(
       "Never label an atom OUTCOME_CLAIM when no explicit outcome is stated.",
