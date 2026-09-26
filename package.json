@@ -11,7 +11,8 @@
     "test:d14-runtime": "node --experimental-loader ./tests/d14-test-loader.mjs --test tests/d14-runtime-gate.test.ts",
     "typecheck": "tsc --noEmit",
     "test:d15-acronym": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-acronym-regression.test.ts",
-    "test:d15-object-overlap": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-object-overlap-regression.test.ts"
+    "test:d15-object-overlap": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-object-overlap-regression.test.ts",
+    "test:e1-extractor-contract": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/e1-extractor-prompt-contract.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
