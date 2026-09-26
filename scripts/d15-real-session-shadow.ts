@@ -59,11 +59,16 @@ function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normal
   };
 }
 
+const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
+if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
+  throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
+}
+
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
 const seenJd = new Set<string>();
 
-for (let offset = 0; chosen.length < 15; offset += 500) {
+for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
   const { data, error } = await supabase
     .from("sessions")
     .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
@@ -83,14 +88,14 @@ for (let offset = 0; chosen.length < 15; offset += 500) {
     seenCv.add(cvKey);
     seenJd.add(jdKey);
     chosen.push(row);
-    if (chosen.length === 15) break;
+    if (chosen.length === requestedSessionCount) break;
   }
 
   if (data.length < 500) break;
 }
 
-if (chosen.length < 15) {
-  throw new Error(`Expected at least 15 distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
+if (chosen.length < requestedSessionCount) {
+  throw new Error(`Expected at least ${requestedSessionCount} distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
 }
 
 
@@ -99,6 +104,7 @@ const report = {
     mode: "D15_REAL_SESSION_SHADOW",
     writes_performed: false,
     sessions_requested: chosen.length,
+    requested_session_count: requestedSessionCount,
     d15_d16_connected_flow: true,
     d16_strategy_validation: "REQUIRED",
     distinct_cv_count: new Set(chosen.map((row) => fingerprint(row.cv_text))).size,
@@ -194,6 +200,18 @@ for (const row of chosen) {
       d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
+      wow: {
+        thread_count: result.d15.threads.length,
+        non_fact_statement_count: result.d15.statements.filter((statement) => statement.kind !== "FACT").length,
+        sustained_strength_count: result.d15.statements.filter((statement) => statement.maturity === "SUSTAINED_STRENGTH").length,
+        thread_depths: result.d15.threads.map((thread) => new Set(thread.evidence_ids.map((id) => result.ledger.evidence.find((atom) => atom.id === id)?.source_span_id).filter((id): id is string => Boolean(id))).size),
+        contextual_delta_tension_count: d16.tensions.filter((tension) => Object.values(tension.contextual_delta).some(Boolean)).length,
+        d16_action_count: d16.actions.length,
+        d16_actions_with_truth_boundaries: d16.actions.filter((action) => action.truthfulness_boundary.permitted_claims.length > 0 || action.truthfulness_boundary.prohibited_claims.length > 0).length,
+        d16_actions_with_evidence_when_available: d16.actions.filter((action) => action.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE" || action.evidence_ids.length > 0).length,
+        source_language: result.pipeline_context.source_language,
+        jd_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("JD-")).map((span) => span.language))],
+      },
     });
   } catch (caught) {
     report.sessions.push({
@@ -213,4 +231,49 @@ await writeFile(
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 console.log(JSON.stringify(report, null, 2));
 
-if (failures.length) process.exitCode = 1;
+const passedSessions = report.sessions.filter((item) => item.outcome === "PASS") as Array<Record<string, unknown>>;
+const wow = passedSessions.map((item) => item.wow as Record<string, unknown>).filter(Boolean);
+const countAtLeast = (key: string, minimum: number) =>
+  wow.filter((item) => Number(item[key] ?? 0) >= minimum).length;
+
+const wowGate = {
+  all_sessions_pass: failures.length === 0 && passedSessions.length === chosen.length,
+  sessions_with_two_or_more_threads: countAtLeast("thread_count", 2),
+  sessions_with_non_fact_story: countAtLeast("non_fact_statement_count", 1),
+  sessions_with_contextual_delta: countAtLeast("contextual_delta_tension_count", 1),
+  sessions_with_d16_action: countAtLeast("d16_action_count", 1),
+  truth_boundary_coverage_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_truth_boundaries ?? 0)),
+  evidence_linkage_when_available_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_evidence_when_available ?? 0)),
+};
+
+(report as typeof report & { wow_kpis?: unknown }).wow_kpis = {
+  target_sessions: requestedSessionCount,
+  thresholds: {
+    all_sessions_pass: requestedSessionCount,
+    sessions_with_two_or_more_threads: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
+    sessions_with_non_fact_story: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
+    sessions_with_contextual_delta: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
+    sessions_with_d16_action: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
+    truth_boundary_coverage_100_percent: true,
+    evidence_linkage_when_available_100_percent: true,
+  },
+  observed: {
+    passed_sessions: passedSessions.length,
+    ...wowGate,
+  },
+  pass: wowGate.all_sessions_pass &&
+    wowGate.sessions_with_two_or_more_threads >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
+    wowGate.sessions_with_non_fact_story >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
+    wowGate.sessions_with_contextual_delta >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
+    wowGate.sessions_with_d16_action >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
+    wowGate.truth_boundary_coverage_100_percent &&
+    wowGate.evidence_linkage_when_available_100_percent,
+};
+
+await writeFile(
+  "d15-real-session-shadow-report.json",
+  JSON.stringify(report, null, 2),
+  "utf8",
+);
+
+if (failures.length || !(report as typeof report & { wow_kpis: { pass: boolean } }).wow_kpis.pass) process.exitCode = 1;
