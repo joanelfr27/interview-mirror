@@ -426,8 +426,8 @@ Hard rules:
 - source_quote MUST be copied verbatim from the JD, character-for-character apart from trimming surrounding whitespace. Never paraphrase or rewrite it.
 - normalized_requirement is a compact label, but source_quote is always the authoritative employer wording.
 - A requirement is a material capability, responsibility, qualification, context or standard stated by the employer.
-- Decompose each requirement into only the facets actually present in the same requirement source_quote.
-- Every facet source_quote MUST be an exact contiguous substring of the requirement source_quote. Never synthesize a facet quote.
+- For each requirement, choose and verify the requirement source_quote FIRST. It must be the exact contiguous JD passage that contains every facet you return for that requirement; do not choose a narrower parent quote and then attach a facet from outside it.
+- Every facet source_quote MUST be an exact contiguous substring of the requirement source_quote, character-for-character apart from trimming surrounding whitespace. Before returning the object, verify this containment for EVERY facet. If any facet is not contained, either expand the requirement source_quote to the exact larger JD passage that contains it, or omit that facet/requirement. Never synthesize, paraphrase, or cross-link quotes from different JD passages.
 - Facet requirement text must remain faithful to its facet source quote and must not introduce facts absent from that quote.
 - Facets are FUNCTION, CONTEXT, SCOPE, SCALE, TOOL_METHOD, LEVEL, OWNERSHIP, STAKEHOLDER, GOVERNANCE and OUTCOME.
 - Do not invent a facet because it is typical for the role.
