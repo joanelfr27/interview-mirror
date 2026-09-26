@@ -54,6 +54,18 @@ test("positive FUNCTION support rejects atoms with UNKNOWN action or object", ()
   }
 });
 
+test("positive OWNERSHIP support rejects UNKNOWN ownership", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.requirements[0].facets = [{ id: "F-1", type: "OWNERSHIP", requirement: "Own finance work", source_span_id: "S-REQ" }];
+    l.evidence[0].subject.ownership = "UNKNOWN";
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
+});
+
 test("judge sanitizer preserves valid documented direct support", () => {
   const result = sanitizeJudgments([raw("DIRECT", ["A1"])], ledger());
   assert.equal(result.errors.length, 0);
