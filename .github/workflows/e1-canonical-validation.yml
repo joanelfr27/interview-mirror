@@ -1,6 +1,9 @@
 name: E1 Canonical Validation
+# Controlled multilingual WOW matrix is seeded separately in the test database.
 
 on:
+  push:
+    branches: ["e1-audit-corrections", "fix/e1-extractor-grounding-contract"]
   pull_request:
     branches: ["audit-version"]
 
@@ -17,3 +20,32 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
+      - name: D15 real-session shadow validation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+        continue-on-error: false
+      - name: D15-D16 WOW multilingual validation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D15_RUNTIME_SESSION_COUNT: "10"
+          D15_RUNTIME_STATUS_FILTER: "e1-d16-wow-validation"
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+        continue-on-error: false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d15-real-session-shadow-report
+          path: d15-real-session-shadow-report.json
+          if-no-files-found: warn
+      - name: Package exact audit repository
+        run: git archive --format=zip --output=Interview_Mirror_D13_Audit_${GITHUB_SHA}.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: d13-audit-repository
+          path: Interview_Mirror_D13_Audit_${{ github.sha }}.zip
+          if-no-files-found: error
