@@ -212,6 +212,13 @@ export function diagnosticConnectionReason(
   return connection(a, b);
 }
 
+export type ProfessionalMirrorConnectionDiagnostic = { atoms: Array<{ id:string; source_span_id:string; ownership:AtomicEvidence["subject"]["ownership"]; normalized_action:string; object:string; domain:string|null; tools_or_systems:string[]; standards:string[] }>; pairs:Array<{ left_id:string; right_id:string; connection_reason:CareerThread["connection_reason"]|null; shared_object:boolean; shared_domain:boolean; shared_tool:boolean; shared_standard:boolean; repeated_action_with_shared_domain:boolean }> };
+export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): ProfessionalMirrorConnectionDiagnostic {
+  const atoms=independentAtoms(ledger); const diagnostics={atoms:atoms.map(atom=>({id:atom.id,source_span_id:atom.source_span_id,ownership:atom.subject.ownership,normalized_action:atom.action.normalized_action,object:atom.action.object,domain:atom.context.domain??null,tools_or_systems:[...(atom.context.tools_or_systems??[])],standards:[...(atom.context.standards??[])]})),pairs:[]} as ProfessionalMirrorConnectionDiagnostic;
+  for(let i=0;i<atoms.length;i+=1) for(let j=i+1;j<atoms.length;j+=1){const left=atoms[i],right=atoms[j]; diagnostics.pairs.push({left_id:left.id,right_id:right.id,connection_reason:diagnosticConnectionReason(left,right),shared_object:diagnosticObjectOverlap(left.action.object,right.action.object,left.provenance.language,right.provenance.language),shared_domain:Boolean(left.context.domain&&right.context.domain&&diagnosticSignalOverlap(left.context.domain,right.context.domain)),shared_tool:Boolean(left.context.tools_or_systems?.some(x=>right.context.tools_or_systems?.some(y=>diagnosticSignalOverlap(x,y)))),shared_standard:Boolean(left.context.standards?.some(x=>right.context.standards?.some(y=>diagnosticSignalOverlap(x,y)))),repeated_action_with_shared_domain:Boolean(diagnosticSignalOverlap(left.action.normalized_action,right.action.normalized_action)&&left.context.domain&&right.context.domain&&diagnosticSignalOverlap(left.context.domain,right.context.domain))});}
+  return diagnostics;
+}
+
 function maturity(independentSpanCount: number): MirrorMaturity {
   if (independentSpanCount >= 3) return "SUSTAINED_STRENGTH";
   if (independentSpanCount === 2) return "SUPPORTED_CONCLUSION";
