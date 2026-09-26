@@ -436,19 +436,25 @@ Hard rules:
   return JSON.parse(raw).requirements as RawRequirement[];
 }
 
+export type CanonicalExtractionDiagnostics = Readonly<{
+  errors: readonly string[];
+  warnings: readonly string[];
+  candidate_atom_count: number;
+  requirement_count: number;
+  facet_count: number;
+  rejected_atoms: readonly string[];
+  rejected_requirements: readonly string[];
+  /** Raw LLM ownership for atoms that survived into canonical EvidenceLedger evidence. */
+  raw_ownership_by_atom_id: Readonly<Record<string, EvidenceOwnership>>;
+  /** Raw LLM ownership for raw atoms rejected before becoming canonical evidence. */
+  raw_ownership_by_rejected_atom_id: Readonly<Record<string, EvidenceOwnership>>;
+}>;
+
 export type CanonicalShadowResult = {
   pipeline_context: PipelineContext;
   ledger: EvidenceLedger;
   source_spans: SourceSpan[];
-  diagnostics: {
-    errors: string[];
-    warnings: string[];
-    candidate_atom_count: number;
-    requirement_count: number;
-    facet_count: number;
-    rejected_atoms: string[];
-    rejected_requirements: string[];
-  };
+  diagnostics: CanonicalExtractionDiagnostics;
 };
 
 export async function extractCanonicalShadow(
@@ -468,6 +474,13 @@ export async function extractCanonicalShadow(
     extractAtoms(session.cv_text ?? ""),
     extractRequirements(session.job_description ?? ""),
   ]);
+
+  // Instrumentation sidecar: capture raw LLM ownership before any source
+  // validation, rejection, or canonicalization. This read-only map never
+  // flows back into the canonicalization path.
+  const rawOwnershipByRawId = Object.freeze(
+    Object.fromEntries(rawAtoms.map((raw) => [raw.id, raw.ownership])),
+  ) as Readonly<Record<string, EvidenceOwnership>>;
 
   const sourceSpans: SourceSpan[] = [];
   const atoms: AtomicEvidence[] = [];
@@ -606,18 +619,33 @@ export async function extractCanonicalShadow(
     throw new Error("Canonical extraction graph failed validation: " + graphErrors.join(" | "));
   }
 
+  const rawOwnershipByAtomId = Object.fromEntries(
+    atoms
+      .map((atom) => [atom.id, rawOwnershipByRawId[atom.id]] as const)
+      .filter((entry): entry is readonly [string, EvidenceOwnership] => entry[1] !== undefined),
+  );
+  const rawOwnershipByRejectedAtomId = Object.fromEntries(
+    rejectedAtoms
+      .map((id) => [id, rawOwnershipByRawId[id]] as const)
+      .filter((entry): entry is readonly [string, EvidenceOwnership] => entry[1] !== undefined),
+  );
+
+  const diagnostics: CanonicalExtractionDiagnostics = Object.freeze({
+    errors: Object.freeze([...errors]),
+    warnings: Object.freeze([...warnings]),
+    candidate_atom_count: atoms.length,
+    requirement_count: requirements.length,
+    facet_count: requirements.reduce((sum, requirement) => sum + requirement.facets.length, 0),
+    rejected_atoms: Object.freeze([...rejectedAtoms]),
+    rejected_requirements: Object.freeze([...rejectedRequirements]),
+    raw_ownership_by_atom_id: Object.freeze(rawOwnershipByAtomId),
+    raw_ownership_by_rejected_atom_id: Object.freeze(rawOwnershipByRejectedAtomId),
+  });
+
   return {
     pipeline_context: context,
     ledger,
     source_spans: uniqueSourceSpans,
-    diagnostics: {
-      errors,
-      warnings,
-      candidate_atom_count: atoms.length,
-      requirement_count: requirements.length,
-      facet_count: requirements.reduce((sum, requirement) => sum + requirement.facets.length, 0),
-      rejected_atoms: rejectedAtoms,
-      rejected_requirements: rejectedRequirements,
-    },
+    diagnostics,
   };
 }

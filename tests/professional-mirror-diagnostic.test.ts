@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { diagnosticConnectionReason } from "@/lib/professional-mirror";
+import {
+  diagnosticConnectionReason,
+  diagnosticSignalOverlap,
+} from "@/lib/professional-mirror";
 import type { AtomicEvidence } from "@/lib/canonical-evidence-model";
 
 function atom(overrides: Partial<AtomicEvidence> = {}): AtomicEvidence {
@@ -49,5 +52,10 @@ describe("D15 diagnostic connection oracle", () => {
     const right = atom({ id: "B", subject: { actor: "candidate", ownership: "TEAM" } });
 
     assert.equal(diagnosticConnectionReason(left, right), null);
+  });
+
+  it("exposes the production overlap primitive without reimplementing matching", () => {
+    assert.equal(diagnosticSignalOverlap("regional financial reporting", "financial reporting"), true);
+    assert.equal(diagnosticSignalOverlap("team", "team"), false);
   });
 });

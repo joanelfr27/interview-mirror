@@ -5,7 +5,6 @@ import { createClient } from "@supabase/supabase-js";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
 import {
   diagnoseProfessionalMirrorConnections,
-  diagnosticObjectOverlap,
   diagnosticSignalOverlap,
 } from "@/lib/professional-mirror";
 import {
@@ -172,7 +171,7 @@ function buildSignalPopulationMatrix(atoms: Array<import("@/lib/canonical-eviden
     action: signalMatrix(atoms, (atom) => atom.action.normalized_action === "UNKNOWN" ? "" : atom.action.normalized_action, textSignalPair((atom) => atom.action.normalized_action === "UNKNOWN" ? "" : atom.action.normalized_action)),
     object: signalMatrix(atoms, (atom) => atom.action.object === "UNKNOWN" ? "" : atom.action.object, (left, right) =>
       left.action.object !== "UNKNOWN" && right.action.object !== "UNKNOWN" &&
-      diagnosticObjectOverlap(left.action.object, right.action.object, left.provenance.language, right.provenance.language)),
+      diagnosticSignalOverlap(left.action.object, right.action.object)),
     tools_or_systems: signalMatrix(atoms, (atom) => atom.context.tools_or_systems, arraySignalPair((atom) => atom.context.tools_or_systems)),
     standards: signalMatrix(atoms, (atom) => atom.context.standards, arraySignalPair((atom) => atom.context.standards)),
   };
