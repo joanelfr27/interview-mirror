@@ -53,6 +53,98 @@ function surroundingSourceQuote(document: string, quote: string): string {
   const lineEnd = lineEndIndex >= 0 ? lineEndIndex : document.length;
   return document.slice(lineStart, lineEnd).trim();
 }
+
+
+function ownershipBucket(atomQuote: string, surroundingQuote: string): "A" | "B" | "C" | "D" {
+  const markerInAtom = ownershipMarkerInText(atomQuote);
+  const markerInSurrounding = ownershipMarkerInText(surroundingQuote);
+  if (!markerInAtom) return markerInSurrounding ? "B" : "C";
+  const competingRelationship = /(?:\b(?:worked|work|reported|report|reports|managed|manage|led|lead|supervised|supervision)\b.{0,80}\b(?:team|manager|supervisor|cfo|director|head|boss|management)\b|\b(?:led by|managed by|under the supervision of|under supervision|report(?:ed)? to|rattach[ée]?(?:e)?\s+à|sous supervision|dirig[ée]?\s+par|équipe dirig[ée]?\s+par)\b)/i;
+  return competingRelationship.test(atomQuote) ? "D" : "A";
+}
+
+type SignalMatrixRow = {
+  population: number;
+  populated: number;
+  population_rate: number;
+  distinct_values: number;
+  eligible_pairs: number;
+  shared_value_pairs: number;
+  shared_value_pair_rate: number;
+};
+
+function normalizeSignalValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim().toLowerCase()).filter(Boolean).sort().join("|");
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function signalMatrix(
+  atoms: Array<import("@/lib/canonical-evidence-model").AtomicEvidence>,
+  getValue: (atom: import("@/lib/canonical-evidence-model").AtomicEvidence) => unknown,
+): SignalMatrixRow {
+  const values = atoms.map(getValue).map(normalizeSignalValue);
+  const populatedValues = values.filter(Boolean);
+  let eligiblePairs = 0;
+  let sharedValuePairs = 0;
+  for (let i = 0; i < values.length; i += 1) {
+    if (!values[i]) continue;
+    for (let j = i + 1; j < values.length; j += 1) {
+      if (!values[j]) continue;
+      eligiblePairs += 1;
+      if (values[i] === values[j]) sharedValuePairs += 1;
+    }
+  }
+  return {
+    population: atoms.length,
+    populated: populatedValues.length,
+    population_rate: atoms.length ? Number((populatedValues.length / atoms.length).toFixed(3)) : 0,
+    distinct_values: new Set(populatedValues).size,
+    eligible_pairs: eligiblePairs,
+    shared_value_pairs: sharedValuePairs,
+    shared_value_pair_rate: eligiblePairs ? Number((sharedValuePairs / eligiblePairs).toFixed(3)) : 0,
+  };
+}
+
+function buildSignalPopulationMatrix(atoms: Array<import("@/lib/canonical-evidence-model").AtomicEvidence>) {
+  return {
+    ownership: signalMatrix(atoms, (atom) => atom.subject.ownership === "UNKNOWN" ? "" : atom.subject.ownership),
+    outcome: signalMatrix(atoms, (atom) => atom.outcome),
+    scope: signalMatrix(atoms, (atom) => atom.scale.scope),
+    quantity: signalMatrix(atoms, (atom) => atom.scale.quantity),
+    team_size: signalMatrix(atoms, (atom) => atom.scale.team_size),
+    temporal: signalMatrix(atoms, (atom) => [atom.time.start, atom.time.end, atom.time.recency]),
+    domain: signalMatrix(atoms, (atom) => atom.context.domain),
+    action: signalMatrix(atoms, (atom) => atom.action.normalized_action === "UNKNOWN" ? "" : atom.action.normalized_action),
+    object: signalMatrix(atoms, (atom) => atom.action.object === "UNKNOWN" ? "" : atom.action.object),
+    tools_or_systems: signalMatrix(atoms, (atom) => atom.context.tools_or_systems),
+    standards: signalMatrix(atoms, (atom) => atom.context.standards),
+  };
+}
+
+function buildOwnershipStratification(
+  diagnostics: Array<{ assertion_type: string; ownership_bucket: "A" | "B" | "C" | "D" }>,
+) {
+  const byAssertionType: Record<string, { A: number; B: number; C: number; D: number; total: number }> = {};
+  for (const item of diagnostics) {
+    const row = byAssertionType[item.assertion_type] ?? { A: 0, B: 0, C: 0, D: 0, total: 0 };
+    row[item.ownership_bucket] += 1;
+    row.total += 1;
+    byAssertionType[item.assertion_type] = row;
+  }
+  const totals = { A: 0, B: 0, C: 0, D: 0, total: diagnostics.length };
+  for (const row of Object.values(byAssertionType)) {
+    totals.A += row.A; totals.B += row.B; totals.C += row.C; totals.D += row.D;
+  }
+  return {
+    by_assertion_type: byAssertionType,
+    totals,
+    thresholds: {
+      bucket_a_trigger: { minimum_cases: 3, minimum_rate: 0.2 },
+      bucket_b_trigger: { minimum_cases: 5, minimum_rate: 0.2 },
+    },
+  };
+}
+
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
@@ -235,8 +327,23 @@ for (const row of chosen) {
             normalized_action: atom.action.normalized_action,
             object: atom.action.object,
             assertion_type: atom.assertion.type,
+            ownership_bucket: ownershipBucket(atomQuote, surroundingQuote),
           };
         }),
+      signal_population_matrix: buildSignalPopulationMatrix(result.ledger.evidence),
+      ownership_stratification: buildOwnershipStratification(
+        result.ledger.evidence
+          .filter((atom) => atom.subject.ownership === "UNKNOWN")
+          .map((atom) => {
+            const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+            const atomQuote = span?.text ?? "";
+            const surroundingQuote = surroundingSourceQuote(row.cv_text, atomQuote);
+            return {
+              assertion_type: atom.assertion.type,
+              ownership_bucket: ownershipBucket(atomQuote, surroundingQuote),
+            };
+          }),
+      ),
       wow: {
         thread_count: result.d15.threads.length,
         non_fact_statement_count: result.d15.statements.filter((statement) => statement.kind !== "FACT").length,
