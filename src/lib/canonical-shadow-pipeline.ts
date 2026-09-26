@@ -19,13 +19,18 @@ export async function runCanonicalShadowPipeline(session: SessionRecord): Promis
   let ledger = extraction.ledger;
   const diagnostics = [...extraction.diagnostics.errors, ...extraction.diagnostics.warnings];
 
-  if (
-    extraction.diagnostics.errors.length ||
-    extraction.diagnostics.rejected_atoms.length ||
-    extraction.diagnostics.rejected_requirements.length ||
-    !ledger.evidence.length ||
-    !ledger.requirements.length
-  ) {
+  const extractionGateReasons: string[] = [];
+  if (extraction.diagnostics.errors.length) extractionGateReasons.push(`errors=${extraction.diagnostics.errors.length}`);
+  if (extraction.diagnostics.rejected_atoms.length) extractionGateReasons.push(`rejected_atoms=${extraction.diagnostics.rejected_atoms.length}`);
+  if (extraction.diagnostics.rejected_requirements.length) extractionGateReasons.push(`rejected_requirements=${extraction.diagnostics.rejected_requirements.length}`);
+  if (!ledger.evidence.length) extractionGateReasons.push("no_evidence");
+  if (!ledger.requirements.length) extractionGateReasons.push("no_requirements");
+
+  if (extractionGateReasons.length) {
+    diagnostics.push(
+      "E1 shadow extraction gate prevented support judging: " + extractionGateReasons.join(", ") +
+      ` | evidence=${ledger.evidence.length} | requirements=${ledger.requirements.length} | facets=${ledger.requirements.reduce((count, requirement) => count + requirement.facets.length, 0)}`,
+    );
     return { ledger, diagnostics, extraction: extraction.diagnostics };
   }
 

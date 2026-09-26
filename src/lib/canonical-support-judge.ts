@@ -50,6 +50,31 @@ const SCHEMA = {
   required: ["judgments"],
 } as const;
 
+function summarizeFacetResponse(raw: RawJudgment[], facets: EvidenceLedger["requirements"][number]["facets"]) {
+  const expected = new Set(facets.map(facet => facet.id));
+  const seen = new Set<string>();
+  let duplicateCount = 0;
+  let unknownCount = 0;
+  let validExpectedCount = 0;
+
+  for (const item of raw) {
+    if (seen.has(item.facet_id)) duplicateCount += 1;
+    seen.add(item.facet_id);
+    if (expected.has(item.facet_id)) validExpectedCount += 1;
+    else unknownCount += 1;
+  }
+
+  return {
+    expected_facets: facets.length,
+    raw_judgments: raw.length,
+    unique_facet_ids: seen.size,
+    valid_expected_judgments: validExpectedCount,
+    unknown_facet_ids: unknownCount,
+    duplicate_facet_ids: duplicateCount,
+    missing_facets: Math.max(0, facets.length - [...expected].filter(id => seen.has(id)).length),
+  };
+}
+
 function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
@@ -170,12 +195,47 @@ export async function judgeCanonicalSupport(
     ],
   });
 
-  const raw = response.choices[0]?.message?.content;
+  let raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical support judgment response.");
-  const parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
-  const rawJudgments = parsed.judgments ?? [];
-  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
+
+  let parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+  let rawJudgments = parsed.judgments ?? [];
+  const facets = ledger.requirements.flatMap(r => r.facets);
+  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+
+  // The first structured response can occasionally omit the required facet set on
+  // real sessions. Retry exactly once with an explicit facet-ID checklist before
+  // failing closed; never synthesize missing judgments locally.
+  if (completenessErrors.length) {
+    const retryResponse = await openai.chat.completions.create({
+      model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments_retry", SCHEMA),
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content:
+            "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) +
+            "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements) +
+            "\n\nCOMPLETENESS REQUIREMENT:\n" +
+            "The previous response did not return a complete facet set. Return exactly one judgment for every facet ID below, including NONE/abstained when evidence is insufficient. Do not omit any facet and do not invent evidence. Required facet IDs:\n" +
+            JSON.stringify(facets.map(facet => facet.id)),
+        },
+      ],
+    });
+    raw = retryResponse.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty canonical support judgment retry response.");
+    parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+    rawJudgments = parsed.judgments ?? [];
+    const retryCompletenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+    if (retryCompletenessErrors.length) {
+      const summary = summarizeFacetResponse(rawJudgments, facets);
+      throw new Error(
+        "Canonical support judgment response was incomplete or structurally invalid after one retry: " +
+        retryCompletenessErrors.join(" | ") +
+        " | response_metrics=" + JSON.stringify(summary),
+      );
+    }
+  }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
