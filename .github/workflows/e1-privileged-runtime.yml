@@ -41,7 +41,7 @@ jobs:
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
       - uses: actions/upload-artifact@v4
-        if: always:
+        if: always()
         with:
           name: d15-d16-runtime-report-${{ github.run_id }}
           path: d15-real-session-shadow-report.json
