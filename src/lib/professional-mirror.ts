@@ -56,11 +56,25 @@ function normalizeClaimToken(value: string): string {
 }
 
 function tokens(value: string): Set<string> {
+  const rawTokens = value.normalize("NFKC")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+
   return new Set(
-    value.normalize("NFKC").toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .map(normalizeClaimToken)
-      .filter((x) => (x.length >= 4 || /^\d+$/.test(x)) && !GENERIC_TOKENS.has(x)),
+    rawTokens
+      .map((raw) => ({
+        raw,
+        normalized: normalizeClaimToken(raw),
+      }))
+      .filter(({ raw, normalized }) => {
+        const isNumeric = /^\d+$/.test(normalized);
+        const isShortProfessionalToken = /^[A-Z0-9]{2,}$/.test(raw);
+        const isStandardToken = normalized.length >= 4;
+
+        return (isStandardToken || isNumeric || isShortProfessionalToken)
+          && !GENERIC_TOKENS.has(normalized);
+      })
+      .map(({ normalized }) => normalized),
   );
 }
 
