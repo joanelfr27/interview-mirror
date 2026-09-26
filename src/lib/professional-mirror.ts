@@ -226,11 +226,6 @@ export type ProfessionalMirrorConnectionDiagnostic = {
     id:string;
     source_span_id:string;
     ownership:AtomicEvidence["subject"]["ownership"];
-    normalized_action:string;
-    object:string;
-    domain:string|null;
-    tools_or_systems:string[];
-    standards:string[];
   }>;
   pairs:Array<{
     left_id:string;
@@ -251,11 +246,6 @@ export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): P
       id:atom.id,
       source_span_id:atom.source_span_id,
       ownership:atom.subject.ownership,
-      normalized_action:atom.action.normalized_action,
-      object:atom.action.object,
-      domain:atom.context.domain??null,
-      tools_or_systems:[...(atom.context.tools_or_systems??[])],
-      standards:[...(atom.context.standards??[])],
     })),
     pairs:[],
   } as ProfessionalMirrorConnectionDiagnostic;
