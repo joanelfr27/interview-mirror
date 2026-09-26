@@ -4,6 +4,7 @@ import { runD16ShadowRuntimeIntegration } from "../src/lib/d16-shadow-runtime-in
 import { CanonicalSupportJudgmentError } from "../src/lib/canonical-support-judge.ts";
 
 test("D16 full chain preserves support-judge diagnostics after completeness failure", async () => {
+  process.env.SUPPORT_JUDGE_INCOMPLETE_TEST = "1";
   const session = {
     id: "CHAIN-TEST",
     user_id: "USER-TEST",
@@ -37,4 +38,5 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
       return true;
     },
   );
+  delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
 });
