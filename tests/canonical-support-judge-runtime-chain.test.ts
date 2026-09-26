@@ -27,15 +27,21 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
     await assert.rejects(
       () => runD16ShadowRuntimeIntegration(session),
       (caught: unknown) => {
-      assert.ok(caught instanceof CanonicalSupportJudgmentError);
-      assert.equal(caught.diagnostic.parsed_successfully, true);
-      assert.equal(caught.diagnostic.requirement_count, 1);
-      assert.equal(caught.diagnostic.facet_count, 1);
-      assert.deepEqual(caught.diagnostic.expected_facet_ids, ["F-1"]);
-      assert.deepEqual(caught.diagnostic.returned_facet_ids, []);
-      assert.deepEqual(caught.diagnostic.missing_facet_ids, ["F-1"]);
-      assert.deepEqual(caught.diagnostic.unknown_facet_ids, []);
-      assert.deepEqual(caught.diagnostic.duplicate_facet_ids, []);
+        if (!(caught instanceof CanonicalSupportJudgmentError)) {
+          console.error(
+            "D16 support-judge chain unexpected error:",
+            caught instanceof Error ? { name: caught.name, message: caught.message, constructor: caught.constructor.name } : caught,
+          );
+          return false;
+        }
+        assert.equal(caught.diagnostic.parsed_successfully, true);
+        assert.equal(caught.diagnostic.requirement_count, 1);
+        assert.equal(caught.diagnostic.facet_count, 1);
+        assert.deepEqual(caught.diagnostic.expected_facet_ids, ["F-1"]);
+        assert.deepEqual(caught.diagnostic.returned_facet_ids, []);
+        assert.deepEqual(caught.diagnostic.missing_facet_ids, ["F-1"]);
+        assert.deepEqual(caught.diagnostic.unknown_facet_ids, []);
+        assert.deepEqual(caught.diagnostic.duplicate_facet_ids, []);
         return true;
       },
     );
