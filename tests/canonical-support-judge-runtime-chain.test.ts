@@ -4,7 +4,10 @@ import { runD16ShadowRuntimeIntegration } from "../src/lib/d16-shadow-runtime-in
 import { CanonicalSupportJudgmentError } from "../src/lib/canonical-support-judge.ts";
 
 test("D16 full chain preserves support-judge diagnostics after completeness failure", async () => {
+  const previousIncompleteFlag = process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
+  const previousOpenAIKey = process.env.OPENAI_API_KEY;
   process.env.SUPPORT_JUDGE_INCOMPLETE_TEST = "1";
+  process.env.OPENAI_API_KEY = "test-key";
   const session = {
     id: "CHAIN-TEST",
     user_id: "USER-TEST",
@@ -27,13 +30,7 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
     await assert.rejects(
       () => runD16ShadowRuntimeIntegration(session),
       (caught: unknown) => {
-        if (!(caught instanceof CanonicalSupportJudgmentError)) {
-          console.error(
-            "D16 support-judge chain unexpected error:",
-            caught instanceof Error ? { name: caught.name, message: caught.message, constructor: caught.constructor.name } : caught,
-          );
-          return false;
-        }
+        assert.ok(caught instanceof CanonicalSupportJudgmentError);
         assert.equal(caught.diagnostic.parsed_successfully, true);
         assert.equal(caught.diagnostic.requirement_count, 1);
         assert.equal(caught.diagnostic.facet_count, 1);
@@ -46,6 +43,9 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
       },
     );
   } finally {
-    delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
+    if (previousIncompleteFlag === undefined) delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
+    else process.env.SUPPORT_JUDGE_INCOMPLETE_TEST = previousIncompleteFlag;
+    if (previousOpenAIKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = previousOpenAIKey;
   }
 });
