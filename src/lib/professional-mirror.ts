@@ -223,6 +223,90 @@ function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connect
   return null;
 }
 
+export type ProfessionalMirrorConnectionDiagnostic = {
+  atoms: Array<{
+    id: string;
+    source_span_id: string;
+    ownership: AtomicEvidence["subject"]["ownership"];
+    normalized_action: string;
+    object: string;
+    domain: string | null;
+    tools_or_systems: string[];
+    standards: string[];
+  }>;
+  pairs: Array<{
+    left_id: string;
+    right_id: string;
+    connection_reason: CareerThread["connection_reason"] | null;
+    shared_object: boolean;
+    shared_domain: boolean;
+    shared_tool: boolean;
+    shared_standard: boolean;
+    repeated_action_with_shared_domain: boolean;
+  }>;
+};
+
+export function diagnoseProfessionalMirrorConnections(
+  ledger: EvidenceLedger,
+): ProfessionalMirrorConnectionDiagnostic {
+  const atoms = independentAtoms(ledger);
+  const diagnostics: ProfessionalMirrorConnectionDiagnostic = {
+    atoms: atoms.map((atom) => ({
+      id: atom.id,
+      source_span_id: atom.source_span_id,
+      ownership: atom.subject.ownership,
+      normalized_action: atom.action.normalized_action,
+      object: atom.action.object,
+      domain: atom.context.domain ?? null,
+      tools_or_systems: [...(atom.context.tools_or_systems ?? [])],
+      standards: [...(atom.context.standards ?? [])],
+    })),
+    pairs: [],
+  };
+
+  for (let i = 0; i < atoms.length; i += 1) {
+    for (let j = i + 1; j < atoms.length; j += 1) {
+      const left = atoms[i];
+      const right = atoms[j];
+      const sharedObject = objectOverlap(left.action.object, right.action.object);
+      const sharedDomain = Boolean(
+        left.context.domain &&
+        right.context.domain &&
+        overlap(left.context.domain, right.context.domain),
+      );
+      const sharedTool = Boolean(
+        left.context.tools_or_systems?.some((x) =>
+          right.context.tools_or_systems?.some((y) => overlap(x, y)),
+        ),
+      );
+      const sharedStandard = Boolean(
+        left.context.standards?.some((x) =>
+          right.context.standards?.some((y) => overlap(x, y)),
+        ),
+      );
+      const repeatedActionWithSharedDomain = Boolean(
+        overlap(left.action.normalized_action, right.action.normalized_action) &&
+        left.context.domain &&
+        right.context.domain &&
+        overlap(left.context.domain, right.context.domain),
+      );
+
+      diagnostics.pairs.push({
+        left_id: left.id,
+        right_id: right.id,
+        connection_reason: connection(left, right),
+        shared_object: sharedObject,
+        shared_domain: sharedDomain,
+        shared_tool: sharedTool,
+        shared_standard: sharedStandard,
+        repeated_action_with_shared_domain: repeatedActionWithSharedDomain,
+      });
+    }
+  }
+
+  return diagnostics;
+}
+
 function maturity(independentSpanCount: number): MirrorMaturity {
   if (independentSpanCount >= 3) return "SUSTAINED_STRENGTH";
   if (independentSpanCount === 2) return "SUPPORTED_CONCLUSION";
