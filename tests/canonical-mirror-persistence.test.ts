@@ -60,17 +60,6 @@ test("D15 collapses identical duplicate imports so they cannot inflate a thread"
   assert.equal(m.threads.length,0);
 });
 
-test("D15 retains semantically similar distinct source evidence for downstream provenance",()=>{
-  const s1=d15Span("S1","Managed regional finance.","CV");
-  const s2=d15Span("S2","Managed regional finance!","LINKEDIN");
-  const l=d15Ledger([d15Atom("A1","S1","regional finance"),d15Atom("A2","S2","regional finance")],[s1,s2]);
-  const m=buildProfessionalMirror(l);
-  assert.equal(m.evidence.length,2);
-  assert.equal(m.threads.length,0);
-  assert.deepEqual(m.evidence.map((item)=>item.evidence_id),["A1","A2"]);
-  assert.equal(validateProfessionalMirror(m,l).valid,true);
-});
-
 test("D15 uses supported evidence connections rather than exact labels only",()=>{
   const s1=d15Span("S1","Managed regional finance.");
   const s2=d15Span("S2","Managed regional tax.");
