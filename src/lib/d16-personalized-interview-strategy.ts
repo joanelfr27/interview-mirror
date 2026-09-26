@@ -376,7 +376,10 @@ export function validateD16Inputs(input: D16Inputs): { valid: boolean; errors: s
       const mirrorRef = mirrorEvidence.get(evidence.evidence_id);
       const atom = ledgerEvidence.get(evidence.evidence_id);
       const span = spans.get(evidence.source_span_id);
-      if (!mirrorRef || !atom || !span) errors.push("D16 forged or missing evidence reference: " + evidence.evidence_id);
+      // D6 evidence is canonical ledger provenance. D15 may intentionally
+      // deduplicate semantically similar evidence from its public mirror view,
+      // so absence from mirror.evidence is not itself a forged reference.
+      if (!atom || !span) errors.push("D16 forged or missing canonical evidence reference: " + evidence.evidence_id);
       if (mirrorRef && (mirrorRef.source_span_id !== evidence.source_span_id || mirrorRef.source_quote !== evidence.source_quote)) errors.push("D16 evidence provenance mismatch: " + evidence.evidence_id);
       if (atom && atom.source_span_id !== evidence.source_span_id) errors.push("D16 evidence atom/source-span mismatch: " + evidence.evidence_id);
       if (span && span.text !== evidence.source_quote) errors.push("D16 evidence quote mismatch: " + evidence.evidence_id);
