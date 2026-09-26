@@ -202,10 +202,6 @@ function dedupeKey(ledger: EvidenceLedger, atom: AtomicEvidence): string {
   ].join("|").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function ownershipCompatible(a: AtomicEvidence, b: AtomicEvidence): boolean {
-  return a.subject.ownership === b.subject.ownership;
-}
-
 function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   const accepted: AtomicEvidence[] = [];
   const seen = new Set<string>();
@@ -219,9 +215,7 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   return accepted;
 }
 
-function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
-  if (!ownershipCompatible(a, b)) return null;
-  if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
+function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {  if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
