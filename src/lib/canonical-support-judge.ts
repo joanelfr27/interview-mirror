@@ -159,6 +159,21 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.abstention_reason = "Positive outcome support requires explicit outcome evidence.";
     }
 
+    // Positive TOOL_METHOD support requires explicit tool, method, system, or standard evidence.
+    // Missing tool/method evidence is absence of evidence, not a positive tool claim.
+    if (
+      positiveFunctionalStatus &&
+      facet.type === "TOOL_METHOD" &&
+      citedAtoms.every(atom => !(atom.context.tools_or_systems?.length || atom.context.standards?.length))
+    ) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain explicit tool, system, method, or standard evidence sufficient for positive tool/method support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive tool/method support requires explicit tool, system, method, or standard evidence.";
+    }
+
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
     // unless the cited credential explicitly names Finance or Accounting.
