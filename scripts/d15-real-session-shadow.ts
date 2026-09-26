@@ -7,7 +7,6 @@ import {
   buildD16DependencySnapshot,
   buildD16Strategy,
   validateD16Strategy,
-  type D16Strategy,
 } from "@/lib/d16-personalized-interview-strategy";
 import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { SessionRecord } from "@/types";
