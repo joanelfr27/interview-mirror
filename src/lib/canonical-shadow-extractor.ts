@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
@@ -402,15 +401,6 @@ async function extractAtoms(
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical candidate extraction response.");
 
-  const debugCvHash = process.env.E1_DEBUG_CV_HASH?.trim();
-  if (debugCvHash) {
-    const cvHash = createHash("sha256").update(cv).digest("hex").slice(0, 12);
-    if (cvHash === debugCvHash) {
-      const parsed = JSON.parse(raw) as { atoms?: RawCandidateAtom[] };
-      const atoms = Array.isArray(parsed.atoms) ? parsed.atoms : [];
-      console.log("[E1_DEBUG_RAW_ATOMS]", JSON.stringify(atoms));
-    }
-  }
 
   return JSON.parse(raw).atoms as RawCandidateAtom[];
 }
