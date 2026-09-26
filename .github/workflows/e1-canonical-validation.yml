@@ -1,4 +1,5 @@
 name: E1 Canonical Validation
+# Controlled multilingual WOW matrix is seeded separately in the test database.
 
 on:
   push:
