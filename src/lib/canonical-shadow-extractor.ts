@@ -221,9 +221,6 @@ function findExactSpan(
   // Recover only whitespace-equivalent spans; never normalize the stored evidence text itself.
   const whitespaceParts = target.split(/\s+/u).filter(Boolean).map(part =>
     part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-export function spanWithinParent")
   );
   if (whitespaceParts.length) {
     const whitespacePattern = new RegExp(whitespaceParts.join("\\s+"), "gu");
