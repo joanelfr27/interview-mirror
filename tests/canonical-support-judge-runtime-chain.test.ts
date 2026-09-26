@@ -23,8 +23,9 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
     updated_at: "2026-01-01T00:00:00.000Z",
   } as any;
 
-  await assert.rejects(
-    () => runD16ShadowRuntimeIntegration(session),
+  try {
+    await assert.rejects(
+      () => runD16ShadowRuntimeIntegration(session),
     (caught: unknown) => {
       assert.ok(caught instanceof CanonicalSupportJudgmentError);
       assert.equal(caught.diagnostic.parsed_successfully, true);
@@ -35,8 +36,10 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
       assert.deepEqual(caught.diagnostic.missing_facet_ids, ["F-1"]);
       assert.deepEqual(caught.diagnostic.unknown_facet_ids, []);
       assert.deepEqual(caught.diagnostic.duplicate_facet_ids, []);
-      return true;
-    },
-  );
-  delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
+        return true;
+      },
+    );
+  } finally {
+    delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
+  }
 });
