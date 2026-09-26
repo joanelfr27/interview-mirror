@@ -272,6 +272,11 @@ function exactOrNull(value: string | null | undefined, source: string): string |
   return candidate && source.includes(candidate) ? candidate : null;
 }
 
+function exactOrUnknown(value: string | null | undefined, source: string): string {
+  const candidate = value?.trim();
+  return candidate && source.includes(candidate) ? candidate : "UNKNOWN";
+}
+
 function exactArrayOrEmpty(values: string[] | undefined, source: string): string[] {
   return (values ?? []).map(value => value.trim()).filter(value => value && source.includes(value));
 }
@@ -301,6 +306,8 @@ function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): Ra
     ...raw,
     actor: groundedActor,
     ownership,
+    normalized_action: exactOrUnknown(raw.normalized_action, source),
+    object: exactOrUnknown(raw.object, source),
     domain: exactOrNull(raw.domain, source),
     jurisdiction: exactOrNull(raw.jurisdiction, source),
     situation: exactOrNull(raw.situation, source),
