@@ -353,8 +353,10 @@ Source-language rule: preserve the language of the supplied CV in normalized fie
 Extract atomic evidence directly from the supplied CV. An atom is ONE explicit proposition that can be traced to one exact source quote.
 
 Hard rules:
-- source_quote MUST be copied verbatim from the CV, character-for-character apart from trimming surrounding whitespace. Never paraphrase, normalize, merge, or rewrite source_quote.
+- source_quote MUST be copied verbatim from the CV, character-for-character apart from trimming surrounding whitespace. Never paraphrase, normalize, merge, or rewrite source_quote. If you cannot produce an exact source quote, DO NOT return the atom.
 - Every populated structured field is an ATOM-LOCAL EXTRACTION, not a semantic summary. The value must be an exact contiguous phrase or literal value that appears inside that atom's source_quote.
+- assertion_type MUST match the proposition actually stated in source_quote. If assertion_type is OUTCOME_CLAIM, outcome MUST be non-null and MUST be an exact contiguous phrase from that same source_quote. Never label an atom OUTCOME_CLAIM when no explicit outcome is stated.
+- For OUTCOME_CLAIM specifically, the outcome field is mandatory evidence, not an optional annotation. If there is no explicit outcome phrase in the source_quote, use another assertion_type or omit the atom.
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
 - actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
