@@ -139,4 +139,40 @@ describe("D15 object-overlap regression guardrail", () => {
       assert.equal(mirror.threads[0].connection_reason, "SHARED_OBJECT");
     });
   }
+  it("allows substantive thread connections across different ownership scopes", () => {
+    const base = ledgerFor("finance reporting", "finance controls") as any;
+    base.evidence[0].subject.ownership = "INDIVIDUAL";
+    base.evidence[1].subject.ownership = "TEAM";
+
+    const mirror = buildProfessionalMirror(base);
+
+    assert.equal(mirror.threads.length, 1);
+    assert.equal(mirror.threads[0].connection_reason, "SHARED_OBJECT");
+    assert.match(mirror.threads[0].label, /Personally/);
+  });
+
+  it("allows shared-tool connections across individual and supervised evidence", () => {
+    const base = ledgerFor("SAP implementation", "SAP reporting") as any;
+    base.evidence[0].subject.ownership = "INDIVIDUAL";
+    base.evidence[1].subject.ownership = "SUPERVISED";
+    base.evidence[0].context = { tools_or_systems: ["SAP"] };
+    base.evidence[1].context = { tools_or_systems: ["SAP"] };
+
+    const mirror = buildProfessionalMirror(base);
+
+    assert.equal(mirror.threads.length, 1);
+    assert.equal(mirror.threads[0].connection_reason, "SHARED_OBJECT");
+  });
+
+  it("keeps ownership visible in thread labels after cross-ownership connection", () => {
+    const base = ledgerFor("finance reporting", "finance controls") as any;
+    base.evidence[0].subject.ownership = "INDIVIDUAL";
+    base.evidence[1].subject.ownership = "TEAM";
+
+    const mirror = buildProfessionalMirror(base);
+
+    assert.equal(mirror.threads.length, 1);
+    assert.ok(mirror.threads[0].label.includes("Personally") || mirror.threads[0].label.includes("As a team"));
+  });
+
 });
