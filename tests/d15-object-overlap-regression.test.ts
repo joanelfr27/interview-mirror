@@ -164,6 +164,17 @@ describe("D15 object-overlap regression guardrail", () => {
     assert.equal(mirror.threads[0].connection_reason, "SHARED_OBJECT");
   });
 
+  it("connects French inflection variants when the substantive object is the same", () => {
+    const base = ledgerFor("les déclarations fiscales et les audits statutaires", "les contrôles fiscaux") as any;
+    base.source_spans.forEach((span: any) => { span.language = "fr"; });
+    base.evidence.forEach((atom: any) => { atom.provenance.language = "fr"; });
+
+    const mirror = buildProfessionalMirror(base);
+
+    assert.equal(mirror.threads.length, 1);
+    assert.equal(mirror.threads[0].connection_reason, "SHARED_OBJECT");
+  });
+
   it("keeps ownership visible in thread labels after cross-ownership connection", () => {
     const base = ledgerFor("finance reporting", "finance controls") as any;
     base.evidence[0].subject.ownership = "INDIVIDUAL";
