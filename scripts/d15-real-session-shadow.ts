@@ -49,14 +49,17 @@ if (error) throw new Error("Supabase session query failed: " + error.message);
 
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
+const seenJd = new Set<string>();
 
 for (const row of (data ?? []) as SessionRow[]) {
   if (!row.cv_text?.trim() || !row.job_description?.trim()) continue;
   const cvKey = fingerprint(row.cv_text);
-  if (seenCv.has(cvKey)) continue;
+  const jdKey = fingerprint(row.job_description);
+  if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
   seenCv.add(cvKey);
+  seenJd.add(jdKey);
   chosen.push(row);
-  if (chosen.length === 3) break;
+  if (chosen.length === 15) break;
 }
 
 if (chosen.length < 3) {
@@ -68,6 +71,8 @@ const report = {
     mode: "D15_REAL_SESSION_SHADOW",
     writes_performed: false,
     sessions_requested: chosen.length,
+    distinct_cv_count: new Set(chosen.map((row) => fingerprint(row.cv_text))).size,
+    distinct_jd_count: new Set(chosen.map((row) => fingerprint(row.job_description))).size,
     selected_session_fingerprints: chosen.map((row) => ({
       session: fingerprint(row.id),
       cv: fingerprint(row.cv_text),
