@@ -220,7 +220,7 @@ function findExactSpan(
   // LLMs can collapse PDF/CV line breaks or repeated spaces even when preserving the source wording.
   // Recover only whitespace-equivalent spans; never normalize the stored evidence text itself.
   const whitespaceParts = target.split(/\s+/u).filter(Boolean).map(part =>
-    part.replace(/[.*+?^$()|[\]\\]/g, "\\  return null;
+    part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 export function spanWithinParent")
