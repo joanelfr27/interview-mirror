@@ -1,0 +1,29 @@
+name: D16 Unprivileged Gates
+
+on:
+  push:
+    branches:
+      - d16-shadow-runtime-integration
+  pull_request:
+    branches:
+      - audit-version
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - run: npm run build
