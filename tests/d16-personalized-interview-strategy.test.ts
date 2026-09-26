@@ -99,6 +99,24 @@ describe("D16 personalized interview strategy", () => {
     assert.ok(validation.errors.some((e) => e.includes("unknown requirement")));
   });
 
+  it("synthesizes a deterministic truth boundary when D6 has no boundary entries", () => {
+    const input = fixture();
+    input.bridge.requirements[0].boundaries = [];
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find((item) => item.requirement_id === "REQ-A")!;
+    assert.deepEqual(tension.truthfulness_boundary.permitted_claims, [
+      "You may state only what is explicitly supported by: Led regional financial reporting for multiple countries.",
+    ]);
+    assert.deepEqual(tension.truthfulness_boundary.prohibited_claims, [
+      "Claiming transformation leadership",
+    ]);
+    for (const action of strategy.actions.filter((item) => item.requirement_id === "REQ-A")) {
+      assert.deepEqual(action.truthfulness_boundary, tension.truthfulness_boundary);
+    }
+  });
+
   it("routes every selected tension to prep, practice and evaluation with traceability", () => {
     const strategy = buildD16Strategy(fixture());
     assert.equal(strategy.actions.length, strategy.tensions.length * 3);
