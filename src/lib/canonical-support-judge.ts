@@ -90,6 +90,54 @@ function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
 
+function buildSupportJudgeDiagnostic(args: {
+  raw: string | null;
+  parsedSuccessfully: boolean;
+  rawJudgments: RawJudgment[];
+  compactRequirements: Array<{ id: string; facets: Array<{ id: string }> }>;
+  compactEvidence: Array<{ id: string }>;
+  requestCharacterCount: number;
+}): SupportJudgeDiagnostic {
+  const expectedFacetIds = args.compactRequirements.flatMap((req) => req.facets.map((facet) => facet.id));
+  const returnedFacetIds = args.rawJudgments.map((judgment) => judgment.facet_id);
+  const expected = new Set(expectedFacetIds);
+  const returned = new Set(returnedFacetIds);
+  const missingFacetIds = expectedFacetIds.filter((id) => !returned.has(id));
+  const unknownFacetIds = returnedFacetIds.filter((id) => !expected.has(id));
+  const duplicateFacetIds = [...new Set(returnedFacetIds.filter((id, index) => returnedFacetIds.indexOf(id) !== index))];
+
+  return {
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: "canonical_support_judgments",
+    requirement_count: args.compactRequirements.length,
+    facet_count: expectedFacetIds.length,
+    expected_facet_ids: expectedFacetIds,
+    evidence_atom_count: args.compactEvidence.length,
+    evidence_atom_ids: args.compactEvidence.map((atom) => atom.id),
+    request_character_count: args.requestCharacterCount,
+    response_present: args.raw !== null,
+    response_character_count: args.raw?.length ?? 0,
+    response_sha256: args.raw === null ? null : createHash("sha256").update(args.raw, "utf8").digest("hex"),
+    parsed_successfully: args.parsedSuccessfully,
+    returned_judgment_count: args.rawJudgments.length,
+    returned_facet_ids: returnedFacetIds,
+    missing_facet_ids: missingFacetIds,
+    unknown_facet_ids: unknownFacetIds,
+    duplicate_facet_ids: duplicateFacetIds,
+    judgment_statuses: Object.fromEntries(args.rawJudgments.map((judgment) => [judgment.facet_id, judgment.status])),
+    supporting_evidence_ids: Object.fromEntries(args.rawJudgments.map((judgment) => [judgment.facet_id, judgment.supporting_evidence_ids])),
+    rationale_lengths: Object.fromEntries(args.rawJudgments.map((judgment) => [judgment.facet_id, judgment.rationale.length])),
+    analogical_mapping_lengths: Object.fromEntries(args.rawJudgments.map((judgment) => [
+      judgment.facet_id,
+      {
+        shared_dimensions: judgment.analogical_mapping?.shared_dimensions.length ?? 0,
+        unshared_dimensions: judgment.analogical_mapping?.unshared_dimensions.length ?? 0,
+      },
+    ])),
+  };
+}
+
 export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgments: SupportJudgment[]; errors: string[] } {
   const errors: string[] = [];
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
@@ -198,20 +246,62 @@ export async function judgeCanonicalSupport(
     "CONTRADICTORY requires explicit conflict; if insufficient to distinguish positive statuses, abstain as NONE; " +
     "rationale must describe evidentiary relationship, not imagined interviewer belief; confidence is mapping confidence; return one judgment per facet. A broader credential/category does not directly satisfy a narrower credential subtype: for example, an MBA in Global Business & Management Studies does not DIRECTLY satisfy a requirement specifically for a Master's degree in Finance or Accounting unless Finance or Accounting is explicitly stated in the cited evidence.";
 
+  const userContent = "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) + "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements);
   const response = await openai.chat.completions.create({
     model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments", SCHEMA),
     messages: [
       { role: "system", content: system },
-      { role: "user", content: "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) + "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements) },
+      { role: "user", content: userContent },
     ],
   });
 
-  const raw = response.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty canonical support judgment response.");
-  const parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+  const raw = response.choices[0]?.message?.content ?? null;
+  if (raw === null || raw.length === 0) {
+    const diagnostic = buildSupportJudgeDiagnostic({
+      raw,
+      parsedSuccessfully: false,
+      rawJudgments: [],
+      compactRequirements,
+      compactEvidence,
+      requestCharacterCount: userContent.length,
+    });
+    throw new CanonicalSupportJudgmentError("Empty canonical support judgment response.", diagnostic);
+  }
+
+  let parsed: { judgments: RawJudgment[] };
+  try {
+    parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+  } catch (error) {
+    const diagnostic = buildSupportJudgeDiagnostic({
+      raw,
+      parsedSuccessfully: false,
+      rawJudgments: [],
+      compactRequirements,
+      compactEvidence,
+      requestCharacterCount: userContent.length,
+    });
+    throw new CanonicalSupportJudgmentError(
+      "Canonical support judgment response could not be parsed as JSON: " + (error instanceof Error ? error.message : String(error)),
+      diagnostic,
+    );
+  }
+
   const rawJudgments = parsed.judgments ?? [];
+  const diagnostic = buildSupportJudgeDiagnostic({
+    raw,
+    parsedSuccessfully: true,
+    rawJudgments,
+    compactRequirements,
+    compactEvidence,
+    requestCharacterCount: userContent.length,
+  });
   const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
+  if (completenessErrors.length) {
+    throw new CanonicalSupportJudgmentError(
+      "Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "),
+      diagnostic,
+    );
+  }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
