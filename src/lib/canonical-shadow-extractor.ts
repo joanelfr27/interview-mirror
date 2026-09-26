@@ -533,7 +533,18 @@ export async function extractCanonicalShadow(
 
     if (atomErrors.length) {
       rejectedAtoms.push(raw.id);
+      const groundingDiagnostic = [
+        "object_present=" + Boolean(raw.object?.trim()),
+        "object_exact=" + Boolean(raw.object?.trim() && span.text.includes(raw.object.trim())),
+        "object_ws_normalized=" + Boolean(raw.object?.trim() && canonicalize(span.text).includes(canonicalize(raw.object.trim()))),
+        "outcome_present=" + Boolean(raw.outcome?.trim()),
+        "outcome_exact=" + Boolean(raw.outcome?.trim() && span.text.includes(raw.outcome.trim())),
+        "outcome_ws_normalized=" + Boolean(raw.outcome?.trim() && canonicalize(span.text).includes(canonicalize(raw.outcome.trim()))),
+        "action_exact=" + Boolean(raw.normalized_action?.trim() && span.text.includes(raw.normalized_action.trim())),
+        "action_ws_normalized=" + Boolean(raw.normalized_action?.trim() && canonicalize(span.text).includes(canonicalize(raw.normalized_action.trim()))),
+      ].join(" ");
       errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}`));
+      warnings.push(`[E1 grounding diagnostic ${raw.id}] ${groundingDiagnostic}`);
       continue;
     }
 
