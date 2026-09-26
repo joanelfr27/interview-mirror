@@ -44,6 +44,28 @@ const GENERIC_TOKENS = new Set([
   "function","functions","area","areas","role","roles","group","groups","activity","activities","person","persons",
 ]);
 
+// Broad modifiers are not sufficient evidence of a shared professional object
+// on their own. Substantive tokens (for example "finance" or "treasury") remain
+// valid single-token connections.
+const BROAD_OBJECT_MODIFIERS = new Set([
+  "commercial",
+  "customer",
+  "digital",
+  "enterprise",
+  "financial",
+  "global",
+  "international",
+  "market",
+  "operational",
+  "performance",
+  "product",
+  "regional",
+  "risk",
+  "service",
+  "strategic",
+  "technical",
+]);
+
 function normalizeClaimToken(value: string): string {
   const token = value.normalize("NFKC").toLowerCase();
   const aliases: Record<string,string> = {
@@ -74,6 +96,15 @@ function overlapCount(a: string, b: string): number {
 
 function overlap(a: string, b: string): boolean {
   return overlapCount(a, b) >= 1;
+}
+
+function objectOverlap(a: string, b: string): boolean {
+  const left = tokens(a);
+  const right = tokens(b);
+  for (const token of left) {
+    if (right.has(token) && !BROAD_OBJECT_MODIFIERS.has(token)) return true;
+  }
+  return false;
 }
 
 function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
@@ -193,7 +224,7 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
 
 function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
   if (!ownershipCompatible(a, b)) return null;
-  if (overlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
+  if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
