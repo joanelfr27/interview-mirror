@@ -42,7 +42,7 @@ const supabase = createClient(url, serviceRoleKey, {
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
-\nfunction buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
+function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
   return {
     version: "rcm-v1",
     model_id: "d16-shadow-runtime",
@@ -91,7 +91,9 @@ const report = {
   run: {
     mode: "D15_REAL_SESSION_SHADOW",
     writes_performed: false,
-    sessions_requested: chosen.length,\n    d15_d16_connected_flow: true,\n    d16_strategy_validation: "REQUIRED",
+    sessions_requested: chosen.length,
+    d15_d16_connected_flow: true,
+    d16_strategy_validation: "REQUIRED",
     distinct_cv_count: new Set(chosen.map((row) => fingerprint(row.cv_text))).size,
     distinct_jd_count: new Set(chosen.map((row) => fingerprint(row.job_description))).size,
     selected_session_fingerprints: chosen.map((row) => ({
