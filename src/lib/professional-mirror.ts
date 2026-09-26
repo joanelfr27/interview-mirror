@@ -44,6 +44,29 @@ const GENERIC_TOKENS = new Set([
   "function","functions","area","areas","role","roles","group","groups","activity","activities","person","persons",
 ]);
 
+// Broad modifiers are not sufficient evidence of a shared professional object
+// on their own. Substantive tokens (for example "finance" or "treasury") remain
+// valid single-token connections.
+const BROAD_OBJECT_MODIFIERS = new Set([
+  "commercial",
+  "customer",
+  "digital",
+  "enterprise",
+  "financial",
+  "global",
+  "international",
+  "market",
+  "operational",
+  "performance",
+  "product",
+  "regional",
+  "regulatory",
+  "risk",
+  "service",
+  "strategic",
+  "technical",
+]);
+
 function normalizeClaimToken(value: string): string {
   const token = value.normalize("NFKC").toLowerCase();
   const aliases: Record<string,string> = {
