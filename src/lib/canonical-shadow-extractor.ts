@@ -476,6 +476,7 @@ export type CanonicalShadowResult = {
     facet_count: number;
     rejected_atoms: string[];
     rejected_requirements: string[];
+    raw_ownership_by_atom_id: Record<string, EvidenceOwnership>;
   };
 };
 
@@ -504,10 +505,12 @@ export async function extractCanonicalShadow(
   const warnings: string[] = [];
   const rejectedAtoms: string[] = [];
   const rejectedRequirements: string[] = [];
+  const rawOwnershipByAtomId: Record<string, EvidenceOwnership> = {};
   const cvUsed = new Set<string>();
   const jdUsed = new Set<string>();
 
   for (const raw of rawAtoms) {
+    rawOwnershipByAtomId[raw.id] = raw.ownership;
     const spanLanguage = detectQuoteLanguage(raw.source_quote, sourceLanguage);
     const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
@@ -644,6 +647,7 @@ export async function extractCanonicalShadow(
       facet_count: requirements.reduce((sum, requirement) => sum + requirement.facets.length, 0),
       rejected_atoms: rejectedAtoms,
       rejected_requirements: rejectedRequirements,
+      raw_ownership_by_atom_id: rawOwnershipByAtomId,
     },
   };
 }
