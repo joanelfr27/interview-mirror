@@ -456,6 +456,7 @@ test("field-level grounding rejects an invented tool while preserving exact quot
 
 test("field-level grounding treats UNKNOWN as a sentinel, not source text", () => {
   const evidence = atom("A1");
+  evidence.subject.ownership = "UNKNOWN";
   evidence.action.normalized_action = "UNKNOWN";
   evidence.action.object = "UNKNOWN";
   const span = {
