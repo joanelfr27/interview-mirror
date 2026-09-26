@@ -1,8 +1,8 @@
 name: D15 Real Session Shadow Validation
 
 on:
-  push:
-    branches: ["d15-runtime-validation"]
+  pull_request:
+    branches: ["audit-version"]
 
 jobs:
   shadow:
