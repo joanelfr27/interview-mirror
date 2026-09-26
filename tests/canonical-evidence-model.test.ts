@@ -471,6 +471,19 @@ test("field-level grounding treats UNKNOWN as a sentinel, not source text", () =
   assert.deepEqual(errors, []);
 });
 
+test("field-level grounding does not exempt UNKNOWN outcome or tools", () => {
+  const evidence = atom("A1");
+  evidence.subject.ownership = "UNKNOWN";
+  evidence.outcome = "UNKNOWN";
+  evidence.context.tools_or_systems = ["UNKNOWN"];
+  const span = {
+    id: "span-A1", document_id: "CV", text: "I managed finance", start_offset: 0, end_offset: 17, language: "en",
+  };
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("outcome is not grounded")));
+  assert.ok(errors.some(e => e.includes("tools_or_systems is not grounded")));
+});
+
 test("field-level grounding accepts structured fields explicitly present in the quote", () => {
   const evidence = atom("A1");
   evidence.scale.quantity = "20";
