@@ -179,6 +179,14 @@ function canonicalize(value: string): string {
 
 
 
+function quoteMismatchDiagnostic(document: string, quote: string): string {
+  const normalizedDocument = canonicalize(document);
+  const normalizedQuote = canonicalize(quote);
+  const whitespaceNormalizedMatch = Boolean(normalizedQuote) && normalizedDocument.includes(normalizedQuote);
+  const caseInsensitiveMatch = Boolean(normalizedQuote) && normalizedDocument.toLocaleLowerCase().includes(normalizedQuote.toLocaleLowerCase());
+  return "quote_diagnostic whitespace_normalized_match=" + whitespaceNormalizedMatch + " case_insensitive_match=" + caseInsensitiveMatch + " quote_chars=" + quote.length;
+}
+
 function findExactSpan(
   documentId: string,
   document: string,
@@ -484,7 +492,7 @@ export async function extractCanonicalShadow(
     const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
-      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
+      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring. ${quoteMismatchDiagnostic(session.cv_text ?? "", raw.source_quote)}`);
       continue;
     }
 
