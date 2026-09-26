@@ -227,7 +227,7 @@ for (const row of chosen) {
           const surroundingQuote = surroundingSourceQuote(row.cv_text, atomQuote);
           return {
             evidence_id: atom.id,
-            raw_llm_ownership: result.diagnostics.raw_ownership_by_atom_id[atom.id] ?? "UNKNOWN",
+            raw_llm_ownership: result.extraction_diagnostics.raw_ownership_by_atom_id[atom.id] ?? "UNKNOWN",
             atom_source_quote: atomQuote,
             ownership_marker_in_atom_quote: ownershipMarkerInText(atomQuote),
             surrounding_cv_quote: surroundingQuote,
