@@ -41,6 +41,18 @@ const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+function ownershipMarkerInText(text: string): boolean {
+  return /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes|we|our|team|teams|nous|notre|nos|équipe|équipes|shared|co-owned|partagé|partagée|partagés|partagées|supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i.test(text);
+}
+
+function surroundingSourceQuote(document: string, quote: string): string {
+  const index = document.indexOf(quote);
+  if (index < 0) return "";
+  const lineStart = document.lastIndexOf("\n", index) + 1;
+  const lineEndIndex = document.indexOf("\n", index + quote.length);
+  const lineEnd = lineEndIndex >= 0 ? lineEndIndex : document.length;
+  return document.slice(lineStart, lineEnd).trim();
+}
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
@@ -207,6 +219,23 @@ for (const row of chosen) {
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
+      ownership_diagnostic: result.ledger.evidence
+        .filter((atom) => atom.subject.ownership === "UNKNOWN")
+        .map((atom) => {
+          const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+          const atomQuote = span?.text ?? "";
+          const surroundingQuote = surroundingSourceQuote(row.cv_text, atomQuote);
+          return {
+            evidence_id: atom.id,
+            atom_source_quote: atomQuote,
+            ownership_marker_in_atom_quote: ownershipMarkerInText(atomQuote),
+            surrounding_cv_quote: surroundingQuote,
+            ownership_marker_in_surrounding_cv_quote: ownershipMarkerInText(surroundingQuote),
+            normalized_action: atom.action.normalized_action,
+            object: atom.action.object,
+            assertion_type: atom.assertion.type,
+          };
+        }),
       wow: {
         thread_count: result.d15.threads.length,
         non_fact_statement_count: result.d15.statements.filter((statement) => statement.kind !== "FACT").length,
