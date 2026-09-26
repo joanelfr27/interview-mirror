@@ -56,7 +56,11 @@ export async function runD16ShadowRuntimeIntegration(
 
   const graphErrors = validateRequirementGraph(shadow.ledger);
   if (graphErrors.length) {
-    throw new Error("D16 shadow ledger validation failed: " + graphErrors.join(" | "));
+    const extractionGateDiagnostics = diagnostics.filter((item) => item.startsWith("E1 shadow extraction gate prevented support judging:"));
+    throw new Error(
+      "D16 shadow ledger validation failed: " + graphErrors.join(" | ") +
+      (extractionGateDiagnostics.length ? " | " + extractionGateDiagnostics.join(" | ") : ""),
+    );
   }
 
   const d2 = buildCanonicalReasoningProjection(shadow.ledger);
