@@ -137,6 +137,17 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.abstention_reason = "Positive functional support requires a grounded action and object in the cited evidence.";
     }
 
+    // Positive OWNERSHIP support requires explicit ownership evidence.
+    // UNKNOWN ownership is absence of evidence, not a positive ownership claim.
+    if (positiveFunctionalStatus && facet.type === "OWNERSHIP" && citedAtoms.every(atom => atom.subject.ownership === "UNKNOWN")) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain explicit ownership attribution sufficient for positive ownership support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive ownership support requires explicit non-UNKNOWN ownership evidence.";
+    }
+
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
     // unless the cited credential explicitly names Finance or Accounting.
