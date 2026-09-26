@@ -60,7 +60,6 @@ const BROAD_OBJECT_MODIFIERS = new Set([
   "performance",
   "product",
   "regional",
-  "regulatory",
   "risk",
   "service",
   "strategic",
