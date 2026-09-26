@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import {
   diagnoseProfessionalMirrorConnections,
@@ -419,6 +420,12 @@ for (const row of chosen) {
       error: caught instanceof Error ? caught.message : String(caught),
       ...(caught instanceof CanonicalSupportJudgmentError
         ? { support_judge_diagnostic: caught.diagnostic }
+        : {}),
+      ...(caught instanceof CanonicalShadowExtractionEarlyReturnError
+        ? {
+            extraction_diagnostics: caught.extraction,
+            extraction_early_return_reasons: caught.reasons,
+          }
         : {}),
     });
   }
