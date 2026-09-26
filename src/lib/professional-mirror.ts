@@ -100,11 +100,11 @@ function overlapCount(a: string, b: string): number {
   return count;
 }
 
-function overlap(a: string, b: string): boolean {
+export function diagnosticSignalOverlap(a: string, b: string): boolean {
   return overlapCount(a, b) >= 1;
 }
 
-function objectOverlap(
+export function diagnosticObjectOverlap(
   a: string,
   b: string,
   leftLanguage?: AtomicEvidence["provenance"]["language"],
@@ -229,11 +229,11 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   return accepted;
 }
 
-function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {  if (objectOverlap(a.action.object, b.action.object, a.provenance.language, b.provenance.language)) return "SHARED_OBJECT";
-  if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
-  if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
-  if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
-  if (overlap(a.action.normalized_action, b.action.normalized_action) && a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "REPEATED_ACTION";
+function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {  if (diagnosticObjectOverlap(a.action.object, b.action.object, a.provenance.language, b.provenance.language)) return "SHARED_OBJECT";
+  if (a.context.domain && b.context.domain && diagnosticSignalOverlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
+  if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => diagnosticSignalOverlap(x, y)))) return "SHARED_TOOL";
+  if (a.context.standards?.some((x) => b.context.standards?.some((y) => diagnosticSignalOverlap(x, y)))) return "SHARED_STANDARD";
+  if (diagnosticSignalOverlap(a.action.normalized_action, b.action.normalized_action) && a.context.domain && b.context.domain && diagnosticSignalOverlap(a.context.domain, b.context.domain)) return "REPEATED_ACTION";
   return null;
 }
 
@@ -282,7 +282,7 @@ export function diagnoseProfessionalMirrorConnections(
     for (let j = i + 1; j < atoms.length; j += 1) {
       const left = atoms[i];
       const right = atoms[j];
-      const sharedObject = objectOverlap(
+      const sharedObject = diagnosticObjectOverlap(
         left.action.object,
         right.action.object,
         left.provenance.language,
@@ -291,23 +291,23 @@ export function diagnoseProfessionalMirrorConnections(
       const sharedDomain = Boolean(
         left.context.domain &&
         right.context.domain &&
-        overlap(left.context.domain, right.context.domain),
+        diagnosticSignalOverlap(left.context.domain, right.context.domain),
       );
       const sharedTool = Boolean(
         left.context.tools_or_systems?.some((x) =>
-          right.context.tools_or_systems?.some((y) => overlap(x, y)),
+          right.context.tools_or_systems?.some((y) => diagnosticSignalOverlap(x, y)),
         ),
       );
       const sharedStandard = Boolean(
         left.context.standards?.some((x) =>
-          right.context.standards?.some((y) => overlap(x, y)),
+          right.context.standards?.some((y) => diagnosticSignalOverlap(x, y)),
         ),
       );
       const repeatedActionWithSharedDomain = Boolean(
-        overlap(left.action.normalized_action, right.action.normalized_action) &&
+        diagnosticSignalOverlap(left.action.normalized_action, right.action.normalized_action) &&
         left.context.domain &&
         right.context.domain &&
-        overlap(left.context.domain, right.context.domain),
+        diagnosticSignalOverlap(left.context.domain, right.context.domain),
       );
 
       diagnostics.pairs.push({
