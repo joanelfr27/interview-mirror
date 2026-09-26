@@ -120,6 +120,20 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
+    // DIRECT FUNCTION support requires a grounded action/object proposition.
+    // Atoms that only establish tools, credentials, languages, etc. must not be
+    // promoted into a functional claim when their action/object is UNKNOWN.
+    if (item.status === "DIRECT" && facet.type === "FUNCTION" && citedAtoms.some(atom =>
+      atom.action.normalized_action.trim() === "UNKNOWN" || atom.action.object.trim() === "UNKNOWN"
+    )) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain a grounded action/object proposition sufficient for DIRECT functional support.";
+      item.confidence = 0;
+      item.abstention_reason = "Functional support requires a grounded action and object in the cited evidence.";
+    }
+
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
     // unless the cited credential explicitly names Finance or Accounting.
