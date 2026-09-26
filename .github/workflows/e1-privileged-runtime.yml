@@ -1,0 +1,45 @@
+name: E1 Privileged Runtime Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_count:
+        description: "Number of runtime sessions to validate"
+        required: true
+        default: "15"
+      status_filter:
+        description: "Optional session status filter"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - run: npm run build
+      - name: D15-D16 privileged runtime validation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count }}
+          D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d15-d16-runtime-report-${{ github.run_id }}
+          path: d15-real-session-shadow-report.json
+          if-no-files-found: warn

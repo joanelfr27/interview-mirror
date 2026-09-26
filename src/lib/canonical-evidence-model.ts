@@ -245,9 +245,11 @@ export function validateAtomicEvidenceAgainstSource(
   const errors: string[] = [];
   const source = sourceSpan.text;
 
-  const requireExact = (label: string, raw: string | undefined | null) => {
+  const requireExact = (label: string, raw: string | undefined | null, allowUnknown = false) => {
     const value = raw?.trim();
-    if (value && !source.includes(value)) {
+    if (!value) return;
+    if (allowUnknown && value === "UNKNOWN") return;
+    if (!source.includes(value)) {
       errors.push(`AtomicEvidence.${label} is not grounded in its source quote.`);
     }
   };
@@ -262,8 +264,8 @@ export function validateAtomicEvidenceAgainstSource(
 
   // Free-text semantic fields are deliberately fail-closed: normalization may
   // change casing/spacing, but it may not introduce facts absent from the quote.
-  requireExact("action.normalized_action", value.action.normalized_action);
-  requireExact("action.object", value.action.object);
+  requireExact("action.normalized_action", value.action.normalized_action, true);
+  requireExact("action.object", value.action.object, true);
   requireExact("context.domain", value.context.domain);
   requireExact("context.jurisdiction", value.context.jurisdiction);
   requireExact("context.situation", value.context.situation);

@@ -24,7 +24,7 @@ function ledger(): EvidenceLedger {
       verifiability: { has_quantifiable_metric: false, has_third_party_entity: false, has_time_anchor: false },
       extraction_confidence: 1,
     }],
-    requirements: [requirement], support_judgments: [],
+    requirements: [{ ...requirement, facets: requirement.facets.map(facet => ({ ...facet })) }], support_judgments: [],
     requirement_statuses: [{ requirement_id: "REQ-1", status: "UNRESOLVED" }],
     unresolved_items: [], candidate_elicitations: [], demonstration_objectives: [],
   };
@@ -43,13 +43,59 @@ test("judge sanitizer reports positive judgment without evidence as a hard error
   assert.ok(result.errors.some(error => error.includes("positive status without cited evidence")));
 });
 
+test("positive FUNCTION support rejects atoms with UNKNOWN action or object", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.evidence[0].action.normalized_action = "UNKNOWN";
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
+});
+
+test("positive OWNERSHIP support rejects UNKNOWN ownership", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.requirements[0].facets = [{ id: "F-1", type: "OWNERSHIP", requirement: "Own finance work", source_span_id: "S-REQ" }];
+    l.evidence[0].subject.ownership = "UNKNOWN";
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
+});
+
+test("positive OUTCOME support rejects missing outcome evidence", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.requirements[0].facets = [{ id: "F-1", type: "OUTCOME", requirement: "Improve finance outcomes", source_span_id: "S-REQ" }];
+    l.evidence[0].outcome = null;
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
+});
+
+test("positive TOOL_METHOD support rejects missing tool or method evidence", () => {
+  for (const status of ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"] as const) {
+    const l = ledger();
+    l.requirements[0].facets = [{ id: "F-1", type: "TOOL_METHOD", requirement: "Use SAP or a documented method", source_span_id: "S-REQ" }];
+    l.evidence[0].context = {};
+    const result = sanitizeJudgments([raw(status, ["A1"])], l);
+    assert.equal(result.judgments[0].status, "NONE");
+    assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+    assert.equal(result.judgments[0].abstained, true);
+  }
+});
+
 test("judge sanitizer preserves valid documented direct support", () => {
   const result = sanitizeJudgments([raw("DIRECT", ["A1"])], ledger());
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
   assert.equal(result.judgments[0].support_basis, "DOCUMENTED");
 });
-
 
 test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
   const l = ledger();

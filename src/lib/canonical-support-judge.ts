@@ -34,8 +34,7 @@ const SCHEMA = {
         support_basis: { type: "string", enum: ["DOCUMENTED", "CANDIDATE_SELF_REPORTED"] },
         analogical_mapping: {
           anyOf: [{
-            type: "object",
-            additionalProperties: false,
+            type: "object", additionalProperties: false,
             properties: {
               shared_dimensions: { type: "array", items: { type: "string" } },
               unshared_dimensions: { type: "array", items: { type: "string" } },
@@ -49,6 +48,31 @@ const SCHEMA = {
   },
   required: ["judgments"],
 } as const;
+
+function summarizeFacetResponse(raw: RawJudgment[], facets: EvidenceLedger["requirements"][number]["facets"]) {
+  const expected = new Set(facets.map(facet => facet.id));
+  const seen = new Set<string>();
+  let duplicateCount = 0;
+  let unknownCount = 0;
+  let validExpectedCount = 0;
+
+  for (const item of raw) {
+    if (seen.has(item.facet_id)) duplicateCount += 1;
+    seen.add(item.facet_id);
+    if (expected.has(item.facet_id)) validExpectedCount += 1;
+    else unknownCount += 1;
+  }
+
+  return {
+    expected_facets: facets.length,
+    raw_judgments: raw.length,
+    unique_facet_ids: seen.size,
+    valid_expected_judgments: validExpectedCount,
+    unknown_facet_ids: unknownCount,
+    duplicate_facet_ids: duplicateCount,
+    missing_facets: Math.max(0, facets.length - [...expected].filter(id => seen.has(id)).length),
+  };
+}
 
 function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
@@ -94,6 +118,61 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       continue;
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
+
+    // Positive FUNCTION support requires a grounded action/object proposition.
+    // Atoms that only establish tools, credentials, languages, etc. must not be
+    // promoted into a functional claim when their action/object is UNKNOWN.
+    const positiveFunctionalStatus =
+      item.status === "DIRECT" ||
+      item.status === "PARTIAL" ||
+      item.status === "ANALOGICAL_TRANSFER";
+    if (positiveFunctionalStatus && facet.type === "FUNCTION" && citedAtoms.some(atom =>
+      atom.action.normalized_action.trim() === "UNKNOWN" || atom.action.object.trim() === "UNKNOWN"
+    )) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain a grounded action/object proposition sufficient for positive functional support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive functional support requires a grounded action and object in the cited evidence.";
+    }
+
+    // Positive OWNERSHIP support requires explicit ownership evidence.
+    // UNKNOWN ownership is absence of evidence, not a positive ownership claim.
+    if (positiveFunctionalStatus && facet.type === "OWNERSHIP" && citedAtoms.every(atom => atom.subject.ownership === "UNKNOWN")) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain explicit ownership attribution sufficient for positive ownership support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive ownership support requires explicit non-UNKNOWN ownership evidence.";
+    }
+
+    // Positive OUTCOME support requires explicit outcome evidence.
+    // Missing outcome is absence of evidence, not a positive outcome claim.
+    if (positiveFunctionalStatus && facet.type === "OUTCOME" && citedAtoms.every(atom => !atom.outcome?.trim())) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain an explicit outcome sufficient for positive outcome support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive outcome support requires explicit outcome evidence.";
+    }
+
+    // Positive TOOL_METHOD support requires explicit tool, method, system, or standard evidence.
+    // Missing tool/method evidence is absence of evidence, not a positive tool claim.
+    if (
+      positiveFunctionalStatus &&
+      facet.type === "TOOL_METHOD" &&
+      citedAtoms.every(atom => !(atom.context.tools_or_systems?.length || atom.context.standards?.length))
+    ) {
+      item.status = "NONE";
+      item.abstained = true;
+      item.supporting_evidence_ids = [];
+      item.rationale = "The cited evidence does not contain explicit tool, system, method, or standard evidence sufficient for positive tool/method support.";
+      item.confidence = 0;
+      item.abstention_reason = "Positive tool/method support requires explicit tool, system, method, or standard evidence.";
+    }
 
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
     // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
@@ -170,12 +249,44 @@ export async function judgeCanonicalSupport(
     ],
   });
 
-  const raw = response.choices[0]?.message?.content;
+  let raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical support judgment response.");
-  const parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
-  const rawJudgments = parsed.judgments ?? [];
-  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) throw new Error("Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "));
+
+  let parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+  let rawJudgments = parsed.judgments ?? [];
+  const facets = ledger.requirements.flatMap(r => r.facets);
+  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+
+  if (completenessErrors.length) {
+    const retryResponse = await openai.chat.completions.create({
+      model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments_retry", SCHEMA),
+      messages: [
+        { role: "system", content: system },
+        {
+          role: "user",
+          content:
+            "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) +
+            "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements) +
+            "\n\nCOMPLETENESS REQUIREMENT:\n" +
+            "The previous response did not return a complete facet set. Return exactly one judgment for every facet ID below, including NONE/abstained when evidence is insufficient. Do not omit any facet and do not invent evidence. Required facet IDs:\n" +
+            JSON.stringify(facets.map(facet => facet.id)),
+        },
+      ],
+    });
+    raw = retryResponse.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty canonical support judgment retry response.");
+    parsed = JSON.parse(raw) as { judgments: RawJudgment[] };
+    rawJudgments = parsed.judgments ?? [];
+    const retryCompletenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
+    if (retryCompletenessErrors.length) {
+      const summary = summarizeFacetResponse(rawJudgments, facets);
+      throw new Error(
+        "Canonical support judgment response was incomplete or structurally invalid after one retry: " +
+        retryCompletenessErrors.join(" | ") +
+        " | response_metrics=" + JSON.stringify(summary),
+      );
+    }
+  }
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
