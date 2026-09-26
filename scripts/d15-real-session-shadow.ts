@@ -65,7 +65,7 @@ const { data, error } = await supabase
   .not("cv_text", "is", null)
   .not("job_description", "is", null)
   .order("created_at", { ascending: false })
-  .limit(50);
+  .limit(500);
 
 if (error) throw new Error("Supabase session query failed: " + error.message);
 
