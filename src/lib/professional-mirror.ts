@@ -49,8 +49,17 @@ const BROAD_OBJECT_MODIFIERS = new Set([
   "market","operational","performance","product","regional","risk","service","strategic","technical",
 ]);
 
-function normalizeClaimToken(value: string): string {
-  const token = value.normalize("NFKC").toLowerCase();
+function normalizeClaimToken(value: string, language?: AtomicEvidence["provenance"]["language"]): string {
+  let token = value.normalize("NFKC").toLowerCase();
+
+  // Conservative French inflection normalization for evidence-object overlap.
+  // This only runs for French source evidence and preserves the existing
+  // English/token-exact behavior.
+  if (language === "fr") {
+    if (token.endsWith("aux") && token.length > 5) token = token.slice(0, -3) + "al";
+    else if (token.endsWith("es") && token.length > 5) token = token.slice(0, -2);
+    else if (token.endsWith("s") && token.length > 4) token = token.slice(0, -1);
+  }
   const aliases: Record<string,string> = {
     managed:"lead",manage:"lead",managing:"lead",led:"lead",leadership:"lead",
     group:"team",groups:"team",team:"team",teams:"team",
@@ -60,7 +69,7 @@ function normalizeClaimToken(value: string): string {
   return aliases[token] ?? token;
 }
 
-function tokens(value: string): Set<string> {
+function tokens(value: string, language?: AtomicEvidence["provenance"]["language"]): Set<string> {
   const rawTokens = value.normalize("NFKC")
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean);
@@ -69,7 +78,7 @@ function tokens(value: string): Set<string> {
     rawTokens
       .map((raw) => ({
         raw,
-        normalized: normalizeClaimToken(raw),
+        normalized: normalizeClaimToken(raw, language),
       }))
       .filter(({ raw, normalized }) => {
         const isNumeric = /^\d+$/.test(normalized);
@@ -95,9 +104,14 @@ function overlap(a: string, b: string): boolean {
   return overlapCount(a, b) >= 1;
 }
 
-function objectOverlap(a: string, b: string): boolean {
-  const left = tokens(a);
-  const right = tokens(b);
+function objectOverlap(
+  a: string,
+  b: string,
+  leftLanguage?: AtomicEvidence["provenance"]["language"],
+  rightLanguage?: AtomicEvidence["provenance"]["language"],
+): boolean {
+  const left = tokens(a, leftLanguage);
+  const right = tokens(b, rightLanguage);
   for (const token of left) {
     if (right.has(token) && !BROAD_OBJECT_MODIFIERS.has(token)) return true;
   }
@@ -215,7 +229,7 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   return accepted;
 }
 
-function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {  if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
+function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {  if (objectOverlap(a.action.object, b.action.object, a.provenance.language, b.provenance.language)) return "SHARED_OBJECT";
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
@@ -268,7 +282,12 @@ export function diagnoseProfessionalMirrorConnections(
     for (let j = i + 1; j < atoms.length; j += 1) {
       const left = atoms[i];
       const right = atoms[j];
-      const sharedObject = objectOverlap(left.action.object, right.action.object);
+      const sharedObject = objectOverlap(
+        left.action.object,
+        right.action.object,
+        left.provenance.language,
+        right.provenance.language,
+      );
       const sharedDomain = Boolean(
         left.context.domain &&
         right.context.domain &&
