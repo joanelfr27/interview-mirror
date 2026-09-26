@@ -32,6 +32,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
+      - name: D16 temporary ownership mechanical probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D16_OWNERSHIP_PROMPT_PROBE: "1"
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-mechanical-probe.ts
       - name: D15-D16 privileged runtime validation
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
