@@ -1,3 +1,4 @@
+// Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
