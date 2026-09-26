@@ -14,12 +14,17 @@ export type CanonicalShadowEarlyReturnReason =
   | "NO_REQUIREMENTS";
 
 export class CanonicalShadowExtractionEarlyReturnError extends Error {
+  public readonly extraction: CanonicalShadowResult["diagnostics"];
+  public readonly reasons: readonly CanonicalShadowEarlyReturnReason[];
+
   constructor(
-    public readonly extraction: CanonicalShadowResult["diagnostics"],
-    public readonly reasons: readonly CanonicalShadowEarlyReturnReason[],
+    extraction: CanonicalShadowResult["diagnostics"],
+    reasons: readonly CanonicalShadowEarlyReturnReason[],
   ) {
     super("Canonical shadow pipeline stopped before support judge: " + reasons.join(", "));
     this.name = "CanonicalShadowExtractionEarlyReturnError";
+    this.extraction = extraction;
+    this.reasons = reasons;
   }
 }
 
