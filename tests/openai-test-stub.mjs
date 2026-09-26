@@ -3,6 +3,9 @@ export default class OpenAI {
     this.chat = {
       completions: {
         create: async (request) => {
+          if (process.env.SUPPORT_JUDGE_INCOMPLETE_TEST !== "1") {
+            throw new Error("OpenAI SDK call invoked during canonical tests; provide an explicit AI integration test mock.");
+          }
           const name = request?.response_format?.json_schema?.name;
           if (name === "canonical_candidate_atoms") return { choices: [{ message: { content: JSON.stringify({ atoms: [{
             id: "A1", source_quote: "I managed finance", actor: "candidate", ownership: "INDIVIDUAL", normalized_action: "managed", object: "finance",
@@ -15,7 +18,6 @@ export default class OpenAI {
             facets: [{ id: "F-1", type: "FUNCTION", requirement: "Manage finance", source_quote: "Manage finance" }]
           }] }) } }] };
           if (name === "canonical_support_judgments") return { choices: [{ message: { content: JSON.stringify({ judgments: [] }) } }] };
-          throw new Error("OpenAI SDK call invoked during canonical tests; provide an explicit AI integration test mock.");
         },
       },
     };
