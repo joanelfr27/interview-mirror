@@ -19,6 +19,19 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
+      - name: D15 real-session shadow validation
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+        continue-on-error: false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d15-real-session-shadow-report
+          path: d15-real-session-shadow-report.json
+          if-no-files-found: warn
       - name: Package exact audit repository
         run: git archive --format=zip --output=Interview_Mirror_D13_Audit_${GITHUB_SHA}.zip HEAD
       - uses: actions/upload-artifact@v4
