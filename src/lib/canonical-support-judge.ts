@@ -34,8 +34,7 @@ const SCHEMA = {
         support_basis: { type: "string", enum: ["DOCUMENTED", "CANDIDATE_SELF_REPORTED"] },
         analogical_mapping: {
           anyOf: [{
-            type: "object",
-            additionalProperties: false,
+            type: "object", additionalProperties: false,
             properties: {
               shared_dimensions: { type: "array", items: { type: "string" } },
               unshared_dimensions: { type: "array", items: { type: "string" } },
@@ -120,18 +119,22 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
-    // DIRECT FUNCTION support requires a grounded action/object proposition.
+    // Positive FUNCTION support requires a grounded action/object proposition.
     // Atoms that only establish tools, credentials, languages, etc. must not be
     // promoted into a functional claim when their action/object is UNKNOWN.
-    if (item.status === "DIRECT" && facet.type === "FUNCTION" && citedAtoms.some(atom =>
+    const positiveFunctionalStatus =
+      item.status === "DIRECT" ||
+      item.status === "PARTIAL" ||
+      item.status === "ANALOGICAL_TRANSFER";
+    if (positiveFunctionalStatus && facet.type === "FUNCTION" && citedAtoms.some(atom =>
       atom.action.normalized_action.trim() === "UNKNOWN" || atom.action.object.trim() === "UNKNOWN"
     )) {
       item.status = "NONE";
       item.abstained = true;
       item.supporting_evidence_ids = [];
-      item.rationale = "The cited evidence does not contain a grounded action/object proposition sufficient for DIRECT functional support.";
+      item.rationale = "The cited evidence does not contain a grounded action/object proposition sufficient for positive functional support.";
       item.confidence = 0;
-      item.abstention_reason = "Functional support requires a grounded action and object in the cited evidence.";
+      item.abstention_reason = "Positive functional support requires a grounded action and object in the cited evidence.";
     }
 
     // Deterministic credential-specificity guard: a generic Master's/MBA credential
@@ -217,9 +220,6 @@ export async function judgeCanonicalSupport(
   const facets = ledger.requirements.flatMap(r => r.facets);
   const completenessErrors = assertCompleteFacetJudgments(rawJudgments, facets);
 
-  // The first structured response can occasionally omit the required facet set on
-  // real sessions. Retry exactly once with an explicit facet-ID checklist before
-  // failing closed; never synthesize missing judgments locally.
   if (completenessErrors.length) {
     const retryResponse = await openai.chat.completions.create({
       model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments_retry", SCHEMA),
