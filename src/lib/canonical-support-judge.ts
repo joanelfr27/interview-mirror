@@ -1,4 +1,6 @@
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { createHash } from "node:crypto";
+
 import type { SessionRecord } from "@/types";
 import {
   type EvidenceLedger,
@@ -18,7 +20,41 @@ type RawJudgment = {
   analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
 };
 
-const STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
+
+export type SupportJudgeDiagnostic = Readonly<{
+  model: string;
+  temperature: number;
+  response_format: string;
+  requirement_count: number;
+  facet_count: number;
+  expected_facet_ids: readonly string[];
+  evidence_atom_count: number;
+  evidence_atom_ids: readonly string[];
+  request_character_count: number;
+  response_present: boolean;
+  response_character_count: number;
+  response_sha256: string | null;
+  parsed_successfully: boolean;
+  returned_judgment_count: number;
+  returned_facet_ids: readonly string[];
+  missing_facet_ids: readonly string[];
+  unknown_facet_ids: readonly string[];
+  duplicate_facet_ids: readonly string[];
+  judgment_statuses: Readonly<Record<string, string>>;
+  supporting_evidence_ids: Readonly<Record<string, readonly string[]>>;
+  rationale_lengths: Readonly<Record<string, number>>;
+  analogical_mapping_lengths: Readonly<Record<string, { shared_dimensions: number; unshared_dimensions: number }>>;
+}>;
+
+export class CanonicalSupportJudgmentError extends Error {
+  readonly diagnostic: SupportJudgeDiagnostic;
+  constructor(message: string, diagnostic: SupportJudgeDiagnostic) {
+    super(message);
+    this.name = "CanonicalSupportJudgmentError";
+    this.diagnostic = diagnostic;
+  }
+}
+\nconst STATUS_VALUES = ["DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE"] as const;
 const SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
