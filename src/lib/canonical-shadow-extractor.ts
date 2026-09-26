@@ -276,6 +276,17 @@ function exactOrUnknown(value: string | null | undefined, source: string): strin
   return candidate && source.includes(candidate) ? candidate : "UNKNOWN";
 }
 
+export function downgradeUngroundedOutcomeClaim(
+  raw: RawCandidateAtom,
+  source: string,
+): RawCandidateAtom {
+  const groundedOutcome = exactOrNull(raw.outcome, source);
+  if (raw.assertion_type === "OUTCOME_CLAIM" && !groundedOutcome) {
+    return { ...raw, assertion_type: "STATED", outcome: null };
+  }
+  return { ...raw, outcome: groundedOutcome };
+}
+
 function exactArrayOrEmpty(values: string[] | undefined, source: string): string[] {
   return (values ?? []).map(value => value.trim()).filter(value => value && source.includes(value));
 }
