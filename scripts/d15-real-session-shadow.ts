@@ -377,12 +377,10 @@ for (const row of chosen) {
           return {
             evidence_id: atom.id,
             raw_llm_ownership: result.extraction_diagnostics.raw_ownership_by_atom_id[atom.id] ?? "UNKNOWN",
-            atom_source_quote: atomQuote,
+            atom_source_quote_fingerprint: fingerprint(atomQuote),
             ownership_marker_in_atom_quote: ownershipMarkerInText(atomQuote),
-            surrounding_cv_quote: surroundingQuote,
+            surrounding_cv_quote_fingerprint: fingerprint(surroundingQuote),
             ownership_marker_in_surrounding_cv_quote: ownershipMarkerInText(surroundingQuote),
-            normalized_action: atom.action.normalized_action,
-            object: atom.action.object,
             assertion_type: atom.assertion.type,
             ownership_bucket: ownershipBucket(atomQuote, surroundingQuote),
           };
