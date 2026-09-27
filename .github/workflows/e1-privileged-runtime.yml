@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 341c4e527e27aef348486692f6912efda384de33
+          ref: f96a135a30be69e5560040fa9774af6d07f1559c
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -39,6 +39,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count }}
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
+          D15_RUNTIME_SESSION_FINGERPRINTS: 797edb8d9213,788e31f7e22e
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
       - name: Verify D15-D16 runtime report exists
         if: always()
