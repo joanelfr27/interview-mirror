@@ -1,0 +1,27 @@
+name: D16 Ownership Post-Fix Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ed4a0b6e860df399a8e98164cc4b8df87a41987e
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: D16 seven-case post-fix ownership probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-postfix-probe.ts
