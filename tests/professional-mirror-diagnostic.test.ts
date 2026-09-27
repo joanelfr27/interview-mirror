@@ -58,4 +58,24 @@ describe("D15 diagnostic connection oracle", () => {
     assert.equal(diagnosticSignalOverlap("regional financial reporting", "financial reporting"), true);
     assert.equal(diagnosticSignalOverlap("team", "team"), false);
   });
+
+  it("asserts the diagnostic matrix exactly matches a second production traversal", () => {
+    const ledger = {
+      source_spans: [
+        { id: "S1", document_id: "CV-1", text: "Managed regional liquidity reporting.", language: "en" },
+        { id: "S2", document_id: "CV-1", text: "Managed weekly liquidity reporting.", language: "en" },
+      ],
+      evidence: [
+        atom({ id: "A", source_span_id: "S1", action: { normalized_action: "managed", object: "regional liquidity reporting" }, context: { domain: "finance" } }),
+        atom({ id: "B", source_span_id: "S2", action: { normalized_action: "managed", object: "weekly liquidity reporting" }, context: { domain: "finance" } }),
+      ],
+      requirements: [],
+      facets: [],
+    } as any;
+    const diagnostics = diagnoseProfessionalMirrorConnections(ledger);
+    assert.doesNotThrow(() => assertProfessionalMirrorConnectionDiagnosticsMatchProduction(ledger, diagnostics));
+    assert.equal(diagnostics.pairs.length, 1);
+    assert.equal(diagnostics.pairs[0]?.connection_reason, "SHARED_OBJECT");
+  });
+
 });
