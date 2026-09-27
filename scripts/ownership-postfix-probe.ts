@@ -28,3 +28,26 @@ for (const [name, probe] of cases) {
       }),
   );
 }
+
+const multiAtomProbe = [
+  "I built financial models.",
+  "My manager assigned this responsibility to me.",
+  "I jointly built the forecast models with my manager.",
+].join("\n");
+
+const multiAtoms = await diagnosticExtractAtomsProbe(multiAtomProbe);
+
+console.log(
+  "OWNERSHIP_MULTIATOM_PROBE_RESULT=" +
+    JSON.stringify({
+      input: multiAtomProbe,
+      atom_count: multiAtoms.length,
+      atoms: multiAtoms.map((atom) => ({
+        id: atom.id,
+        ownership: atom.ownership,
+        normalized_action: atom.normalized_action,
+        object: atom.object,
+        assertion_type: atom.assertion_type,
+      })),
+    }),
+);
