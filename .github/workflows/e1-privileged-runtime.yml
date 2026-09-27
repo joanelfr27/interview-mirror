@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 14b9a7ece11d94b1eb1a623b2ad2ab599492375a
+          ref: eadc85bc9e98ff906d73cf277f890932d7c51228
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
