@@ -22,7 +22,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - name: Run impact diagnostic
-        run: node --experimental-loader ./tests/ts-alias-loader.mjs scripts/e1-rejected-atom-impact-diagnostic.ts
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/e1-rejected-atom-impact-diagnostic.ts
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
