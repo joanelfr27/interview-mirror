@@ -248,6 +248,38 @@ export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "F
   };
 }
 
+function tokenSet(value: string): Set<string> {
+  return new Set(
+    canonicalize(value)
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((token) => token.length >= 2),
+  );
+}
+
+function lineOverlap(a: string, b: string): number {
+  const left = tokenSet(a);
+  const right = tokenSet(b);
+  if (!left.size || !right.size) return 0;
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared += 1;
+  return shared / Math.max(left.size, right.size);
+}
+
+function nearestCvLine(document: string, quote: string): { line: string; overlap: number } | null {
+  const candidates = document
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!candidates.length || !quote.trim()) return null;
+  let best: { line: string; overlap: number } | null = null;
+  for (const line of candidates) {
+    const overlap = lineOverlap(quote, line);
+    if (!best || overlap > best.overlap) best = { line, overlap };
+  }
+  return best;
+}
+
 function exactOrNull(value: string | null | undefined, source: string): string | null {
   const candidate = value?.trim();
   return candidate && source.includes(candidate) ? candidate : null;
@@ -465,6 +497,17 @@ export type CanonicalContextPopulationDiagnostic = Readonly<{
   canonical_standards_populated: boolean;
 }>;
 
+export type RejectedAtomDiagnostic = Readonly<{
+  atom_id: string;
+  rejection_class: "SOURCE_QUOTE_NOT_FOUND" | "FIELD_NOT_GROUNDED";
+  source_quote: string;
+  normalized_action: string;
+  object: string;
+  rejection_reasons: readonly string[];
+  nearest_cv_line?: string;
+  nearest_cv_line_overlap?: number;
+}>;
+
 export type CanonicalExtractionDiagnostics = Readonly<{
   errors: readonly string[];
   warnings: readonly string[];
@@ -479,6 +522,8 @@ export type CanonicalExtractionDiagnostics = Readonly<{
   raw_ownership_by_rejected_atom_id: Readonly<Record<string, EvidenceOwnership>>;
   /** Presence-only raw-vs-canonical context sidecar; never contains raw values. */
   context_population_by_atom_id: Readonly<Record<string, CanonicalContextPopulationDiagnostic>>;
+  /** One-time, opt-in capture of rejected raw atom content for forensic diagnosis only. */
+  rejected_atom_diagnostics?: readonly RejectedAtomDiagnostic[];
 }>;
 
 export type CanonicalShadowResult = {
@@ -490,6 +535,7 @@ export type CanonicalShadowResult = {
 
 export async function extractCanonicalShadow(
   session: SessionRecord,
+  options: { captureRejectedAtomDiagnostics?: boolean } = {},
 ): Promise<CanonicalShadowResult> {
   const language = normalizeLanguage(session.preparation_language);
   const sourceLanguage = detectSourceLanguage(session.cv_text ?? "", "");
@@ -520,6 +566,7 @@ export async function extractCanonicalShadow(
   const warnings: string[] = [];
   const rejectedAtoms: string[] = [];
   const rejectedRequirements: string[] = [];
+  const rejectedAtomDiagnostics: RejectedAtomDiagnostic[] = [];
   const cvUsed = new Set<string>();
   const jdUsed = new Set<string>();
 
@@ -529,6 +576,18 @@ export async function extractCanonicalShadow(
     if (!span) {
       rejectedAtoms.push(raw.id);
       warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
+      if (options.captureRejectedAtomDiagnostics) {
+        const nearest = nearestCvLine(session.cv_text ?? "", raw.source_quote);
+        rejectedAtomDiagnostics.push({
+          atom_id: raw.id,
+          rejection_class: "SOURCE_QUOTE_NOT_FOUND",
+          source_quote: raw.source_quote,
+          normalized_action: raw.normalized_action,
+          object: raw.object,
+          rejection_reasons: [`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`],
+          ...(nearest ? { nearest_cv_line: nearest.line, nearest_cv_line_overlap: Number(nearest.overlap.toFixed(3)) } : {}),
+        });
+      }
       continue;
     }
 
@@ -545,6 +604,16 @@ export async function extractCanonicalShadow(
     if (atomErrors.length) {
       rejectedAtoms.push(raw.id);
       errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}`));
+      if (options.captureRejectedAtomDiagnostics) {
+        rejectedAtomDiagnostics.push({
+          atom_id: raw.id,
+          rejection_class: "FIELD_NOT_GROUNDED",
+          source_quote: span.text,
+          normalized_action: raw.normalized_action,
+          object: raw.object,
+          rejection_reasons: [...atomErrors],
+        });
+      }
       continue;
     }
 
@@ -688,6 +757,9 @@ export async function extractCanonicalShadow(
     raw_ownership_by_atom_id: Object.freeze(rawOwnershipByAtomId),
     raw_ownership_by_rejected_atom_id: Object.freeze(rawOwnershipByRejectedAtomId),
     context_population_by_atom_id: Object.freeze(contextPopulationByAtomId),
+    ...(options.captureRejectedAtomDiagnostics
+      ? { rejected_atom_diagnostics: Object.freeze([...rejectedAtomDiagnostics]) }
+      : {}),
   });
 
   return {
