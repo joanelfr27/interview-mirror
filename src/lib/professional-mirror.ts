@@ -44,6 +44,11 @@ const GENERIC_TOKENS = new Set([
   "function","functions","area","areas","role","roles","group","groups","activity","activities","person","persons",
 ]);
 
+const BROAD_OBJECT_MODIFIERS = new Set([
+  "commercial","customer","digital","enterprise","financial","global","international",
+  "market","operational","performance","product","regional","risk","service","strategic","technical",
+]);
+
 function normalizeClaimToken(value: string): string {
   const token = value.normalize("NFKC").toLowerCase();
   const aliases: Record<string,string> = {
@@ -56,11 +61,25 @@ function normalizeClaimToken(value: string): string {
 }
 
 function tokens(value: string): Set<string> {
+  const rawTokens = value.normalize("NFKC")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
+
   return new Set(
-    value.normalize("NFKC").toLowerCase()
-      .split(/[^\p{L}\p{N}]+/u)
-      .map(normalizeClaimToken)
-      .filter((x) => (x.length >= 4 || /^\d+$/.test(x)) && !GENERIC_TOKENS.has(x)),
+    rawTokens
+      .map((raw) => ({
+        raw,
+        normalized: normalizeClaimToken(raw),
+      }))
+      .filter(({ raw, normalized }) => {
+        const isNumeric = /^\d+$/.test(normalized);
+        const isShortProfessionalToken = /^[A-Z0-9]{2,}$/.test(raw);
+        const isStandardToken = normalized.length >= 4;
+
+        return (isStandardToken || isNumeric || isShortProfessionalToken)
+          && !GENERIC_TOKENS.has(normalized);
+      })
+      .map(({ normalized }) => normalized),
   );
 }
 
@@ -76,11 +95,15 @@ function overlap(a: string, b: string): boolean {
   return overlapCount(a, b) >= 1;
 }
 
-/**
- * Diagnostic-only access to the production overlap primitive.
- * This wrapper intentionally exposes no field-selection or connection-ordering
- * logic; those semantics remain owned by connection().
- */
+function objectOverlap(a: string, b: string): boolean {
+  const left = tokens(a);
+  const right = tokens(b);
+  for (const token of left) {
+    if (right.has(token) && !BROAD_OBJECT_MODIFIERS.has(token)) return true;
+  }
+  return false;
+}
+
 export function diagnosticSignalOverlap(a: string, b: string): boolean {
   return overlap(a, b);
 }
@@ -202,7 +225,7 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
 
 function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
   if (!ownershipCompatible(a, b)) return null;
-  if (overlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
+  if (objectOverlap(a.action.object, b.action.object)) return "SHARED_OBJECT";
   if (a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "SHARED_DOMAIN";
   if (a.context.tools_or_systems?.some((x) => b.context.tools_or_systems?.some((y) => overlap(x, y)))) return "SHARED_TOOL";
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
@@ -210,10 +233,6 @@ function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connect
   return null;
 }
 
-/**
- * Instrumentation-only oracle for diagnostics. Keep `connection` private so
- * this does not become part of the Professional Mirror public contract.
- */
 export function diagnosticConnectionReason(
   a: AtomicEvidence,
   b: AtomicEvidence,
