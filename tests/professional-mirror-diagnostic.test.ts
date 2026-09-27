@@ -128,6 +128,13 @@ describe("D15 diagnostic connection oracle", () => {
           action: { normalized_action: "reconciled", object: "treasury accounts" },
           context: { domain: "treasury", tools_or_systems: ["Treasury-F"], standards: ["GAAP-F"] },
         }),
+        atom({
+          id: "G",
+          source_span_id: "S-G",
+          subject: { actor: "candidate", ownership: "TEAM" },
+          action: { normalized_action: "managed", object: "regional finance reporting" },
+          context: { domain: "finance", tools_or_systems: ["ERP-A"], standards: ["IFRS-A"] },
+        }),
       ],
       requirements: [],
       facets: [],
@@ -154,6 +161,13 @@ describe("D15 diagnostic connection oracle", () => {
       (pair) => pair.left_id === "E" && pair.right_id === "F",
     );
     assert.equal(repeatedActionPair?.connection_reason, "SHARED_DOMAIN");
+
+    // G matches A on object/domain/tool/standard, but the ownership gate must
+    // short-circuit every otherwise-eligible connection mechanism.
+    const incompatibleOwnershipPair = diagnostics.pairs.find(
+      (pair) => pair.left_id === "A" && pair.right_id === "G",
+    );
+    assert.equal(incompatibleOwnershipPair?.connection_reason, null);
   });
 
 });
