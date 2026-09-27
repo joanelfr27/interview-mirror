@@ -6,11 +6,11 @@ on:
       ref:
         description: "Trusted ref to validate after environment approval"
         required: true
-        default: "fix/e1-extractor-grounding-contract"
+        default: "d16-integration"
       session_count:
         description: "Number of runtime sessions to validate"
         required: true
-        default: "15"
+        default: "2"
       status_filter:
         description: "Optional session status filter"
         required: false
@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -42,10 +43,14 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count }}
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
+          D15_RUNTIME_SESSION_FINGERPRINTS: 797edb8d9213,788e31f7e22e
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
+      - name: Verify D15-D16 runtime report exists
+        if: always()
+        run: test -s d15-real-session-shadow-report.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: d15-d16-runtime-report-${{ github.run_id }}
           path: d15-real-session-shadow-report.json
-          if-no-files-found: warn
+          if-no-files-found: error

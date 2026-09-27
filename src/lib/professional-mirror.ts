@@ -104,6 +104,10 @@ function objectOverlap(a: string, b: string): boolean {
   return false;
 }
 
+export function diagnosticSignalOverlap(a: string, b: string): boolean {
+  return overlap(a, b);
+}
+
 function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
   const span = spanFor(ledger, atom);
   return tokens([
@@ -227,6 +231,108 @@ function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connect
   if (a.context.standards?.some((x) => b.context.standards?.some((y) => overlap(x, y)))) return "SHARED_STANDARD";
   if (overlap(a.action.normalized_action, b.action.normalized_action) && a.context.domain && b.context.domain && overlap(a.context.domain, b.context.domain)) return "REPEATED_ACTION";
   return null;
+}
+
+export function diagnosticConnectionReason(
+  a: AtomicEvidence,
+  b: AtomicEvidence,
+): CareerThread["connection_reason"] | null {
+  return connection(a, b);
+}
+
+export type ProfessionalMirrorConnectionDiagnostic = {
+  atoms: Array<{
+    id:string;
+    source_span_id:string;
+    ownership:AtomicEvidence["subject"]["ownership"];
+  }>;
+  pairs:Array<{
+    left_id:string;
+    right_id:string;
+    connection_reason:CareerThread["connection_reason"]|null;
+    shared_object:boolean;
+    shared_domain:boolean;
+    shared_tool:boolean;
+    shared_standard:boolean;
+    repeated_action_with_shared_domain:boolean;
+  }>;
+};
+
+export function assertProfessionalMirrorConnectionDiagnosticsMatchProduction(
+  ledger: EvidenceLedger,
+  diagnostics: ProfessionalMirrorConnectionDiagnostic,
+): void {
+  const atoms = independentAtoms(ledger);
+  assertDiagnosticInvariant(diagnostics, atoms);
+}
+
+function optionalOverlap(a: string | undefined, b: string | undefined): boolean {
+  return Boolean(a && b && overlap(a, b));
+}
+
+function assertDiagnosticInvariant(
+  diagnostics: ProfessionalMirrorConnectionDiagnostic,
+  atoms: AtomicEvidence[],
+): void {
+  const expectedAtoms = atoms.map((atom) => ({
+    id: atom.id,
+    source_span_id: atom.source_span_id,
+    ownership: atom.subject.ownership,
+  }));
+
+  if (JSON.stringify(diagnostics.atoms) !== JSON.stringify(expectedAtoms)) {
+    throw new Error("D15 diagnostic invariant failed: atom population/order differs from production independentAtoms().");
+  }
+
+  const expectedPairs: ProfessionalMirrorConnectionDiagnostic["pairs"] = [];
+  for (let i = 0; i < atoms.length; i += 1) {
+    for (let j = i + 1; j < atoms.length; j += 1) {
+      expectedPairs.push({
+        left_id: atoms[i].id,
+        right_id: atoms[j].id,
+        connection_reason: connection(atoms[i], atoms[j]),
+        shared_object: Boolean(atoms[i].action.object && atoms[j].action.object && overlap(atoms[i].action.object, atoms[j].action.object)),
+        shared_domain: Boolean(atoms[i].context.domain && atoms[j].context.domain && optionalOverlap(atoms[i].context.domain, atoms[j].context.domain)),
+        shared_tool: Boolean(atoms[i].context.tools_or_systems?.some((x) => atoms[j].context.tools_or_systems?.some((y) => overlap(x, y)))),
+        shared_standard: Boolean(atoms[i].context.standards?.some((x) => atoms[j].context.standards?.some((y) => overlap(x, y)))),
+        repeated_action_with_shared_domain: Boolean(overlap(atoms[i].action.normalized_action, atoms[j].action.normalized_action) && atoms[i].context.domain && atoms[j].context.domain && optionalOverlap(atoms[i].context.domain, atoms[j].context.domain)),
+      });
+    }
+  }
+
+  if (JSON.stringify(diagnostics.pairs) !== JSON.stringify(expectedPairs)) {
+    throw new Error("D15 diagnostic invariant failed: pair population/order/signals/reasons differ from production connection().");
+  }
+}
+
+export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): ProfessionalMirrorConnectionDiagnostic {
+  const atoms=independentAtoms(ledger);
+  const diagnostics={
+    atoms:atoms.map(atom=>({
+      id:atom.id,
+      source_span_id:atom.source_span_id,
+      ownership:atom.subject.ownership,
+    })),
+    pairs:[],
+  } as ProfessionalMirrorConnectionDiagnostic;
+
+  // Signal fields are descriptive and independently evaluated. They may report
+  // multiple true mechanisms for one pair. They do not determine connection_reason;
+  // that remains exclusively the production oracle above.
+  for(let i=0;i<atoms.length;i+=1) for(let j=i+1;j<atoms.length;j+=1){
+    const left=atoms[i],right=atoms[j];
+    diagnostics.pairs.push({
+      left_id:left.id,
+      right_id:right.id,
+      connection_reason:diagnosticConnectionReason(left,right),
+      shared_object:Boolean(left.action.object && right.action.object && diagnosticSignalOverlap(left.action.object,right.action.object)),
+      shared_domain:Boolean(left.context.domain&&right.context.domain&&diagnosticSignalOverlap(left.context.domain,right.context.domain)),
+      shared_tool:Boolean(left.context.tools_or_systems?.some(x=>right.context.tools_or_systems?.some(y=>diagnosticSignalOverlap(x,y)))),
+      shared_standard:Boolean(left.context.standards?.some(x=>right.context.standards?.some(y=>diagnosticSignalOverlap(x,y)))),
+      repeated_action_with_shared_domain:Boolean(diagnosticSignalOverlap(left.action.normalized_action,right.action.normalized_action)&&left.context.domain&&right.context.domain&&diagnosticSignalOverlap(left.context.domain,right.context.domain)),
+    });
+  }
+  return diagnostics;
 }
 
 function maturity(independentSpanCount: number): MirrorMaturity {
