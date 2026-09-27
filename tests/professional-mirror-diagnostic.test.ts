@@ -97,7 +97,7 @@ describe("D15 diagnostic connection oracle", () => {
           id: "A",
           source_span_id: "S-A",
           action: { normalized_action: "managed", object: "regional finance reporting" },
-          context: { domain: "finance", tools_or_systems: ["ERP-A"], standards: ["IFRS-A"] },
+          context: { domain: "finance", tools_or_systems: ["Oracle"], standards: ["IFRS-A"] },
         }),
         atom({
           id: "B",
@@ -109,7 +109,7 @@ describe("D15 diagnostic connection oracle", () => {
           id: "C",
           source_span_id: "S-C",
           action: { normalized_action: "implemented", object: "ERP controls" },
-          context: { domain: "technology", tools_or_systems: ["ERP-A"], standards: ["GAAP-C"] },
+          context: { domain: "technology", tools_or_systems: ["Oracle"], standards: ["GAAP-C"] },
         }),
         atom({
           id: "D",
@@ -134,7 +134,7 @@ describe("D15 diagnostic connection oracle", () => {
           source_span_id: "S-G",
           subject: { actor: "candidate", ownership: "TEAM" },
           action: { normalized_action: "managed", object: "regional finance reporting" },
-          context: { domain: "finance", tools_or_systems: ["ERP-A"], standards: ["IFRS-A"] },
+          context: { domain: "finance", tools_or_systems: ["Oracle"], standards: ["IFRS-A"] },
         }),
       ],
       requirements: [],
