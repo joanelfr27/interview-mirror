@@ -412,6 +412,12 @@ ${OWNERSHIP_EXTRACTION_RULE}
   return JSON.parse(raw).atoms as RawCandidateAtom[];
 }
 
+
+// TEMPORARY D16 POST-FIX PROBE ONLY. Remove after isolated ownership validation.
+export async function diagnosticExtractAtomsProbe(cv: string): Promise<RawCandidateAtom[]> {
+  return extractAtoms(cv);
+}
+
 async function extractRequirements(
   jd: string,
 ): Promise<RawRequirement[]> {
