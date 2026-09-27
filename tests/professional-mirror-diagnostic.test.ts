@@ -88,8 +88,8 @@ describe("D15 diagnostic connection oracle", () => {
         { id: "S-B", document_id: "CV", text: "Reviewed regional finance dashboards.", language: "en" },
         { id: "S-C", document_id: "CV", text: "Implemented ERP controls.", language: "en" },
         { id: "S-D", document_id: "CV", text: "Audited IFRS controls.", language: "en" },
-        { id: "S-E", document_id: "CV", text: "Reconciled treasury balances.", language: "en" },
-        { id: "S-F", document_id: "CV", text: "Reconciled treasury accounts.", language: "en" },
+        { id: "S-E", document_id: "CV", text: "Reconciled balances.", language: "en" },
+        { id: "S-F", document_id: "CV", text: "Reconciled accounts.", language: "en" },
         { id: "S-G", document_id: "CV", text: "Managed regional finance reporting.", language: "en" },
       ],
       evidence: [
@@ -120,13 +120,13 @@ describe("D15 diagnostic connection oracle", () => {
         atom({
           id: "E",
           source_span_id: "S-E",
-          action: { normalized_action: "reconciled", object: "treasury balances" },
+          action: { normalized_action: "reconciled", object: "balances" },
           context: { domain: "treasury", tools_or_systems: ["Treasury-E"], standards: ["GAAP-E"] },
         }),
         atom({
           id: "F",
           source_span_id: "S-F",
-          action: { normalized_action: "reconciled", object: "treasury accounts" },
+          action: { normalized_action: "reconciled", object: "accounts" },
           context: { domain: "treasury", tools_or_systems: ["Treasury-F"], standards: ["GAAP-F"] },
         }),
         atom({
