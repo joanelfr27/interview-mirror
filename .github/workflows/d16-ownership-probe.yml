@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 8a9421b16eec5f0915f1c2e5a282051fa55ef96d
+          ref: 903a180c9b30e0e16c9a06863f5261c2f89a037e
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -21,7 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - name: D16 eight-case post-fix ownership probe
+      - name: D16 eight-case + multi-atom ownership probe
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-postfix-probe.ts
