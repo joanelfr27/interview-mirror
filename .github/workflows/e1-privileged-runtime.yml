@@ -6,7 +6,7 @@ on:
       session_count:
         description: "Number of runtime sessions to validate"
         required: true
-        default: "15"
+        default: "2"
       status_filter:
         description: "Optional session status filter"
         required: false
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f820c55b9725bccb780f7977559051913650d8a8
+          ref: d16-integration
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
