@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { extractCanonicalShadow } from "@/lib/canonical-shadow-extractor";
+import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,21 +54,11 @@ for (const row of sessions) {
   const result = await extractCanonicalShadow(
     {
       id: row.id,
-      user_id: "",
       title: row.title ?? "",
       cv_text: row.cv_text,
       job_description: row.job_description,
-      cv_analysis: null,
-      interview_strategy: null,
       preparation_language: "en",
-      preparation_purpose: null,
-      interview_date: null,
-      coaching_focus: null,
-      job_description_url: null,
-      status: "diagnostic",
-      created_at: "",
-      updated_at: "",
-    },
+    } as SessionRecord,
     { captureRejectedAtomDiagnostics: true },
   );
 
