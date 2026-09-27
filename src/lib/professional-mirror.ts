@@ -247,6 +247,10 @@ export function assertProfessionalMirrorConnectionDiagnosticsMatchProduction(
   assertDiagnosticInvariant(diagnostics, atoms);
 }
 
+function optionalOverlap(a: string | undefined, b: string | undefined): boolean {
+  return Boolean(a && b && overlap(a, b));
+}
+
 function assertDiagnosticInvariant(
   diagnostics: ProfessionalMirrorConnectionDiagnostic,
   atoms: AtomicEvidence[],
@@ -269,10 +273,10 @@ function assertDiagnosticInvariant(
         right_id: atoms[j].id,
         connection_reason: connection(atoms[i], atoms[j]),
         shared_object: Boolean(atoms[i].action.object && atoms[j].action.object && overlap(atoms[i].action.object, atoms[j].action.object)),
-        shared_domain: Boolean(atoms[i].context.domain && atoms[j].context.domain && overlap(atoms[i].context.domain, atoms[j].context.domain)),
+        shared_domain: Boolean(atoms[i].context.domain && atoms[j].context.domain && optionalOverlap(atoms[i].context.domain, atoms[j].context.domain)),
         shared_tool: Boolean(atoms[i].context.tools_or_systems?.some((x) => atoms[j].context.tools_or_systems?.some((y) => overlap(x, y)))),
         shared_standard: Boolean(atoms[i].context.standards?.some((x) => atoms[j].context.standards?.some((y) => overlap(x, y)))),
-        repeated_action_with_shared_domain: Boolean(overlap(atoms[i].action.normalized_action, atoms[j].action.normalized_action) && atoms[i].context.domain && atoms[j].context.domain && overlap(atoms[i].context.domain, atoms[j].context.domain)),
+        repeated_action_with_shared_domain: Boolean(overlap(atoms[i].action.normalized_action, atoms[j].action.normalized_action) && atoms[i].context.domain && atoms[j].context.domain && optionalOverlap(atoms[i].context.domain, atoms[j].context.domain)),
       });
     }
   }
