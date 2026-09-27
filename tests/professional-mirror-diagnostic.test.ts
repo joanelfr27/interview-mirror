@@ -90,7 +90,7 @@ describe("D15 diagnostic connection oracle", () => {
         { id: "S-D", document_id: "CV", text: "Audited IFRS controls.", language: "en" },
         { id: "S-E", document_id: "CV", text: "Reconciled treasury balances.", language: "en" },
         { id: "S-F", document_id: "CV", text: "Reconciled treasury accounts.", language: "en" },
-        { id: "S-G", document_id: "CV", text: "Managed regional finance reporting.", language: "en" },
+        { id: "S-G", document_id: "CV", text: "Managed regional finance reporting for the board.", language: "en" },
       ],
       evidence: [
         atom({
@@ -133,7 +133,7 @@ describe("D15 diagnostic connection oracle", () => {
           id: "G",
           source_span_id: "S-G",
           subject: { actor: "candidate", ownership: "TEAM" },
-          action: { normalized_action: "managed", object: "regional finance reporting" },
+          action: { normalized_action: "managed", object: "regional finance reporting for the board" },
           context: { domain: "finance", tools_or_systems: ["ERP-A"], standards: ["IFRS-A"] },
         }),
       ],
