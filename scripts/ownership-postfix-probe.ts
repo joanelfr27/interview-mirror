@@ -8,6 +8,7 @@ const cases = [
   ["negative_manager_assignment", "My manager assigned this responsibility to me."],
   ["negative_predecessor", "My predecessor owned the reporting process before I joined."],
   ["adversarial_joint", "I supported my manager in building the forecast models."],
+  ["adversarial_shared", "I jointly built the forecast models with my manager."],
 ] as const;
 
 for (const [name, probe] of cases) {
