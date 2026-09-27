@@ -379,6 +379,7 @@ for (const row of chosen) {
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
+      context_population_diagnostic: result.extraction_diagnostics.context_population_by_atom_id,
       ownership_diagnostic: result.ledger.evidence
         .filter((atom) => atom.subject.ownership === "UNKNOWN")
         .map((atom) => {
