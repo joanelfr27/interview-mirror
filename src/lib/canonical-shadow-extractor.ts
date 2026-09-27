@@ -670,3 +670,9 @@ export async function extractCanonicalShadow(
     diagnostics,
   };
 }
+
+
+/** Temporary D16 mechanical probe; remove after Track-B instrument check. */
+export async function diagnosticExtractAtomsProbe(cv: string): Promise<RawCandidateAtom[]> {
+  return extractAtoms(cv);
+}
