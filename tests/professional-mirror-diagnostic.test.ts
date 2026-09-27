@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  assertProfessionalMirrorConnectionDiagnosticsMatchProduction,
+  diagnoseProfessionalMirrorConnections,
   diagnosticConnectionReason,
   diagnosticSignalOverlap,
 } from "@/lib/professional-mirror";
