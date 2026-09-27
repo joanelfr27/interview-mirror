@@ -237,8 +237,11 @@ if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
 const seenJd = new Set<string>();
+const targetSessionCount = sessionFingerprintFilter.size > 0
+  ? sessionFingerprintFilter.size
+  : requestedSessionCount;
 
-for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
+for (let offset = 0; chosen.length < targetSessionCount; offset += 500) {
   let sessionQuery = supabase
     .from("sessions")
     .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
@@ -263,14 +266,14 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
     seenCv.add(cvKey);
     seenJd.add(jdKey);
     chosen.push(row);
-    if (chosen.length === requestedSessionCount) break;
+    if (chosen.length === targetSessionCount) break;
   }
 
   if (data.length < 500) break;
 }
 
-if (chosen.length < requestedSessionCount) {
-  throw new Error(`Expected at least ${requestedSessionCount} distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
+if (chosen.length < targetSessionCount) {
+  throw new Error(`Expected ${targetSessionCount} targeted sessions after exhausting session history, found ${chosen.length}.`);
 }
 
 
