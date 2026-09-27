@@ -3,7 +3,7 @@ name: D16 Unprivileged Gates
 on:
   push:
     branches:
-      - d16-shadow-runtime-integration
+      - d16-integration
   pull_request:
     branches:
       - audit-version
