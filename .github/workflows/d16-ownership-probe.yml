@@ -1,0 +1,28 @@
+name: D16 Ownership Mechanical Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 31252c7bdb08c650cc28fcd32da1e333328ec990
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: D16 isolated ownership mechanical probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D16_OWNERSHIP_PROMPT_PROBE: "1"
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-mechanical-probe.ts
