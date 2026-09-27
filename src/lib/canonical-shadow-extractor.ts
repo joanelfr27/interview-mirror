@@ -126,11 +126,19 @@ const CANDIDATE_SCHEMA = {
 } as const;
 
 export const OWNERSHIP_EXTRACTION_RULE = `
-Ownership is a property of the proposition's asserted action, not of a word appearing anywhere in the quote.
-- First determine whether an explicit ownership marker attaches to the same action/proposition represented by this atom.
-- A first-person or possessive marker elsewhere in the sentence is not sufficient by itself.
+Ownership answers who explicitly performs or owns the atom's asserted action. Assertion type is a separate field and does not determine ownership.
+
+- First determine the actor of the asserted action represented by this atom.
+- If the candidate is explicitly the actor/owner of that action, return INDIVIDUAL.
+- A first-person subject or possessive marker that is directly attached to the asserted action is explicit candidate ownership evidence. Examples:
+  - "I built financial models." -> INDIVIDUAL
+  - "I managed the forecasting process." -> INDIVIDUAL
+  - "J'ai construit des modèles de forecast." -> INDIVIDUAL
+  - "J'ai piloté le processus budgétaire." -> INDIVIDUAL
+- A RESPONSIBILITY assertion can still have INDIVIDUAL ownership. Do not use assertion_type as a reason to return UNKNOWN.
+- A first-person or possessive marker elsewhere in the sentence is not sufficient by itself. The marker must identify the candidate as the actor/owner of the asserted action.
 - Do NOT treat phrases such as "my manager", "my predecessor", or "my colleague" as candidate ownership merely because they contain "my".
-- Do NOT treat an assignment or reporting relationship such as "my manager assigned this responsibility to me" as INDIVIDUAL ownership unless the quote explicitly establishes that the candidate owned the asserted action.
+- Do NOT treat an assignment or reporting relationship such as "my manager assigned this responsibility to me" as INDIVIDUAL ownership: "me" is the recipient of the assignment, not the actor/owner of the asserted action, unless the quote explicitly establishes candidate ownership.
 - When an explicit ownership marker genuinely attaches to the atom's asserted action, preserve that ownership signal; otherwise return UNKNOWN.
 - Do not infer ownership from job titles, managerial titles, grammatical proximity alone, or typical responsibilities.
 - Do not invent or upgrade ownership beyond what the quote explicitly establishes.
