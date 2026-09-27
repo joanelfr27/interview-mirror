@@ -62,7 +62,6 @@ for (const row of sessions) {
       preparation_language: "en",
     } as SessionRecord,
     {
-      captureRejectedAtomDiagnostics: true,
       captureExtractionReproducibility: true,
     },
   );
@@ -85,7 +84,6 @@ for (const row of sessions) {
         JSON.stringify(first?.atom_ids ?? []) === JSON.stringify(second?.atom_ids ?? []),
     },
     first_run_rejected_atoms: result.diagnostics.rejected_atoms,
-    rejected_atom_diagnostics: result.diagnostics.rejected_atom_diagnostics ?? [],
   });
 }
 
