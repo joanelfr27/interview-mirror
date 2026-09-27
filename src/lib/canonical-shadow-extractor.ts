@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
@@ -184,6 +185,21 @@ const REQUIREMENT_SCHEMA = {
   required: ["requirements"]
 } as const;
 
+export type ExtractionRequestDiagnostic = Readonly<{
+  invocation: number;
+  model: string;
+  temperature: number;
+  prompt_sha256: string;
+  request_sha256: string;
+  response_sha256: string;
+  atom_ids: readonly string[];
+  atom_count: number;
+}>;
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
 function responseFormat(name: string, schema: unknown) {
   return {
     type: "json_schema" as const,
@@ -355,16 +371,13 @@ function toAtomicEvidence(
 
 async function extractAtoms(
   cv: string,
+  diagnostics?: ExtractionRequestDiagnostic[],
+  invocation = 1,
 ): Promise<RawCandidateAtom[]> {
   const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
-    model: AI_MODEL,
-    temperature: 0,
-    response_format: responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA),
-    messages: [
-      {
-        role: "system",
-        content: `You are the canonical candidate-evidence extractor for Interview Mirror.
+  const model = AI_MODEL;
+  const temperature = 0;
+  const systemContent = `You are the canonical candidate-evidence extractor for Interview Mirror.
 
 Source-language rule: preserve the language of the supplied CV in normalized fields. Do not translate, rewrite into the preparation language, or mix languages. Source quotes must remain verbatim. The preparation/product language is irrelevant to this canonical extraction layer.
 
@@ -398,18 +411,43 @@ ${OWNERSHIP_EXTRACTION_RULE}
 - Every explicit material fact in those sections that could correspond to a JD requirement must be represented by at least one atom, unless it is already represented by another atom with the same source proposition.
 - In particular, do not omit explicit years of experience, named standards (for example IFRS or SYSCOHADA), language abilities, education/credentials, or explicit location facts merely because they are not employment bullets.
 - This is a coverage requirement, not a fit judgment: do not invent facts to fill a missing category.
-`
-      },
-      {
-        role: "user",
-        content: `CV SOURCE:\n${cv}`
-      }
-    ]
+`;
+  const messages = [
+    { role: "system" as const, content: systemContent },
+    { role: "user" as const, content: `CV SOURCE:\n${cv}` },
+  ];
+  const responseFormatValue = responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA);
+  const request_sha256 = sha256(JSON.stringify({
+    model,
+    temperature,
+    response_format: responseFormatValue,
+    messages,
+  }));
+  const prompt_sha256 = sha256(JSON.stringify(messages));
+
+  const response = await openai.chat.completions.create({
+    model,
+    temperature,
+    response_format: responseFormatValue,
+    messages,
   });
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty canonical candidate extraction response.");
-  return JSON.parse(raw).atoms as RawCandidateAtom[];
+  const atoms = JSON.parse(raw).atoms as RawCandidateAtom[];
+
+  diagnostics?.push({
+    invocation,
+    model,
+    temperature,
+    prompt_sha256,
+    request_sha256,
+    response_sha256: sha256(raw),
+    atom_ids: atoms.map((atom) => atom.id),
+    atom_count: atoms.length,
+  });
+
+  return atoms;
 }
 
 async function extractRequirements(
@@ -501,8 +539,18 @@ export async function extractCanonicalShadow(
   };
 
   const contextErrors = validatePipelineContext(context);
+  const extractionRequestDiagnostics: ExtractionRequestDiagnostic[] = [];
   const [rawAtoms, rawRequirements] = await Promise.all([
-    extractAtoms(session.cv_text ?? ""),
+    (async () => {
+      const first = await extractAtoms(
+        session.cv_text ?? "",
+        options.captureExtractionReproducibility ? extractionRequestDiagnostics : undefined,
+        1,
+      );
+      if (!options.captureExtractionReproducibility) return first;
+      await extractAtoms(session.cv_text ?? "", extractionRequestDiagnostics, 2);
+      return first;
+    })(),
     extractRequirements(session.job_description ?? ""),
   ]);
 
@@ -688,6 +736,9 @@ export async function extractCanonicalShadow(
     raw_ownership_by_atom_id: Object.freeze(rawOwnershipByAtomId),
     raw_ownership_by_rejected_atom_id: Object.freeze(rawOwnershipByRejectedAtomId),
     context_population_by_atom_id: Object.freeze(contextPopulationByAtomId),
+    ...(options.captureExtractionReproducibility
+      ? { extraction_request_diagnostics: Object.freeze([...extractionRequestDiagnostics]) }
+      : {}),
   });
 
   return {
