@@ -224,8 +224,17 @@ function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normal
 
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
+const sessionFingerprintFilter = new Set(
+  (process.env.D15_RUNTIME_SESSION_FINGERPRINTS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
+);
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
+}
+if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== requestedSessionCount) {
+  throw new Error("D15_RUNTIME_SESSION_FINGERPRINTS count must match D15_RUNTIME_SESSION_COUNT.");
 }
 
 const chosen: SessionRow[] = [];
@@ -250,6 +259,8 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
 
   for (const row of data as SessionRow[]) {
     if (!row.cv_text?.trim() || !row.job_description?.trim()) continue;
+    const sessionKey = fingerprint(row.id);
+    if (sessionFingerprintFilter.size > 0 && !sessionFingerprintFilter.has(sessionKey)) continue;
     const cvKey = fingerprint(row.cv_text);
     const jdKey = fingerprint(row.job_description);
     if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
