@@ -125,6 +125,24 @@ const CANDIDATE_SCHEMA = {
   required: ["atoms"]
 } as const;
 
+export const OWNERSHIP_EXTRACTION_RULE = `
+Ownership answers who explicitly performs or owns the atom's asserted action. Assertion type is a separate field and does not determine ownership.
+
+- First determine the actor of the asserted action represented by this atom.
+- If the candidate is explicitly the actor/owner of that action, return INDIVIDUAL.
+- A first-person subject or possessive marker that is directly attached to the asserted action is explicit candidate ownership evidence. Examples:
+  - "I built financial models." -> INDIVIDUAL
+  - "I managed the forecasting process." -> INDIVIDUAL
+  - "J'ai construit des modèles de forecast." -> INDIVIDUAL
+  - "J'ai piloté le processus budgétaire." -> INDIVIDUAL
+- A RESPONSIBILITY assertion can still have INDIVIDUAL ownership. Do not use assertion_type as a reason to return UNKNOWN.
+- A first-person or possessive marker elsewhere in the sentence is not sufficient by itself. The marker must identify the candidate as the actor/owner of the asserted action.
+- Do NOT treat phrases such as "my manager", "my predecessor", or "my colleague" as candidate ownership merely because they contain "my".
+- Do NOT treat an assignment or reporting relationship such as "my manager assigned this responsibility to me" as INDIVIDUAL ownership: "me" is the recipient of the assignment, not the actor/owner of the asserted action, unless the quote explicitly establishes candidate ownership.
+- When an explicit ownership marker genuinely attaches to the atom's asserted action, preserve that ownership signal; otherwise return UNKNOWN.
+- Do not infer ownership from job titles, managerial titles, grammatical proximity alone, or typical responsibilities.
+- Do not invent or upgrade ownership beyond what the quote explicitly establishes.
+`;
 const REQUIREMENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -358,7 +376,9 @@ Hard rules:
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
 - actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
-- ownership: use INDIVIDUAL, TEAM, SHARED, or SUPERVISED only when the quote explicitly contains the corresponding ownership marker. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
+- ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
+- OWNERSHIP RULE:
+${OWNERSHIP_EXTRACTION_RULE}
 - domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied from the same source_quote when present. If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
 - Employment dates must NOT be attached to a responsibility/achievement atom unless those dates occur in that atom's source_quote. If dates are useful, create a separate employment atom whose source_quote contains the dates.
 - Never infer geography from an employer location, role location, or surrounding CV section when it is absent from the atom quote.
