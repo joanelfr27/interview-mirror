@@ -90,7 +90,7 @@ describe("D15 diagnostic connection oracle", () => {
         { id: "S-D", document_id: "CV", text: "Audited IFRS controls.", language: "en" },
         { id: "S-E", document_id: "CV", text: "Reconciled balances.", language: "en" },
         { id: "S-F", document_id: "CV", text: "Reconciled accounts.", language: "en" },
-        { id: "S-G", document_id: "CV", text: "Managed regional finance reporting.", language: "en" },
+        { id: "S-G", document_id: "CV", text: "Managed regional finance reporting across Africa and West Africa.", language: "en" },
       ],
       evidence: [
         atom({
