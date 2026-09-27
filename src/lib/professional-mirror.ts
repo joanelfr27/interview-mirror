@@ -239,6 +239,49 @@ export type ProfessionalMirrorConnectionDiagnostic = {
   }>;
 };
 
+export function assertProfessionalMirrorConnectionDiagnosticsMatchProduction(
+  ledger: EvidenceLedger,
+  diagnostics: ProfessionalMirrorConnectionDiagnostic,
+): void {
+  const atoms = independentAtoms(ledger);
+  assertDiagnosticInvariant(diagnostics, atoms);
+}
+
+function assertDiagnosticInvariant(
+  diagnostics: ProfessionalMirrorConnectionDiagnostic,
+  atoms: AtomicEvidence[],
+): void {
+  const expectedAtoms = atoms.map((atom) => ({
+    id: atom.id,
+    source_span_id: atom.source_span_id,
+    ownership: atom.subject.ownership,
+  }));
+
+  if (JSON.stringify(diagnostics.atoms) !== JSON.stringify(expectedAtoms)) {
+    throw new Error("D15 diagnostic invariant failed: atom population/order differs from production independentAtoms().");
+  }
+
+  const expectedPairs: ProfessionalMirrorConnectionDiagnostic["pairs"] = [];
+  for (let i = 0; i < atoms.length; i += 1) {
+    for (let j = i + 1; j < atoms.length; j += 1) {
+      expectedPairs.push({
+        left_id: atoms[i].id,
+        right_id: atoms[j].id,
+        connection_reason: connection(atoms[i], atoms[j]),
+        shared_object: Boolean(atoms[i].action.object && atoms[j].action.object && overlap(atoms[i].action.object, atoms[j].action.object)),
+        shared_domain: Boolean(atoms[i].context.domain && atoms[j].context.domain && overlap(atoms[i].context.domain, atoms[j].context.domain)),
+        shared_tool: Boolean(atoms[i].context.tools_or_systems?.some((x) => atoms[j].context.tools_or_systems?.some((y) => overlap(x, y)))),
+        shared_standard: Boolean(atoms[i].context.standards?.some((x) => atoms[j].context.standards?.some((y) => overlap(x, y)))),
+        repeated_action_with_shared_domain: Boolean(overlap(atoms[i].action.normalized_action, atoms[j].action.normalized_action) && atoms[i].context.domain && atoms[j].context.domain && overlap(atoms[i].context.domain, atoms[j].context.domain)),
+      });
+    }
+  }
+
+  if (JSON.stringify(diagnostics.pairs) !== JSON.stringify(expectedPairs)) {
+    throw new Error("D15 diagnostic invariant failed: pair population/order/signals/reasons differ from production connection().");
+  }
+}
+
 export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): ProfessionalMirrorConnectionDiagnostic {
   const atoms=independentAtoms(ledger);
   const diagnostics={
