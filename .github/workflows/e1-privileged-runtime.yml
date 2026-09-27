@@ -3,6 +3,10 @@ name: E1 Privileged Runtime Validation
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Trusted ref to validate after environment approval"
+        required: true
+        default: "d16-integration"
       session_count:
         description: "Number of runtime sessions to validate"
         required: true
@@ -22,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: d16-integration
+          ref: ${{ inputs.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
