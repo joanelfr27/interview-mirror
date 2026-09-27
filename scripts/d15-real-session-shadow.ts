@@ -369,6 +369,30 @@ for (const row of chosen) {
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
+      context_population_diagnostic: {
+        by_atom: result.extraction_diagnostics.context_population_by_atom_id,
+        summary: result.ledger.evidence.reduce(
+          (summary, atom) => {
+            const item = result.extraction_diagnostics.context_population_by_atom_id[atom.id];
+            if (!item) return summary;
+            summary.domain.raw_populated += Number(item.raw_domain_populated);
+            summary.domain.canonical_populated += Number(item.canonical_domain_populated);
+            summary.domain.raw_present_but_canonical_missing += Number(item.raw_domain_populated && !item.canonical_domain_populated);
+            summary.tools_or_systems.raw_populated += Number(item.raw_tools_populated);
+            summary.tools_or_systems.canonical_populated += Number(item.canonical_tools_populated);
+            summary.tools_or_systems.raw_present_but_canonical_missing += Number(item.raw_tools_populated && !item.canonical_tools_populated);
+            summary.standards.raw_populated += Number(item.raw_standards_populated);
+            summary.standards.canonical_populated += Number(item.canonical_standards_populated);
+            summary.standards.raw_present_but_canonical_missing += Number(item.raw_standards_populated && !item.canonical_standards_populated);
+            return summary;
+          },
+          {
+            domain: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            tools_or_systems: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            standards: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+          },
+        ),
+      },
       ownership_diagnostic: result.ledger.evidence
         .filter((atom) => atom.subject.ownership === "UNKNOWN")
         .map((atom) => {
