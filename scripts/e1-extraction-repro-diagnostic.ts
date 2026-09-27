@@ -41,11 +41,10 @@ if (sessions.length !== TARGET_SESSIONS.size) {
 const report = {
   mode: "E1_EXTRACTION_REPRODUCIBILITY_DIAGNOSTIC",
   privacy_scope: {
-    rejected_atoms_only: true,
-    captures_candidate_derived_prose: true,
+    captures_rejected_atom_ids_only: true,
+    captures_candidate_derived_prose: false,
     captures_prompt_or_response_content: false,
     captures_full_documents: false,
-    captures_nearest_cv_line_only_for_source_quote_mismatch: true,
     standard_runtime_report_unchanged: true,
     repeated_candidate_extraction_calls: 2,
   },
@@ -80,8 +79,11 @@ for (const row of sessions) {
       prompt_identical: first?.prompt_sha256 === second?.prompt_sha256,
       request_identical: first?.request_sha256 === second?.request_sha256,
       response_identical: first?.response_sha256 === second?.response_sha256,
-      atom_ids_identical:
+      atom_ids_identical_in_order:
         JSON.stringify(first?.atom_ids ?? []) === JSON.stringify(second?.atom_ids ?? []),
+      atom_id_sets_identical:
+        JSON.stringify([...(first?.atom_ids ?? [])].sort()) ===
+        JSON.stringify([...(second?.atom_ids ?? [])].sort()),
     },
     first_run_rejected_atoms: result.diagnostics.rejected_atoms,
   });
