@@ -1,0 +1,39 @@
+name: E1 Rejected Atom Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: d16-e1-rejected-atom-diagnostic
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+
+      - name: Capture rejected atoms for the two pinned sessions
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/e1-rejected-atom-diagnostic.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e1-rejected-atom-diagnostic
+          path: e1-rejected-atom-diagnostic-report.json
+          if-no-files-found: error
+          retention-days: 1
