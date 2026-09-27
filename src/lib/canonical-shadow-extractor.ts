@@ -436,6 +436,15 @@ Hard rules:
   return JSON.parse(raw).requirements as RawRequirement[];
 }
 
+export type CanonicalContextPopulationDiagnostic = Readonly<{
+  raw_domain_populated: boolean;
+  canonical_domain_populated: boolean;
+  raw_tools_populated: boolean;
+  canonical_tools_populated: boolean;
+  raw_standards_populated: boolean;
+  canonical_standards_populated: boolean;
+}>;
+
 export type CanonicalExtractionDiagnostics = Readonly<{
   errors: readonly string[];
   warnings: readonly string[];
@@ -448,6 +457,8 @@ export type CanonicalExtractionDiagnostics = Readonly<{
   raw_ownership_by_atom_id: Readonly<Record<string, EvidenceOwnership>>;
   /** Raw LLM ownership for raw atoms rejected before becoming canonical evidence. */
   raw_ownership_by_rejected_atom_id: Readonly<Record<string, EvidenceOwnership>>;
+  /** Privacy-safe raw-vs-canonical context population diagnostic. */
+  context_population_by_atom_id: Readonly<Record<string, CanonicalContextPopulationDiagnostic>>;
 }>;
 
 export type CanonicalShadowResult = {
@@ -624,6 +635,22 @@ export async function extractCanonicalShadow(
       .map((atom) => [atom.id, rawOwnershipByRawId[atom.id]] as const)
       .filter((entry): entry is readonly [string, EvidenceOwnership] => entry[1] !== undefined),
   );
+  const contextPopulationByAtomId = Object.fromEntries(
+    atoms.map((atom) => {
+      const raw = rawAtoms.find((candidate) => candidate.id === atom.id);
+      return [
+        atom.id,
+        {
+          raw_domain_populated: Boolean(raw?.domain?.trim()),
+          canonical_domain_populated: Boolean(atom.context.domain?.trim()),
+          raw_tools_populated: Boolean(raw?.tools_or_systems?.some((value) => value.trim())),
+          canonical_tools_populated: Boolean(atom.context.tools_or_systems?.length),
+          raw_standards_populated: Boolean(raw?.standards?.some((value) => value.trim())),
+          canonical_standards_populated: Boolean(atom.context.standards?.length),
+        } satisfies CanonicalContextPopulationDiagnostic,
+      ] as const;
+    }),
+  );
   const rawOwnershipByRejectedAtomId = Object.fromEntries(
     rejectedAtoms
       .map((id) => [id, rawOwnershipByRawId[id]] as const)
@@ -640,6 +667,7 @@ export async function extractCanonicalShadow(
     rejected_requirements: Object.freeze([...rejectedRequirements]),
     raw_ownership_by_atom_id: Object.freeze(rawOwnershipByAtomId),
     raw_ownership_by_rejected_atom_id: Object.freeze(rawOwnershipByRejectedAtomId),
+    context_population_by_atom_id: Object.freeze(contextPopulationByAtomId),
   });
 
   return {
