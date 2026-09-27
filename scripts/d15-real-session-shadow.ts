@@ -233,15 +233,14 @@ const sessionFingerprintFilter = new Set(
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
 }
+if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== requestedSessionCount) {
+  throw new Error("D15_RUNTIME_SESSION_FINGERPRINTS count must match D15_RUNTIME_SESSION_COUNT.");
+}
 
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
 const seenJd = new Set<string>();
-const targetSessionCount = sessionFingerprintFilter.size > 0
-  ? sessionFingerprintFilter.size
-  : requestedSessionCount;
-
-for (let offset = 0; chosen.length < targetSessionCount; offset += 500) {
+for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
   let sessionQuery = supabase
     .from("sessions")
     .select("id,user_id,title,cv_text,job_description,cv_analysis,interview_strategy,preparation_language,preparation_purpose,interview_date,coaching_focus,job_description_url,status,created_at,updated_at")
@@ -259,21 +258,22 @@ for (let offset = 0; chosen.length < targetSessionCount; offset += 500) {
 
   for (const row of data as SessionRow[]) {
     if (!row.cv_text?.trim() || !row.job_description?.trim()) continue;
-    if (sessionFingerprintFilter.size > 0 && !sessionFingerprintFilter.has(fingerprint(row.id))) continue;
+    const sessionKey = fingerprint(row.id);
+    if (sessionFingerprintFilter.size > 0 && !sessionFingerprintFilter.has(sessionKey)) continue;
     const cvKey = fingerprint(row.cv_text);
     const jdKey = fingerprint(row.job_description);
     if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
     seenCv.add(cvKey);
     seenJd.add(jdKey);
     chosen.push(row);
-    if (chosen.length === targetSessionCount) break;
+    if (chosen.length === requestedSessionCount) break;
   }
 
   if (data.length < 500) break;
 }
 
-if (chosen.length < targetSessionCount) {
-  throw new Error(`Expected ${targetSessionCount} targeted sessions after exhausting session history, found ${chosen.length}.`);
+if (chosen.length < requestedSessionCount) {
+  throw new Error(`Expected at least ${requestedSessionCount} distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
 }
 
 
@@ -377,6 +377,30 @@ for (const row of chosen) {
       d16_tension_requirement_ids: d16.tensions.map((tension) => tension.requirement_id),
       d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
+      context_population_diagnostic: {
+        by_atom: result.extraction_diagnostics.context_population_by_atom_id,
+        summary: result.ledger.evidence.reduce(
+          (summary, atom) => {
+            const item = result.extraction_diagnostics.context_population_by_atom_id[atom.id];
+            if (!item) return summary;
+            summary.domain.raw_populated += Number(item.raw_domain_populated);
+            summary.domain.canonical_populated += Number(item.canonical_domain_populated);
+            summary.domain.raw_present_but_canonical_missing += Number(item.raw_domain_populated && !item.canonical_domain_populated);
+            summary.tools_or_systems.raw_populated += Number(item.raw_tools_populated);
+            summary.tools_or_systems.canonical_populated += Number(item.canonical_tools_populated);
+            summary.tools_or_systems.raw_present_but_canonical_missing += Number(item.raw_tools_populated && !item.canonical_tools_populated);
+            summary.standards.raw_populated += Number(item.raw_standards_populated);
+            summary.standards.canonical_populated += Number(item.canonical_standards_populated);
+            summary.standards.raw_present_but_canonical_missing += Number(item.raw_standards_populated && !item.canonical_standards_populated);
+            return summary;
+          },
+          {
+            domain: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            tools_or_systems: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            standards: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+          },
+        ),
+      },
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
       ownership_diagnostic: result.ledger.evidence
