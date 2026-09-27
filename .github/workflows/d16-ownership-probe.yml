@@ -1,4 +1,4 @@
-name: D16 Ownership Mechanical Probe
+name: D16 Ownership Post-Fix Probe
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: f70697c9ecbc3edfa4cf1746ec3496af96f2f89e
+          ref: ca8cbdac452647d6b1a5489c8a4ef3942d083905
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -21,8 +21,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - name: D16 isolated ownership mechanical probe
+      - name: D16 seven-case post-fix ownership probe
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          D16_OWNERSHIP_PROMPT_PROBE: "1"
-        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-mechanical-probe.ts
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/ownership-postfix-probe.ts
