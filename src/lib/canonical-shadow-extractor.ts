@@ -517,6 +517,8 @@ export type CanonicalExtractionDiagnostics = Readonly<{
   raw_ownership_by_rejected_atom_id: Readonly<Record<string, EvidenceOwnership>>;
   /** Presence-only raw-vs-canonical context sidecar; never contains raw values. */
   context_population_by_atom_id: Readonly<Record<string, CanonicalContextPopulationDiagnostic>>;
+  /** Structural fingerprints for repeated candidate extraction calls; no prompt/response content is stored. */
+  extraction_request_diagnostics?: readonly ExtractionRequestDiagnostic[];
 }>;
 
 export type CanonicalShadowResult = {
@@ -528,6 +530,7 @@ export type CanonicalShadowResult = {
 
 export async function extractCanonicalShadow(
   session: SessionRecord,
+  options: { captureExtractionReproducibility?: boolean } = {},
 ): Promise<CanonicalShadowResult> {
   const language = normalizeLanguage(session.preparation_language);
   const sourceLanguage = detectSourceLanguage(session.cv_text ?? "", "");
