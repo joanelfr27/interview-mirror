@@ -168,6 +168,7 @@ describe("D15 diagnostic connection oracle", () => {
     const incompatibleOwnershipPair = diagnostics.pairs.find(
       (pair) => pair.left_id === "A" && pair.right_id === "G",
     );
+    assert.ok(incompatibleOwnershipPair);
     assert.equal(incompatibleOwnershipPair?.connection_reason, null);
   });
 
