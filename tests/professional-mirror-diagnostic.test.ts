@@ -120,13 +120,13 @@ describe("D15 diagnostic connection oracle", () => {
         atom({
           id: "E",
           source_span_id: "S-E",
-          action: { normalized_action: "reconciled", object: "treasury balances" },
+          action: { normalized_action: "reconciled", object: "cash balances" },
           context: { domain: "treasury", tools_or_systems: ["Treasury-E"], standards: ["GAAP-E"] },
         }),
         atom({
           id: "F",
           source_span_id: "S-F",
-          action: { normalized_action: "reconciled", object: "treasury accounts" },
+          action: { normalized_action: "reconciled", object: "bank accounts" },
           context: { domain: "treasury", tools_or_systems: ["Treasury-F"], standards: ["GAAP-F"] },
         }),
         atom({
