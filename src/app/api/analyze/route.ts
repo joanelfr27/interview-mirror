@@ -295,6 +295,22 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
       predicates: failure.predicates,
       inputs: inputDiagnostics,
     }));
+    if (failure.code === "ANALYSIS_RUNTIME_FAILURE") {
+      const runtimeError = error as {
+        name?: unknown;
+        status?: unknown;
+        type?: unknown;
+        code?: unknown;
+        message?: unknown;
+      };
+      console.error("[ANALYSIS RUNTIME ERROR]", JSON.stringify({
+        name: error instanceof Error ? error.name : typeof error,
+        status: typeof runtimeError.status === "number" ? runtimeError.status : undefined,
+        type: typeof runtimeError.type === "string" ? runtimeError.type : undefined,
+        code: typeof runtimeError.code === "string" ? runtimeError.code : undefined,
+        message: typeof runtimeError.message === "string" ? runtimeError.message.slice(0, 300) : undefined,
+      }));
+    }
     console.error("[ANALYSIS FAILED]", failure.code);
     throw new Error("ANALYSIS_GENERATION_FAILED");
   }
