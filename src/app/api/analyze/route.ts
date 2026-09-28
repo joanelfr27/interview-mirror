@@ -270,13 +270,7 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
   } catch (error) {
     const failure = error instanceof AnalysisFailure
       ? error
-      : new AnalysisFailure("INVALID_EVIDENCE_GROUNDED_ANALYSIS", {
-          response_present: true, response_json_parseable: true, match_score_valid: false,
-          strengths_array: false, gaps_array: false, keyword_alignment_array: false, summary_string: false,
-          focus_areas_array: false, evidence_chain_array: false, evidence_chain_nonempty: false,
-          evidence_item_shape: false, actionable_recommendations_non_generic: false, jd_grounding: false,
-          cv_grounding: false, strengths_items_valid: false, gaps_items_valid: false, focus_area_items_valid: false,
-        });
+      : new AnalysisFailure("ANALYSIS_RUNTIME_FAILURE", null);
     console.error("[ANALYSIS DIAGNOSTIC]", JSON.stringify({
       code: failure.code,
       predicates: failure.predicates,
