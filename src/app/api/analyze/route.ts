@@ -295,7 +295,7 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
       predicates: failure.predicates,
       inputs: inputDiagnostics,
     }));
-    console.error("[ANALYSIS FAILED]", code);
+    console.error("[ANALYSIS FAILED]", failure.code);
     throw new Error("ANALYSIS_GENERATION_FAILED");
   }
 }
