@@ -127,7 +127,7 @@ type AnalysisFailureCode =
 
 class AnalysisFailure extends Error {
   readonly code: AnalysisFailureCode;
-  readonly predicates: AnalysisDiagnosticPredicates;
+  readonly predicates: AnalysisDiagnosticPredicates | null;
 
   constructor(code: AnalysisFailureCode, predicates: AnalysisDiagnosticPredicates) {
     super(code);
