@@ -122,7 +122,8 @@ type AnalysisInputDiagnostics = {
 type AnalysisFailureCode =
   | "EMPTY_AI_RESPONSE"
   | "INVALID_AI_JSON"
-  | "INVALID_EVIDENCE_GROUNDED_ANALYSIS";
+  | "INVALID_EVIDENCE_GROUNDED_ANALYSIS"
+  | "ANALYSIS_RUNTIME_FAILURE";
 
 class AnalysisFailure extends Error {
   readonly code: AnalysisFailureCode;
@@ -268,12 +269,30 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
     if (!validation.valid) throw new AnalysisFailure("INVALID_EVIDENCE_GROUNDED_ANALYSIS", validation.predicates);
     return parsed;
   } catch (error) {
-    const isTypedFailure = error instanceof AnalysisFailure;
-    const code = isTypedFailure ? error.code : "ANALYSIS_RUNTIME_FAILURE";
-    const predicates = isTypedFailure ? error.predicates : null;
+    const failure = error instanceof AnalysisFailure
+      ? error
+      : new AnalysisFailure("ANALYSIS_RUNTIME_FAILURE", {
+          response_present: false,
+          response_json_parseable: false,
+          match_score_valid: false,
+          strengths_array: false,
+          gaps_array: false,
+          keyword_alignment_array: false,
+          summary_string: false,
+          focus_areas_array: false,
+          evidence_chain_array: false,
+          evidence_chain_nonempty: false,
+          evidence_item_shape: false,
+          actionable_recommendations_non_generic: false,
+          jd_grounding: false,
+          cv_grounding: false,
+          strengths_items_valid: false,
+          gaps_items_valid: false,
+          focus_area_items_valid: false,
+        });
     console.error("[ANALYSIS DIAGNOSTIC]", JSON.stringify({
-      code,
-      predicates,
+      code: failure.code,
+      predicates: failure.predicates,
       inputs: inputDiagnostics,
     }));
     console.error("[ANALYSIS FAILED]", code);
