@@ -180,7 +180,7 @@ function validateAnalysis(value: unknown, cvText: string, jobDescription: string
   predicates.evidence_chain_array = Array.isArray(a.evidenceChain);
   predicates.evidence_chain_nonempty = predicates.evidence_chain_array && a.evidenceChain.length > 0;
 
-  const generic = /\b(prepare examples|be ready|prepare for|show your|improve your|prepare simple examples|préparez des exemples|soyez prêt|améliorez votre|clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|based on the cv|à partir du cv)\b/i;
+  // Match only standalone generic recommendations. Common action verbs such as "prepare for"\n  // must not invalidate a recommendation that names the specific requirement or evidence.\n  const generic = /^(?:prepare examples|be ready|prepare simple examples|préparez des exemples|soyez prêt|clear professional story|parcours professionnel clair|elements importants|éléments importants|based on the cv|à partir du cv|connect your experience|connect your experiences|improve your skills|améliorez vos compétences|show your experience|montrez votre expérience|prepare for the interview|préparez-vous pour l entretien)\.?$/i;
   const cvSource = canonicalize(cvText);
   const jdSource = canonicalize(jobDescription);
   let evidenceItemShape = true;
