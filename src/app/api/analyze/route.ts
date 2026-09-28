@@ -292,8 +292,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
-  const rawCvText = typeof body.cvText === "string" ? body.cvText : "";
-  let rawJobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
+  const rawRequestCvText = typeof body.cvText === "string" ? body.cvText : "";
+  const rawRequestJobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
+  const rawCvText = rawRequestCvText;
+  let rawJobDescription = rawRequestJobDescription;
   let jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
   let cvDocument: IngestedDocument;
   let jobDescriptionDocument: IngestedDocument | null = null;
@@ -346,8 +348,8 @@ export async function POST(request: Request) {
 
   const inputDiagnostics: AnalysisInputDiagnostics = {
     raw_request: {
-      cv: inputFingerprint(rawCvText),
-      job_description: inputFingerprint(rawJobDescription),
+      cv: inputFingerprint(rawRequestCvText),
+      job_description: inputFingerprint(rawRequestJobDescription),
     },
     canonical: {
       cv: inputFingerprint(cvText),
