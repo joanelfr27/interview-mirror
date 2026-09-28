@@ -268,15 +268,15 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
     if (!validation.valid) throw new AnalysisFailure("INVALID_EVIDENCE_GROUNDED_ANALYSIS", validation.predicates);
     return parsed;
   } catch (error) {
-    const failure = error instanceof AnalysisFailure
-      ? error
-      : new AnalysisFailure("ANALYSIS_RUNTIME_FAILURE", null);
+    const isTypedFailure = error instanceof AnalysisFailure;
+    const code = isTypedFailure ? error.code : "ANALYSIS_RUNTIME_FAILURE";
+    const predicates = isTypedFailure ? error.predicates : null;
     console.error("[ANALYSIS DIAGNOSTIC]", JSON.stringify({
-      code: failure.code,
-      predicates: failure.predicates,
+      code,
+      predicates,
       inputs: inputDiagnostics,
     }));
-    console.error("[ANALYSIS FAILED]", failure.code);
+    console.error("[ANALYSIS FAILED]", code);
     throw new Error("ANALYSIS_GENERATION_FAILED");
   }
 }
