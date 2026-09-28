@@ -125,12 +125,14 @@ type AnalysisFailureCode =
   | "INVALID_EVIDENCE_GROUNDED_ANALYSIS";
 
 class AnalysisFailure extends Error {
-  constructor(
-    readonly code: AnalysisFailureCode,
-    readonly predicates: AnalysisDiagnosticPredicates
-  ) {
+  readonly code: AnalysisFailureCode;
+  readonly predicates: AnalysisDiagnosticPredicates;
+
+  constructor(code: AnalysisFailureCode, predicates: AnalysisDiagnosticPredicates) {
     super(code);
     this.name = "AnalysisFailure";
+    this.code = code;
+    this.predicates = predicates;
   }
 }
 
