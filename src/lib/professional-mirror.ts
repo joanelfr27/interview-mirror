@@ -108,6 +108,12 @@ export function diagnosticSignalOverlap(a: string, b: string): boolean {
   return overlap(a, b);
 }
 
+export function diagnosticSharedObjectWords(a: string, b: string): string[] {
+  const left = tokens(a);
+  const right = tokens(b);
+  return [...left].filter((token) => right.has(token) && !BROAD_OBJECT_MODIFIERS.has(token)).sort();
+}
+
 function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
   const span = spanFor(ledger, atom);
   return tokens([
