@@ -204,18 +204,18 @@ function sourceSectionAt(document: string, startOffset: number, quote: string): 
   const lineEnd = lineEndIndex >= 0 ? lineEndIndex : document.length;
   const line = document.slice(lineStart, lineEnd).trim();
 
-  if (/^[•*-]\\s+/.test(line)) return "BULLET";
+  if (/^[•*-]\s+/.test(line)) return "BULLET";
 
-  const experienceStart = document.search(/(?:^|\\n)\\s*(?:PROFESSIONAL EXPERIENCE|EXPÉRIENCE PROFESSIONNELLE)\\s*(?:\\n|$)/i);
+  const experienceStart = document.search(/(?:^|\n)\s*(?:PROFESSIONAL EXPERIENCE|EXPÉRIENCE PROFESSIONNELLE)\s*(?:\n|$)/i);
   if (experienceStart >= 0 && startOffset > experienceStart) {
     const remainder = document.slice(experienceStart);
-    const nextMajorSection = remainder.search(/\\n\\s*(?:EDUCATION|ÉDUCATION|CORE SKILLS|ADDITIONAL SKILLS|COMPÉTENCES|FORMATION|PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFIL PROFESSIONNEL)\\s*(?:\\n|$)/i);
+    const nextMajorSection = remainder.search(/\n\s*(?:EDUCATION|ÉDUCATION|CORE SKILLS|ADDITIONAL SKILLS|COMPÉTENCES|FORMATION|PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFIL PROFESSIONNEL)\s*(?:\n|$)/i);
     const experienceEnd = nextMajorSection >= 0 ? experienceStart + nextMajorSection : document.length;
     if (startOffset < experienceEnd) return "EXPERIENCE_NON_BULLET";
   }
 
   const prefix = document.slice(0, startOffset);
-  const headings = [...prefix.matchAll(/(?:^|\\n)\\s*([A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý &/\\-]{3,})\\s*(?=\\n|$)/g)]
+  const headings = [...prefix.matchAll(/(?:^|\n)\s*([A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý &/\-]{3,})\s*(?=\n|$)/g)]
     .map((match) => match[1].trim());
   const heading = headings.at(-1) ?? "";
   if (/PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFIL PROFESSIONNEL/.test(heading)) return "SUMMARY_OR_PROFILE";
