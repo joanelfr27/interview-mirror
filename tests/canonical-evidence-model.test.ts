@@ -98,6 +98,54 @@ test("multiple atoms may share one exact source span without duplicating the led
   assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
 });
 
+test("multiple requirements may share one exact JD span without duplicating the ledger span", () => {
+  const document = "Manage finance and report results to leadership.";
+  const used = new Set<string>();
+  const first = findExactSpan("JD-test", document, document, "en", used, "REQUIREMENT");
+  const second = findExactSpan("JD-test", document, document, "en", used, "REQUIREMENT");
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(second.id, first.id);
+
+  const req1: Requirement = {
+    id: "REQ-SHARED-1",
+    source_span_id: first.id,
+    normalized_requirement: "Manage finance",
+    category: "CAPABILITY",
+    salience: "CORE",
+    facets: [{ id: "F-SHARED-1", type: "FUNCTION", requirement: "Manage finance", source_span_id: first.id }],
+    extraction_confidence: 1,
+  };
+  const req2: Requirement = {
+    id: "REQ-SHARED-2",
+    source_span_id: second.id,
+    normalized_requirement: "Report results to leadership",
+    category: "RESPONSIBILITY",
+    salience: "IMPORTANT",
+    facets: [{ id: "F-SHARED-2", type: "STAKEHOLDER", requirement: "leadership", source_span_id: second.id }],
+    extraction_confidence: 1,
+  };
+  const sourceSpans = [...new Map([first, second].map((span) => [span.id, span])).values()];
+  const ledger: EvidenceLedger = {
+    source_spans: sourceSpans,
+    evidence: [],
+    requirements: [req1, req2],
+    support_judgments: [],
+    requirement_statuses: [
+      { requirement_id: req1.id, status: "UNRESOLVED" },
+      { requirement_id: req2.id, status: "UNRESOLVED" },
+    ],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+
+  assert.equal(ledger.requirements.length, 2);
+  assert.equal(ledger.source_spans.length, 1);
+  assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
+});
+
 test("requirement aggregation is deterministic", () => {
   const req = requirement();
   const direct = judgment("F-1", "DIRECT", ["A1"]);
