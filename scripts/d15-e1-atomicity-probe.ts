@@ -3,7 +3,7 @@ import {
   validateAtomicEvidence,
   validateAtomicEvidenceAgainstSource,
 } from "@/lib/canonical-evidence-model.ts";
-import type { SessionRecord } from "@/types.ts";
+import type { SessionRecord } from "@/types";
 
 type ProbeCase = {
   id: string;
@@ -116,15 +116,15 @@ for (const probeCase of CASES) {
         : ["source span missing"];
 
       const actionTokensInObject = objectContainsActionToken(
-        atom.normalized_action,
-        atom.object,
+        atom.action.normalized_action,
+        atom.action.object,
       );
 
       return {
         atom_id: atom.id,
         source_quote: span?.text ?? null,
-        verb: atom.normalized_action,
-        object: atom.object,
+        verb: atom.action.normalized_action,
+        object: atom.action.object,
         grounding: groundingErrors.length === 0 ? "PASS" : "FAIL",
         grounding_errors: groundingErrors,
         action_tokens_found_in_object: actionTokensInObject,
