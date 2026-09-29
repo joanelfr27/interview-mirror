@@ -208,17 +208,6 @@ function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
-function diagnosticSourceSection(document: string, span: { text: string; start_offset: number }): string {
-  const quote = span.text.trim();
-  if (/^[•*-]\s+/.test(quote)) return "BULLET";
-  const prefix = document.slice(0, span.start_offset);
-  const headings = [...prefix.matchAll(/(^|\\n)\\s*([A-Z][A-Z &/\\-]{3,})\\s*(?=\\n|$)/g)].map((match) => match[2].trim());
-  const heading = headings.at(-1) ?? "";
-  if (/PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFILE PROFESSIONNEL/.test(heading)) return "SUMMARY_OR_PROFILE";
-  if (/CORE SKILLS|ADDITIONAL SKILLS/.test(heading)) return "SKILLS";
-  if (/PROFESSIONAL EXPERIENCE|EXPÉRIENCE PROFESSIONNELLE/.test(heading)) return "EXPERIENCE_NON_BULLET";
-  return heading || "UNKNOWN_SECTION";
-}
 function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
   return {
     version: "rcm-v1",
