@@ -49,6 +49,7 @@ jobs:
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
           D15_RUNTIME_SESSION_FINGERPRINTS: ${{ inputs.session_fingerprints }}
           D15_GOLD_DIAGNOSTICS: "true"
+          E1_PROBE_DIAGNOSTICS: "true"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
       - name: Verify D15-D16 runtime report exists
         if: always()
