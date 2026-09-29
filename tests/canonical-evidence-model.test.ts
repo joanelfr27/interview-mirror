@@ -98,6 +98,31 @@ test("multiple atoms may share one exact source span without duplicating the led
   assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
 });
 
+test("source section detection classifies bullets, experience prose, summary, and skills", () => {
+  const document = [
+    "PROFESSIONAL SUMMARY",
+    "Finance leader with regional experience.",
+    "",
+    "PROFESSIONAL EXPERIENCE",
+    "Finance Manager at Example SA",
+    "• Managing accounting systems",
+    "",
+    "CORE SKILLS",
+    "Financial reporting",
+  ].join("\n");
+  const used = new Set<string>();
+
+  const summary = findExactSpan("CV-sections", document, "Finance leader with regional experience.", "en", used, "ATOM");
+  const experience = findExactSpan("CV-sections", document, "Finance Manager at Example SA", "en", used, "ATOM");
+  const bullet = findExactSpan("CV-sections", document, "• Managing accounting systems", "en", used, "ATOM");
+  const skills = findExactSpan("CV-sections", document, "Financial reporting", "en", used, "ATOM");
+
+  assert.equal(bullet?.source_section, "BULLET");
+  assert.equal(experience?.source_section, "EXPERIENCE_NON_BULLET");
+  assert.equal(summary?.source_section, "SUMMARY_OR_PROFILE");
+  assert.equal(skills?.source_section, "SKILLS");
+});
+
 test("multiple requirements may share one exact JD span without duplicating the ledger span", () => {
   const document = "Manage finance and report results to leadership.";
   const used = new Set<string>();
