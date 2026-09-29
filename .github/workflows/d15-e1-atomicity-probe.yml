@@ -1,0 +1,41 @@
+name: D15 E1 Atomicity Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Canonical test suite
+        run: npm run test:canonical
+
+      - name: Build
+        run: npm run build
+
+      - name: Run real-runtime atomicity probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-e1-atomicity-probe.ts
