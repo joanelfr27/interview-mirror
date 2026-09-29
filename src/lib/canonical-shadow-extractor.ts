@@ -255,6 +255,22 @@ function findExactSpan(
     cursor = index + Math.max(1, target.length);
   }
 
+  // Multiple atomic propositions may legitimately be grounded in the same
+  // exact source sentence. Prefer an unused occurrence above, but if every
+  // exact occurrence is already claimed, reuse the first exact position.
+  const reusedIndex = document.indexOf(target);
+  if (reusedIndex >= 0) {
+    return {
+      id: `SPAN-${documentId}-${spanKind}-${reusedIndex}-${reusedIndex + target.length}`,
+      document_id: documentId,
+      text: target,
+      start_offset: reusedIndex,
+      end_offset: reusedIndex + target.length,
+      language,
+      source_section: sourceSectionAt(document, reusedIndex, target),
+    };
+  }
+
   return null;
 }
 
@@ -584,7 +600,9 @@ export async function extractCanonicalShadow(
       continue;
     }
 
-    sourceSpans.push(span);
+    if (!sourceSpans.some((existing) => existing.id === span.id)) {
+      sourceSpans.push(span);
+    }
     atoms.push(atom);
   }
 
