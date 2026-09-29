@@ -544,9 +544,23 @@ test("normalized action grounding accepts case-only differences but rejects a di
 
   assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
 
-  evidence.action.normalized_action = "Managed";
+  evidence.action.normalized_action = "maintain";
   const errors = validateAtomicEvidenceAgainstSource(evidence, span);
   assert.ok(errors.some(e => e.includes("action.normalized_action is not grounded")));
+
+  const french = atom("A2");
+  french.action.normalized_action = "Organisait";
+  french.action.object = "leur résolution";
+  french.subject.ownership = "UNKNOWN";
+  const frenchSpan = {
+    id: "span-A2",
+    document_id: "CV",
+    text: "Coordonnait les incidents et organisait leur résolution.",
+    start_offset: 0,
+    end_offset: 53,
+    language: "fr",
+  };
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(french, frenchSpan), []);
 });
 
 test("field-level grounding rejects an invented structured outcome despite an exact source quote", () => {
