@@ -596,7 +596,10 @@ export async function extractCanonicalShadow(
 
     if (atomErrors.length) {
       rejectedAtoms.push(raw.id);
-      errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}`));
+      const probeDiagnostic = process.env.E1_PROBE_DIAGNOSTICS === "true"
+        ? ` Probe raw normalized_action: ${JSON.stringify(raw.normalized_action)}; canonical normalized_action: ${JSON.stringify(canonicalRaw.normalized_action)}; object: ${JSON.stringify(canonicalRaw.object)}; source_quote: ${JSON.stringify(raw.source_quote)}.`
+        : "";
+      errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}${probeDiagnostic}`));
       continue;
     }
 
