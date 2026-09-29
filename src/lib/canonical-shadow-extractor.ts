@@ -224,7 +224,7 @@ function sourceSectionAt(document: string, startOffset: number, quote: string): 
   return "UNKNOWN_SECTION";
 }
 
-function findExactSpan(
+export function findExactSpan(
   documentId: string,
   document: string,
   quote: string,
