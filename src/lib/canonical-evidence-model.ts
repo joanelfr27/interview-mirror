@@ -16,6 +16,12 @@ export type EvidenceSourceType =
   | "CV" | "LINKEDIN" | "APPLICATION" | "CANDIDATE_ELICITED"
   | "INTERVIEW_TRANSCRIPT" | "USER_EDITED";
 export type EvidenceLanguage = "en" | "fr" | string;
+export type EvidenceSourceSection =
+  | "BULLET"
+  | "SUMMARY_OR_PROFILE"
+  | "SKILLS"
+  | "EXPERIENCE_NON_BULLET"
+  | "UNKNOWN_SECTION";
 export type EvidenceOwnership = "INDIVIDUAL" | "TEAM" | "SHARED" | "SUPERVISED" | "UNKNOWN";
 export type AssertionType =
   | "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT"
@@ -35,6 +41,7 @@ export type SourceSpan = {
   start_offset: number;
   end_offset: number;
   language: EvidenceLanguage;
+  source_section?: EvidenceSourceSection;
 };
 
 export type AtomicEvidence = {
