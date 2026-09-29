@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spanWithinParent } from "../src/lib/canonical-shadow-extractor.ts";
+import { findExactSpan, spanWithinParent } from "../src/lib/canonical-shadow-extractor.ts";
 import {
   aggregateRequirementStatus,
   validateAtomicEvidence,
@@ -66,6 +66,37 @@ function judgment(facet_id: string, status: SupportJudgment["status"], ids: stri
     support_basis: "DOCUMENTED",
   };
 }
+
+
+
+test("multiple atoms may share one exact source span without duplicating the ledger span", () => {
+  const document = "Booked travel and maintained calendars for managers.";
+  const used = new Set<string>();
+  const first = findExactSpan("CV-test", document, document, "en", used, "ATOM");
+  const second = findExactSpan("CV-test", document, document, "en", used, "ATOM");
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(second.id, first.id);
+
+  const firstAtom = { ...atom("A1"), source_span_id: first.id };
+  const secondAtom = { ...atom("A2"), source_span_id: second.id };
+  const sourceSpans = [...new Map([first, second].map((span) => [span.id, span])).values()];
+  const ledger: EvidenceLedger = {
+    source_spans: sourceSpans,
+    evidence: [firstAtom, secondAtom],
+    requirements: [],
+    support_judgments: [],
+    requirement_statuses: [],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+
+  assert.equal(ledger.evidence.length, 2);
+  assert.equal(ledger.source_spans.length, 1);
+  assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
+});
 
 test("requirement aggregation is deterministic", () => {
   const req = requirement();
