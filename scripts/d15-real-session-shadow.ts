@@ -498,7 +498,7 @@ for (const row of chosen) {
   }
 }
 
-function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_atoms: string[] }) {
+function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_atoms: ReadonlyArray<string> }) {
   const attempted = diagnostics.candidate_atom_count + diagnostics.rejected_atoms.length;
   return {
     attempted_atom_count: attempted,
