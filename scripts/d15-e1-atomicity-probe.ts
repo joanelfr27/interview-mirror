@@ -41,6 +41,9 @@ const CASES: ProbeCase[] = [
 
 const RUNS_PER_CASE = 3;
 
+// Probe-only: expose rejected candidate source quotes without changing production diagnostics.
+process.env.E1_PROBE_DIAGNOSTICS = "true";
+
 function normalizedTokens(value: string): string[] {
   return value
     .normalize("NFKC")
