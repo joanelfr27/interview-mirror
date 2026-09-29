@@ -561,7 +561,10 @@ export async function extractCanonicalShadow(
     const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
-      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
+      const probeDiagnostic = process.env.E1_PROBE_DIAGNOSTICS === "true"
+        ? ` Rejected source_quote: ${JSON.stringify(raw.source_quote)}.`
+        : "";
+      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.${probeDiagnostic}`);
       continue;
     }
 
