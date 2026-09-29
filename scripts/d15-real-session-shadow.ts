@@ -239,7 +239,6 @@ if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== reque
 
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
-const seenJd = new Set<string>();
 for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
   let sessionQuery = supabase
     .from("sessions")
@@ -261,10 +260,8 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
     const sessionKey = fingerprint(row.id);
     if (sessionFingerprintFilter.size > 0 && !sessionFingerprintFilter.has(sessionKey)) continue;
     const cvKey = fingerprint(row.cv_text);
-    const jdKey = fingerprint(row.job_description);
-    if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
+    if (seenCv.has(cvKey)) continue;
     seenCv.add(cvKey);
-    seenJd.add(jdKey);
     chosen.push(row);
     if (chosen.length === requestedSessionCount) break;
   }
@@ -273,7 +270,7 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
 }
 
 if (chosen.length < requestedSessionCount) {
-  throw new Error(`Expected at least ${requestedSessionCount} distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
+  throw new Error(`Expected at least ${requestedSessionCount} distinct CV sessions after exhausting session history, found ${chosen.length}.`);
 }
 
 
