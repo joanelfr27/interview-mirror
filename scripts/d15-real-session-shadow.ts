@@ -356,6 +356,7 @@ for (const row of chosen) {
       outcome: "PASS",
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
+      e1_atom_rejection: rejectionRate(result.extraction_diagnostics),
       evidence_with_domain: domains.length,
       evidence_domain_rate: result.ledger.evidence.length
         ? Number((domains.length / result.ledger.evidence.length).toFixed(3))
@@ -489,11 +490,22 @@ for (const row of chosen) {
       ...(caught instanceof CanonicalShadowExtractionEarlyReturnError
         ? {
             extraction_diagnostics: caught.extraction,
+            e1_atom_rejection: rejectionRate(caught.extraction),
             extraction_early_return_reasons: caught.reasons,
           }
         : {}),
     });
   }
+}
+
+function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_atoms: string[] }) {
+  const attempted = diagnostics.candidate_atom_count + diagnostics.rejected_atoms.length;
+  return {
+    attempted_atom_count: attempted,
+    accepted_atom_count: diagnostics.candidate_atom_count,
+    rejected_atom_count: diagnostics.rejected_atoms.length,
+    rejected_atom_rate: attempted ? Number((diagnostics.rejected_atoms.length / attempted).toFixed(3)) : 0,
+  };
 }
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
