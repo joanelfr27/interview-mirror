@@ -42,6 +42,17 @@ export type ProfessionalMirror = {
 const GENERIC_TOKENS = new Set([
   "team","teams","process","processes","system","systems","data","work","business","project","projects",
   "function","functions","area","areas","role","roles","group","groups","activity","activities","person","persons",
+  "equipe","equipes","équipe","équipes","processus","systeme","systemes","système","systèmes",
+  "projet","projets","fonction","fonctions","groupe","groupes","activite","activites","activité","activités",
+  "personne","personnes",
+]);
+
+const FUNCTION_STOP_WORDS = new Set([
+  "with","from","into","during","through","over","under","upon","between","among","within","without",
+  "about","after","before","across","around","toward","towards","such","than","then","this","that",
+  "their","they","them","your","our","have","been","were","will","would","could","should",
+  "dans","pour","avec","leur","leurs","sans","sous","entre","parmi","chez","vers","depuis","après",
+  "avant","pendant","durant","selon","comme","cette","cette","ceux","elles","elle","nous","vous",
 ]);
 
 const BROAD_OBJECT_MODIFIERS = new Set([
@@ -77,7 +88,8 @@ function tokens(value: string): Set<string> {
         const isStandardToken = normalized.length >= 4;
 
         return (isStandardToken || isNumeric || isShortProfessionalToken)
-          && !GENERIC_TOKENS.has(normalized);
+          && !GENERIC_TOKENS.has(normalized)
+          && !FUNCTION_STOP_WORDS.has(normalized);
       })
       .map(({ normalized }) => normalized),
   );
@@ -106,6 +118,12 @@ function objectOverlap(a: string, b: string): boolean {
 
 export function diagnosticSignalOverlap(a: string, b: string): boolean {
   return overlap(a, b);
+}
+
+export function diagnosticSharedObjectWords(a: string, b: string): string[] {
+  const left = tokens(a);
+  const right = tokens(b);
+  return [...left].filter((token) => right.has(token) && !BROAD_OBJECT_MODIFIERS.has(token)).sort();
 }
 
 function claimTokens(ledger: EvidenceLedger, atom: AtomicEvidence): Set<string> {
@@ -263,7 +281,7 @@ export function assertProfessionalMirrorConnectionDiagnosticsMatchProduction(
   diagnostics: ProfessionalMirrorConnectionDiagnostic,
 ): void {
   const atoms = independentAtoms(ledger);
-  assertDiagnosticInvariant(diagnostics, atoms);
+  assertDiagnosticInvariant(diagnostics, atoms, ledger);
 }
 
 function optionalOverlap(a: string | undefined, b: string | undefined): boolean {
@@ -273,6 +291,7 @@ function optionalOverlap(a: string | undefined, b: string | undefined): boolean 
 function assertDiagnosticInvariant(
   diagnostics: ProfessionalMirrorConnectionDiagnostic,
   atoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
 ): void {
   const expectedAtoms = atoms.map((atom) => ({
     id: atom.id,
@@ -290,7 +309,12 @@ function assertDiagnosticInvariant(
       expectedPairs.push({
         left_id: atoms[i].id,
         right_id: atoms[j].id,
-        connection_reason: connection(atoms[i], atoms[j]),
+        connection_reason:
+          atoms[i].source_span_id && atoms[j].source_span_id &&
+          [spanFor(ledger, atoms[i])?.source_section, spanFor(ledger, atoms[j])?.source_section]
+            .includes("EXPERIENCE_NON_BULLET")
+            ? null
+            : connection(atoms[i], atoms[j]),
         shared_object: Boolean(atoms[i].action.object && atoms[j].action.object && overlap(atoms[i].action.object, atoms[j].action.object)),
         shared_domain: Boolean(atoms[i].context.domain && atoms[j].context.domain && optionalOverlap(atoms[i].context.domain, atoms[j].context.domain)),
         shared_tool: Boolean(atoms[i].context.tools_or_systems?.some((x) => atoms[j].context.tools_or_systems?.some((y) => overlap(x, y)))),
@@ -324,7 +348,11 @@ export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): P
     diagnostics.pairs.push({
       left_id:left.id,
       right_id:right.id,
-      connection_reason:diagnosticConnectionReason(left,right),
+      connection_reason:
+        [spanFor(ledger, left)?.source_section, spanFor(ledger, right)?.source_section]
+          .includes("EXPERIENCE_NON_BULLET")
+          ? null
+          : diagnosticConnectionReason(left,right),
       shared_object:Boolean(left.action.object && right.action.object && diagnosticSignalOverlap(left.action.object,right.action.object)),
       shared_domain:Boolean(left.context.domain&&right.context.domain&&diagnosticSignalOverlap(left.context.domain,right.context.domain)),
       shared_tool:Boolean(left.context.tools_or_systems?.some(x=>right.context.tools_or_systems?.some(y=>diagnosticSignalOverlap(x,y)))),
@@ -351,12 +379,19 @@ function safeLabel(atom: AtomicEvidence): string {
   return [ownership, atom.action.normalized_action, atom.action.object].filter(Boolean).join(" ").trim();
 }
 
-function buildThreads(atoms: AtomicEvidence[]): CareerThread[] {
+function buildThreads(ledger: EvidenceLedger, atoms: AtomicEvidence[]): CareerThread[] {
   const adjacency = new Map<string, Array<{ id: string; reason: CareerThread["connection_reason"] }>>();
   for (const atom of atoms) adjacency.set(atom.id, []);
 
   for (let i = 0; i < atoms.length; i += 1) {
     for (let j = i + 1; j < atoms.length; j += 1) {
+      const leftSpan = spanFor(ledger, atoms[i]);
+      const rightSpan = spanFor(ledger, atoms[j]);
+      if (
+        leftSpan?.source_section === "EXPERIENCE_NON_BULLET" ||
+        rightSpan?.source_section === "EXPERIENCE_NON_BULLET"
+      ) continue;
+
       const reason = connection(atoms[i], atoms[j]);
       if (!reason) continue;
       adjacency.get(atoms[i].id)?.push({ id: atoms[j].id, reason });
@@ -417,7 +452,12 @@ export function buildProfessionalMirror(ledger: EvidenceLedger): ProfessionalMir
     return span ? [{ evidence_id: atom.id, source_span_id: span.id, source_quote: span.text, source_type: atom.provenance.source_type }] : [];
   });
 
-  const threads = buildThreads(atoms);
+  // Role-overview lines remain canonical evidence/facts for traceability, but do not
+  // participate in D15 thread construction or maturity.
+  const threadAtoms = atoms.filter(
+    (atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET",
+  );
+  const threads = buildThreads(ledger, threadAtoms);
   const statements: MirrorStatement[] = [];
 
   for (const atom of atoms) {

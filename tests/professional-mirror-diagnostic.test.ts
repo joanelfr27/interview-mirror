@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   assertProfessionalMirrorConnectionDiagnosticsMatchProduction,
   diagnoseProfessionalMirrorConnections,
+  buildProfessionalMirror,
   diagnosticConnectionReason,
   diagnosticSignalOverlap,
 } from "@/lib/professional-mirror";
@@ -169,6 +170,55 @@ describe("D15 diagnostic connection oracle", () => {
       (pair) => pair.left_id === "A" && pair.right_id === "G",
     );
     assert.equal(incompatibleOwnershipPair?.connection_reason, null);
+  });
+
+
+  it("drops English/French function words while preserving substantive nouns", () => {
+    assert.equal(diagnosticSignalOverlap("with", "with"), false);
+    assert.equal(diagnosticSignalOverlap("with marketing", "with colleagues"), false);
+    assert.equal(diagnosticSignalOverlap("avec", "avec"), false);
+    assert.equal(diagnosticSignalOverlap("avec fournisseurs", "avec clients"), false);
+    assert.equal(diagnosticSignalOverlap("office database", "office supplies"), true);
+  });
+
+  it("keeps role-overview evidence traceable but prevents it from creating D15 edges", () => {
+    const ledger = {
+      source_spans: [
+        {
+          id: "S1",
+          document_id: "CV-1",
+          text: "Responsible for accounting systems.",
+          language: "en",
+          source_section: "EXPERIENCE_NON_BULLET",
+        },
+        {
+          id: "S2",
+          document_id: "CV-1",
+          text: "Managed accounting systems.",
+          language: "en",
+          source_section: "BULLET",
+        },
+      ],
+      evidence: [
+        atom({
+          id: "A",
+          source_span_id: "S1",
+          action: { normalized_action: "Responsible", object: "accounting systems" },
+        }),
+        atom({
+          id: "B",
+          source_span_id: "S2",
+          action: { normalized_action: "Managed", object: "accounting systems" },
+        }),
+      ],
+      requirements: [],
+      facets: [],
+    } as any;
+
+    const mirror = buildProfessionalMirror(ledger);
+    assert.equal(mirror.evidence.length, 2);
+    assert.equal(mirror.threads.length, 0);
+    assert.equal(mirror.statements.filter((statement) => statement.kind === "FACT").length, 2);
   });
 
 });
