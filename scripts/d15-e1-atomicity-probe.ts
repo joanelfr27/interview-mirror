@@ -164,6 +164,8 @@ for (const probeCase of CASES) {
       expected_atom_count: probeCase.expectedAtomCount,
       atom_count: atoms.length,
       rejected_atoms: extraction.diagnostics.rejected_atoms,
+      warnings: extraction.diagnostics.warnings,
+errors: extraction.diagnostics.errors,
       rejection_rate:
         extraction.diagnostics.candidate_atom_count +
           extraction.diagnostics.rejected_atoms.length >
