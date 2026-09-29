@@ -174,9 +174,10 @@ describe("D15 diagnostic connection oracle", () => {
 
 
   it("drops English/French function words while preserving substantive nouns", () => {
-    assert.equal(diagnosticSignalOverlap("with marketing colleagues", "with project colleagues"), true);
     assert.equal(diagnosticSignalOverlap("with", "with"), false);
-    assert.equal(diagnosticSignalOverlap("avec les équipes", "avec les équipes"), false);
+    assert.equal(diagnosticSignalOverlap("with marketing", "with colleagues"), false);
+    assert.equal(diagnosticSignalOverlap("avec", "avec"), false);
+    assert.equal(diagnosticSignalOverlap("avec fournisseurs", "avec clients"), false);
     assert.equal(diagnosticSignalOverlap("office database", "office supplies"), true);
   });
 
