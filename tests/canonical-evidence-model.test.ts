@@ -544,7 +544,7 @@ test("normalized action grounding accepts case-only differences but rejects a di
 
   assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
 
-  evidence.action.normalized_action = "maintain";
+  evidence.action.normalized_action = "Managed";
   const errors = validateAtomicEvidenceAgainstSource(evidence, span);
   assert.ok(errors.some(e => e.includes("action.normalized_action is not grounded")));
 
