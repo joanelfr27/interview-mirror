@@ -422,7 +422,7 @@ for (const row of chosen) {
                   evidence_id: atom.id,
                   source_span_id: atom.source_span_id,
                   source_quote: span?.text ?? "",
-                  source_section: span ? diagnosticSourceSection(row.cv_text, span) : "UNKNOWN_SECTION",
+                  source_section: span?.source_section ?? "UNKNOWN_SECTION",
                   assertion_type: atom.assertion.type,
                   action_object: atom.action.object,
                 };
