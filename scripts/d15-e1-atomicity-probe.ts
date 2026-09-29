@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { extractCanonicalShadow } from "@/lib/canonical-shadow-extractor.ts";
 import {
   validateAtomicEvidence,
