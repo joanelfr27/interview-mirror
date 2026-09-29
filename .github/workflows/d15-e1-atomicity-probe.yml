@@ -38,4 +38,5 @@ jobs:
       - name: Run real-runtime atomicity probe
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          E1_PROBE_DIAGNOSTICS: "true"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-e1-atomicity-probe.ts
