@@ -269,7 +269,10 @@ export function validateAtomicEvidenceAgainstSource(
 
   // Free-text semantic fields are deliberately fail-closed: normalization may
   // change casing/spacing, but it may not introduce facts absent from the quote.
-  requireExact("action.normalized_action", value.action.normalized_action);
+  const normalizedAction = value.action.normalized_action?.trim();
+  if (normalizedAction && !source.toLocaleLowerCase().includes(normalizedAction.toLocaleLowerCase())) {
+    errors.push("AtomicEvidence.action.normalized_action is not grounded in its source quote.");
+  }
   requireExact("action.object", value.action.object);
   requireExact("context.domain", value.context.domain);
   requireExact("context.jurisdiction", value.context.jurisdiction);
