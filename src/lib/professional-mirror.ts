@@ -281,7 +281,7 @@ export function assertProfessionalMirrorConnectionDiagnosticsMatchProduction(
   diagnostics: ProfessionalMirrorConnectionDiagnostic,
 ): void {
   const atoms = independentAtoms(ledger);
-  assertDiagnosticInvariant(diagnostics, atoms);
+  assertDiagnosticInvariant(diagnostics, atoms, ledger);
 }
 
 function optionalOverlap(a: string | undefined, b: string | undefined): boolean {
@@ -291,6 +291,7 @@ function optionalOverlap(a: string | undefined, b: string | undefined): boolean 
 function assertDiagnosticInvariant(
   diagnostics: ProfessionalMirrorConnectionDiagnostic,
   atoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
 ): void {
   const expectedAtoms = atoms.map((atom) => ({
     id: atom.id,
@@ -451,7 +452,12 @@ export function buildProfessionalMirror(ledger: EvidenceLedger): ProfessionalMir
     return span ? [{ evidence_id: atom.id, source_span_id: span.id, source_quote: span.text, source_type: atom.provenance.source_type }] : [];
   });
 
-  const threads = buildThreads(ledger, atoms);
+  // Role-overview lines remain canonical evidence/facts for traceability, but do not
+  // participate in D15 thread construction or maturity.
+  const threadAtoms = atoms.filter(
+    (atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET",
+  );
+  const threads = buildThreads(ledger, threadAtoms);
   const statements: MirrorStatement[] = [];
 
   for (const atom of atoms) {
