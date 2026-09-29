@@ -503,6 +503,27 @@ test("final requirement graph rejects incomplete facet judgments", () => {
 });
 
 
+test("normalized action grounding accepts case-only differences but rejects a different verb", () => {
+  const evidence = atom("A1");
+  evidence.action.normalized_action = "Maintained";
+  evidence.action.object = "action logs";
+  evidence.subject.ownership = "UNKNOWN";
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "Coordinated project meetings and maintained action logs.",
+    start_offset: 0,
+    end_offset: 53,
+    language: "en",
+  };
+
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
+
+  evidence.action.normalized_action = "Managed";
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("action.normalized_action is not grounded")));
+});
+
 test("field-level grounding rejects an invented structured outcome despite an exact source quote", () => {
   const evidence = atom("A1");
   evidence.outcome = "€2M savings";
