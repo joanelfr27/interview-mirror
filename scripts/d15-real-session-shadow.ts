@@ -8,6 +8,7 @@ import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import {
   diagnoseProfessionalMirrorConnections,
   diagnosticSignalOverlap,
+  diagnosticSharedObjectWords,
 } from "@/lib/professional-mirror";
 import {
   buildD16DependencySnapshot,
@@ -206,6 +207,18 @@ function buildOwnershipStratification(
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
+
+function diagnosticSourceSection(document: string, span: { text: string; start_offset: number }): string {
+  const quote = span.text.trim();
+  if (/^[•*-]\s+/.test(quote)) return "BULLET";
+  const prefix = document.slice(0, span.start_offset);
+  const headings = [...prefix.matchAll(/(^|\\n)\\s*([A-Z][A-Z &/\\-]{3,})\\s*(?=\\n|$)/g)].map((match) => match[2].trim());
+  const heading = headings.at(-1) ?? "";
+  if (/PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFILE PROFESSIONNEL/.test(heading)) return "SUMMARY_OR_PROFILE";
+  if (/CORE SKILLS|ADDITIONAL SKILLS/.test(heading)) return "SKILLS";
+  if (/PROFESSIONAL EXPERIENCE|EXPÉRIENCE PROFESSIONNELLE/.test(heading)) return "EXPERIENCE_NON_BULLET";
+  return heading || "UNKNOWN_SECTION";
+}
 function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
   return {
     version: "rcm-v1",
@@ -400,6 +413,38 @@ for (const row of chosen) {
       },
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
+      ...(process.env.D15_GOLD_DIAGNOSTICS === "true"
+        ? {
+            d15_gold_object_diagnostic: (() => {
+              const atoms = result.ledger.evidence.map((atom) => {
+                const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+                return {
+                  evidence_id: atom.id,
+                  source_span_id: atom.source_span_id,
+                  source_quote: span?.text ?? "",
+                  source_section: span ? diagnosticSourceSection(row.cv_text, span) : "UNKNOWN_SECTION",
+                  assertion_type: atom.assertion.type,
+                  action_object: atom.action.object,
+                };
+              });
+              const atomById = new Map(result.ledger.evidence.map((atom) => [atom.id, atom]));
+              const pairs = diagnoseProfessionalMirrorConnections(result.ledger).pairs
+                .filter((pair) => pair.connection_reason)
+                .map((pair) => ({
+                  left_id: pair.left_id,
+                  right_id: pair.right_id,
+                  connection_reason: pair.connection_reason,
+                  left_object: atomById.get(pair.left_id)?.action.object ?? "",
+                  right_object: atomById.get(pair.right_id)?.action.object ?? "",
+                  shared_object_words: diagnosticSharedObjectWords(
+                    atomById.get(pair.left_id)?.action.object ?? "",
+                    atomById.get(pair.right_id)?.action.object ?? "",
+                  ),
+                }));
+              return { atoms, connected_pairs: pairs };
+            })(),
+          }
+        : {}),
       ownership_diagnostic: result.ledger.evidence
         .filter((atom) => atom.subject.ownership === "UNKNOWN")
         .map((atom) => {
