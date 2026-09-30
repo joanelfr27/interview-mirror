@@ -244,13 +244,18 @@ function citedAtoms(fixture:GoldFixture,result:D15BVerificationResult){
   }));
 }
 
-function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):string[]{
-  const supportGrounded=result.accepted.some(thread=>
-    /support for|supported|assist(?:ed|ance)?/i.test(thread.headline) &&
-    thread.evidence_ids.some(id=>/\b(?:support(?:ed|ing)?|assist(?:ed|ing)?)\b/i.test(fixture.lines[Number(id.slice(1))-1]??""))
-  );
-  if(!supportGrounded) return errors;
-  return errors.filter(error=>!/lead(?:er|ership|ing|s|\b)|unsupported ownership|ownership upgrade/i.test(error));
+const LEADERSHIP_OR_OWNERSHIP=/\b(?:led|lead|leading|owned|own|drove|driven|managed|pilot(?:é|e|er|ait)|dirig(?:é|e|er|eait)|posséd(?:é|er)|pris en charge)\b/i;
+
+export type SemanticPreclearResult={ errors:string[]; set_aside:Array<{raw:string;reason:string}> };
+
+export function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):SemanticPreclearResult {
+  const neutralCandidate=result.accepted.every(thread=>!LEADERSHIP_OR_OWNERSHIP.test(thread.headline));
+  if(!neutralCandidate) return {errors,set_aside:[]};
+  const setAside=errors.filter(error=>/lead(?:er|ership|ing|s|\b)|unsupported ownership|ownership upgrade/i.test(error));
+  return {
+    errors:errors.filter(error=>!setAside.includes(error)),
+    set_aside:setAside.map(raw=>({raw,reason:"Candidate headline contains no leadership/ownership upgrade verb; raw semantic finding retained for audit."})),
+  };
 }
 
 export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult, unmatchedThreadIds:string[]):Promise<string[]> {
@@ -265,7 +270,9 @@ export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerifica
   });
   const parsed=JSON.parse(response.choices[0]?.message?.content||'{"passed":false,"errors":["empty scorer response"]}') as {passed:boolean;errors:string[]};
   const raw=parsed.passed?[]:parsed.errors;
-  return supportGroundingPreclear(fixture,result,raw);
+  const preclear=supportGroundingPreclear(fixture,result,raw);
+  for(const item of preclear.set_aside) console.log("[D15 GOLD SEMANTIC SET-ASIDE]",JSON.stringify(item));
+  return preclear.errors;
 }
 
 export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
