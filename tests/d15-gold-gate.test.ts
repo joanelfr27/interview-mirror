@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
+import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures, supportGroundingPreclear } from "@/lib/d15-gold-gate";
 import type { D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
 
 test("D15-B Gold fixtures are frozen as Nancy/Marie/David/Elena/Thomas",()=>{
@@ -157,4 +157,41 @@ test("Gold v2.1 Thomas support paraphrase creates no deterministic leadership or
   const a=assessD15BGoldDeterministically(thomas,r);
   assert.equal(a.errors.length,0);
   assert.ok(!a.errors.some(x=>/lead|ownership upgrade|unsupported ownership/i.test(x)));
+});
+
+
+test("semantic preclear sets aside false leadership finding for neutral Thomas support paraphrase",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?")]);
+  const x=supportGroundingPreclear(thomas,r,["Candidate implies leadership of the rollout."]);
+  assert.deepEqual(x.errors,[]);
+  assert.equal(x.set_aside.length,1);
+  assert.match(x.set_aside[0]!.raw,/leadership/i);
+});
+
+test("semantic preclear does not hide English leadership upgrade over support evidence",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Led the rollout of a new customer portal and collected user feedback.",["E4","E5"],"What did you personally own?")]);
+  const raw=["Candidate implies unsupported ownership/leadership of the rollout."];
+  const x=supportGroundingPreclear(thomas,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear does not hide French leadership upgrade over participation evidence",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([proposal("A","A piloté la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge ?")]);
+  const raw=["Le texte implique un leadership non étayé sur la réorganisation."];
+  const x=supportGroundingPreclear(marie,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear treats Nancy neutral Connecting wording as no ownership upgrade and retains raw set-aside",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const r=result([proposal("A","Connecting acquisition accounting with systems integration following business changes.",["E4","E5"],"What did you personally own?")]);
+  const raw=["The headline implies leadership of acquisition integration."];
+  const x=supportGroundingPreclear(nancy,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
 });
