@@ -116,6 +116,13 @@ function unsupportedProperNouns(claim: string, source: string): string[] {
   });
   return [...new Set(unsupported)];
 }
+
+function isFullyTitleCaseHeadline(value:string):boolean {
+  const words=value.match(/[\p{L}][\p{L}'’.-]*/gu) ?? [];
+  const lexical=words.filter(word=>!PROPER_NOUN_STOP_WORDS.has(normalized(word)));
+  return lexical.length>=2 && lexical.every(word=>/^\p{Lu}/u.test(word));
+}
+
 function exactNumericTokens(value: string): string[] {
   return value.match(/\b\d+(?:[.,]\d+)?\b/g) ?? [];
 }
@@ -516,6 +523,16 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
 
   for (const proposal of deterministic.accepted) {
     let workingProposal={...proposal};
+    if(isFullyTitleCaseHeadline(workingProposal.headline)){
+      const floor=deterministicHeadlineFloor(ledger,workingProposal);
+      const floorProposal={...workingProposal,headline:floor};
+      const floorErrors=deterministicProposalErrors(ledger,floorProposal);
+      if(floorErrors.length){
+        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: Title Case headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
+        continue;
+      }
+      workingProposal=floorProposal;
+    }
     let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
     if (!headline.supported) {
       const repaired=await repairHeadlineOnce(ledger,workingProposal);
