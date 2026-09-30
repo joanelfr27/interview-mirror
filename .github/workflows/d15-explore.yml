@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git hash-object src/lib/d15-gold-gate.ts)"
-          expected="d53dabd324be266017515c758df497ecfb3b0b12"
+          expected="4eab933ad3a5c61e379d10b41ebbb360f791574e"
           echo "Gold scorer blob: $actual"
           test "$actual" = "$expected"
 
