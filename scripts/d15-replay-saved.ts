@@ -32,6 +32,7 @@ async function main(){
   const deterministic=assessD15BGoldDeterministically(fixture,result);
   console.log("\\nCASE "+fixture.id);
   console.log("DETERMINISTIC",JSON.stringify(deterministic));
+  if(process.env.D15_REPLAY_DETERMINISTIC_ONLY==="1") continue;
   for(let pass=1;pass<=2;pass++){
    const raw=await semanticGoldErrors(fixture,result,deterministic.unmatched_thread_ids);
    console.log("SEMANTIC_PASS_"+pass+"_RAW",JSON.stringify(raw));
