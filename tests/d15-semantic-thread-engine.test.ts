@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
-import { buildD15BSemanticInput, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
+import { buildD15BSemanticInput, deterministicOutcomeQuestion, deterministicOwnershipQuestion, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 
 const span=(id:string,text:string)=>({id,document_id:"CV",text,start_offset:0,end_offset:text.length,language:"en"});
 const atom=(id:string,spanId:string,action:string,object:string,ownership:AtomicEvidence["subject"]["ownership"]="UNKNOWN"):AtomicEvidence=>({
@@ -193,4 +193,27 @@ test("D15-B guard spec: Nancy-style integration support headline remains accepte
   const s2=span("S2","Supported systems integration following business changes.");
   const l=ledger([atom("A1","S1","Supported","acquisition accounting and financial integration activities"),atom("A2","S2","Supported","systems integration following business changes")],[s1,s2]);
   assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Financial and systems integration support",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,1);
+});
+
+test("D15-B Thomas exact support evidence selects English ownership floor from cited atoms",()=>{
+  const s1=span("S1","Supported the rollout of a new customer portal.");
+  const s2=span("S2","Collected user feedback during the portal rollout.");
+  const l=ledger([atom("E4","S1","Supported","the rollout of a new customer portal"),atom("E5","S2","Collected","user feedback during the portal rollout")],[s1,s2]);
+  const proposal={id:"THOMAS-A",headline:"Customer portal rollout and user feedback",evidence_ids:["E4","E5"],question_back:null};
+  assert.equal(deterministicOwnershipQuestion(l,proposal),"In this work, what did you personally own or do, and what did you mainly support or assist with?");
+});
+
+test("D15-B reviewed outcome floors are exact premise-free templates in both languages",()=>{
+  const en1=span("S1","Prepared monthly sales forecasts.");
+  const en2=span("S2","Introduced a structured pipeline review.");
+  const en=ledger([atom("E2","S1","Prepared","monthly sales forecasts"),atom("E4","S2","Introduced","a structured pipeline review")],[en1,en2]);
+  const p={id:"DAVID-A",headline:"Sales forecasting and pipeline review",evidence_ids:["E2","E4"],question_back:null};
+  assert.equal(deterministicOutcomeQuestion(en,p),"Did this change anything measurable? If so, what?");
+
+  const fr1={...span("F1","Analysait les retards de livraison."),language:"fr" as const};
+  const fr2={...span("F2","Déployait de nouvelles procédures."),language:"fr" as const};
+  const a1={...atom("E5","F1","Analysait","les retards de livraison"),provenance:{source_type:"CV" as const,language:"fr" as const,extraction_method:"LLM" as const}};
+  const a2={...atom("E3","F2","Déployait","de nouvelles procédures"),provenance:{source_type:"CV" as const,language:"fr" as const,extraction_method:"LLM" as const}};
+  const fr=ledger([a1,a2],[fr1,fr2]);
+  assert.equal(deterministicOutcomeQuestion(fr,{...p,evidence_ids:["E5","E3"]}),"Cela a-t-il changé quelque chose de mesurable ? Si oui, quoi ?");
 });
