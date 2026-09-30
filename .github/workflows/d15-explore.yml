@@ -29,6 +29,10 @@ jobs:
           actual="$(git hash-object src/lib/d15-gold-gate.ts)"
           expected="90800ad5c48735d8b2743ee5bbd769419093ff15"
           echo "Gold scorer blob: $actual"
+          test_blob="$(git hash-object tests/d15-gold-gate.test.ts)"
+          expected_test_blob="747eaf58b71bcd64f4e303f4f770f0791d043421"
+          echo "Gold test blob: $test_blob"
+          test "$test_blob" = "$expected_test_blob"
           test "$actual" = "$expected"
 
       - name: Setup Node
