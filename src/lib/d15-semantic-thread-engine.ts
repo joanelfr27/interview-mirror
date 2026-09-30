@@ -84,7 +84,9 @@ function unsupportedProperNouns(claim: string, source: string): string[] {
   if (words.length === 0) return [];
 
   const first = words[0];
-  if (!first) return [];
+  if (first === undefined) {
+    throw new Error("D15 invariant violation: non-empty lexical token array has no first token");
+  }
   const firstIsCapitalized = /^\p{Lu}/u.test(first);
   if (!firstIsCapitalized || TITLE_CASE_CONNECTORS.has(normalized(first))) return [];
 
