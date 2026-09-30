@@ -1,6 +1,6 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
-import { buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
+import { buildD15BGoldLedger, d15BGoldFixtures, runD15BGoldGate } from "@/lib/d15-gold-gate";
 
 const order = ["ELENA","NANCY","MARIE","DAVID","THOMAS"] as const;
 const fixtures = [...d15BGoldFixtures()].sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
@@ -32,6 +32,14 @@ async function main(){
     }
     out.push("");
   }
+  out.push("=".repeat(72),"GOLD SCORER","=".repeat(72));
+  const gold=await runD15BGoldGate();
+  for(const item of gold){
+    out.push(`${item.fixture_id}: ${item.passed ? "PASS" : "FAIL"}`);
+    for(const error of item.deterministic_errors) out.push(`  deterministic: ${error}`);
+    for(const error of item.semantic_errors) out.push(`  semantic: ${error}`);
+  }
+  out.push("");
   const text=out.join("\n");
   mkdirSync("tmp/d15-explore",{recursive:true});
   const file=`tmp/d15-explore/${stamp}.txt`;
