@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 20
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ALLOW_REAL_OPENAI: "1"
     steps:
       - name: Checkout selected branch
         uses: actions/checkout@v4
