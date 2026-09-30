@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
+import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures, supportGroundingPreclear, semanticScopePreclear } from "@/lib/d15-gold-gate";
+import type { D15BGoldScorerInput } from "@/lib/d15-gold-gate";
 import type { D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
 
 test("D15-B Gold fixtures are frozen as Nancy/Marie/David/Elena/Thomas",()=>{
@@ -157,4 +158,178 @@ test("Gold v2.1 Thomas support paraphrase creates no deterministic leadership or
   const a=assessD15BGoldDeterministically(thomas,r);
   assert.equal(a.errors.length,0);
   assert.ok(!a.errors.some(x=>/lead|ownership upgrade|unsupported ownership/i.test(x)));
+});
+
+
+test("semantic preclear sets aside false leadership finding for neutral Thomas support paraphrase",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?")]);
+  const x=supportGroundingPreclear(thomas,r,["Candidate implies leadership of the rollout."]);
+  assert.deepEqual(x.errors,[]);
+  assert.equal(x.set_aside.length,1);
+  assert.match(x.set_aside[0]!.raw,/leadership/i);
+});
+
+test("semantic preclear does not hide English leadership upgrade over support evidence",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Led the rollout of a new customer portal and collected user feedback.",["E4","E5"],"What did you personally own?")]);
+  const raw=["Candidate implies unsupported ownership/leadership of the rollout."];
+  const x=supportGroundingPreclear(thomas,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear does not hide French leadership upgrade over participation evidence",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([proposal("A","A piloté la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge ?")]);
+  const raw=["Le texte implique un leadership non étayé sur la réorganisation."];
+  const x=supportGroundingPreclear(marie,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear treats Nancy neutral Connecting wording as no ownership upgrade and retains raw set-aside",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const r=result([proposal("A","Connecting acquisition accounting with systems integration following business changes.",["E4","E5"],"What did you personally own?")]);
+  const raw=["The headline implies leadership of acquisition integration."];
+  const x=supportGroundingPreclear(nancy,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+
+test("semantic preclear does not hide leadership upgrade carried by the question",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"How did you lead the rollout?")]);
+  const raw=["Candidate implies unsupported leadership of the rollout."];
+  const x=supportGroundingPreclear(thomas,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear upgrade boundary catches wider English and French leadership stems",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  for(const headline of ["Headed the rollout","Oversaw the rollout","Spearheaded the rollout","Orchestrated the rollout","Responsible for the rollout"]){
+    const raw=["unsupported ownership"];
+    assert.deepEqual(supportGroundingPreclear(thomas,result([proposal("A",headline,["E4"],null)]),raw).errors,raw);
+  }
+  const marie=d15BGoldFixtures()[1]!;
+  for(const headline of ["A piloté la réorganisation","Pilotait la réorganisation","Dirigeait la réorganisation","A mené la réorganisation"]){
+    const raw=["leadership non étayé"];
+    assert.deepEqual(
+      supportGroundingPreclear(marie,result([proposal("A",headline,["E8"],null)]),raw).errors,
+      raw,
+      `French upgrade must survive pre-clear: ${headline}`
+    );
+  }
+});
+
+
+test("semantic preclear does not mistake Nancy B management audience for a management verb",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const r=result([proposal("B","Connecting financial information with internal stakeholders and management.",["E8","E10"],"What decision or action changed because of the information you provided?")]);
+  const raw=["The headline implies unsupported leadership."];
+  const x=supportGroundingPreclear(nancy,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+test("semantic preclear does not mistake known or ahead for ownership or heading verbs",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  for(const headline of ["Connecting known issues with user feedback.","Working ahead of rollout with user feedback."]){
+    const raw=["Candidate implies unsupported leadership."];
+    const x=supportGroundingPreclear(thomas,result([proposal("A",headline,["E4","E5"],null)]),raw);
+    assert.deepEqual(x.errors,[]);
+    assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+  }
+});
+
+test("semantic preclear does not mistake French direction audience noun for leadership verb",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([proposal("A","Analyser les retards de livraison et présenter les causes principales à la direction.",["E5"],null)]);
+  const raw=["Le texte implique un leadership non étayé."];
+  const x=supportGroundingPreclear(marie,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+
+test("semantic preclear excludes only exact system ownership questions from upgrade scan",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const raw=["Candidate implies unsupported leadership of the rollout."];
+  const exact=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?")]);
+  assert.deepEqual(supportGroundingPreclear(thomas,exact,raw).errors,[]);
+  const presupposing=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"How did you lead the rollout?")]);
+  assert.deepEqual(supportGroundingPreclear(thomas,presupposing,raw).errors,raw);
+});
+
+
+test("semantic scope preclear sets aside full-branch contrast demand on Marie E5+E8 only",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const partial=result([
+    proposal("A","Analyser les retards de livraison et participer à la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge et à quoi avez-vous seulement participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  const raw=["Marie A requires the Déployait versus Participait contrast."];
+  assert.deepEqual(semanticScopePreclear(marie,partial,raw).errors,[]);
+  const full=result([
+    proposal("A","Analyser les retards, déployer des procédures et participer à la réorganisation.",["E5","E3","E8"],"Qu’avez-vous personnellement déployé, et à quoi avez-vous plutôt participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  assert.deepEqual(semanticScopePreclear(marie,full,raw).errors,raw);
+});
+
+test("semantic scope preclear makes Marie B SHOULD outcome criticism observational",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([
+    proposal("A","Analyser les retards de livraison et participer à la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge et à quoi avez-vous seulement participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  const raw=["Marie B fails to clarify the concrete outcome."];
+  const x=semanticScopePreclear(marie,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+test("semantic scope preclear makes Nancy A semantic criticism observational only when deterministic recall is missing",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const missing=result([
+    proposal("A","Connecting acquisition accounting with systems integration following business changes.",["E4","E5"],"What did you personally own?"),
+    proposal("B","Connecting financial information with management and internal stakeholders who use it for decisions.",["E8","E10"],null),
+  ]);
+  const raw=["Nancy A does not surface the ownership tension."];
+  assert.deepEqual(semanticScopePreclear(nancy,missing,raw).errors,[]);
+  const recovered=result([
+    proposal("A","Keeping finance operating through acquisition integration, systems integration, and accounting-process change.",["E4","E5","E6"],"What did you personally own, and what did you mainly support?"),
+    proposal("B","Connecting financial information with management and internal stakeholders who use it for decisions.",["E8","E10"],null),
+  ]);
+  assert.deepEqual(semanticScopePreclear(nancy,recovered,raw).errors,raw);
+});
+
+test("Gold v2.1 Elena accepts grounded premise-free CV-level pattern question only in genuine restraint state",()=>{
+  const elena=d15BGoldFixtures()[3]!;
+  const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
+  r.completion_state="COMPLETED_NO_QUALIFYING_RELATIONSHIP";
+  r.cv_question_back='Your CV includes “Answered incoming calls and welcomed visitors.”, “Processed routine invoices according to established procedures.” Without assuming they form one pattern, is there a recurring way of working or responsibility that connects some of these elements?';
+  assert.deepEqual(assessD15BGoldDeterministically(elena,r).errors,[]);
+});
+
+test("Gold v2.1 Elena rejects fabricated or paraphrased CV anchors",()=>{
+  const elena=d15BGoldFixtures()[3]!;
+  for(const anchor of ["Led executive office operations.","Managed incoming calls and visitors."]){
+    const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
+    r.completion_state="COMPLETED_NO_QUALIFYING_RELATIONSHIP";
+    r.cv_question_back=`Your CV includes “${anchor}”. Without assuming they form one pattern, is there a recurring way of working that connects some of these elements?`;
+    assert.ok(assessD15BGoldDeterministically(elena,r).errors.some(e=>e.includes("non-verbatim")));
+  }
+});
+
+test("Gold v2.1 Elena rejects fallback question on ALL_REJECTED or ERROR",()=>{
+  const elena=d15BGoldFixtures()[3]!;
+  for(const state of ["ALL_REJECTED","ERROR"] as const){
+    const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
+    r.completion_state=state;
+    r.cv_question_back='Your CV includes “Answered incoming calls and welcomed visitors.” Without assuming they form one pattern, is there a recurring way of working that connects some of these elements?';
+    assert.ok(assessD15BGoldDeterministically(elena,r).errors.some(e=>e.includes("genuine completed no-relationship")));
+  }
 });
