@@ -188,8 +188,9 @@ function deterministicProposalErrors(
   if (SENIORITY_ESCALATION.test(proposal.headline) && !SENIORITY_ESCALATION.test(source)) {
     errors.push("headline introduces unsupported seniority");
   }
-  if (unsupportedProperNouns(proposal.headline, source).length > 0) {
-    errors.push("headline introduces an unsupported named entity or place");
+  const unsupportedHeadlineEntities=unsupportedProperNouns(proposal.headline,source);
+  if(unsupportedHeadlineEntities.length>0){
+    errors.push(`headline introduces an unsupported named entity or place: headline=${JSON.stringify(proposal.headline)} flagged_tokens=${JSON.stringify(unsupportedHeadlineEntities)}`);
   }
 
   if (OWNERSHIP_ESCALATION.test(proposal.headline)) {
@@ -487,7 +488,7 @@ Do not ask generic ownership merely because ownership metadata is unknown. Do no
   return typeof q === "string" && q.trim() ? q.trim() : null;
 }
 
-function deterministicHeadlineFloor(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
+export function deterministicHeadlineFloor(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
   const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
   const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
   const objects=[...new Set(atoms.map(atom=>atom.object.trim()).filter(Boolean))].slice(0,3);
