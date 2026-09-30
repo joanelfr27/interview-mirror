@@ -1,5 +1,6 @@
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
 
 export type D15BSemanticThreadProposal = {
   id: string;
@@ -30,6 +31,9 @@ const OWNERSHIP_ESCALATION = /\b(led|lead|leading|owned|owner|ownership|managed|
 const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved)\b/i;
 const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
 const YEAR_OR_DURATION = /(?:\b(?:19|20)\d{2}\b|\b\d+\s*(?:years?|months?|weeks?|days?)\b)/i;
+const SCOPE_ESCALATION = /\b(global|regional|enterprise(?:-wide)?|company(?:-wide)?|group(?:-wide)?|organization(?:-wide)?|organisation(?:-wide)?|across\s+\d+\s+(?:countries|markets|teams|entities)|executive|c-suite|board)\b/i;
+const SENIORITY_ESCALATION = /\b(senior|head of|director|executive|chief|vice president|vp)\b/i;
+const PROPER_NOUN_TOKEN = /\b[A-ZÀ-ÖØ-Þ][\p{L}\p{M}'’.-]{2,}\b/gu;
 
 function supportedAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
   const spanIds = new Set(ledger.source_spans.map((span) => span.id));
@@ -64,6 +68,13 @@ function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
       ].join(" ");
     })
     .join(" ");
+}
+
+function unsupportedProperNouns(claim: string, source: string): string[] {
+  const sourceNorm = normalized(source);
+  const tokens = claim.match(PROPER_NOUN_TOKEN) ?? [];
+  return [...new Set(tokens.filter((token, index) => index > 0 || !claim.trim().startsWith(token))
+    .filter((token) => !sourceNorm.includes(normalized(token))))];
 }
 
 function threadMaturity(evidenceCount: number): MirrorMaturity {
@@ -103,6 +114,15 @@ function deterministicProposalErrors(
   }
   if (OUTCOME_ESCALATION.test(proposal.headline) && !OUTCOME_ESCALATION.test(source)) {
     errors.push("headline introduces an unsupported outcome");
+  }
+  if (SCOPE_ESCALATION.test(proposal.headline) && !SCOPE_ESCALATION.test(source)) {
+    errors.push("headline introduces unsupported scope");
+  }
+  if (SENIORITY_ESCALATION.test(proposal.headline) && !SENIORITY_ESCALATION.test(source)) {
+    errors.push("headline introduces unsupported seniority");
+  }
+  if (unsupportedProperNouns(proposal.headline, source).length > 0) {
+    errors.push("headline introduces an unsupported named entity or place");
   }
 
   if (OWNERSHIP_ESCALATION.test(proposal.headline)) {
@@ -157,6 +177,132 @@ export function verifyD15BSemanticThreadProposals(
     });
   }
 
+  return { accepted, rejected };
+}
+
+export type D15BClaimVerification = {
+  supported: boolean;
+  reason: string;
+};
+
+const PROPOSAL_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    proposals: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          headline: { type: "string" },
+          evidence_ids: { type: "array", items: { type: "string" } },
+          question_back: { anyOf: [{ type: "string" }, { type: "null" }] },
+        },
+        required: ["id", "headline", "evidence_ids", "question_back"],
+      },
+    },
+  },
+  required: ["proposals"],
+} as const;
+
+const VERIFIER_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    supported: { type: "boolean" },
+    reason: { type: "string" },
+  },
+  required: ["supported", "reason"],
+} as const;
+
+function jsonSchemaFormat(name: string, schema: unknown) {
+  return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
+}
+
+export async function proposeD15BSemanticThreads(ledger: EvidenceLedger): Promise<D15BSemanticThreadProposal[]> {
+  const input = buildD15BSemanticInput(ledger);
+  if (input.atoms.length < 2) return [];
+  const response = await getOpenAI().chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: jsonSchemaFormat("d15_b_semantic_threads", PROPOSAL_SCHEMA),
+    messages: [
+      {
+        role: "system",
+        content: `You are a bounded semantic pattern proposer for Interview Mirror D15-B.
+Use ONLY the canonical evidence atoms supplied. Do not infer from job titles, employers, typical duties, or outside knowledge.
+A thread is a recurring professional pattern supported by at least two independent evidence atoms/source spans.
+Semantic similarity is allowed even when wording differs. Lexical overlap alone is not enough.
+Never invent or upgrade ownership, outcomes, metrics, dates, duration, scale, scope, seniority, entities, places, tools, or responsibilities.
+The headline is an interpretation, never evidence. Keep it concise and faithful to the cited atoms.
+question_back may ask the candidate to clarify an uncertainty exposed by the cited evidence, but must not assert an unsupported premise.
+Cite only evidence_id values present in the input. Prefer restraint: return no proposal rather than a weak or false thread.
+Return JSON only.`,
+      },
+      { role: "user", content: JSON.stringify(input) },
+    ],
+  });
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"proposals":[]}') as { proposals?: D15BSemanticThreadProposal[] };
+  return Array.isArray(parsed.proposals) ? parsed.proposals : [];
+}
+
+function citedAtomsForVerifier(ledger: EvidenceLedger, evidenceIds: string[]) {
+  const wanted = new Set(evidenceIds);
+  return buildD15BSemanticInput(ledger).atoms.filter((atom) => wanted.has(atom.evidence_id));
+}
+
+export async function verifyD15BClaimIndependently(
+  ledger: EvidenceLedger,
+  evidenceIds: string[],
+  claim: string,
+  claimType: "HEADLINE" | "QUESTION_BACK",
+): Promise<D15BClaimVerification> {
+  const atoms = citedAtomsForVerifier(ledger, evidenceIds);
+  if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
+  const response = await getOpenAI().chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: jsonSchemaFormat("d15_b_claim_verification", VERIFIER_SCHEMA),
+    messages: [
+      {
+        role: "system",
+        content: `You are the independent D15-B claim verifier. You receive ONLY cited canonical evidence atoms and one candidate-facing claim.
+Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
+Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, or causal claims.
+For HEADLINE, semantic synthesis is allowed only when every substantive assertion is supported by the cited atoms.
+For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true.
+Return supported=false whenever uncertain. Return JSON only.`,
+      },
+      { role: "user", content: JSON.stringify({ claim_type: claimType, cited_atoms: atoms, claim }) },
+    ],
+  });
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"supported":false,"reason":"empty verifier response"}') as D15BClaimVerification;
+  return { supported: parsed.supported === true, reason: String(parsed.reason ?? "") };
+}
+
+export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promise<D15BVerificationResult> {
+  const proposed = await proposeD15BSemanticThreads(ledger);
+  const deterministic = verifyD15BSemanticThreadProposals(ledger, proposed);
+  const accepted: D15BVerifiedThread[] = [];
+  const rejected = [...deterministic.rejected];
+
+  for (const proposal of deterministic.accepted) {
+    const headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "HEADLINE");
+    if (!headline.supported) {
+      rejected.push({ proposal_id: proposal.id, reasons: [`independent headline verifier rejected: ${headline.reason}`] });
+      continue;
+    }
+    if (proposal.question_back) {
+      const question = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.question_back, "QUESTION_BACK");
+      if (!question.supported) {
+        rejected.push({ proposal_id: proposal.id, reasons: [`independent question verifier rejected: ${question.reason}`] });
+        continue;
+      }
+    }
+    accepted.push(proposal);
+  }
   return { accepted, rejected };
 }
 
