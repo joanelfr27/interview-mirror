@@ -515,25 +515,19 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     const cut=breaks.length ? breaks[breaks.length-1]! : head.lastIndexOf(" ");
     return clean.slice(0,cut>40?cut:max).trimEnd()+"…";
   };
+  // Until E1 carries an explicit role_id, use only responsibility evidence and
+  // deterministic source-position spread. Do not infer role boundaries from CV text.
   const eligibleSpans=supportedAtoms(ledger)
+    .filter(atom=>atom.assertion.type==="RESPONSIBILITY")
     .map(atom=>ledger.source_spans.find(span=>span.id===atom.source_span_id))
     .filter((span):span is NonNullable<typeof span>=>Boolean(span))
     .sort((a,b)=>(a.start_offset-b.start_offset)||a.id.localeCompare(b.id));
   const selected:typeof eligibleSpans=[];
-  const seenSections=new Set<string>();
-  for(const span of eligibleSpans){
-    const section=span.source_section ?? "UNKNOWN";
-    if(seenSections.has(section)) continue;
-    selected.push(span); seenSections.add(section);
-    if(selected.length===3) break;
-  }
-  if(selected.length<3){
-    const chosen=new Set(selected.map(span=>span.id));
-    for(const span of eligibleSpans){
-      if(chosen.has(span.id)) continue;
-      selected.push(span); chosen.add(span.id);
-      if(selected.length===3) break;
-    }
+  if(eligibleSpans.length<=3){
+    selected.push(...eligibleSpans);
+  }else{
+    const positions=[0,Math.floor((eligibleSpans.length-1)/2),eligibleSpans.length-1];
+    for(const index of [...new Set(positions)]) selected.push(eligibleSpans[index]!);
   }
   const anchorText=selected.length
     ? selected.map(span=>`“${clauseTrim(span.text)}”`).join(", ")
