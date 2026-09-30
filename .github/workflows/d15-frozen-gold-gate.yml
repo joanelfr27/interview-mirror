@@ -42,3 +42,7 @@ jobs:
         env:
           D15_REPLAY_DETERMINISTIC_ONLY: "1"
         run: npm run replay:d15:saved
+      - name: Semantic replay twice
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run replay:d15:saved
