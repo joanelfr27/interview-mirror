@@ -402,7 +402,7 @@ Reject ownership upgrades, invented outcomes, metrics, dates/durations, named en
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
 For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only professional insight value. supported=true only when combining the cited atoms reveals a useful relationship, bridge, operating pattern, or function that no single cited line states on its own. Category labels, duty summaries, paraphrases, and bundles of similar activities are false. Routine administrative bundles are false. Be strict about insight, but do not re-run factual entailment here.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
-Return supported=false whenever uncertain. Return JSON only.`,
+Reject the claim when its language differs from expected_language. Return supported=false whenever uncertain. Return JSON only.`,
       },
       { role: "user", content: JSON.stringify({ claim_type: claimType, expected_language: sourceLanguageForEvidence(ledger,evidenceIds), cited_atoms: atoms, claim }) },
     ],
@@ -482,13 +482,18 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
     }
-    const generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal) ?? deterministicOutcomeQuestion(ledger,proposal);
-    if (generatedQuestion) {
-      const questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
-      accepted.push(questionCheck.supported ? { ...proposal, question_back: generatedQuestion } : proposal);
-    } else {
-      accepted.push(proposal);
+    const preferredQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal);
+    let generatedQuestion = preferredQuestion ?? deterministicOutcomeQuestion(ledger,proposal);
+    let questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
+    if (!questionCheck.supported && preferredQuestion) {
+      generatedQuestion = deterministicOutcomeQuestion(ledger,proposal);
+      questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
     }
+    if (!questionCheck.supported) {
+      rejected.push({ proposal_id: proposal.id, reasons: [`required question verifier rejected: ${questionCheck.reason}`] });
+      continue;
+    }
+    accepted.push({ ...proposal, question_back: generatedQuestion });
   }
   return { accepted, rejected };
 }
