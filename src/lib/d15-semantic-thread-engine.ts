@@ -235,30 +235,12 @@ export function verifyD15BSemanticThreadProposals(
     });
   }
 
-  const cvLanguage=(()=>{
-    const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
-    if(languages.size!==1) return "en" as const;
-    return [...languages][0]!;
-  })();
-  const visibleCvAnchors=[...new Set(
-    supportedAtoms(ledger)
-      .map(atom=>atom.action.object?.trim())
-      .filter((value):value is string=>Boolean(value))
-  )].slice(0,3);
-  const anchorText=visibleCvAnchors.length
-    ? visibleCvAnchors.map(value=>`“${value}”`).join(", ")
-    : null;
-  const cv_question_back=accepted.length===0
-    ? (cvLanguage==="fr"
-      ? (anchorText
-        ? `Votre CV mentionne notamment ${anchorText}. Sans supposer qu'ils forment un même fil conducteur, y a-t-il une manière de travailler ou une responsabilité récurrente qui relie certains de ces éléments et que le CV ne rend pas encore explicite ?`
-        : "Sans supposer qu’un fil conducteur existe, y a-t-il une manière de travailler ou une responsabilité récurrente dans votre parcours que le CV ne rend pas encore explicite ?")
-      : (anchorText
-        ? `Your CV includes ${anchorText}. Without assuming they form one pattern, is there a recurring way of working or responsibility that connects some of these elements but is not yet explicit in the CV?`
-        : "Without assuming there is a common thread, is there a recurring way of working or responsibility in your experience that the CV does not yet make explicit?"))
-    : null;
-  return { accepted, rejected, cv_question_back };
-}
+  const completion_state:D15BVerificationResult["completion_state"]=accepted.length>0
+    ? "COMPLETED_WITH_THREADS"
+    : proposals.length===0
+      ? "COMPLETED_NO_QUALIFYING_RELATIONSHIP"
+      : "ALL_REJECTED";
+  return { accepted, rejected, cv_question_back:null, completion_state };}
 
 export type D15BClaimVerification = {
   supported: boolean;
@@ -524,10 +506,46 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     if(languages.size!==1) return "en" as const;
     return [...languages][0]!;
   })();
+
+  const clauseTrim=(text:string,max=96)=>{
+    const clean=text.replace(/\\s+/g," ").trim();
+    if(clean.length<=max) return clean;
+    const head=clean.slice(0,max+1);
+    const breaks=[...head.matchAll(/[,;:—–]|\s[-–—]\s/g)].map(m=>m.index ?? -1).filter(i=>i>=40);
+    const cut=breaks.length ? breaks[breaks.length-1]! : head.lastIndexOf(" ");
+    return clean.slice(0,cut>40?cut:max).trimEnd()+"…";
+  };
+  const eligibleSpans=supportedAtoms(ledger)
+    .map(atom=>ledger.source_spans.find(span=>span.id===atom.source_span_id))
+    .filter((span):span is NonNullable<typeof span>=>Boolean(span))
+    .sort((a,b)=>(a.start_offset-b.start_offset)||a.id.localeCompare(b.id));
+  const selected:typeof eligibleSpans=[];
+  const seenSections=new Set<string>();
+  for(const span of eligibleSpans){
+    const section=span.source_section ?? "UNKNOWN";
+    if(seenSections.has(section)) continue;
+    selected.push(span); seenSections.add(section);
+    if(selected.length===3) break;
+  }
+  if(selected.length<3){
+    const chosen=new Set(selected.map(span=>span.id));
+    for(const span of eligibleSpans){
+      if(chosen.has(span.id)) continue;
+      selected.push(span); chosen.add(span.id);
+      if(selected.length===3) break;
+    }
+  }
+  const anchorText=selected.length
+    ? selected.map(span=>`“${clauseTrim(span.text)}”`).join(", ")
+    : null;
   const cv_question_back=accepted.length===0
     ? (cvLanguage==="fr"
-      ? "Y a-t-il, dans votre expérience, un mode de travail ou une responsabilité récurrente que ces éléments du CV ne rendent pas encore visible ?"
-      : "Across your experience, is there a recurring way of working or responsibility that these CV entries do not yet make visible?")
+      ? (anchorText
+        ? `Votre CV mentionne notamment ${anchorText}. Sans supposer qu'ils forment un même fil conducteur, y a-t-il une manière de travailler ou une responsabilité récurrente qui relie certains de ces éléments ?`
+        : "Sans supposer qu’un fil conducteur existe, y a-t-il une manière de travailler ou une responsabilité récurrente qui relie certains éléments de votre parcours ?")
+      : (anchorText
+        ? `Your CV includes ${anchorText}. Without assuming they form one pattern, is there a recurring way of working or responsibility that connects some of these elements?`
+        : "Without assuming there is a common thread, is there a recurring way of working or responsibility that connects some elements of your experience?"))
     : null;
   const completion_state:D15BVerificationResult["completion_state"]=accepted.length>0
     ? "COMPLETED_WITH_THREADS"
