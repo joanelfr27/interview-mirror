@@ -84,11 +84,11 @@ function unsupportedProperNouns(claim: string, source: string): string[] {
   if (words.length === 0) return [];
 
   const first = words[0];
-  const firstIsCapitalized = /^\\p{Lu}/u.test(first);
+  const firstIsCapitalized = /^\p{Lu}/u.test(first);
   if (!firstIsCapitalized || TITLE_CASE_CONNECTORS.has(normalized(first))) return [];
 
   const second = words[1];
-  const secondIsCapitalized = second ? /^\\p{Lu}/u.test(second) : false;
+  const secondIsCapitalized = second ? /^\p{Lu}/u.test(second) : false;
   if (secondIsCapitalized) return [];
 
   return sourceNorm.includes(normalized(first)) ? [] : [first];
