@@ -1,0 +1,42 @@
+name: D15 Gold Mechanical Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Branch/ref containing the D15 Gold gate changes"
+        required: true
+        default: "d15-bounded-fixes"
+
+permissions:
+  contents: read
+
+jobs:
+  mechanical-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref }}
+
+      - name: Record exact checkout
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          git log -1 --oneline
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: D15 Gold synthetic tests
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-gold-gate.test.ts
