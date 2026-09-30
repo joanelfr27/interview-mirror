@@ -30,7 +30,8 @@ const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
   INDIVIDUAL: 3,
 };
 
-const OWNERSHIP_ESCALATION = /\b(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))\b/iu;
+const OWNERSHIP_ESCALATION = /(?<!\\p{L})(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))(?!\\p{L})/iu;
+const OWNERSHIP_PREMISE = /(?:^|[.!?]\\s*)(?:since|as|given that|because|after)\\s+you\\s+/iu;
 const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved|réduit|réduite|réduits|réduites|réduire|diminué|diminuée|amélioré|améliorée|augmenté|augmentée)\b/iu;
 const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
 const YEAR_OR_DURATION = /(?:\b(?:19|20)\d{2}\b|\b\d+\s*(?:years?|months?|weeks?|days?)\b)/i;
@@ -199,6 +200,7 @@ function deterministicProposalErrors(
     const question = proposal.question_back;
     if (unsupportedExactValues(question, source).length > 0) errors.push("question_back asserts an unsupported exact value");
     if (unsupportedProperNouns(question, source).length > 0) errors.push("question_back asserts an unsupported named entity or place");
+    if (OWNERSHIP_PREMISE.test(question) && OWNERSHIP_ESCALATION.test(question) && !OWNERSHIP_ESCALATION.test(source)) errors.push("question_back asserts unsupported ownership premise");
     // Ownership/outcome words in a question can name the unknown being elicited; the
     // independent QUESTION_BACK verifier determines whether the wording asserts a premise.
     if (SCOPE_ESCALATION.test(question) && !SCOPE_ESCALATION.test(source)) errors.push("question_back asserts unsupported scope");
