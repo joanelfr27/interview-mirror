@@ -108,6 +108,20 @@ test("D15-B rejects unsupported named entities or places",()=>{
 });
 
 
+test("D15-B guard spec: mid-sentence unsupported entity is rejected",()=>{
+  const s1=span("S1","Supported acquisition accounting and systems integration.");
+  const s2=span("S2","Supported a portal rollout.");
+  const l=ledger([atom("A1","S1","Supported","acquisition accounting and systems integration"),atom("A2","S2","Supported","a portal rollout")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Integration support with Microsoft",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,0);
+});
+
+test("D15-B guard spec: two-word unsupported entity at headline start is rejected",()=>{
+  const s1=span("S1","Supported a customer portal rollout.");
+  const s2=span("S2","Collected user feedback during rollout.");
+  const l=ledger([atom("A1","S1","Supported","a customer portal rollout"),atom("A2","S2","Collected","user feedback during rollout")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"New York portal rollout support",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,0);
+});
+
 test("D15-B shared boundary rejects contradicted evidence",()=>{
   const s1=span("S1","Managed treasury reporting.");
   const s2=span("S2","Did not manage treasury reporting.");
