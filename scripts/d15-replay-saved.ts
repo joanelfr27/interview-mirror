@@ -46,7 +46,8 @@ async function main(){
   for(const review of reviews){
    const cats=review.findings.map(x=>x.category);
    const protection=forbidden(fixture.id,cats);
-   if(protection){ console.log("PROTECTION_BROKEN:",protection); failed=true; }\n   if(fixture.id==="NANCY" && review.findings.some(x=>x.thread_id==="B" && x.category==="CORE_MEANING_MISMATCH")){ console.log("PROTECTION_BROKEN: Nancy B validity rejected"); failed=true; }
+   if(protection){ console.log("PROTECTION_BROKEN:",protection); failed=true; }
+   if(fixture.id==="NANCY" && review.findings.some(x=>x.thread_id==="B" && x.category==="CORE_MEANING_MISMATCH")){ console.log("PROTECTION_BROKEN: Nancy B validity rejected"); failed=true; }
    if(fixture.id==="NANCY"){
     for(const id of deterministic.unmatched_thread_ids){
      if(!review.unmatched_extras.some(x=>x.thread_id===id)){ console.log("PROTECTION_BROKEN: Nancy unmatched extra not explicitly classified:",id); failed=true; }
