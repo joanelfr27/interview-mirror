@@ -461,6 +461,34 @@ Do not ask generic ownership merely because ownership metadata is unknown. Do no
   return typeof q === "string" && q.trim() ? q.trim() : null;
 }
 
+function deterministicHeadlineFloor(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
+  const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
+  const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
+  const objects=[...new Set(atoms.map(atom=>atom.object.trim()).filter(Boolean))].slice(0,3);
+  if(objects.length===0) return language==="fr" ? "Éléments professionnels documentés" : "Documented professional activities";
+  return language==="fr"
+    ? `Lien documenté entre ${objects.join(" et ")}`
+    : `Documented connection between ${objects.join(" and ")}`;
+}
+
+async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThreadProposal):Promise<string|null>{
+  const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
+  const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
+  const response=await getOpenAI().chat.completions.create({
+    model:AI_MODEL,temperature:0,response_format:jsonSchemaFormat("d15_b_headline_repair",{
+      type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
+    }),
+    messages:[
+      {role:"system",content:`Repair only the presentation of an already-discovered relationship. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. Use only the cited atoms. Do not add outcomes, ownership, scale, dates, entities, seniority, causality, or responsibilities. Preserve the relationship; do not discover a new one. Return JSON only.`},
+      {role:"user",content:JSON.stringify({rejected_headline:proposal.headline,cited_atoms:atoms})},
+    ],
+  });
+  try{
+    const parsed=JSON.parse(response.choices[0]?.message?.content||"{}") as {headline?:unknown};
+    return typeof parsed.headline==="string"&&parsed.headline.trim()?parsed.headline.trim():null;
+  }catch{return null;}
+}
+
 export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promise<D15BVerificationResult> {
   const proposed = await proposeD15BSemanticThreads(ledger);
   const deterministic = verifyD15BSemanticThreadProposals(ledger, proposed);
@@ -468,34 +496,51 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   const rejected = [...deterministic.rejected];
 
   for (const proposal of deterministic.accepted) {
-    const headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "HEADLINE");
+    let workingProposal={...proposal};
+    let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
     if (!headline.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`independent headline verifier rejected: ${headline.reason}`] });
-      continue;
+      const repaired=await repairHeadlineOnce(ledger,workingProposal);
+      if(repaired){
+        const repairedProposal={...workingProposal,headline:repaired};
+        const guardErrors=deterministicProposalErrors(ledger,repairedProposal);
+        const repairedCheck=guardErrors.length ? {supported:false,reason:guardErrors.join(" | ")} : await verifyD15BClaimIndependently(ledger,proposal.evidence_ids,repaired,"HEADLINE");
+        if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; }
+      }
     }
-    const significance = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "SIGNIFICANCE");
+    if (!headline.supported) {
+      const floor=deterministicHeadlineFloor(ledger,workingProposal);
+      const floorProposal={...workingProposal,headline:floor};
+      const floorErrors=deterministicProposalErrors(ledger,floorProposal);
+      if(floorErrors.length){
+        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
+        continue;
+      }
+      workingProposal=floorProposal;
+      headline={supported:true,reason:"reviewed deterministic headline floor"};
+    }
+    const significance = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
     if (!significance.supported) {
-      const significanceConfirmation = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "SIGNIFICANCE");
+      const significanceConfirmation = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
       if (!significanceConfirmation.supported) {
         rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`] });
         continue;
       }
     }
-    if (proposal.question_back) {
-      const question = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.question_back, "QUESTION_BACK");
+    if (workingProposal.question_back) {
+      const question = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.question_back, "QUESTION_BACK");
       if (!question.supported) {
         rejected.push({ proposal_id: proposal.id, reasons: [`independent question verifier rejected: ${question.reason}`] });
         continue;
       }
     }
-    const preferredQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal);
-    let generatedQuestion = preferredQuestion ?? deterministicOutcomeQuestion(ledger,proposal);
+    const preferredQuestion = deterministicOwnershipQuestion(ledger, workingProposal) ?? await enrichD15BQuestion(ledger, workingProposal);
+    let generatedQuestion = preferredQuestion ?? deterministicOutcomeQuestion(ledger,workingProposal);
     let questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
     if (!questionCheck.supported) {
       // Reviewed deterministic floor: support/assist/participate evidence gets
       // ownership clarification first; otherwise ask premise-free outcome.
-      generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? deterministicOutcomeQuestion(ledger,proposal);
-      const floorErrors = deterministicProposalErrors(ledger, { ...proposal, question_back: generatedQuestion });
+      generatedQuestion = deterministicOwnershipQuestion(ledger, workingProposal) ?? deterministicOutcomeQuestion(ledger,workingProposal);
+      const floorErrors = deterministicProposalErrors(ledger, { ...workingProposal, question_back: generatedQuestion });
       if (floorErrors.length) {
         rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor failed deterministic truth guards: ${floorErrors.join(" | ")}`] });
         continue;
@@ -508,7 +553,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question repair failed: ${questionCheck.reason}`] });
       continue;
     }
-    accepted.push({ ...proposal, question_back: generatedQuestion });
+    accepted.push({ ...workingProposal, question_back: generatedQuestion });
   }
   const cvLanguage=(()=>{
     const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
