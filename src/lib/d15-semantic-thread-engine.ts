@@ -19,7 +19,7 @@ export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
   rejected: Array<{ proposal_id: string; reasons: string[] }>;
   cv_question_back: string | null;
-  completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED";
+  completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
 
 const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
