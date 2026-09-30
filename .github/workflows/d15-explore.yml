@@ -43,8 +43,8 @@ jobs:
       - name: Pre-spend typecheck
         run: npm run typecheck
 
-      - name: Pre-spend D15 engine regressions
-        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-semantic-thread-engine.test.ts
+      - name: Pre-spend D15 engine and Gold regressions
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-semantic-thread-engine.test.ts tests/d15-gold-gate.test.ts
 
       - name: Print ten Mirrors and Gold scores
         env:
