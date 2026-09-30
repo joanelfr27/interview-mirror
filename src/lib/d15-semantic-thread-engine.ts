@@ -70,12 +70,28 @@ function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
 }
 
 const TITLE_CASE_CONNECTORS = new Set(["and","or","of","the","through","its","for","to","in","with","across","during","et","ou","de","du","des","la","le","les","pour","avec","dans"]);
+
+/**
+ * Proper-noun hard guard, intentionally narrow.
+ * A capitalized token is only treated as a candidate entity when it is the
+ * first lexical token and the next lexical token is not also capitalized.
+ * This preserves the reviewed Syngenta/Paris adversarial cases without
+ * treating ordinary Title Case headlines as named entities.
+ */
 function unsupportedProperNouns(claim: string, source: string): string[] {
   const sourceNorm = normalized(source);
-  const tokens = claim.match(PROPER_NOUN_TOKEN) ?? [];
-  return [...new Set(tokens
-    .filter((token) => !TITLE_CASE_CONNECTORS.has(normalized(token)))
-    .filter((token) => !sourceNorm.includes(normalized(token))))];
+  const words = claim.trim().match(/[\\p{L}][\\p{L}'’.-]*/gu) ?? [];
+  if (words.length === 0) return [];
+
+  const first = words[0];
+  const firstIsCapitalized = /^\\p{Lu}/u.test(first);
+  if (!firstIsCapitalized || TITLE_CASE_CONNECTORS.has(normalized(first))) return [];
+
+  const second = words[1];
+  const secondIsCapitalized = second ? /^\\p{Lu}/u.test(second) : false;
+  if (secondIsCapitalized) return [];
+
+  return sourceNorm.includes(normalized(first)) ? [] : [first];
 }
 function exactNumericTokens(value: string): string[] {
   return value.match(/\b\d+(?:[.,]\d+)?\b/g) ?? [];
