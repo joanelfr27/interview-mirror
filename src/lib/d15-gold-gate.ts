@@ -190,9 +190,22 @@ export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BV
 
   if(fixture.id==="ELENA"){
     if(result.accepted.length!==0) errors.push("Elena restraint failed: expected zero displayed professional threads");
-    // v2.1 makes the CV-level pattern-seeking question part of complete D15-B.
-    // The current D15BVerificationResult contract has no CV-level question field, so this remains an explicit product-capability failure.
-    errors.push("Elena CV-level pattern-seeking question capability is absent from the current D15-B output contract");
+    const extended=result as D15BVerificationResult & {completion_state?:string;cv_question_back?:string|null};
+    if(extended.completion_state===undefined)
+      errors.push("ELENA_CAPABILITY_MISSING: completion state absent");
+    else if(extended.completion_state!=="COMPLETED_NO_QUALIFYING_RELATIONSHIP")
+      errors.push("ELENA_CAPABILITY_MISSING: CV-level question is valid only for genuine completed no-relationship state");
+    const question=extended.cv_question_back?.trim()??"";
+    if(!question) errors.push("ELENA_CAPABILITY_MISSING: CV-level pattern-seeking question is absent");
+    else {
+      if(languageMismatch("en",question)) errors.push("ELENA_CAPABILITY_MISSING: CV-level question language mismatch");
+      if(!/(?:recurring|pattern|connect)/i.test(question)) errors.push("ELENA_CAPABILITY_MISSING: CV-level question is not pattern-seeking");
+      if(!/(?:without assuming|do not assume|not assuming)/i.test(question)) errors.push("ELENA_CAPABILITY_MISSING: CV-level question is not premise-free");
+      const quoted=[...question.matchAll(/[“"]([^”"]+)[”"]/g)].map(m=>m[1]!.replace(/…$/,"").trim());
+      if(quoted.length===0) errors.push("ELENA_CAPABILITY_MISSING: CV-level question has no visible CV anchor");
+      else if(quoted.some(anchor=>!fixture.lines.some(line=>line.includes(anchor))))
+        errors.push("ELENA_CAPABILITY_MISSING: CV-level question contains a non-verbatim CV anchor");
+    }
     return {errors,unmatched_thread_ids:unmatched.map(x=>x.id),matched};
   }
 
