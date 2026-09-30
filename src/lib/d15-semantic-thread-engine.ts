@@ -386,6 +386,33 @@ Return supported=false whenever uncertain. Return JSON only.`,
   return { supported: parsed.supported === true, reason: String(parsed.reason ?? "") };
 }
 
+const QUESTION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: { question_back: { anyOf: [{ type: "string" }, { type: "null" }] } },
+  required: ["question_back"],
+} as const;
+
+async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): Promise<string | null> {
+  const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
+  const response = await getOpenAI().chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: jsonSchemaFormat("d15_b_question", QUESTION_SCHEMA),
+    messages: [
+      { role: "system", content: `Generate at most one optional clarification question for an already-valid professional insight.
+Return null unless answering the question would materially strengthen the insight.
+Priority 1: genuine ownership tension in the evidence, especially support/assist/participate wording or a mix of support-level and stronger implementation wording. Ask neutrally what the candidate personally owned versus supported; never presume leadership.
+Priority 2: an evidenced action/change with no stated result; ask neutrally what changed or resulted.
+Do not ask generic ownership merely because ownership metadata is unknown. Do not ask scale or timing by default. Do not assert an unknown fact in the question. Return JSON only.` },
+      { role: "user", content: JSON.stringify({ headline: proposal.headline, cited_atoms: atoms }) },
+    ],
+  });
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"question_back":null}') as { question_back?: string | null };
+  const q = parsed.question_back;
+  return typeof q === "string" && q.trim() ? q.trim() : null;
+}
+
 export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promise<D15BVerificationResult> {
   const proposed = await proposeD15BSemanticThreads(ledger);
   const deterministic = verifyD15BSemanticThreadProposals(ledger, proposed);
@@ -410,7 +437,13 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
     }
-    accepted.push(proposal);
+    const generatedQuestion = await enrichD15BQuestion(ledger, proposal);
+    if (generatedQuestion) {
+      const questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
+      accepted.push(questionCheck.supported ? { ...proposal, question_back: generatedQuestion } : proposal);
+    } else {
+      accepted.push(proposal);
+    }
   }
   return { accepted, rejected };
 }
