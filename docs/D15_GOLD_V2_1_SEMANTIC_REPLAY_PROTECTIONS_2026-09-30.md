@@ -23,10 +23,10 @@ For each fixture and each of the two passes:
 - preserve every raw `semanticGoldErrors()` string verbatim;
 - emit a non-authoritative keyword pre-flag for likely ownership, outcome, leadership, or Nancy-B issues only to assist review;
 - do **not** convert keyword matches into verdicts;
-- after the run, manually classify each raw string against semantic protections 1–3 and record that classification next to the verbatim string;
+- after the run, the agent prepares every raw string, its keyword pre-flag, and a proposed classification against semantic protections 1–3; Thibaut manually confirms or overturns each row, and Thibaut's recorded decision is the verdict;
 - retain all other strings as non-scored observations.
 
-The manual classification is the protection verdict. No new protection, category target, or favorable reinterpretation may be introduced after seeing the output.
+Thibaut's manual classification is the protection verdict. Agent-proposed classifications are advisory only and cannot close the gate. No new protection, category target, or favorable reinterpretation may be introduced after seeing the output.
 
 ## Stability
 
