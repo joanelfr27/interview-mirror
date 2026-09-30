@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Pre-spend typecheck
+        run: npm run typecheck
+
+      - name: Pre-spend D15 engine regressions
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-semantic-thread-engine.test.ts
+
       - name: Print ten Mirrors and Gold scores
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
