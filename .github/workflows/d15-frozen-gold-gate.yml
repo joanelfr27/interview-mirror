@@ -33,7 +33,7 @@ jobs:
           test "$actual" = "${{ inputs.expected_sha }}"
           scorer="$(git hash-object src/lib/d15-gold-gate.ts)"
           echo "scorer_blob=$scorer"
-          test "$scorer" = "93caab3b5f3062d94e18d7d4c01caebca1c737be"
+          test "$scorer" = "f9af8b13fe3af1ebbce2611a330bdc0c767db7dd"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
