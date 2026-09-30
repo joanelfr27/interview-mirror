@@ -309,8 +309,9 @@ async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCa
 Return only candidate evidence sets; do NOT write headlines, summaries, questions, or candidate-facing prose.
 A candidate set needs at least two independent source spans whose relationship reveals a professional operating pattern that no single atom states alone.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
-Select the SMALLEST sufficient evidence set for each relationship. Do not add atoms merely because they share a topic. Do not optimize coverage.
-Prefer 1-2 strong relationships; maximum 3. Return zero when evidence contains only routine unrelated duties or category-level similarity.
+Select the SMALLEST sufficient evidence set that captures the COMPLETE relationship. Do not add atoms merely because they share a topic and do not optimize coverage.
+Rank candidate relationships by professional information gain: prefer a relationship that connects different activities/stakeholders/stages over one that merely groups similar work. Prefer evidence that closes a meaningful loop (for example observation->management, diagnosis->procedure change, forecast->review cadence, system change->user interaction). Avoid redundant candidates that explain the same underlying pattern.
+Prefer 1-2 strong relationships; maximum 2. Return zero when evidence contains only routine unrelated duties or category-level similarity.
 Do not infer facts from titles, employers, typical duties, or outside knowledge. Evidence IDs must come from input. Return JSON only.` },
       { role: "user", content: JSON.stringify(input) },
     ],
