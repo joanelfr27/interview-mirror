@@ -1,0 +1,47 @@
+name: D15 Explore Mirrors
+
+on:
+  workflow_dispatch:
+    inputs:
+      change_note:
+        description: "One-line note describing this exploration iteration"
+        required: false
+        default: "explore baseline"
+
+permissions:
+  contents: read
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Print ten Mirrors and Gold scores
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CHANGE_NOTE: ${{ inputs.change_note }}
+        run: npm run explore:d15 -- "$CHANGE_NOTE"
+
+      - name: Upload exploration output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d15-explore-${{ github.run_id }}
+          path: tmp/d15-explore/*.txt
+          if-no-files-found: warn
+          retention-days: 14
