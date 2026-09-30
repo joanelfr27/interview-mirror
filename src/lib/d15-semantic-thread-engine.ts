@@ -18,6 +18,7 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
   rejected: Array<{ proposal_id: string; reasons: string[] }>;
+  cv_question_back: string | null;
 };
 
 const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
@@ -505,7 +506,17 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     }
     accepted.push({ ...proposal, question_back: generatedQuestion });
   }
-  return { accepted, rejected };
+  const cvLanguage=(()=>{
+    const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
+    if(languages.size!==1) return "en" as const;
+    return [...languages][0]!;
+  })();
+  const cv_question_back=accepted.length===0
+    ? (cvLanguage==="fr"
+      ? "Y a-t-il, dans votre expérience, un mode de travail ou une responsabilité récurrente que ces éléments du CV ne rendent pas encore visible ?"
+      : "Across your experience, is there a recurring way of working or responsibility that these CV entries do not yet make visible?")
+    : null;
+  return { accepted, rejected, cv_question_back };
 }
 
 export type D15BSemanticInput = {
