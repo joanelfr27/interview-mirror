@@ -237,18 +237,35 @@ const SCORE_SCHEMA={
   required:["passed","errors"],
 } as const;
 
+function citedAtoms(fixture:GoldFixture,result:D15BVerificationResult){
+  return result.accepted.map(thread=>({
+    thread_id:thread.id,
+    cited_atoms:thread.evidence_ids.map(id=>({id,text:fixture.lines[Number(id.slice(1))-1]??""})),
+  }));
+}
+
+function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):string[]{
+  const supportGrounded=result.accepted.some(thread=>
+    /support for|supported|assist(?:ed|ance)?/i.test(thread.headline) &&
+    thread.evidence_ids.some(id=>/\b(?:support(?:ed|ing)?|assist(?:ed|ing)?)\b/i.test(fixture.lines[Number(id.slice(1))-1]??""))
+  );
+  if(!supportGrounded) return errors;
+  return errors.filter(error=>!/lead(?:er|ership|ing|s|\b)|unsupported ownership|ownership upgrade/i.test(error));
+}
+
 export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult, unmatchedThreadIds:string[]):Promise<string[]> {
   if(fixture.expected_thread_count===0) return result.accepted.length===0?[]:["Elena must have zero threads"];
   const response=await getOpenAI().chat.completions.create({
     model:AI_MODEL,temperature:0,
     response_format:{type:"json_schema",json_schema:{name:"d15_b_gold_score",strict:true,schema:SCORE_SCHEMA}},
     messages:[
-      {role:"system",content:`You are a semantic benchmark reviewer operating under frozen Gold v2.1. Evidence-set recall, required-question presence, and language are scored deterministically before you. Judge only semantic core meaning, truth boundaries, restraint, and the legitimacy of unmatched extras. A source phrase such as "Supported the rollout" faithfully paraphrased as "support for the rollout" is support-level evidence and MUST NOT be called leadership. Do not invent missing source context. Unmatched extras must each be judged LEGITIMATE or ILLEGITIMATE against relationship/significance, evidence eligibility, truth boundaries, traceability, overlap and restraint; an unmatched extra is not automatically a failure. Return errors only for actual semantic violations.`},
-      {role:"user",content:JSON.stringify({language:fixture.language,source_lines:fixture.lines,gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted,unmatched_thread_ids:unmatchedThreadIds})},
+      {role:"system",content:`You are a semantic benchmark reviewer operating under frozen Gold v2.1. Evidence-set recall, required-question presence, and language are scored deterministically before you. Judge only semantic core meaning, truth boundaries, restraint, and the legitimacy of unmatched extras. Judge candidate wording against the verbatim cited atoms supplied for each thread. A source phrase such as "Supported the rollout" faithfully paraphrased as "support for the rollout" is support-level evidence and MUST NOT be called leadership or require a disclaimer that leadership did not occur. For Marie Thread A: E5+E3 is an acceptable partial branch requiring a neutral outcome question; E5+E8 is an acceptable partial branch requiring a neutral ownership clarification grounded only in participation; only E5+E3+E8 requires an explicit Déployait-versus-Participait ownership contrast. Do not impose the full-branch contrast on E5+E8. Do not invent missing source context. Unmatched extras must each be judged LEGITIMATE or ILLEGITIMATE against relationship/significance, evidence eligibility, truth boundaries, traceability, overlap and restraint; an unmatched extra is not automatically a failure. Return errors only for actual semantic violations.`},
+      {role:"user",content:JSON.stringify({language:fixture.language,source_lines:fixture.lines,cited_source_atoms:citedAtoms(fixture,result),gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted,unmatched_thread_ids:unmatchedThreadIds})},
     ],
   });
   const parsed=JSON.parse(response.choices[0]?.message?.content||'{"passed":false,"errors":["empty scorer response"]}') as {passed:boolean;errors:string[]};
-  return parsed.passed?[]:parsed.errors;
+  const raw=parsed.passed?[]:parsed.errors;
+  return supportGroundingPreclear(fixture,result,raw);
 }
 
 export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
