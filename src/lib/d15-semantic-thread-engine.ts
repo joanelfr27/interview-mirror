@@ -19,6 +19,7 @@ export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
   rejected: Array<{ proposal_id: string; reasons: string[] }>;
   cv_question_back: string | null;
+  completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED";
 };
 
 const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
@@ -516,7 +517,13 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       ? "Y a-t-il, dans votre expérience, un mode de travail ou une responsabilité récurrente que ces éléments du CV ne rendent pas encore visible ?"
       : "Across your experience, is there a recurring way of working or responsibility that these CV entries do not yet make visible?")
     : null;
-  return { accepted, rejected, cv_question_back };
+  const completion_state:D15BVerificationResult["completion_state"]=accepted.length>0
+    ? "COMPLETED_WITH_THREADS"
+    : proposed.length===0
+      ? "COMPLETED_NO_QUALIFYING_RELATIONSHIP"
+      : "ALL_REJECTED";
+  const safeCvQuestion=completion_state==="COMPLETED_NO_QUALIFYING_RELATIONSHIP" ? cv_question_back : null;
+  return { accepted, rejected, cv_question_back:safeCvQuestion, completion_state };
 }
 
 export type D15BSemanticInput = {
