@@ -30,7 +30,7 @@ const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
   INDIVIDUAL: 3,
 };
 
-const OWNERSHIP_ESCALATION = /(?<!\\p{L})(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))(?!\\p{L})/iu;
+const OWNERSHIP_ESCALATION = /(?<!\p{L})(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))(?!\p{L})/iu;
 const OWNERSHIP_PREMISE = /(?:^|[.!?]\\s*)(?:since|as|given that|because|after)\\s+you\\s+/iu;
 const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved|réduit|réduite|réduits|réduites|réduire|diminué|diminuée|amélioré|améliorée|augmenté|augmentée)\b/iu;
 const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
@@ -95,7 +95,7 @@ const TITLE_CASE_CONNECTORS = new Set(["and","or","of","the","through","its","fo
  */
 function unsupportedProperNouns(claim: string, source: string): string[] {
   const sourceNorm = normalized(source);
-  const words = claim.trim().match(/[\\p{L}][\\p{L}'’.-]*/gu) ?? [];
+  const words = claim.trim().match(/[\p{L}][\p{L}'’.-]*/gu) ?? [];
   if (words.length === 0) return [];
 
   const first = words[0];
