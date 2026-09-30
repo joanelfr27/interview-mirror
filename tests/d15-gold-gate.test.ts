@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { assertD15EligibilityExtractionEquivalent } from "@/lib/professional-mirror";
 import { buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
 
 test("D15-B Gold fixtures are frozen as Nancy/Marie/David/Elena/Thomas",()=>{
@@ -25,4 +26,12 @@ test("D15-B frozen human decisions are encoded without weakening",()=>{
   assert.deepEqual(marie.threads[0]?.required_sets,[["E5","E3"],["E5","E8"],["E5","E3","E8"]]);
   assert.equal(elena.expected_thread_count,0);
   assert.equal(thomas.threads[0]?.required_sets.length,4);
+});
+
+
+test("D15 eligibility extraction is exactly equivalent on all five Gold ledgers", () => {
+  for (const fixture of d15BGoldFixtures()) {
+    const ledger = buildD15BGoldLedger(fixture as any);
+    assert.doesNotThrow(() => assertD15EligibilityExtractionEquivalent(ledger), fixture.id);
+  }
 });
