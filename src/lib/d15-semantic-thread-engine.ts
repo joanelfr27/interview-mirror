@@ -233,7 +233,17 @@ export function verifyD15BSemanticThreadProposals(
     });
   }
 
-  return { accepted, rejected };
+  const cvLanguage=(()=>{
+    const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
+    if(languages.size!==1) return "en" as const;
+    return [...languages][0]!;
+  })();
+  const cv_question_back=accepted.length===0
+    ? (cvLanguage==="fr"
+      ? "Y a-t-il, dans votre expérience, un mode de travail ou une responsabilité récurrente que ces éléments du CV ne rendent pas encore visible ?"
+      : "Across your experience, is there a recurring way of working or responsibility that these CV entries do not yet make visible?")
+    : null;
+  return { accepted, rejected, cv_question_back };
 }
 
 export type D15BClaimVerification = {
@@ -330,7 +340,7 @@ Rank candidate relationships by professional information gain. Treat the dimensi
 - DIAGNOSIS_CHANGE: prefer diagnosis/root-cause evidence paired with a procedure/process change or reorganisation over dashboards/reporting.
 - OPERATING_RHYTHM: prefer recurring planning/forecast evidence paired with a structured review cadence over general account/team activity.
 - CHANGE_USER_INTERFACE: prefer implementation/rollout evidence paired with user feedback, training, or support over generic project administration.
-- CHANGE_CONTINUITY and INFORMATION_DECISION: prefer the smallest set that captures the full cross-stage relationship, not merely adjacent topical duties.
+- CHANGE_CONTINUITY: capture both the evidenced change context and the implementation/process response when both exist. Do not stop at two support/context lines when an additional implementation/process-change atom is needed to complete that relationship.\n- INFORMATION_DECISION: prefer the smallest set that captures the full information-to-decision/stakeholder relationship, not merely adjacent topical duties.
 - MULTIPARTY_RESOLUTION: require evidence of a problem plus coordination across the parties involved in resolving it.
 When a stronger dimension above is supported, do not substitute a weaker OTHER or topical-coordination bundle using overlapping or nearby evidence. Choose at most ONE best evidence set per meaningful dimension and suppress generic project/administrative coordination when a more informative relationship exists.
 Prefer 1-2 strong relationships; maximum 2. Return zero when evidence contains only routine unrelated duties or category-level similarity.
