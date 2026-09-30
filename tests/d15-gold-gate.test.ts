@@ -136,3 +136,25 @@ test("Gold v2.1 unmatched extra is observable without deterministic pass/fail",(
   assert.equal(a.errors.length,0);
   assert.deepEqual(a.unmatched_thread_ids,["EXTRA"]);
 });
+
+
+test("Gold v2.1 Nancy B E8+E10 is protected as a valid Gold relationship",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const r=result([
+    proposal("A","Keeping finance operating through acquisition integration, systems integration, and accounting-process change.",["E4","E5","E6"],"What did you personally own, and what did you mainly support?"),
+    proposal("B","Connecting financial information with management and internal stakeholders who use it for decisions.",["E8","E10"],"What decision or action changed because of the information you provided?"),
+  ]);
+  const a=assessD15BGoldDeterministically(nancy,r);
+  assert.equal(a.errors.length,0);
+  assert.deepEqual(a.unmatched_thread_ids,[]);
+});
+
+test("Gold v2.1 Thomas support paraphrase creates no deterministic leadership or ownership-upgrade finding",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([
+    proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?"),
+  ]);
+  const a=assessD15BGoldDeterministically(thomas,r);
+  assert.equal(a.errors.length,0);
+  assert.ok(!a.errors.some(x=>/lead|ownership upgrade|unsupported ownership/i.test(x)));
+});
