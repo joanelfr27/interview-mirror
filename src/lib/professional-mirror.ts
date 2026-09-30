@@ -247,72 +247,7 @@ function ownershipCompatible(a: AtomicEvidence, b: AtomicEvidence): boolean {
   return a.subject.ownership === b.subject.ownership;
 }
 
-function legacyIndependentAtomsForEquivalence(ledger: EvidenceLedger): AtomicEvidence[] {
-  const accepted: AtomicEvidence[] = [];
-  const seen = new Set<string>();
-  for (const atom of affirmativeAtoms(ledger)) {
-    const key = dedupeKey(ledger, atom);
-    if (!key || seen.has(key)) continue;
-    if (accepted.some((candidate) => semanticDuplicate(ledger, candidate, atom))) continue;
-    seen.add(key);
-    accepted.push(atom);
-  }
-  return accepted;
-}
-
-const eligibilityEquivalenceCoverage = {
-  ledgers_checked: 0,
-  contradiction_ledgers: 0,
-  duplicate_ledgers: 0,
-  excluded_section_ledgers: 0,
-};
-
-export function assertD15EligibilityExtractionEquivalent(ledger: EvidenceLedger): void {
-  const legacy = legacyIndependentAtomsForEquivalence(ledger);
-  const legacyIds = legacy.map((atom) => atom.id);
-  const sharedIds = d15EligibleIndependentAtoms(ledger).map((atom) => atom.id);
-
-  const contradictoryKeys = new Set(
-    ledger.evidence
-      .filter((atom) => atom.assertion.polarity === "NEGATED")
-      .map(contradictionKey)
-      .filter(Boolean),
-  );
-  const contradictionRemoved = ledger.evidence.some(
-    (atom) => atom.assertion.polarity === "AFFIRMATIVE" && contradictoryKeys.has(contradictionKey(atom)),
-  );
-
-  const preDedupe = affirmativeAtoms(ledger);
-  const duplicateRemoved = legacy.length < preDedupe.length;
-  // Legacy pre-connection section boundary, retained temporarily as the
-  // equivalence oracle. EXPERIENCE_NON_BULLET remains Mirror evidence/fact but
-  // is removed before thread connection.
-  const legacyThreadIds = legacy
-    .filter((atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET")
-    .map((atom) => atom.id);
-  const sharedThreadIds = d15ThreadEligibleAtoms(ledger, d15EligibleIndependentAtoms(ledger))
-    .map((atom) => atom.id);
-  const excludedSectionRemoved = legacyThreadIds.length < legacyIds.length;
-
-  eligibilityEquivalenceCoverage.ledgers_checked += 1;
-  if (contradictionRemoved) eligibilityEquivalenceCoverage.contradiction_ledgers += 1;
-  if (duplicateRemoved) eligibilityEquivalenceCoverage.duplicate_ledgers += 1;
-  if (excludedSectionRemoved) eligibilityEquivalenceCoverage.excluded_section_ledgers += 1;
-
-  console.log("[D15 ELIGIBILITY EQUIVALENCE]", JSON.stringify(eligibilityEquivalenceCoverage));
-
-  if (JSON.stringify(legacyIds) !== JSON.stringify(sharedIds)) {
-    throw new Error(`D15 eligibility extraction mismatch: legacy=${JSON.stringify(legacyIds)} shared=${JSON.stringify(sharedIds)}`);
-  }
-  if (JSON.stringify(legacyThreadIds) !== JSON.stringify(sharedThreadIds)) {
-    throw new Error(`D15 pre-connection eligibility mismatch: legacy=${JSON.stringify(legacyThreadIds)} shared=${JSON.stringify(sharedThreadIds)}`);
-  }
-}
-
 function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
-  // TEMPORARY equivalence oracle: every existing D15 ledger exercised by the
-  // canonical suite is compared old-vs-shared before the legacy path is removed.
-  assertD15EligibilityExtractionEquivalent(ledger);
   return d15EligibleIndependentAtoms(ledger);
 }
 
