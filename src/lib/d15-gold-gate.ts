@@ -25,6 +25,7 @@ export type D15BGoldCaseResult = {
   engine: D15BVerificationResult;
   deterministic_errors: string[];
   semantic_errors: string[];
+  unmatched_thread_ids: string[];
 };
 
 const FIXTURES: GoldFixture[] = [
@@ -145,19 +146,78 @@ export function buildD15BGoldLedger(fixture: GoldFixture): EvidenceLedger {
 
 function setKey(ids:string[]):string { return [...new Set(ids)].sort().join("|"); }
 
-function deterministicGoldErrors(fixture:GoldFixture, result:D15BVerificationResult):string[] {
+function looksFrench(text:string):boolean {
+  return /[àâçéèêëîïôûùüÿœæ]|\\b(?:dans|avec|vous|votre|qu|avez|personnellement|particip|réorganisation|retards|livraison|suivi|équipes|fournisseurs|commandes)\\b/i.test(text);
+}
+function languageMismatch(expected:"en"|"fr", text:string|null|undefined):boolean {
+  if(!text) return false;
+  return expected==="fr" ? !looksFrench(text) : looksFrench(text);
+}
+function isQuestion(text:string|null|undefined):boolean { return Boolean(text && text.trim().endsWith("?")); }
+function ownershipQuestion(text:string|null|undefined):boolean {
+  return isQuestion(text) && /personnel|personally|own|pris(?:e)? en charge|pilot|lead|led|souten|assist|particip/i.test(text!);
+}
+function outcomeQuestion(text:string|null|undefined):boolean {
+  return isQuestion(text) && /résultat|result|chang|impact|amélior|improv|après|after|produit|outcome/i.test(text!);
+}
+function diagnosisChangeMeaning(text:string):boolean {
+  const diagnosis=/retard|delay|cause|diagnos|bloc|break/i.test(text);
+  const change=/procéd|proced|réorgan|reorgan|déploi|deploy|process|traitement des commandes|order process/i.test(text);
+  return diagnosis && change;
+}
+
+export type D15BDeterministicGoldAssessment = {
+  errors:string[];
+  unmatched_thread_ids:string[];
+  matched:{rule_id:string;proposal_id:string;evidence_key:string}[];
+};
+
+export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BVerificationResult):D15BDeterministicGoldAssessment {
   const errors:string[]=[];
-  if(result.accepted.length!==fixture.expected_thread_count) errors.push(`expected ${fixture.expected_thread_count} accepted threads, got ${result.accepted.length}`);
-  if(fixture.expected_thread_count===0) return errors;
   const unmatched=[...result.accepted];
+  const matched:D15BDeterministicGoldAssessment["matched"]=[];
+
+  if(fixture.id==="ELENA"){
+    if(result.accepted.length!==0) errors.push("Elena restraint failed: expected zero displayed professional threads");
+    // v2.1 makes the CV-level pattern-seeking question part of complete D15-B.
+    // The current D15BVerificationResult contract has no CV-level question field, so this remains an explicit product-capability failure.
+    errors.push("Elena CV-level pattern-seeking question capability is absent from the current D15-B output contract");
+    return {errors,unmatched_thread_ids:unmatched.map(x=>x.id),matched};
+  }
+
   for(const rule of fixture.threads){
     const allowed=new Set(rule.required_sets.map(setKey));
     const idx=unmatched.findIndex(p=>allowed.has(setKey(p.evidence_ids)) && !p.evidence_ids.some(id=>rule.prohibited_ids.includes(id)));
-    if(idx<0) errors.push(`Gold thread ${rule.id} required evidence/purity not recovered`);
-    else unmatched.splice(idx,1);
+    if(idx<0){ errors.push(`Gold thread ${rule.id} required evidence/purity not recovered`); continue; }
+    const p=unmatched.splice(idx,1)[0]!;
+    const key=setKey(p.evidence_ids);
+    matched.push({rule_id:rule.id,proposal_id:p.id,evidence_key:key});
+
+    if(languageMismatch(fixture.language,p.headline)) errors.push(`Gold thread ${rule.id} headline language mismatch: expected ${fixture.language}`);
+    if(languageMismatch(fixture.language,p.question_back)) errors.push(`Gold thread ${rule.id} question language mismatch: expected ${fixture.language}`);
+
+    if(fixture.id==="NANCY" && rule.id==="A" && !ownershipQuestion(p.question_back))
+      errors.push("Nancy A requires a premise-free ownership clarification");
+    if(fixture.id==="MARIE" && rule.id==="A"){
+      if(!diagnosisChangeMeaning(p.headline)) errors.push("Marie A headline must preserve delivery-delay diagnosis and evidenced process/procedure change");
+      if(key===setKey(["E5","E3"]) && !outcomeQuestion(p.question_back))
+        errors.push("Marie A E5+E3 requires a neutral outcome question");
+      if(key===setKey(["E5","E8"]) && !ownershipQuestion(p.question_back))
+        errors.push("Marie A E5+E8 requires a neutral ownership question about participation");
+      if(key===setKey(["E5","E3","E8"])){
+        if(!ownershipQuestion(p.question_back) || !/déploi|deploy/i.test(p.question_back??"") || !/particip/i.test(p.question_back??""))
+          errors.push("Marie A full recall requires an explicit Déployait-versus-Participait ownership question");
+      }
+    }
+    if(fixture.id==="DAVID" && rule.id==="A" && !(ownershipQuestion(p.question_back)||outcomeQuestion(p.question_back)))
+      errors.push("David A requires an ownership or outcome question");
+    if(fixture.id==="THOMAS" && rule.id==="A" && !ownershipQuestion(p.question_back))
+      errors.push("Thomas A requires a premise-free personal-ownership clarification");
   }
-  if(unmatched.length) errors.push(`${unmatched.length} accepted thread(s) did not match any Gold evidence group`);
-  return errors;
+
+  // v2.1 third path: unmatched extras are not an automatic pass or fail.
+  // They must be routed to a separate legitimacy review.
+  return {errors,unmatched_thread_ids:unmatched.map(x=>x.id),matched};
 }
 
 const SCORE_SCHEMA={
@@ -166,14 +226,14 @@ const SCORE_SCHEMA={
   required:["passed","errors"],
 } as const;
 
-async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult):Promise<string[]> {
+async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult, unmatchedThreadIds:string[]):Promise<string[]> {
   if(fixture.expected_thread_count===0) return result.accepted.length===0?[]:["Elena must have zero threads"];
   const response=await getOpenAI().chat.completions.create({
     model:AI_MODEL,temperature:0,
     response_format:{type:"json_schema",json_schema:{name:"d15_b_gold_score",strict:true,schema:SCORE_SCHEMA}},
     messages:[
-      {role:"system",content:`You are an independent benchmark scorer, not the generator. Score the candidate output against the frozen Gold rules supplied. Do not reward fluency. Fail any unsupported ownership/outcome/scale/timing/seniority/scope claim. Wording may differ if semantic meaning is faithful. Questions must satisfy the specified ambiguity without asserting its answer. The maturity ceiling is Emerging. Return JSON only.`},
-      {role:"user",content:JSON.stringify({language:fixture.language,gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted})},
+      {role:"system",content:`You are a semantic benchmark reviewer operating under frozen Gold v2.1. Evidence-set recall, required-question presence, and language are scored deterministically before you. Judge only semantic core meaning, truth boundaries, restraint, and the legitimacy of unmatched extras. A source phrase such as "Supported the rollout" faithfully paraphrased as "support for the rollout" is support-level evidence and MUST NOT be called leadership. Do not invent missing source context. Unmatched extras must each be judged LEGITIMATE or ILLEGITIMATE against relationship/significance, evidence eligibility, truth boundaries, traceability, overlap and restraint; an unmatched extra is not automatically a failure. Return errors only for actual semantic violations.`},
+      {role:"user",content:JSON.stringify({language:fixture.language,source_lines:fixture.lines,gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted,unmatched_thread_ids:unmatchedThreadIds})},
     ],
   });
   const parsed=JSON.parse(response.choices[0]?.message?.content||'{"passed":false,"errors":["empty scorer response"]}') as {passed:boolean;errors:string[]};
@@ -185,9 +245,10 @@ export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
   for(const fixture of FIXTURES){
     const ledger=buildD15BGoldLedger(fixture);
     const engine=await runD15BSemanticThreadEngine(ledger);
-    const deterministic_errors=deterministicGoldErrors(fixture,engine);
-    const semantic_errors=deterministic_errors.length?[]:await semanticGoldErrors(fixture,engine);
-    results.push({fixture_id:fixture.id,passed:deterministic_errors.length===0&&semantic_errors.length===0,engine,deterministic_errors,semantic_errors});
+    const deterministic=assessD15BGoldDeterministically(fixture,engine);
+    const deterministic_errors=deterministic.errors;
+    const semantic_errors=deterministic_errors.length?[]:await semanticGoldErrors(fixture,engine,deterministic.unmatched_thread_ids);
+    results.push({fixture_id:fixture.id,passed:deterministic_errors.length===0&&semantic_errors.length===0,engine,deterministic_errors,semantic_errors,unmatched_thread_ids:deterministic.unmatched_thread_ids});
   }
   return results;
 }
