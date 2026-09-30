@@ -31,7 +31,7 @@ test("D15-B frozen human decisions are encoded without weakening",()=>{
 
 
 const proposal=(id:string,headline:string,evidence_ids:string[],question_back:string|null)=>({
-  id,headline,evidence_ids,question_back,maturity:"EMERGING_PATTERN" as const,
+  id,headline,evidence_ids,question_back,maturity:"EMERGING_PATTERN" as const,verification:"SUPPORTED" as const,
 });
 const result=(accepted:ReturnType<typeof proposal>[]):D15BVerificationResult=>({accepted,rejected:[]});
 
