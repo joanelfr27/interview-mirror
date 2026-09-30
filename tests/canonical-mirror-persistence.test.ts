@@ -184,3 +184,99 @@ test("D15 validator rejects forged maturity",()=>{
   assert.equal(v.valid,false);
   assert.ok(v.errors.some((e)=>e.includes("maturity")));
 });
+
+
+test("D15-A caps a multi-line thread at Emerging when career context is unproven",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const s3=d15Span("S3","Managed regional finance controls.");
+  const l=d15Ledger([
+    d15Atom("A1","S1","regional finance"),
+    d15Atom("A2","S2","regional finance reporting"),
+    d15Atom("A3","S3","regional finance controls"),
+  ],[s1,s2,s3]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  assert.equal(m.threads[0].maturity,"EMERGING_PATTERN");
+  assert.equal(m.threads[0].maturity_basis.context_status,"UNPROVEN");
+  assert.equal(m.threads[0].maturity_basis.independent_context_count,1);
+  assert.deepEqual(m.threads[0].maturity_basis.source_span_ids,["S1","S2","S3"]);
+  const pattern=m.statements.find((x)=>x.kind==="PATTERN");
+  assert.ok(pattern);
+  assert.equal(pattern.maturity,"EMERGING_PATTERN");
+  assert.equal(m.statements.some((x)=>x.kind==="INTERPRETATION"),false);
+  assert.equal(validateProfessionalMirror(m,l).valid,true);
+});
+
+test("D15-A validator rejects forged sustained maturity on an unproven-context thread",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const s3=d15Span("S3","Managed regional finance controls.");
+  const l=d15Ledger([
+    d15Atom("A1","S1","regional finance"),
+    d15Atom("A2","S2","regional finance reporting"),
+    d15Atom("A3","S3","regional finance controls"),
+  ],[s1,s2,s3]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  m.threads[0].maturity="SUSTAINED_STRENGTH";
+  const pattern=m.statements.find((x)=>x.kind==="PATTERN");
+  assert.ok(pattern);
+  pattern.maturity="SUSTAINED_STRENGTH";
+  const v=validateProfessionalMirror(m,l);
+  assert.equal(v.valid,false);
+  assert.ok(v.errors.some((e)=>e.includes("maturity exceeds the proven career-context evidence")));
+});
+
+test("D15-A emits each missing thread dimension once with canonical provenance",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const l=d15Ledger([
+    d15Atom("A1","S1","regional finance"),
+    d15Atom("A2","S2","regional finance reporting"),
+  ],[s1,s2]);
+  l.evidence.forEach((atom)=>{ atom.subject.ownership="UNKNOWN"; });
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  assert.deepEqual(
+    m.threads[0].not_said_yet.map((gap)=>gap.dimension),
+    ["OUTCOME","SCALE","TIMING"],
+  );
+  for(const gap of m.threads[0].not_said_yet){
+    assert.deepEqual(gap.evidence_ids,["A1","A2"]);
+    assert.deepEqual(gap.source_span_ids,["S1","S2"]);
+  }
+  assert.equal(m.threads[0].not_said_yet.some((gap:any)=>gap.dimension==="OWNERSHIP"),false);
+  assert.equal(validateProfessionalMirror(m,l).valid,true);
+});
+
+test("D15-A does not flag a thread dimension when canonical evidence supplies it",()=>{
+  const s1=d15Span("S1","Managed regional finance for three agencies in 2025 and improved close quality.");
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const a1=d15Atom("A1","S1","regional finance");
+  const a2=d15Atom("A2","S2","regional finance reporting");
+  a1.outcome="improved close quality";
+  a1.scale.scope="three agencies";
+  a1.time.start="2025";
+  a1.verifiability.has_time_anchor=true;
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  assert.deepEqual(m.threads[0].not_said_yet,[]);
+  assert.equal(validateProfessionalMirror(m,l).valid,true);
+});
+
+test("D15-A validator rejects forged Not Said Yet provenance",()=>{
+  const s1=d15Span("S1","Managed regional finance.");
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const l=d15Ledger([
+    d15Atom("A1","S1","regional finance"),
+    d15Atom("A2","S2","regional finance reporting"),
+  ],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  m.threads[0].not_said_yet[0].source_span_ids=["FORGED"];
+  const v=validateProfessionalMirror(m,l);
+  assert.equal(v.valid,false);
+  assert.ok(v.errors.some((e)=>e.includes("Not Said Yet gaps/provenance")));
+});
