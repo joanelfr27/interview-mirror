@@ -251,6 +251,37 @@ async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationRes
   return parsed.passed?[]:parsed.errors;
 }
 
+export type D15BSemanticReplayReview = {
+  findings: Array<{ thread_id:string|null; category:string; detail:string }>;
+  unmatched_extras: Array<{ thread_id:string; classification:"LEGITIMATE"|"ILLEGITIMATE"; detail:string }>;
+};
+
+const REPLAY_SEMANTIC_SCHEMA={
+  type:"object",additionalProperties:false,
+  properties:{
+    findings:{type:"array",items:{type:"object",additionalProperties:false,properties:{thread_id:{anyOf:[{type:"string"},{type:"null"}]},category:{type:"string",enum:["CORE_MEANING_MISMATCH","UNSUPPORTED_OWNERSHIP","UNSUPPORTED_OUTCOME","UNSUPPORTED_SCALE","UNSUPPORTED_TIMING","UNSUPPORTED_SENIORITY","UNSUPPORTED_SCOPE","RESTRAINT_VIOLATION","TRACEABILITY_VIOLATION","OVERLAP_VIOLATION"]},detail:{type:"string"}},required:["thread_id","category","detail"]}},
+    unmatched_extras:{type:"array",items:{type:"object",additionalProperties:false,properties:{thread_id:{type:"string"},classification:{type:"string",enum:["LEGITIMATE","ILLEGITIMATE"]},detail:{type:"string"}},required:["thread_id","classification","detail"]}},
+  },
+  required:["findings","unmatched_extras"],
+} as const;
+
+/** Replay-only semantic pass. It intentionally does not short-circuit on deterministic findings. */
+export async function runD15BSemanticReplayReview(
+  fixture:GoldFixture,
+  result:D15BVerificationResult,
+  unmatchedThreadIds:string[],
+):Promise<D15BSemanticReplayReview> {
+  const response=await getOpenAI().chat.completions.create({
+    model:AI_MODEL,temperature:0,
+    response_format:{type:"json_schema",json_schema:{name:"d15_b_semantic_replay",strict:true,schema:REPLAY_SEMANTIC_SCHEMA}},
+    messages:[
+      {role:"system",content:`You are the replay-only semantic reviewer for frozen D15 Gold v2.1. Deterministic recall, language and required-question findings are out of scope. Judge semantic core meaning, truth boundaries, restraint, traceability/overlap, and explicitly classify every supplied unmatched thread ID as LEGITIMATE or ILLEGITIMATE. Do not silently penalise unmatched extras. Grounded "support for the rollout" is support-level wording, never leadership. Nancy Gold Thread B E8+E10 is a valid relationship and must not be rejected merely as category-level similarity. Do not invent source context. Return only the normalized categories allowed by the schema.`},
+      {role:"user",content:JSON.stringify({language:fixture.language,source_lines:fixture.lines,gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted,unmatched_thread_ids:unmatchedThreadIds})},
+    ],
+  });
+  return JSON.parse(response.choices[0]?.message?.content||'{"findings":[],"unmatched_extras":[]}') as D15BSemanticReplayReview;
+}
+
 export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
   const results:D15BGoldCaseResult[]=[];
   for(const fixture of FIXTURES){
