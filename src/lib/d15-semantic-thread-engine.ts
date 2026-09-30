@@ -298,7 +298,7 @@ export async function verifyD15BClaimIndependently(
   ledger: EvidenceLedger,
   evidenceIds: string[],
   claim: string,
-  claimType: "HEADLINE" | "QUESTION_BACK",
+  claimType: "HEADLINE" | "SIGNIFICANCE" | "QUESTION_BACK",
 ): Promise<D15BClaimVerification> {
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
   if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
@@ -313,6 +313,7 @@ export async function verifyD15BClaimIndependently(
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, or causal claims.
 For HEADLINE, semantic synthesis is allowed only when every substantive assertion is supported by the cited atoms.
+For SIGNIFICANCE, supported=true ONLY when the claim expresses a professionally meaningful relationship, bridge, operating pattern, or function that emerges from combining the cited atoms and is not merely a category label, duty summary, paraphrase, or bundle of activities. Ask: would a candidate learn something useful about how they operate from this headline that no single cited line already says? Routine administrative bundles must be false. Be deliberately strict.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true.
 Return supported=false whenever uncertain. Return JSON only.`,
       },
@@ -333,6 +334,11 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     const headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "HEADLINE");
     if (!headline.supported) {
       rejected.push({ proposal_id: proposal.id, reasons: [`independent headline verifier rejected: ${headline.reason}`] });
+      continue;
+    }
+    const significance = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "SIGNIFICANCE");
+    if (!significance.supported) {
+      rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected: ${significance.reason}`] });
       continue;
     }
     if (proposal.question_back) {
