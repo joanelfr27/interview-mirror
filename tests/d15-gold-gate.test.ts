@@ -195,3 +195,26 @@ test("semantic preclear treats Nancy neutral Connecting wording as no ownership 
   assert.deepEqual(x.errors,[]);
   assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
 });
+
+
+test("semantic preclear does not hide leadership upgrade carried by the question",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"How did you lead the rollout?")]);
+  const raw=["Candidate implies unsupported leadership of the rollout."];
+  const x=supportGroundingPreclear(thomas,r,raw);
+  assert.deepEqual(x.errors,raw);
+  assert.deepEqual(x.set_aside,[]);
+});
+
+test("semantic preclear upgrade boundary catches wider English and French leadership stems",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  for(const headline of ["Headed the rollout","Oversaw the rollout","Spearheaded the rollout","Orchestrated the rollout","Responsible for the rollout"]){
+    const raw=["unsupported ownership"];
+    assert.deepEqual(supportGroundingPreclear(thomas,result([proposal("A",headline,["E4"],null)]),raw).errors,raw);
+  }
+  const marie=d15BGoldFixtures()[1]!;
+  for(const headline of ["A piloté la réorganisation","Pilotait la réorganisation","Dirigeait la réorganisation","A mené la réorganisation"]){
+    const raw=["leadership non étayé"];
+    assert.deepEqual(supportGroundingPreclear(marie,result([proposal("A",headline,["E8"],null)]),raw).errors,raw);
+  }
+});
