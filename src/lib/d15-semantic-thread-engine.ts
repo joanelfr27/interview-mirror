@@ -310,7 +310,14 @@ Return only candidate evidence sets; do NOT write headlines, summaries, question
 A candidate set needs at least two independent source spans whose relationship reveals a professional operating pattern that no single atom states alone.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
 Select the SMALLEST sufficient evidence set that captures the COMPLETE relationship. Do not add atoms merely because they share a topic and do not optimize coverage.
-Rank candidate relationships by professional information gain: prefer a relationship that connects different activities/stakeholders/stages over one that merely groups similar work. Prefer evidence that closes a meaningful loop (for example observation->management, diagnosis->procedure change, forecast->review cadence, system change->user interaction). Avoid redundant candidates that explain the same underlying pattern.
+Rank candidate relationships by professional information gain. Treat the dimensions as operational ranking rules, not labels:
+- EXTERNAL_INTERNAL_BRIDGE: prefer direct evidence that customer/user/market observations are carried to internal or senior-management audiences over generic coordination.
+- DIAGNOSIS_CHANGE: prefer diagnosis/root-cause evidence paired with a procedure/process change or reorganisation over dashboards/reporting.
+- OPERATING_RHYTHM: prefer recurring planning/forecast evidence paired with a structured review cadence over general account/team activity.
+- CHANGE_USER_INTERFACE: prefer implementation/rollout evidence paired with user feedback, training, or support over generic project administration.
+- CHANGE_CONTINUITY and INFORMATION_DECISION: prefer the smallest set that captures the full cross-stage relationship, not merely adjacent topical duties.
+- MULTIPARTY_RESOLUTION: require evidence of a problem plus coordination across the parties involved in resolving it.
+When a stronger dimension above is supported, do not substitute a weaker OTHER or topical-coordination bundle using overlapping or nearby evidence. Choose at most ONE best evidence set per meaningful dimension and suppress generic project/administrative coordination when a more informative relationship exists.
 Prefer 1-2 strong relationships; maximum 2. Return zero when evidence contains only routine unrelated duties or category-level similarity.
 Do not infer facts from titles, employers, typical duties, or outside knowledge. Evidence IDs must come from input. Return JSON only.` },
       { role: "user", content: JSON.stringify(input) },
@@ -332,7 +339,7 @@ Describe ONLY the relationship/function that emerges when the lines are consider
 Prefer relationship-descriptive constructions such as "Connecting X with Y", "Linking X to Y", "Combining X with Y", or an equally concise factual relationship. Do not merely name a topic, role, activity category, or repeat the reasoning-dimension label.
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
-The headline is interpretation, never evidence. Return JSON only.` },
+Write in the same language as the supplied source evidence. The headline is interpretation, never evidence. Return JSON only.` },
       { role: "user", content: JSON.stringify({ dimension: candidate.dimension, cited_atoms: atoms }) },
     ],
   });
@@ -396,6 +403,17 @@ const QUESTION_SCHEMA = {
   required: ["question_back"],
 } as const;
 
+function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): string | null {
+  const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
+  const quotes = atoms.map((atom) => atom.source_quote).join(" ");
+  const support = /\b(support(?:ed|ing)?|assist(?:ed|ing)?|help(?:ed|ing)?|participat(?:e|ed|ing)|contribut(?:e|ed|ing)|sout(?:enir|enu|enue|enus|enues)|appuy(?:er|é|ée|és|ées)|assist(?:er|é|ée|és|ées)|particip(?:er|é|ée|és|ées|ait|aient)|contribu(?:er|é|ée|és|ées|ait|aient))\b/iu.test(quotes);
+  if (!support) return null;
+  const french = atoms.some((atom) => /\b(?:soutenir|appuy|assist|particip|contribu|déploy|coordonn|réorganis)\w*/iu.test(atom.source_quote));
+  return french
+    ? "Dans ce travail, qu’avez-vous personnellement pris en charge, et qu’avez-vous plutôt soutenu ou accompagné ?"
+    : "In this work, what did you personally own or do, and what did you mainly support or assist with?";
+}
+
 async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): Promise<string | null> {
   const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
   const response = await getOpenAI().chat.completions.create({
@@ -440,7 +458,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
     }
-    const generatedQuestion = await enrichD15BQuestion(ledger, proposal);
+    const generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal);
     if (generatedQuestion) {
       const questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
       accepted.push(questionCheck.supported ? { ...proposal, question_back: generatedQuestion } : proposal);
