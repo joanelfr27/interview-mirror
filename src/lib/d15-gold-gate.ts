@@ -268,7 +268,7 @@ export function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerifica
   };
 }
 
-function semanticScopePreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):SemanticPreclearResult {
+export function semanticScopePreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):SemanticPreclearResult {
   const deterministic=assessD15BGoldDeterministically(fixture,result);
   const missingRules=new Set(deterministic.errors.flatMap(e=>{const m=e.match(/^Gold thread ([A-Z]) required evidence\/purity not recovered$/);return m?[m[1]]:[];}));
   const marieE5E8=result.accepted.some(t=>t.evidence_ids.length===2&&t.evidence_ids.includes("E5")&&t.evidence_ids.includes("E8")&&!t.evidence_ids.includes("E3"));
