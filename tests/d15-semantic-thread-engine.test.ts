@@ -106,3 +106,30 @@ test("D15-B rejects unsupported named entities or places",()=>{
   assert.equal(result.accepted.length,0);
   assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("named entity")));
 });
+
+
+test("D15-B shared boundary rejects contradicted evidence",()=>{
+  const s1=span("S1","Managed treasury reporting.");
+  const s2=span("S2","Did not manage treasury reporting.");
+  const s3=span("S3","Reviewed treasury reporting.");
+  const neg={...atom("N1","S2","Managed","treasury reporting"),assertion:{type:"RESPONSIBILITY",polarity:"NEGATED"}} as AtomicEvidence;
+  const l=ledger([atom("A1","S1","Managed","treasury reporting"),neg,atom("A2","S3","Reviewed","treasury reporting")],[s1,s2,s3]);
+  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A2"]);
+  const result=verifyD15BSemanticThreadProposals(l,[{id:"P1",headline:"Treasury reporting",evidence_ids:["A1","A2"],question_back:null}]);
+  assert.equal(result.accepted.length,0);
+  assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("unknown or ineligible")));
+});
+
+test("D15-B shared boundary deduplicates semantic evidence",()=>{
+  const s1=span("S1","Managed monthly treasury reporting.");
+  const s2=span("S2","Managed monthly treasury reporting.");
+  const l=ledger([atom("A1","S1","Managed","monthly treasury reporting"),atom("A2","S2","Managed","monthly treasury reporting")],[s1,s2]);
+  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A1"]);
+});
+
+test("D15-B shared boundary excludes role-overview atoms before semantic threading",()=>{
+  const s1={...span("S1","Responsible for accounting systems."),source_section:"EXPERIENCE_NON_BULLET"};
+  const s2={...span("S2","Managed accounting systems."),source_section:"BULLET"};
+  const l=ledger([atom("A1","S1","Responsible","accounting systems"),atom("A2","S2","Managed","accounting systems")],[s1,s2] as any);
+  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A2"]);
+});
