@@ -1,6 +1,22 @@
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
-import { runD15BSemanticThreadEngine, type D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
+import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
+
+export type D15BGoldScorerInput = {
+  accepted: Array<{
+    id: string;
+    headline: string;
+    evidence_ids: string[];
+    question_back: string | null;
+    maturity: string;
+    verification: "SUPPORTED";
+  }>;
+  rejected: Array<{ proposal_id: string; reasons: string[] }>;
+  cv_question_back?: string | null;
+  completion_state?: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
+};
+
+type D15BVerificationResult = D15BGoldScorerInput;
 
 type GoldThreadRule = {
   id: string;
