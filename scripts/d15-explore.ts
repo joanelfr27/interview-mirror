@@ -1,5 +1,6 @@
 import { writeFileSync, mkdirSync } from "node:fs";
-import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
+import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently } from "@/lib/d15-semantic-thread-engine";
+import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
 import { buildD15BGoldLedger, d15BGoldFixtures, runD15BGoldGate } from "@/lib/d15-gold-gate";
 
 const order = ["ELENA","NANCY","MARIE","DAVID","THOMAS"] as const;
@@ -12,10 +13,39 @@ function evidenceLines(fixture: ReturnType<typeof d15BGoldFixtures>[number], ids
   }).join("\n");
 }
 
+
+function syntheticSignificanceLedger(lines:[string,string]):EvidenceLedger{
+  const source_spans:SourceSpan[]=lines.map((text,i)=>({id:`SS${i+1}`,document_id:"SYNTHETIC",text,start_offset:i*200,end_offset:i*200+text.length,language:"en",source_section:"BULLET"}));
+  const evidence:AtomicEvidence[]=source_spans.map((span,i)=>({
+    id:`SE${i+1}`,source_span_id:span.id,provenance:{source_type:"CV",language:"en",extraction_method:"PARSER"},
+    subject:{actor:"candidate",ownership:"INDIVIDUAL"},action:{normalized_action:i===0?"reviewed":"changed",object:lines[i]!},
+    context:{},scale:{},time:{},outcome:null,assertion:{type:"RESPONSIBILITY",polarity:"AFFIRMATIVE"},
+    verifiability:{has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false},extraction_confidence:1,
+  }));
+  return {evidence,source_spans,requirements:[],support_judgments:[],requirement_statuses:[],unresolved_items:[],candidate_elicitations:[],demonstration_objectives:[]};
+}
+
+async function assertSyntheticSignificanceStability(out:string[]){
+  const controls=[
+    {name:"functional relationship",expected:true,lines:["Reviewed recurring causes in customer complaints.","Changed the intake checklist after reviewing recurring complaint causes."] as [string,string],claim:"Connecting recurring complaint diagnosis with intake-process changes"},
+    {name:"mere administrative bundle",expected:false,lines:["Filed supplier invoices each week.","Archived supplier invoices each month."] as [string,string],claim:"Invoice administration"},
+  ];
+  out.push("=".repeat(72),"SYNTHETIC SIGNIFICANCE STABILITY","=".repeat(72));
+  for(const control of controls){
+    const ledger=syntheticSignificanceLedger(control.lines);
+    const verdicts:boolean[]=[];
+    for(let i=0;i<3;i++) verdicts.push((await verifyD15BClaimIndependently(ledger,["SE1","SE2"],control.claim,"SIGNIFICANCE")).supported);
+    out.push(`${control.name}: ${verdicts.join(",")} expected=${control.expected}`);
+    if(verdicts.some(v=>v!==control.expected)) throw new Error(`significance stability failed for ${control.name}: ${verdicts.join(",")}`);
+  }
+  out.push("");
+}
+
 async function main(){
   const note=process.argv.slice(2).join(" ").trim() || "no change note supplied";
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
+  await assertSyntheticSignificanceStability(out);
   for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
     for(let run=1;run<=2;run++){
