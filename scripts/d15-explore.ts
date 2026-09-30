@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently } from "@/lib/d15-semantic-thread-engine";
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
-import { buildD15BGoldLedger, d15BGoldFixtures, runD15BGoldGate } from "@/lib/d15-gold-gate";
+import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
 
 const order = ["ELENA","NANCY","MARIE","DAVID","THOMAS"] as const;
 const fixtures = [...d15BGoldFixtures()].sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
@@ -46,10 +46,10 @@ async function main(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
   await assertSyntheticSignificanceStability(out);
-  for(const fixture of fixtures){
+  const scoredRuns = new Map<string, Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>();\n  for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
     for(let run=1;run<=2;run++){
-      const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));
+      const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));\n      if(run===2) scoredRuns.set(fixture.id,result);
       out.push(`\nRUN ${run}\n`,`MIRROR_STATUS: ${result.completion_state}`,`CV_QUESTION_BACK: ${result.cv_question_back ?? "—"}`);
       if(!result.accepted.length) out.push("ACCEPTED: none");
       for(const thread of result.accepted){
@@ -62,12 +62,14 @@ async function main(){
     }
     out.push("");
   }
-  out.push("=".repeat(72),"GOLD SCORER","=".repeat(72));
-  const gold=await runD15BGoldGate();
-  for(const item of gold){
-    out.push(`${item.fixture_id}: ${item.passed ? "PASS" : "FAIL"}`);
-    for(const error of item.deterministic_errors) out.push(`  deterministic: ${error}`);
-    for(const error of item.semantic_errors) out.push(`  semantic: ${error}`);
+  out.push("=".repeat(72),"GOLD SCORER — SCORES PRINTED RUN 2","=".repeat(72));
+  for(const fixture of fixtures){
+    const engine=scoredRuns.get(fixture.id);
+    if(!engine) throw new Error(`missing printed RUN 2 for ${fixture.id}`);
+    out.push(`SCORER_INPUT ${fixture.id}: RUN 2 evidence_keys=[${engine.accepted.map(t=>[...t.evidence_ids].sort().join("+")).join(", ") || "none"}]`);
+    const assessment=assessD15BGoldDeterministically(fixture,engine);
+    out.push(`${fixture.id}: ${assessment.errors.length===0 ? "DETERMINISTIC PASS" : "DETERMINISTIC FAIL"}`);
+    for(const error of assessment.errors) out.push(`  deterministic: ${error}`);
   }
   out.push("");
   const text=out.join("\n");
