@@ -1,0 +1,33 @@
+name: D15 Saved Semantic Replay
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: "Ref containing replay-only scorer"
+        required: true
+        default: "d15-bounded-fixes"
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Replay saved semantic output twice
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: npm run replay:d15:saved
