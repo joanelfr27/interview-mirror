@@ -2,6 +2,9 @@ name: D15-B Offline Gold Gate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - d15-bounded-fixes
 
 permissions:
   contents: read
