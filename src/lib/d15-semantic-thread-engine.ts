@@ -90,37 +90,43 @@ const PROPER_NOUN_STOP_WORDS = new Set([
   "finance","change","operating","rhythm","customer","portal","rollout","user","feedback",
   "integration","accounting","systems","support","process","processes","delivery","delays",
 ]);
-const SENTENCE_INITIAL_COMMON_WORDS = new Set([
-  ...PROPER_NOUN_STOP_WORDS,
-  "supported","collected","worked","maintained","analyzing","analysing","connecting",
-  "keeping","reviewing","implementing","deploying","participating","coordinating",
-  "analysant","connectant","maintenant","soutenant","participant","déployant","coordonnant",
-]);
+const SENTENCE_INITIAL_VERB_MORPHOLOGY=/(?:ing|ed|ant|ent|é|ée|és|ées)$/iu;
+const ENTITY_PREPOSITIONS=new Set(["for","with","at","in","from","chez","avec","à","a","dans","pour"]);
 
-/**
- * Proper-noun hard guard.
- * Inspect every capitalized lexical token. Common/function words are exempt,
- * and sentence-initial common verbs are exempt; otherwise a capitalized token
- * must already occur in the cited source.
- */
-function unsupportedProperNouns(claim: string, source: string): string[] {
-  const sourceNorm = normalized(source);
-  const words = claim.trim().match(/[\p{L}][\p{L}'’.-]*/gu) ?? [];
-  const unsupported: string[] = [];
-  words.forEach((word,index)=>{
-    if (!/^\p{Lu}/u.test(word)) return;
+/** High-confidence entity guard only. Capitalisation alone is presentation, not entity evidence. */
+function unsupportedProperNouns(claim:string,source:string):string[]{
+  const sourceNorm=normalized(source);
+  const words=claim.trim().match(/[\\p{L}][\\p{L}'’.-]*/gu)??[];
+  const unsupported:string[]=[];
+  for(let i=0;i<words.length;i++){
+    const word=words[i]!;
+    if(!/^\\p{Lu}/u.test(word)) continue;
     const norm=normalized(word);
-    if (PROPER_NOUN_STOP_WORDS.has(norm)) return;
-    if (index===0 && SENTENCE_INITIAL_COMMON_WORDS.has(norm)) return;
-    if (!sourceNorm.includes(norm)) unsupported.push(word);
-  });
+    if(PROPER_NOUN_STOP_WORDS.has(norm)||sourceNorm.includes(norm)) continue;
+    if(i===0){
+      if(SENTENCE_INITIAL_VERB_MORPHOLOGY.test(norm)) continue;
+      unsupported.push(word); // first-token morphology rule: non-verb capitalised token is entity-like
+      continue;
+    }
+    const prev=normalized(words[i-1]??"");
+    const next=words[i+1];
+    const consecutive=!!next&&/^\\p{Lu}/u.test(next)&&!PROPER_NOUN_STOP_WORDS.has(normalized(next));
+    if(ENTITY_PREPOSITIONS.has(prev)||consecutive||!isFullyTitleCaseHeadline(claim)) unsupported.push(word);
+  }
   return [...new Set(unsupported)];
 }
 
 function isFullyTitleCaseHeadline(value:string):boolean {
-  const words=value.match(/[\p{L}][\p{L}'’.-]*/gu) ?? [];
+  const words=value.match(/[\\p{L}][\\p{L}'’.-]*/gu)??[];
   const lexical=words.filter(word=>!PROPER_NOUN_STOP_WORDS.has(normalized(word)));
-  return lexical.length>=2 && lexical.every(word=>/^\p{Lu}/u.test(word));
+  return lexical.length>=2&&lexical.every(word=>/^\\p{Lu}/u.test(word));
+}
+
+function obviousHeadlineLanguageMismatch(expected:"en"|"fr",value:string):boolean {
+  const n=` ${normalized(value)} `;
+  const fr=/\\b(?:avec|entre|des|les|une|analyse|délais|processus|participation|déploiement)\\b/u.test(n);
+  const en=/\\b(?:with|between|the|and|analysis|delays|process|participation|deployment|supporting|connecting)\\b/u.test(n);
+  return expected==="fr" ? en&&!fr : fr&&!en;
 }
 
 function exactNumericTokens(value: string): string[] {
@@ -523,7 +529,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
 
   for (const proposal of deterministic.accepted) {
     let workingProposal={...proposal};
-    if(isFullyTitleCaseHeadline(workingProposal.headline)){
+    if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
       const floor=deterministicHeadlineFloor(ledger,workingProposal);
       const floorProposal={...workingProposal,headline:floor};
       const floorErrors=deterministicProposalErrors(ledger,floorProposal);
