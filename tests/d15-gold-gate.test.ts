@@ -215,7 +215,11 @@ test("semantic preclear upgrade boundary catches wider English and French leader
   const marie=d15BGoldFixtures()[1]!;
   for(const headline of ["A piloté la réorganisation","Pilotait la réorganisation","Dirigeait la réorganisation","A mené la réorganisation"]){
     const raw=["leadership non étayé"];
-    assert.deepEqual(supportGroundingPreclear(marie,result([proposal("A",headline,["E8"],null)]),raw).errors,raw);
+    assert.deepEqual(
+      supportGroundingPreclear(marie,result([proposal("A",headline,["E8"],null)]),raw).errors,
+      raw,
+      `French upgrade must survive pre-clear: ${headline}`
+    );
   }
 });
 
@@ -246,4 +250,14 @@ test("semantic preclear does not mistake French direction audience noun for lead
   const x=supportGroundingPreclear(marie,r,raw);
   assert.deepEqual(x.errors,[]);
   assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+
+test("semantic preclear excludes only exact system ownership questions from upgrade scan",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const raw=["Candidate implies unsupported leadership of the rollout."];
+  const exact=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?")]);
+  assert.deepEqual(supportGroundingPreclear(thomas,exact,raw).errors,[]);
+  const presupposing=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"How did you lead the rollout?")]);
+  assert.deepEqual(supportGroundingPreclear(thomas,presupposing,raw).errors,raw);
 });
