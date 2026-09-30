@@ -1,6 +1,7 @@
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { d15ThreadEligibleAtoms } from "@/lib/d15-evidence-eligibility";
 
 export type D15BSemanticThreadProposal = {
   id: string;
@@ -36,11 +37,9 @@ const SENIORITY_ESCALATION = /\b(senior|head of|director|executive|chief|vice pr
 const PROPER_NOUN_TOKEN = /\b[A-ZÀ-ÖØ-Þ][\p{L}\p{M}'’.-]{2,}\b/gu;
 
 function supportedAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
-  const spanIds = new Set(ledger.source_spans.map((span) => span.id));
-  return ledger.evidence
-    .filter((atom) => atom.assertion.polarity === "AFFIRMATIVE")
-    .filter((atom) => atom.provenance.source_type !== "CANDIDATE_ELICITED")
-    .filter((atom) => spanIds.has(atom.source_span_id));
+  // D15-B consumes the same canonical pre-connection evidence population as
+  // the Professional Mirror. This prevents a second eligibility ontology.
+  return d15ThreadEligibleAtoms(ledger);
 }
 
 function normalized(value: string): string {
