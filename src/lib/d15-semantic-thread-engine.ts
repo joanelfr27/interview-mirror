@@ -429,8 +429,8 @@ function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSe
   const quotes = atoms.map((atom) => atom.source_quote).join(" ");
   const support = /\b(support(?:ed|ing)?|assist(?:ed|ing)?|help(?:ed|ing)?|participat(?:e|ed|ing)|contribut(?:e|ed|ing)|sout(?:enir|enu|enue|enus|enues)|appuy(?:er|é|ée|és|ées)|assist(?:er|é|ée|és|ées)|particip(?:er|é|ée|és|ées|ait|aient)|contribu(?:er|é|ée|és|ées|ait|aient))\b/iu.test(quotes);
   if (!support) return null;
-  const french = atoms.some((atom) => /\b(?:soutenir|appuy|assist|particip|contribu|déploy|coordonn|réorganis)\w*/iu.test(atom.source_quote));
-  return french
+  const language = sourceLanguageForEvidence(ledger, proposal.evidence_ids);
+  return language === "fr"
     ? "Dans ce travail, qu’avez-vous personnellement pris en charge, et qu’avez-vous plutôt soutenu ou accompagné ?"
     : "In this work, what did you personally own or do, and what did you mainly support or assist with?";
 }
