@@ -39,6 +39,10 @@ test("D15 builds an evidence-grounded Mirror",()=>{
   assert.equal(m.version,"d15-v1");
   assert.ok(m.threads.length>=1);
   assert.ok(m.statements.some(x=>x.kind==="PATTERN"));
+  assert.equal(m.threads[0]?.maturity,"EMERGING_PATTERN");
+  assert.deepEqual(m.threads[0]?.not_said_yet.map((gap)=>gap.dimension),["OUTCOME","SCALE","TIMING"]);
+  assert.equal(m.threads[0]?.maturity_basis.proven_context_count,1);
+  assert.equal(m.threads[0]?.maturity_basis.context_status,"CANONICAL_ROLE_CONTEXT_UNAVAILABLE");
   assert.equal(validateProfessionalMirror(m,l).valid,true);
 });
 
@@ -173,14 +177,33 @@ test("D15 collapses a conservative paraphrase duplicate",()=>{
   assert.equal(m.threads.length,0);
 });
 
-test("D15 validator rejects forged maturity",()=>{
+test("D15 validator rejects forged sustained maturity without proven career contexts",()=>{
   const s1=d15Span("S1","Managed regional finance.");
-  const l=d15Ledger([d15Atom("A1","S1","regional finance")],[s1]);
+  const s2=d15Span("S2","Managed regional finance reporting.");
+  const l=d15Ledger([d15Atom("A1","S1","regional finance"),d15Atom("A2","S2","regional finance")],[s1,s2]);
   const m=buildProfessionalMirror(l);
-  const fact=m.statements.find((x)=>x.kind==="FACT");
-  assert.ok(fact);
-  fact.maturity="SUSTAINED_STRENGTH";
+  assert.equal(m.threads.length,1);
+  m.threads[0].maturity="SUSTAINED_STRENGTH";
+  const pattern=m.statements.find((x)=>x.kind==="PATTERN");
+  assert.ok(pattern);
+  pattern.maturity="SUSTAINED_STRENGTH";
   const v=validateProfessionalMirror(m,l);
   assert.equal(v.valid,false);
   assert.ok(v.errors.some((e)=>e.includes("maturity")));
+});
+
+
+test("D15-A computes Not Said Yet once per thread and suppresses dimensions documented anywhere in the thread",()=>{
+  const s1=d15Span("S1","Managed regional finance and reduced close time.");
+  const s2=d15Span("S2","Managed regional finance reporting for 4 entities in 2025.");
+  const a1=d15Atom("A1","S1","regional finance");
+  const a2=d15Atom("A2","S2","regional finance");
+  a1.outcome="reduced close time";
+  a2.scale.scope="4 entities";
+  a2.time.start="2025";
+  const l=d15Ledger([a1,a2],[s1,s2]);
+  const m=buildProfessionalMirror(l);
+  assert.equal(m.threads.length,1);
+  assert.deepEqual(m.threads[0].not_said_yet,[]);
+  assert.equal(validateProfessionalMirror(m,l).valid,true);
 });

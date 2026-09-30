@@ -10,11 +10,29 @@ export type MirrorEvidenceRef = {
   source_type: EvidenceSourceType;
 };
 
+export type MirrorGapDimension = "OUTCOME" | "SCALE" | "TIMING";
+
+export type MirrorNotSaidYet = {
+  dimension: MirrorGapDimension;
+  evidence_ids: string[];
+  source_span_ids: string[];
+};
+
+export type MirrorMaturityBasis = {
+  proven_context_count: number;
+  context_status: "CANONICAL_ROLE_CONTEXT_UNAVAILABLE";
+  evidence_ids: string[];
+  source_span_ids: string[];
+};
+
 export type CareerThread = {
   id: string;
   label: string;
   evidence_ids: string[];
   connection_reason: "SHARED_OBJECT" | "SHARED_DOMAIN" | "SHARED_TOOL" | "SHARED_STANDARD" | "REPEATED_ACTION";
+  maturity: MirrorMaturity;
+  maturity_basis: MirrorMaturityBasis;
+  not_said_yet: MirrorNotSaidYet[];
 };
 
 export type MirrorStatement = {
@@ -363,11 +381,60 @@ export function diagnoseProfessionalMirrorConnections(ledger: EvidenceLedger): P
   return diagnostics;
 }
 
-function maturity(independentSpanCount: number): MirrorMaturity {
-  if (independentSpanCount >= 3) return "SUSTAINED_STRENGTH";
-  if (independentSpanCount === 2) return "SUPPORTED_CONCLUSION";
-  if (independentSpanCount === 1) return "EMERGING_PATTERN";
+function maturityForCanonicalContext(provenContextCount: number): MirrorMaturity {
+  // D15-A fail-closed rule: canonical evidence currently carries no role/employer
+  // context identifier. Source-span count is not a proxy for career-context count.
+  // Until canonical role context exists, a supported thread is capped at Emerging.
+  if (provenContextCount >= 3) return "SUSTAINED_STRENGTH";
+  if (provenContextCount === 2) return "SUPPORTED_CONCLUSION";
+  if (provenContextCount === 1) return "EMERGING_PATTERN";
   return "INSUFFICIENT_EVIDENCE";
+}
+
+function threadTruthScaffolding(
+  atoms: AtomicEvidence[],
+  evidenceIds: string[],
+): Pick<CareerThread, "maturity" | "maturity_basis" | "not_said_yet"> {
+  const evidence = evidenceIds
+    .map((id) => atoms.find((atom) => atom.id === id))
+    .filter((atom): atom is AtomicEvidence => Boolean(atom));
+  const sourceSpanIds = [...new Set(evidence.map((atom) => atom.source_span_id))].sort();
+
+  // No canonical role/employer context exists yet. Fail closed to one context for
+  // any supported thread; do not infer role blocks inside D15.
+  const provenContextCount = evidence.length > 0 ? 1 : 0;
+  const maturity = maturityForCanonicalContext(provenContextCount);
+
+  const gaps: MirrorNotSaidYet[] = [];
+  const addGap = (dimension: MirrorGapDimension) => gaps.push({
+    dimension,
+    evidence_ids: [...evidenceIds].sort(),
+    source_span_ids: [...sourceSpanIds],
+  });
+
+  if (!evidence.some((atom) => Boolean(atom.outcome?.trim()))) addGap("OUTCOME");
+  if (!evidence.some((atom) =>
+    Boolean(atom.scale.quantity?.trim()) ||
+    Boolean(atom.scale.currency?.trim()) ||
+    typeof atom.scale.team_size === "number" ||
+    Boolean(atom.scale.scope?.trim()),
+  )) addGap("SCALE");
+  if (!evidence.some((atom) =>
+    Boolean(atom.time.start?.trim()) ||
+    Boolean(atom.time.end?.trim()) ||
+    Boolean(atom.time.recency?.trim()),
+  )) addGap("TIMING");
+
+  return {
+    maturity,
+    maturity_basis: {
+      proven_context_count: provenContextCount,
+      context_status: "CANONICAL_ROLE_CONTEXT_UNAVAILABLE",
+      evidence_ids: [...evidenceIds].sort(),
+      source_span_ids: [...sourceSpanIds],
+    },
+    not_said_yet: gaps,
+  };
 }
 
 function safeLabel(atom: AtomicEvidence): string {
@@ -434,11 +501,14 @@ function buildThreads(ledger: EvidenceLedger, atoms: AtomicEvidence[]): CareerTh
       .filter(Boolean);
     const label = [...new Set(labels)].sort()[0] ?? "Supported professional thread";
 
+    const evidenceIds = [...component].sort();
+    const truthScaffolding = threadTruthScaffolding(atoms, evidenceIds);
     threads.push({
       id: `THREAD-${component.sort().join("-")}`,
       label,
-      evidence_ids: [...component].sort(),
+      evidence_ids: evidenceIds,
       connection_reason: bestReason,
+      ...truthScaffolding,
     });
   }
 
@@ -481,18 +551,12 @@ export function buildProfessionalMirror(ledger: EvidenceLedger): ProfessionalMir
       kind: "PATTERN",
       text: `Repeated professional thread: ${thread.label}.`,
       evidence_ids: [...thread.evidence_ids],
-      maturity: maturity(spanCount),
+      maturity: thread.maturity,
     });
 
-    if (spanCount >= 3) {
-      statements.push({
-        id: `INTERPRETATION-${thread.id}`,
-        kind: "INTERPRETATION",
-        text: `Across multiple documented experiences, ${thread.label} appears as a sustained professional thread.`,
-        evidence_ids: [...thread.evidence_ids],
-        maturity: "SUSTAINED_STRENGTH",
-      });
-    }
+    // D15-A deliberately suppresses sustained-strength interpretation language
+    // while canonical role context is unavailable. Multiple lines are not proof
+    // of multiple career contexts.
   }
 
   statements.sort((a, b) => a.id.localeCompare(b.id));
@@ -540,8 +604,12 @@ export function validateProfessionalMirror(mirror: ProfessionalMirror, ledger: E
     const uniqueSpans = new Set(statement.evidence_ids.map((id) => evidenceById.get(id)?.source_span_id)
       .filter((id): id is string => Boolean(id)));
     if (statement.kind !== "FACT" && uniqueSpans.size < 2) errors.push(`D15 ${statement.id} needs two distinct source spans.`);
-    if (statement.maturity !== maturity(uniqueSpans.size)) {
-      errors.push(`D15 ${statement.id} maturity does not match its independent source-span count.`);
+    const expectedMaturity =
+      statement.kind === "FACT"
+        ? "EMERGING_PATTERN"
+        : maturityForCanonicalContext(statement.evidence_ids.length > 0 ? 1 : 0);
+    if (statement.maturity !== expectedMaturity) {
+      errors.push(`D15 ${statement.id} maturity exceeds the proven canonical career-context evidence.`);
     }
     for (const id of statement.evidence_ids) {
       if (!mirrorEvidenceById.has(id)) errors.push(`D15 ${statement.id} references evidence outside the Mirror: ${id}`);
@@ -558,6 +626,17 @@ export function validateProfessionalMirror(mirror: ProfessionalMirror, ledger: E
     if (uniqueEvidence.size !== thread.evidence_ids.length) errors.push(`D15 thread ${thread.id} contains duplicate evidence.`);
     if (uniqueSpans.size < 2) errors.push(`D15 thread ${thread.id} needs two distinct source spans.`);
     for (const id of thread.evidence_ids) if (!mirrorEvidenceById.has(id)) errors.push(`D15 thread ${thread.id} references unknown evidence: ${id}`);
+
+    const expectedScaffolding = threadTruthScaffolding(independentAtoms(ledger), thread.evidence_ids);
+    if (thread.maturity !== expectedScaffolding.maturity) {
+      errors.push(`D15 thread ${thread.id} maturity exceeds the proven canonical career-context evidence.`);
+    }
+    if (JSON.stringify(thread.maturity_basis) !== JSON.stringify(expectedScaffolding.maturity_basis)) {
+      errors.push(`D15 thread ${thread.id} maturity provenance does not match canonical evidence.`);
+    }
+    if (JSON.stringify(thread.not_said_yet) !== JSON.stringify(expectedScaffolding.not_said_yet)) {
+      errors.push(`D15 thread ${thread.id} Not Said Yet gaps do not match canonical evidence.`);
+    }
   }
 
   const statementById = new Map(mirror.statements.map((statement) => [statement.id, statement]));
