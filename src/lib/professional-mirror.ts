@@ -1,4 +1,5 @@
 import type { AtomicEvidence, EvidenceLedger, EvidenceSourceType } from "@/lib/canonical-evidence-model";
+import { d15EligibleIndependentAtoms } from "@/lib/d15-evidence-eligibility";
 
 export type MirrorStatementKind = "FACT" | "PATTERN" | "INTERPRETATION";
 export type MirrorMaturity = "INSUFFICIENT_EVIDENCE" | "EMERGING_PATTERN" | "SUPPORTED_CONCLUSION" | "SUSTAINED_STRENGTH";
@@ -246,7 +247,7 @@ function ownershipCompatible(a: AtomicEvidence, b: AtomicEvidence): boolean {
   return a.subject.ownership === b.subject.ownership;
 }
 
-function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
+function legacyIndependentAtomsForEquivalence(ledger: EvidenceLedger): AtomicEvidence[] {
   const accepted: AtomicEvidence[] = [];
   const seen = new Set<string>();
   for (const atom of affirmativeAtoms(ledger)) {
@@ -257,6 +258,21 @@ function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
     accepted.push(atom);
   }
   return accepted;
+}
+
+export function assertD15EligibilityExtractionEquivalent(ledger: EvidenceLedger): void {
+  const legacyIds = legacyIndependentAtomsForEquivalence(ledger).map((atom) => atom.id);
+  const sharedIds = d15EligibleIndependentAtoms(ledger).map((atom) => atom.id);
+  if (JSON.stringify(legacyIds) !== JSON.stringify(sharedIds)) {
+    throw new Error(`D15 eligibility extraction mismatch: legacy=${JSON.stringify(legacyIds)} shared=${JSON.stringify(sharedIds)}`);
+  }
+}
+
+function independentAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
+  // TEMPORARY equivalence oracle: every existing D15 ledger exercised by the
+  // canonical suite is compared old-vs-shared before the legacy path is removed.
+  assertD15EligibilityExtractionEquivalent(ledger);
+  return d15EligibleIndependentAtoms(ledger);
 }
 
 function connection(a: AtomicEvidence, b: AtomicEvidence): CareerThread["connection_reason"] | null {
