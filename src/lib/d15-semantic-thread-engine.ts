@@ -344,8 +344,11 @@ Do not infer facts from titles, employers, typical duties, or outside knowledge.
       { role: "user", content: JSON.stringify(input) },
     ],
   });
-  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"candidates":[]}') as { candidates?: D15BCandidateSet[] };
-  return Array.isArray(parsed.candidates) ? parsed.candidates : [];
+  const content=response.choices[0]?.message?.content;
+  if(!content?.trim()) throw new Error("candidate discovery returned empty model content");
+  const parsed = JSON.parse(content) as { candidates?: D15BCandidateSet[] };
+  if(!Array.isArray(parsed.candidates)) throw new Error("candidate discovery returned invalid candidates payload");
+  return parsed.candidates;
 }
 
 async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15BCandidateSet): Promise<string> {
@@ -406,7 +409,7 @@ export async function verifyD15BClaimIndependently(
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, or causal claims.
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
-For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only professional insight value. supported=true only when combining the cited atoms reveals a useful relationship, bridge, operating pattern, or function that no single cited line states on its own. Category labels, duty summaries, paraphrases, and bundles of similar activities are false. Routine administrative bundles are false. Be strict about insight, but do not re-run factual entailment here.
+For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only whether combining the cited atoms reveals a relationship, bridge, operating pattern, or function that no single cited line states on its own. Significance does NOT require prestige, strategic scope, a measured outcome, or unusual work. A functional input-to-use, diagnosis-to-response, observation-to-audience, recurring-activity-to-review, or implementation-to-user relationship can be significant when the connection genuinely emerges across atoms. Category labels, duty summaries, paraphrases, and bundles of merely similar activities are false. Routine administrative bundles with no cross-atom functional relationship are false. Do not re-run factual entailment here.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Reject the claim when its language differs from expected_language. Return supported=false whenever uncertain. Return JSON only.`,
       },
@@ -490,7 +493,13 @@ async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThr
 }
 
 export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promise<D15BVerificationResult> {
-  const proposed = await proposeD15BSemanticThreads(ledger);
+  let proposed:D15BSemanticThreadProposal[];
+  try {
+    proposed = await proposeD15BSemanticThreads(ledger);
+  } catch (error) {
+    const reason=error instanceof Error ? error.message : String(error);
+    return { accepted:[], rejected:[{proposal_id:"ENGINE",reasons:[`ENGINE_ERROR: ${reason}`]}], cv_question_back:null, completion_state:"ERROR" };
+  }
   const deterministic = verifyD15BSemanticThreadProposals(ledger, proposed);
   const accepted: D15BVerifiedThread[] = [];
   const rejected = [...deterministic.rejected];
