@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runD16ShadowRuntimeIntegration } from "../src/lib/d16-shadow-runtime-integration.ts";
-import { CanonicalSupportJudgmentError } from "../src/lib/canonical-support-judge.ts";
 
-test("D16 full chain preserves support-judge diagnostics after completeness failure", async () => {
+test("D16 full chain preserves fail-closed support-judge completion for omitted facets", async () => {
   const previousIncompleteFlag = process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
   const previousOpenAIKey = process.env.OPENAI_API_KEY;
   process.env.SUPPORT_JUDGE_INCOMPLETE_TEST = "1";
@@ -27,21 +26,14 @@ test("D16 full chain preserves support-judge diagnostics after completeness fail
   } as any;
 
   try {
-    await assert.rejects(
-      () => runD16ShadowRuntimeIntegration(session),
-      (caught: unknown) => {
-        assert.ok(caught instanceof CanonicalSupportJudgmentError);
-        assert.equal(caught.diagnostic.parsed_successfully, true);
-        assert.equal(caught.diagnostic.requirement_count, 1);
-        assert.equal(caught.diagnostic.facet_count, 1);
-        assert.deepEqual(caught.diagnostic.expected_facet_ids, ["F-1"]);
-        assert.deepEqual(caught.diagnostic.returned_facet_ids, []);
-        assert.deepEqual(caught.diagnostic.missing_facet_ids, ["F-1"]);
-        assert.deepEqual(caught.diagnostic.unknown_facet_ids, []);
-        assert.deepEqual(caught.diagnostic.duplicate_facet_ids, []);
-        return true;
-      },
-    );
+    const result = await runD16ShadowRuntimeIntegration(session);
+    const judgments = result.ledger.support_judgments;
+    assert.equal(judgments.length, 1);
+    assert.equal(judgments[0]?.facet_id, "F-1");
+    assert.equal(judgments[0]?.status, "NONE");
+    assert.equal(judgments[0]?.abstained, true);
+    assert.deepEqual(judgments[0]?.supporting_evidence_ids, []);
+    assert.equal(judgments[0]?.confidence, 0);
   } finally {
     if (previousIncompleteFlag === undefined) delete process.env.SUPPORT_JUDGE_INCOMPLETE_TEST;
     else process.env.SUPPORT_JUDGE_INCOMPLETE_TEST = previousIncompleteFlag;
