@@ -15,7 +15,6 @@ jobs:
     timeout-minutes: 20
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ALLOW_REAL_OPENAI: "1"
     steps:
       - name: Checkout selected branch
         uses: actions/checkout@v4
@@ -33,4 +32,6 @@ jobs:
       - name: Production build
         run: npm run build
       - name: Run frozen five-CV D15-B Gold Gate
+        env:
+          ALLOW_REAL_OPENAI: "1"
         run: node --experimental-loader ./tests/ts-alias-loader.mjs tests/d15-gold-gate-runtime.ts
