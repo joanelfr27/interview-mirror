@@ -46,6 +46,18 @@ function normalized(value: string): string {
   return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function sourceLanguageForEvidence(ledger: EvidenceLedger, evidenceIds: string[]): "en"|"fr" {
+  const wanted=new Set(evidenceIds);
+  const languages=new Set(
+    supportedAtoms(ledger)
+      .filter(atom=>wanted.has(atom.id))
+      .map(atom=>ledger.source_spans.find(span=>span.id===atom.source_span_id)?.language)
+      .filter((language): language is "en"|"fr"=>language==="en"||language==="fr")
+  );
+  if(languages.size!==1) throw new Error("D15 invariant violation: thread evidence must resolve to exactly one source language");
+  return [...languages][0]!;
+}
+
 function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
   const wanted = new Set(evidenceIds);
   return supportedAtoms(ledger)
@@ -343,7 +355,7 @@ Prefer relationship-descriptive constructions such as "Connecting X with Y", "Li
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
 Write in the same language as the supplied source evidence. The headline is interpretation, never evidence. Return JSON only.` },
-      { role: "user", content: JSON.stringify({ source_language: ledger.source_spans.find((span) => candidate.evidence_ids.some((id) => supportedAtoms(ledger).find((atom) => atom.id === id)?.source_span_id === span.id))?.language ?? "en", dimension: candidate.dimension, cited_atoms: atoms }) },
+      { role: "user", content: JSON.stringify({ source_language: sourceLanguageForEvidence(ledger,candidate.evidence_ids), dimension: candidate.dimension, cited_atoms: atoms }) },
     ],
   });
   const parsed = JSON.parse(response.choices[0]?.message?.content || '{"headline":""}') as { headline?: string };
@@ -392,7 +404,7 @@ For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only 
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Return supported=false whenever uncertain. Return JSON only.`,
       },
-      { role: "user", content: JSON.stringify({ claim_type: claimType, cited_atoms: atoms, claim }) },
+      { role: "user", content: JSON.stringify({ claim_type: claimType, expected_language: sourceLanguageForEvidence(ledger,evidenceIds), cited_atoms: atoms, claim }) },
     ],
   });
   const parsed = JSON.parse(response.choices[0]?.message?.content || '{"supported":false,"reason":"empty verifier response"}') as D15BClaimVerification;
@@ -417,6 +429,12 @@ function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSe
     : "In this work, what did you personally own or do, and what did you mainly support or assist with?";
 }
 
+function deterministicOutcomeQuestion(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
+  return sourceLanguageForEvidence(ledger,proposal.evidence_ids)==="fr"
+    ? "Quel résultat concret a suivi ce travail, s’il y en a eu un ?"
+    : "What concrete result followed from this work, if any?";
+}
+
 async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): Promise<string | null> {
   const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
   const response = await getOpenAI().chat.completions.create({
@@ -428,8 +446,8 @@ async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemantic
 Return null unless answering the question would materially strengthen the insight.
 Priority 1: genuine ownership tension in the EVIDENCE TEXT. Treat support/assist/help/participate/contribute wording (and French soutenir/appuyer/assister/participer/contribuer) as an explicit ownership ambiguity. If the thread depends on such wording, generate a neutral question asking what the candidate personally owned/did versus supported; never presume leadership. Also ask when support-level wording is mixed with stronger implementation/deployment/coordination wording.
 Priority 2: an evidenced action/change with no stated result; ask neutrally what changed or resulted.
-Do not ask generic ownership merely because ownership metadata is unknown. Do not ask scale or timing by default. Do not assert an unknown fact in the question. Return JSON only.` },
-      { role: "user", content: JSON.stringify({ headline: proposal.headline, cited_atoms: atoms }) },
+Do not ask generic ownership merely because ownership metadata is unknown. Do not ask scale or timing by default. Do not assert an unknown fact in the question. Write the question strictly in source_language. Return JSON only.` },
+      { role: "user", content: JSON.stringify({ source_language: sourceLanguageForEvidence(ledger,proposal.evidence_ids), headline: proposal.headline, cited_atoms: atoms }) },
     ],
   });
   const parsed = JSON.parse(response.choices[0]?.message?.content || '{"question_back":null}') as { question_back?: string | null };
@@ -464,7 +482,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
     }
-    const generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal);
+    const generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal) ?? deterministicOutcomeQuestion(ledger,proposal);
     if (generatedQuestion) {
       const questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
       accepted.push(questionCheck.supported ? { ...proposal, question_back: generatedQuestion } : proposal);
