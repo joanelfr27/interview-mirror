@@ -1,5 +1,5 @@
 import type { AtomicEvidence, EvidenceLedger, EvidenceSourceType } from "@/lib/canonical-evidence-model";
-import { d15EligibleIndependentAtoms } from "@/lib/d15-evidence-eligibility";
+import { d15EligibleIndependentAtoms, d15ThreadEligibleAtoms } from "@/lib/d15-evidence-eligibility";
 
 export type MirrorStatementKind = "FACT" | "PATTERN" | "INTERPRETATION";
 export type MirrorMaturity = "INSUFFICIENT_EVIDENCE" | "EMERGING_PATTERN" | "SUPPORTED_CONCLUSION" | "SUSTAINED_STRENGTH";
@@ -284,19 +284,28 @@ export function assertD15EligibilityExtractionEquivalent(ledger: EvidenceLedger)
 
   const preDedupe = affirmativeAtoms(ledger);
   const duplicateRemoved = legacy.length < preDedupe.length;
-  const excludedSectionSeen = legacy.some(
-    (atom) => spanFor(ledger, atom)?.source_section === "EXPERIENCE_NON_BULLET",
-  );
+  // Legacy pre-connection section boundary, retained temporarily as the
+  // equivalence oracle. EXPERIENCE_NON_BULLET remains Mirror evidence/fact but
+  // is removed before thread connection.
+  const legacyThreadIds = legacy
+    .filter((atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET")
+    .map((atom) => atom.id);
+  const sharedThreadIds = d15ThreadEligibleAtoms(ledger, d15EligibleIndependentAtoms(ledger))
+    .map((atom) => atom.id);
+  const excludedSectionRemoved = legacyThreadIds.length < legacyIds.length;
 
   eligibilityEquivalenceCoverage.ledgers_checked += 1;
   if (contradictionRemoved) eligibilityEquivalenceCoverage.contradiction_ledgers += 1;
   if (duplicateRemoved) eligibilityEquivalenceCoverage.duplicate_ledgers += 1;
-  if (excludedSectionSeen) eligibilityEquivalenceCoverage.excluded_section_ledgers += 1;
+  if (excludedSectionRemoved) eligibilityEquivalenceCoverage.excluded_section_ledgers += 1;
 
   console.log("[D15 ELIGIBILITY EQUIVALENCE]", JSON.stringify(eligibilityEquivalenceCoverage));
 
   if (JSON.stringify(legacyIds) !== JSON.stringify(sharedIds)) {
     throw new Error(`D15 eligibility extraction mismatch: legacy=${JSON.stringify(legacyIds)} shared=${JSON.stringify(sharedIds)}`);
+  }
+  if (JSON.stringify(legacyThreadIds) !== JSON.stringify(sharedThreadIds)) {
+    throw new Error(`D15 pre-connection eligibility mismatch: legacy=${JSON.stringify(legacyThreadIds)} shared=${JSON.stringify(sharedThreadIds)}`);
   }
 }
 
@@ -572,9 +581,7 @@ export function buildProfessionalMirror(ledger: EvidenceLedger): ProfessionalMir
 
   // Role-overview lines remain canonical evidence/facts for traceability, but do not
   // participate in D15 thread construction or maturity.
-  const threadAtoms = atoms.filter(
-    (atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET",
-  );
+  const threadAtoms = d15ThreadEligibleAtoms(ledger, atoms);
   const threads = buildThreads(ledger, threadAtoms);
   const statements: MirrorStatement[] = [];
 
