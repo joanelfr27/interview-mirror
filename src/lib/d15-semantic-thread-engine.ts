@@ -240,10 +240,22 @@ export function verifyD15BSemanticThreadProposals(
     if(languages.size!==1) return "en" as const;
     return [...languages][0]!;
   })();
+  const visibleCvAnchors=[...new Set(
+    supportedAtoms(ledger)
+      .map(atom=>atom.action.object?.trim())
+      .filter((value):value is string=>Boolean(value))
+  )].slice(0,3);
+  const anchorText=visibleCvAnchors.length
+    ? visibleCvAnchors.map(value=>`“${value}”`).join(", ")
+    : null;
   const cv_question_back=accepted.length===0
     ? (cvLanguage==="fr"
-      ? "Y a-t-il, dans votre expérience, un mode de travail ou une responsabilité récurrente que ces éléments du CV ne rendent pas encore visible ?"
-      : "Across your experience, is there a recurring way of working or responsibility that these CV entries do not yet make visible?")
+      ? (anchorText
+        ? `Votre CV mentionne notamment ${anchorText}. Sans supposer qu'ils forment un même fil conducteur, y a-t-il une manière de travailler ou une responsabilité récurrente qui relie certains de ces éléments et que le CV ne rend pas encore explicite ?`
+        : "Sans supposer qu’un fil conducteur existe, y a-t-il une manière de travailler ou une responsabilité récurrente dans votre parcours que le CV ne rend pas encore explicite ?")
+      : (anchorText
+        ? `Your CV includes ${anchorText}. Without assuming they form one pattern, is there a recurring way of working or responsibility that connects some of these elements but is not yet explicit in the CV?`
+        : "Without assuming there is a common thread, is there a recurring way of working or responsibility in your experience that the CV does not yet make explicit?"))
     : null;
   return { accepted, rejected, cv_question_back };
 }
