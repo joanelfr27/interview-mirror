@@ -1,0 +1,195 @@
+import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
+import { runD15BSemanticThreadEngine, type D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
+
+type GoldThreadRule = {
+  id: string;
+  core_meaning: string;
+  required_sets: string[][];
+  prohibited_ids: string[];
+  question_requirement: string;
+};
+
+type GoldFixture = {
+  id: "NANCY" | "MARIE" | "DAVID" | "ELENA" | "THOMAS";
+  language: "en" | "fr";
+  lines: string[];
+  threads: GoldThreadRule[];
+  expected_thread_count: number;
+  global_must_not: string[];
+};
+
+export type D15BGoldCaseResult = {
+  fixture_id: GoldFixture["id"];
+  passed: boolean;
+  engine: D15BVerificationResult;
+  deterministic_errors: string[];
+  semantic_errors: string[];
+};
+
+const FIXTURES: GoldFixture[] = [
+  {
+    id: "NANCY", language: "en", expected_thread_count: 2,
+    lines: [
+      "Managing accounting systems and financial procedures.",
+      "Preparing and analysing actual, forecast and budget financial information.",
+      "Managing statutory financial reporting and taxation requirements.",
+      "Supporting acquisition accounting and financial integration activities.",
+      "Supporting systems integration following business changes.",
+      "Implementing and improving accounting systems and processes.",
+      "Training and developing finance staff.",
+      "Providing financial information to management to support business decisions.",
+      "Maintaining effective financial controls and reporting processes.",
+      "Communicating financial information to internal stakeholders.",
+    ],
+    threads: [
+      { id:"A", core_meaning:"Finance keeps functioning while the business changes through acquisition, integration, systems and process change.", required_sets:[["E4","E5","E6"]], prohibited_ids:["E1","E3","E8","E9","E10"], question_requirement:"Surface the support-versus-implementation ownership tension and ask what Nancy actually led or owned without assuming leadership." },
+      { id:"B", core_meaning:"Financial information is connected to management and internal stakeholders who use it for decisions.", required_sets:[["E8","E10"]], prohibited_ids:["E3","E4","E5","E6","E9"], question_requirement:"Ask whether a decision or action changed because of the information, without claiming that it did." },
+    ],
+    global_must_not:["Do not claim Nancy led acquisitions or integrations.","Do not invent outcomes, scale, dates, duration, seniority or strategic-leader status."],
+  },
+  {
+    id:"MARIE", language:"fr", expected_thread_count:2,
+    lines:[
+      "Coordonnait les opérations quotidiennes de trois agences régionales.",
+      "Suivait les incidents clients et organisait leur résolution avec les équipes concernées.",
+      "Déployait de nouvelles procédures de suivi des commandes dans les agences.",
+      "Formait les nouveaux superviseurs aux procédures opérationnelles.",
+      "Analysait les retards de livraison et présentait les causes principales à la direction.",
+      "Coordonnait le suivi des fournisseurs et des équipes internes lors des périodes de forte activité.",
+      "Mettre à jour les tableaux de bord hebdomadaires pour la direction.",
+      "Participait à la réorganisation du processus de traitement des commandes.",
+    ],
+    threads:[
+      { id:"A", core_meaning:"Elle identifie où le flux de commandes se bloque et contribue à modifier les procédures qui le structurent.", required_sets:[["E5","E3"],["E5","E8"],["E5","E3","E8"]], prohibited_ids:["E1","E4","E6","E7"], question_requirement:"En français, faire ressortir Déployait versus Participait à et demander ce qu'elle a réellement piloté, sans le présumer." },
+      { id:"B", core_meaning:"Quand un problème implique plusieurs parties, elle les organise pour le résoudre.", required_sets:[["E2","E6"]], prohibited_ids:["E1","E3","E4","E5","E7","E8"], question_requirement:"En français, demander quel résultat concret cette coordination a produit, sans inventer le résultat." },
+    ],
+    global_must_not:["Les sorties doivent être en français.","Ne pas utiliser direction, suivi ou équipes comme thème lexical.","Ne pas inventer de baisse des retards, dates ou leadership de la réorganisation."],
+  },
+  {
+    id:"DAVID", language:"en", expected_thread_count:2,
+    lines:[
+      "Managed a portfolio of business customers across the northern region.",
+      "Prepared monthly sales forecasts and reviewed variances with the sales team.",
+      "Visited key accounts to understand customer priorities and coordinate follow-up.",
+      "Introduced a structured pipeline review for the sales team.",
+      "Worked with marketing colleagues to coordinate product launches.",
+      "Presented customer and market observations to senior management.",
+      "Coached new account executives on customer planning and reporting routines.",
+      "Supported negotiations with several strategic customers.",
+    ],
+    threads:[
+      { id:"A", core_meaning:"Beyond managing accounts, he builds the planning and review discipline the sales team runs on.", required_sets:[["E2","E4"],["E4","E7"],["E2","E4","E7"]], prohibited_ids:["E1","E3","E5","E6","E8"], question_requirement:"Ask about ownership or the outcome of the pipeline-review discipline without inventing results." },
+      { id:"B", core_meaning:"He carries what customers need and what he observes in the market back to senior management.", required_sets:[["E3","E6"]], prohibited_ids:["E1","E2","E4","E5","E7","E8"], question_requirement:"Ask whether anything changed because of his observations without claiming that it did." },
+    ],
+    global_must_not:["Do not restate the thread merely as sales or account management.","Do not invent revenue, forecast accuracy, win-rate, team size or dates."],
+  },
+  {
+    id:"ELENA", language:"en", expected_thread_count:0,
+    lines:[
+      "Answered incoming calls and welcomed visitors.",
+      "Updated contact information in the office database.",
+      "Prepared meeting rooms and circulated agendas.",
+      "Processed routine invoices according to established procedures.",
+      "Booked travel and maintained calendars for managers.",
+      "Filed documents and maintained electronic records.",
+      "Ordered office supplies when requested.",
+      "Assisted with general administrative tasks.",
+    ],
+    threads:[],
+    global_must_not:["Zero threads. Do not manufacture office, maintained or record-keeping patterns.","Do not infer organised, reliable, detail-oriented, initiative, ownership or improvement."],
+  },
+  {
+    id:"THOMAS", language:"en", expected_thread_count:1,
+    lines:[
+      "Coordinated project meetings and maintained action logs.",
+      "Prepared status updates for project stakeholders.",
+      "Worked with technical teams to track delivery issues.",
+      "Supported the rollout of a new customer portal.",
+      "Collected user feedback during the portal rollout.",
+      "Maintained project documentation and risk registers.",
+      "Assisted with training sessions for users of the new portal.",
+      "Helped project managers prepare steering-committee materials.",
+    ],
+    threads:[
+      { id:"A", core_meaning:"He works where a new customer portal meets the people who have to use it.", required_sets:[["E4","E5"],["E4","E7"],["E5","E7"],["E4","E5","E7"]], prohibited_ids:["E1","E2","E3","E6","E8"], question_requirement:"Ask what he personally owned because the evidence is support-level; do not assume he led the rollout." },
+    ],
+    global_must_not:["Do not create a second project-administration thread.","Do not claim portal leadership, adoption success, user count or dates."],
+  },
+];
+
+function atom(id:string, spanId:string, line:string, language:"en"|"fr"):AtomicEvidence {
+  const first = line.replace(/[.]/g,"").split(/\s+/)[0] ?? "Performed";
+  const object = line.slice(first.length).trim().replace(/[.]$/,"");
+  return {
+    id, source_span_id:spanId, provenance:{source_type:"CV",language,extraction_method:"LLM"},
+    subject:{actor:"candidate",ownership:"UNKNOWN"}, action:{normalized_action:first,object},
+    context:{},scale:{},time:{},outcome:null,
+    assertion:{type:"RESPONSIBILITY",polarity:"AFFIRMATIVE"},
+    verifiability:{has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false},
+    extraction_confidence:1,
+  };
+}
+
+export function buildD15BGoldLedger(fixture: GoldFixture): EvidenceLedger {
+  const source_spans:SourceSpan[] = fixture.lines.map((line,i)=>({
+    id:`S${i+1}`,document_id:`GOLD-${fixture.id}`,text:line,start_offset:i*100,end_offset:i*100+line.length,
+    language:fixture.language,source_section:"BULLET",
+  }));
+  return {
+    source_spans,
+    evidence:fixture.lines.map((line,i)=>atom(`E${i+1}`,`S${i+1}`,line,fixture.language)),
+    requirements:[],support_judgments:[],requirement_statuses:[],unresolved_items:[],candidate_elicitations:[],demonstration_objectives:[],
+  };
+}
+
+function setKey(ids:string[]):string { return [...new Set(ids)].sort().join("|"); }
+
+function deterministicGoldErrors(fixture:GoldFixture, result:D15BVerificationResult):string[] {
+  const errors:string[]=[];
+  if(result.accepted.length!==fixture.expected_thread_count) errors.push(`expected ${fixture.expected_thread_count} accepted threads, got ${result.accepted.length}`);
+  if(fixture.expected_thread_count===0) return errors;
+  const unmatched=[...result.accepted];
+  for(const rule of fixture.threads){
+    const allowed=new Set(rule.required_sets.map(setKey));
+    const idx=unmatched.findIndex(p=>allowed.has(setKey(p.evidence_ids)) && !p.evidence_ids.some(id=>rule.prohibited_ids.includes(id)));
+    if(idx<0) errors.push(`Gold thread ${rule.id} required evidence/purity not recovered`);
+    else unmatched.splice(idx,1);
+  }
+  if(unmatched.length) errors.push(`${unmatched.length} accepted thread(s) did not match any Gold evidence group`);
+  return errors;
+}
+
+const SCORE_SCHEMA={
+  type:"object",additionalProperties:false,
+  properties:{passed:{type:"boolean"},errors:{type:"array",items:{type:"string"}}},
+  required:["passed","errors"],
+} as const;
+
+async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult):Promise<string[]> {
+  if(fixture.expected_thread_count===0) return result.accepted.length===0?[]:["Elena must have zero threads"];
+  const response=await getOpenAI().chat.completions.create({
+    model:AI_MODEL,temperature:0,
+    response_format:{type:"json_schema",json_schema:{name:"d15_b_gold_score",strict:true,schema:SCORE_SCHEMA}},
+    messages:[
+      {role:"system",content:`You are an independent benchmark scorer, not the generator. Score the candidate output against the frozen Gold rules supplied. Do not reward fluency. Fail any unsupported ownership/outcome/scale/timing/seniority/scope claim. Wording may differ if semantic meaning is faithful. Questions must satisfy the specified ambiguity without asserting its answer. The maturity ceiling is Emerging. Return JSON only.`},
+      {role:"user",content:JSON.stringify({language:fixture.language,gold_threads:fixture.threads,global_must_not:fixture.global_must_not,candidate_output:result.accepted})},
+    ],
+  });
+  const parsed=JSON.parse(response.choices[0]?.message?.content||'{"passed":false,"errors":["empty scorer response"]}') as {passed:boolean;errors:string[]};
+  return parsed.passed?[]:parsed.errors;
+}
+
+export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
+  const results:D15BGoldCaseResult[]=[];
+  for(const fixture of FIXTURES){
+    const ledger=buildD15BGoldLedger(fixture);
+    const engine=await runD15BSemanticThreadEngine(ledger);
+    const deterministic_errors=deterministicGoldErrors(fixture,engine);
+    const semantic_errors=deterministic_errors.length?[]:await semanticGoldErrors(fixture,engine);
+    results.push({fixture_id:fixture.id,passed:deterministic_errors.length===0&&semantic_errors.length===0,engine,deterministic_errors,semantic_errors});
+  }
+  return results;
+}
+
+export function d15BGoldFixtures():readonly GoldFixture[]{ return FIXTURES; }
