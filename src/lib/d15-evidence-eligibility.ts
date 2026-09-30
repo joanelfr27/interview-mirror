@@ -92,3 +92,19 @@ export function d15EligibleIndependentAtoms(ledger: EvidenceLedger): AtomicEvide
   }
   return accepted;
 }
+
+
+/**
+ * Canonical D15 pre-connection atom boundary.
+ * Exact extraction of the existing Professional Mirror rule: role-overview
+ * EXPERIENCE_NON_BULLET atoms remain traceable Mirror evidence/facts but cannot
+ * participate in D15 thread connections or maturity.
+ */
+export function d15ThreadEligibleAtoms(
+  ledger: EvidenceLedger,
+  atoms: AtomicEvidence[] = d15EligibleIndependentAtoms(ledger),
+): AtomicEvidence[] {
+  return atoms.filter(
+    (atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET",
+  );
+}
