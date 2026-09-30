@@ -36,7 +36,22 @@ jobs:
         run: npm ci
 
       - name: Typecheck
+        id: typecheck
+        continue-on-error: true
         run: npm run typecheck
 
       - name: D15 Gold synthetic tests
+        id: gold_tests
+        continue-on-error: true
         run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-gold-gate.test.ts
+
+      - name: Mechanical gate summary
+        if: always()
+        run: |
+          echo "typecheck=${{ steps.typecheck.outcome }}"
+          echo "gold_tests=${{ steps.gold_tests.outcome }}"
+          if [ "${{ steps.typecheck.outcome }}" != "success" ] || [ "${{ steps.gold_tests.outcome }}" != "success" ]; then
+            echo "Mechanical validation failed."
+            exit 1
+          fi
+          echo "Mechanical validation passed."
