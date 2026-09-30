@@ -424,7 +424,7 @@ const QUESTION_SCHEMA = {
   required: ["question_back"],
 } as const;
 
-function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): string | null {
+export function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): string | null {
   const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
   const quotes = atoms.map((atom) => atom.source_quote).join(" ");
   const support = /\b(support(?:ed|ing)?|assist(?:ed|ing)?|help(?:ed|ing)?|participat(?:e|ed|ing)|contribut(?:e|ed|ing)|sout(?:enir|enu|enue|enus|enues)|appuy(?:er|é|ée|és|ées)|assist(?:er|é|ée|és|ées)|particip(?:er|é|ée|és|ées|ait|aient)|contribu(?:er|é|ée|és|ées|ait|aient))\b/iu.test(quotes);
@@ -435,7 +435,7 @@ function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSe
     : "In this work, what did you personally own or do, and what did you mainly support or assist with?";
 }
 
-function deterministicOutcomeQuestion(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
+export function deterministicOutcomeQuestion(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
   return sourceLanguageForEvidence(ledger,proposal.evidence_ids)==="fr"
     ? "Cela a-t-il changé quelque chose de mesurable ? Si oui, quoi ?"
     : "Did this change anything measurable? If so, what?";
