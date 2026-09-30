@@ -244,7 +244,7 @@ function citedAtoms(fixture:GoldFixture,result:D15BVerificationResult){
   }));
 }
 
-const LEADERSHIP_OR_OWNERSHIP=/\b(?:lead\w*|led|own\w*|drov\w*|driven|manag\w*|head\w*|overs(?:ee|aw|een|e\w*)|spearhead\w*|orchestrat\w*|responsible\s+for|pilot\w*|dirig\w*|men(?:é|e|ait|aient|er|ons|ez|ent)|condui\w*|supervis\w*|pris\s+en\s+charge)\b/i;
+const LEADERSHIP_OR_OWNERSHIP=/\b(?:lead(?:s|ing)?|led|own(?:s|ed|ing)?|drive(?:s|n|ing)?|drove|manag(?:e|ed|es|ing)|head(?:s|ed|ing)?|oversee(?:s|ing)?|oversaw|overseen|spearhead(?:s|ed|ing)?|orchestrat(?:e|ed|es|ing)|responsible\s+for|pilot(?:e|es|er|ait|aient|é|ée|és|ées)|dirig(?:e|es|er|eait|eaient|é|ée|és|ées)|men(?:er|e|es|ait|aient|é|ée|és|ées)|condui(?:re|t|te|ts|tes|sait|saient)|supervis(?:er|e|es|ait|aient|é|ée|és|ées)|pris\s+en\s+charge)\b/i;
 
 export type SemanticPreclearResult={ errors:string[]; set_aside:Array<{raw:string;reason:string}> };
 
