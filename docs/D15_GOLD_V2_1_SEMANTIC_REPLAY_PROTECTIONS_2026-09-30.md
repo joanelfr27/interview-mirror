@@ -43,3 +43,7 @@ The replay record must include:
 ## Replay-only execution
 
 The replay deliberately calls `semanticGoldErrors()` even where deterministic findings exist. This bypasses only the normal deterministic short-circuit. Production/LOCK behavior remains unchanged.
+
+
+## Elena capability addendum — 2026-09-30
+The Elena deterministic rule set expanded after the original frozen replay: complete restraint now requires `COMPLETED_NO_QUALIFYING_RELATIONSHIP` plus a grounded, premise-free, pattern-seeking CV-level question. Historical saved outputs predate both fields; their Elena capability finding therefore reflects an absent capability, not a regression in thread restraint.
