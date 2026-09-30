@@ -244,17 +244,17 @@ function citedAtoms(fixture:GoldFixture,result:D15BVerificationResult){
   }));
 }
 
-const LEADERSHIP_OR_OWNERSHIP=/\b(?:led|lead|leading|owned|own|drove|driven|managed|pilot(?:é|e|er|ait)|dirig(?:é|e|er|eait)|posséd(?:é|er)|pris en charge)\b/i;
+const LEADERSHIP_OR_OWNERSHIP=/\b(?:lead\w*|led|own\w*|drov\w*|driven|manag\w*|head\w*|overs(?:ee|aw|een|e\w*)|spearhead\w*|orchestrat\w*|responsible\s+for|pilot\w*|dirig\w*|men(?:é|e|ait|aient|er|ons|ez|ent)|condui\w*|supervis\w*|pris\s+en\s+charge)\b/i;
 
 export type SemanticPreclearResult={ errors:string[]; set_aside:Array<{raw:string;reason:string}> };
 
 export function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):SemanticPreclearResult {
-  const neutralCandidate=result.accepted.every(thread=>!LEADERSHIP_OR_OWNERSHIP.test(thread.headline));
+  const neutralCandidate=result.accepted.every(thread=>!LEADERSHIP_OR_OWNERSHIP.test(`${thread.headline}\n${thread.question_back??""}`));
   if(!neutralCandidate) return {errors,set_aside:[]};
   const setAside=errors.filter(error=>/lead(?:er|ership|ing|s|\b)|unsupported ownership|ownership upgrade/i.test(error));
   return {
     errors:errors.filter(error=>!setAside.includes(error)),
-    set_aside:setAside.map(raw=>({raw,reason:"Candidate headline contains no leadership/ownership upgrade verb; raw semantic finding retained for audit."})),
+    set_aside:setAside.map(raw=>({raw,reason:"Candidate headline and question contain no leadership/ownership upgrade verb; raw semantic finding retained for audit."})),
   };
 }
 
