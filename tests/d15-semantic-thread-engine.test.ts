@@ -133,3 +133,64 @@ test("D15-B shared boundary excludes role-overview atoms before semantic threadi
   const l=ledger([atom("A1","S1","Responsible","accounting systems"),atom("A2","S2","Managed","accounting systems")],[s1,s2] as any);
   assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A2"]);
 });
+
+
+test("D15-B guard spec: French piloté ownership escalation is rejected",()=>{
+  const s1=span("S1","Participait à la réorganisation des processus.");
+  const s2=span("S2","A contribué au suivi de la réorganisation.");
+  const l=ledger([atom("A1","S1","Participait","à la réorganisation des processus"),atom("A2","S2","Contribué","au suivi de la réorganisation")],[s1,s2]);
+  const r=verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Vous avez piloté la réorganisation des processus",evidence_ids:["A1","A2"],question_back:null}]);
+  assert.equal(r.accepted.length,0);
+});
+
+test("D15-B guard spec: French réduit outcome escalation is rejected",()=>{
+  const s1=span("S1","Analysait les retards de livraison.");
+  const s2=span("S2","Mettait à jour le tableau de bord des retards.");
+  const l=ledger([atom("A1","S1","Analysait","les retards de livraison"),atom("A2","S2","Mettait","à jour le tableau de bord des retards")],[s1,s2]);
+  const r=verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Vous avez réduit les retards de livraison",evidence_ids:["A1","A2"],question_back:null}]);
+  assert.equal(r.accepted.length,0);
+});
+
+for (const entity of ["Syngenta","Paris"]) test(`D15-B guard spec: first-word entity ${entity} is rejected`,()=>{
+  const s1=span("S1","Supported acquisition accounting and systems integration.");
+  const s2=span("S2","Supported a portal rollout.");
+  const l=ledger([atom("A1","S1","Supported","acquisition accounting and systems integration"),atom("A2","S2","Supported","a portal rollout")],[s1,s2]);
+  const headline=entity==="Syngenta"?"Syngenta acquisition and systems integration support":"Paris portal rollout support";
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline,evidence_ids:["A1","A2"],question_back:null}]).accepted.length,0);
+});
+
+for (const headline of ["Finance Through Change","Finance and Its Operating Rhythm"]) test(`D15-B guard spec: benign Title Case remains accepted: ${headline}`,()=>{
+  const s1=span("S1","Worked across finance during change.");
+  const s2=span("S2","Maintained the operating rhythm of finance.");
+  const l=ledger([atom("A1","S1","Worked","across finance during change"),atom("A2","S2","Maintained","the operating rhythm of finance")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline,evidence_ids:["A1","A2"],question_back:null}]).accepted.length,1);
+});
+
+test("D15-B guard spec: exact numeric value must be grounded",()=>{
+  const s1=span("S1","Handled 8 reviews.");
+  const s2=span("S2","Supported review follow-up.");
+  const l=ledger([atom("A1","S1","Handled","8 reviews"),atom("A2","S2","Supported","review follow-up")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Handled 12 reviews",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,0);
+});
+
+test("D15-B guard spec: unsupported ownership premise inside question is rejected",()=>{
+  const s1=span("S1","Supported a portal rollout.");
+  const s2=span("S2","Collected user feedback during rollout.");
+  const l=ledger([atom("A1","S1","Supported","a portal rollout"),atom("A2","S2","Collected","user feedback during rollout")],[s1,s2]);
+  const r=verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Portal rollout and user feedback",evidence_ids:["A1","A2"],question_back:"Since you led the rollout, what outcome did you achieve?"}]);
+  assert.equal(r.accepted.length,0);
+});
+
+test("D15-B guard spec: Thomas portal-style grounded English headline remains accepted",()=>{
+  const s1=span("S1","Supported the rollout of a new customer portal.");
+  const s2=span("S2","Collected user feedback during the portal rollout.");
+  const l=ledger([atom("A1","S1","Supported","the rollout of a new customer portal"),atom("A2","S2","Collected","user feedback during the portal rollout")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Customer portal rollout and user feedback",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,1);
+});
+
+test("D15-B guard spec: Nancy-style integration support headline remains accepted",()=>{
+  const s1=span("S1","Supported acquisition accounting and financial integration activities.");
+  const s2=span("S2","Supported systems integration following business changes.");
+  const l=ledger([atom("A1","S1","Supported","acquisition accounting and financial integration activities"),atom("A2","S2","Supported","systems integration following business changes")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Financial and systems integration support",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,1);
+});
