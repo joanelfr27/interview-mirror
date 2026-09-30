@@ -191,7 +191,9 @@ export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BV
   if(fixture.id==="ELENA"){
     if(result.accepted.length!==0) errors.push("Elena restraint failed: expected zero displayed professional threads");
     const extended=result as D15BVerificationResult & {completion_state?:string;cv_question_back?:string|null};
-    if(extended.completion_state!=="COMPLETED_NO_QUALIFYING_RELATIONSHIP")
+    if(extended.completion_state===undefined)
+      errors.push("ELENA_CAPABILITY_MISSING: completion state absent");
+    else if(extended.completion_state!=="COMPLETED_NO_QUALIFYING_RELATIONSHIP")
       errors.push("ELENA_CAPABILITY_MISSING: CV-level question is valid only for genuine completed no-relationship state");
     const question=extended.cv_question_back?.trim()??"";
     if(!question) errors.push("ELENA_CAPABILITY_MISSING: CV-level pattern-seeking question is absent");
