@@ -252,14 +252,14 @@ async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationRes
 }
 
 export type D15BSemanticReplayReview = {
-  findings: Array<{ category:string; detail:string }>;
+  findings: Array<{ thread_id:string|null; category:string; detail:string }>;
   unmatched_extras: Array<{ thread_id:string; classification:"LEGITIMATE"|"ILLEGITIMATE"; detail:string }>;
 };
 
 const REPLAY_SEMANTIC_SCHEMA={
   type:"object",additionalProperties:false,
   properties:{
-    findings:{type:"array",items:{type:"object",additionalProperties:false,properties:{category:{type:"string",enum:["CORE_MEANING_MISMATCH","UNSUPPORTED_OWNERSHIP","UNSUPPORTED_OUTCOME","UNSUPPORTED_SCALE","UNSUPPORTED_TIMING","UNSUPPORTED_SENIORITY","UNSUPPORTED_SCOPE","RESTRAINT_VIOLATION","TRACEABILITY_VIOLATION","OVERLAP_VIOLATION"]},detail:{type:"string"}},required:["category","detail"]}},
+    findings:{type:"array",items:{type:"object",additionalProperties:false,properties:{thread_id:{anyOf:[{type:"string"},{type:"null"}]},category:{type:"string",enum:["CORE_MEANING_MISMATCH","UNSUPPORTED_OWNERSHIP","UNSUPPORTED_OUTCOME","UNSUPPORTED_SCALE","UNSUPPORTED_TIMING","UNSUPPORTED_SENIORITY","UNSUPPORTED_SCOPE","RESTRAINT_VIOLATION","TRACEABILITY_VIOLATION","OVERLAP_VIOLATION"]},detail:{type:"string"}},required:["thread_id","category","detail"]}},
     unmatched_extras:{type:"array",items:{type:"object",additionalProperties:false,properties:{thread_id:{type:"string"},classification:{type:"string",enum:["LEGITIMATE","ILLEGITIMATE"]},detail:{type:"string"}},required:["thread_id","classification","detail"]}},
   },
   required:["findings","unmatched_extras"],
