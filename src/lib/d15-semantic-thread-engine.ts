@@ -262,31 +262,93 @@ function jsonSchemaFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
 
-export async function proposeD15BSemanticThreads(ledger: EvidenceLedger): Promise<D15BSemanticThreadProposal[]> {
+type D15BCandidateSet = {
+  id: string;
+  dimension: "CHANGE_CONTINUITY" | "INFORMATION_DECISION" | "DIAGNOSIS_CHANGE" | "MULTIPARTY_RESOLUTION" | "OPERATING_RHYTHM" | "EXTERNAL_INTERNAL_BRIDGE" | "CHANGE_USER_INTERFACE" | "OTHER";
+  evidence_ids: string[];
+};
+
+const CANDIDATE_SET_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    candidates: {
+      type: "array",
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          id: { type: "string" },
+          dimension: { type: "string", enum: ["CHANGE_CONTINUITY","INFORMATION_DECISION","DIAGNOSIS_CHANGE","MULTIPARTY_RESOLUTION","OPERATING_RHYTHM","EXTERNAL_INTERNAL_BRIDGE","CHANGE_USER_INTERFACE","OTHER"] },
+          evidence_ids: { type: "array", minItems: 2, items: { type: "string" } },
+        },
+        required: ["id","dimension","evidence_ids"],
+      },
+    },
+  },
+  required: ["candidates"],
+} as const;
+
+const INTERPRETATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: { headline: { type: "string" } },
+  required: ["headline"],
+} as const;
+
+async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCandidateSet[]> {
   const input = buildD15BSemanticInput(ledger);
   if (input.atoms.length < 2) return [];
   const response = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
-    response_format: jsonSchemaFormat("d15_b_semantic_threads", PROPOSAL_SCHEMA),
+    response_format: jsonSchemaFormat("d15_b_candidate_sets", CANDIDATE_SET_SCHEMA),
     messages: [
-      {
-        role: "system",
-        content: `You are the whole-CV professional pattern reasoner for Interview Mirror D15-B. Read the complete eligible evidence set before proposing anything. Your job is not to cluster similar duties; it is to discover the few highest-value professional insights that emerge across the candidate's evidence.
-Use ONLY the canonical evidence atoms supplied. Do not infer from job titles, employers, typical duties, or outside knowledge.
-A thread is a professionally meaningful relationship or function supported by at least two independent evidence atoms/source spans. Reason across the whole CV first, then select evidence for the strongest insights. Use these abstract reasoning dimensions to test candidate relationships: CHANGE_CONTINUITY (a function kept operating while systems/processes/business changed); INFORMATION_DECISION (information or observations carried into management/decision use); DIAGNOSIS_CHANGE (a problem or blockage identified and a procedure/process response followed); MULTIPARTY_RESOLUTION (different parties coordinated around resolving an issue); OPERATING_RHYTHM (planning/forecasting, review and follow-through form a recurring management cadence); EXTERNAL_INTERNAL_BRIDGE (customer/user/market signals connected to internal management); CHANGE_USER_INTERFACE (a system/change connected to the people who adopt or use it). Do not name a dimension unless the evidence relationship exists. These dimensions are a reasoning scaffold, not answers and not evidence. Prefer evidence combinations that demonstrate one dimension over generic topical similarity.
-Before returning each proposal, apply this counterfactual test: if its headline could reasonably be used as a section heading on the CV by merely grouping similar duties, reject it. The headline must instead explain a relationship between activities or what function those activities collectively serve. Do not create a thread that merely renames, summarizes, or bundles a role/activity category. Prefer at most 3 high-value threads and usually 1-2; evidence may be left unused. Do not force every role or atom into a thread. If the CV contains only routine unrelated duties with no meaningful relationship across them, return zero proposals.\nSemantic similarity is allowed even when wording differs. Lexical overlap alone is not enough.
-Never invent or upgrade ownership, outcomes, metrics, dates, duration, scale, scope, seniority, entities, places, tools, or responsibilities.
-The headline is an interpretation, never evidence. Keep it concise and faithful to the cited atoms.
-question_back is optional and only for a material uncertainty in an otherwise meaningful thread. At most one per thread. OWNERSHIP-TENSION RULE: when a proposed thread is supported mainly by support/assist/participate/coordinated-with wording, or mixes support-level wording with stronger implementation wording, ask neutrally what the candidate personally owned versus supported. Do not state that they led or owned it. Otherwise, after an evidenced action/change with no result, a neutral outcome question is preferred. Do not ask generic ownership questions merely because an ownership field is unknown, and do not ask scale/timing by default. It must not assert an unsupported premise.
-Cite only evidence_id values present in the input. Prefer restraint: return no proposal rather than a weak, merely descriptive, or false thread.
-Return JSON only.`,
-      },
+      { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything.
+Return only candidate evidence sets; do NOT write headlines, summaries, questions, or candidate-facing prose.
+A candidate set needs at least two independent source spans whose relationship reveals a professional operating pattern that no single atom states alone.
+Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
+Select the SMALLEST sufficient evidence set for each relationship. Do not add atoms merely because they share a topic. Do not optimize coverage.
+Prefer 1-2 strong relationships; maximum 3. Return zero when evidence contains only routine unrelated duties or category-level similarity.
+Do not infer facts from titles, employers, typical duties, or outside knowledge. Evidence IDs must come from input. Return JSON only.` },
       { role: "user", content: JSON.stringify(input) },
     ],
   });
-  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"proposals":[]}') as { proposals?: D15BSemanticThreadProposal[] };
-  return Array.isArray(parsed.proposals) ? parsed.proposals : [];
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"candidates":[]}') as { candidates?: D15BCandidateSet[] };
+  return Array.isArray(parsed.candidates) ? parsed.candidates : [];
+}
+
+async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15BCandidateSet): Promise<string> {
+  const atoms = citedAtomsForVerifier(ledger, candidate.evidence_ids);
+  const response = await getOpenAI().chat.completions.create({
+    model: AI_MODEL,
+    temperature: 0,
+    response_format: jsonSchemaFormat("d15_b_interpretation", INTERPRETATION_SCHEMA),
+    messages: [
+      { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
+Explain the relationship/function that emerges when the lines are considered together. Do not merely name a topic, role, activity category, or repeat the reasoning-dimension label.
+Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, or causality.
+The headline is interpretation, never evidence. Return JSON only.` },
+      { role: "user", content: JSON.stringify({ dimension: candidate.dimension, cited_atoms: atoms }) },
+    ],
+  });
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{"headline":""}') as { headline?: string };
+  return String(parsed.headline ?? "").trim();
+}
+
+export async function proposeD15BSemanticThreads(ledger: EvidenceLedger): Promise<D15BSemanticThreadProposal[]> {
+  const candidates = await discoverD15BCandidateSets(ledger);
+  const eligible = new Set(buildD15BSemanticInput(ledger).atoms.map((atom) => atom.evidence_id));
+  const proposals: D15BSemanticThreadProposal[] = [];
+  for (const candidate of candidates) {
+    const ids = [...new Set(candidate.evidence_ids)];
+    if (ids.length < 2 || ids.some((id) => !eligible.has(id))) continue;
+    const headline = await interpretD15BCandidateSet(ledger, { ...candidate, evidence_ids: ids });
+    if (!headline) continue;
+    proposals.push({ id: candidate.id, headline, evidence_ids: ids, question_back: null });
+  }
+  return proposals;
 }
 
 function citedAtomsForVerifier(ledger: EvidenceLedger, evidenceIds: string[]) {
