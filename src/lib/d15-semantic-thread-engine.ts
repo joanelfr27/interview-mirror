@@ -84,32 +84,37 @@ function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
     .join(" ");
 }
 
-const TITLE_CASE_CONNECTORS = new Set(["and","or","of","the","through","its","for","to","in","with","across","during","et","ou","de","du","des","la","le","les","pour","avec","dans"]);
+const PROPER_NOUN_STOP_WORDS = new Set([
+  "and","or","of","the","through","its","for","to","in","with","across","during","a","an",
+  "et","ou","de","du","des","la","le","les","pour","avec","dans","un","une",
+  "finance","change","operating","rhythm","customer","portal","rollout","user","feedback",
+  "integration","accounting","systems","support","process","processes","delivery","delays",
+]);
+const SENTENCE_INITIAL_COMMON_WORDS = new Set([
+  ...PROPER_NOUN_STOP_WORDS,
+  "supported","collected","worked","maintained","analyzing","analysing","connecting",
+  "keeping","reviewing","implementing","deploying","participating","coordinating",
+  "analysant","connectant","maintenant","soutenant","participant","déployant","coordonnant",
+]);
 
 /**
- * Proper-noun hard guard, intentionally narrow.
- * A capitalized token is only treated as a candidate entity when it is the
- * first lexical token and the next lexical token is not also capitalized.
- * This preserves the reviewed Syngenta/Paris adversarial cases without
- * treating ordinary Title Case headlines as named entities.
+ * Proper-noun hard guard.
+ * Inspect every capitalized lexical token. Common/function words are exempt,
+ * and sentence-initial common verbs are exempt; otherwise a capitalized token
+ * must already occur in the cited source.
  */
 function unsupportedProperNouns(claim: string, source: string): string[] {
   const sourceNorm = normalized(source);
   const words = claim.trim().match(/[\p{L}][\p{L}'’.-]*/gu) ?? [];
-  if (words.length === 0) return [];
-
-  const first = words[0];
-  if (first === undefined) {
-    throw new Error("D15 invariant violation: non-empty lexical token array has no first token");
-  }
-  const firstIsCapitalized = /^\p{Lu}/u.test(first);
-  if (!firstIsCapitalized || TITLE_CASE_CONNECTORS.has(normalized(first))) return [];
-
-  const second = words[1];
-  const secondIsCapitalized = second ? /^\p{Lu}/u.test(second) : false;
-  if (secondIsCapitalized) return [];
-
-  return sourceNorm.includes(normalized(first)) ? [] : [first];
+  const unsupported: string[] = [];
+  words.forEach((word,index)=>{
+    if (!/^\p{Lu}/u.test(word)) return;
+    const norm=normalized(word);
+    if (PROPER_NOUN_STOP_WORDS.has(norm)) return;
+    if (index===0 && SENTENCE_INITIAL_COMMON_WORDS.has(norm)) return;
+    if (!sourceNorm.includes(norm)) unsupported.push(word);
+  });
+  return [...new Set(unsupported)];
 }
 function exactNumericTokens(value: string): string[] {
   return value.match(/\b\d+(?:[.,]\d+)?\b/g) ?? [];
