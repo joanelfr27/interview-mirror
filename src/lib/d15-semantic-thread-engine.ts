@@ -405,7 +405,7 @@ async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemantic
     messages: [
       { role: "system", content: `Generate at most one optional clarification question for an already-valid professional insight.
 Return null unless answering the question would materially strengthen the insight.
-Priority 1: genuine ownership tension in the evidence, especially support/assist/participate wording or a mix of support-level and stronger implementation wording. Ask neutrally what the candidate personally owned versus supported; never presume leadership.
+Priority 1: genuine ownership tension in the EVIDENCE TEXT. Treat support/assist/help/participate/contribute wording (and French soutenir/appuyer/assister/participer/contribuer) as an explicit ownership ambiguity. If the thread depends on such wording, generate a neutral question asking what the candidate personally owned/did versus supported; never presume leadership. Also ask when support-level wording is mixed with stronger implementation/deployment/coordination wording.
 Priority 2: an evidenced action/change with no stated result; ask neutrally what changed or resulted.
 Do not ask generic ownership merely because ownership metadata is unknown. Do not ask scale or timing by default. Do not assert an unknown fact in the question. Return JSON only.` },
       { role: "user", content: JSON.stringify({ headline: proposal.headline, cited_atoms: atoms }) },
