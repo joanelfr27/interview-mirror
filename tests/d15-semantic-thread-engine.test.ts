@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
-import { buildD15BSemanticInput, deterministicOutcomeQuestion, deterministicOwnershipQuestion, parseD15BCandidateDiscoveryContent, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
+import { buildD15BSemanticInput, deterministicHeadlineFloor, deterministicOutcomeQuestion, deterministicOwnershipQuestion, parseD15BCandidateDiscoveryContent, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 
 const span=(id:string,text:string)=>({id,document_id:"CV",text,start_offset:0,end_offset:text.length,language:"en"});
 const atom=(id:string,spanId:string,action:string,object:string,ownership:AtomicEvidence["subject"]["ownership"]="UNKNOWN"):AtomicEvidence=>({
@@ -129,6 +129,26 @@ test("D15-B guard spec: Title-Case headline containing unsupported entity is rej
   const r=verifyD15BSemanticThreadProposals(l,[{id:"P",headline:"Portal Rollout For Microsoft",evidence_ids:["A1","A2"],question_back:null}]);
   assert.equal(r.accepted.length,0);
   assert.ok(r.rejected[0]?.reasons.some(reason=>reason.includes("named entity")));
+});
+
+test("D15-B deterministic headline floor survives truth guards across representative Gold-language atoms",()=>{
+  const cases:[string,string,string,string][]=[
+    ["NANCY","Supported acquisition accounting and financial integration activities.","Supporting systems integration following business changes.","en"],
+    ["MARIE","Analysait les causes des retards de livraison.","Participait aux projets d’amélioration des processus.","fr"],
+    ["DAVID","Maintained sales operating routines.","Coordinated recurring sales reporting activities.","en"],
+    ["THOMAS","Supported the rollout of a new customer portal.","Collected user feedback during rollout.","en"],
+    ["ELENA","Maintained office records and correspondence.","Supported routine administrative activities.","en"],
+  ];
+  for(const [name,a,b,language] of cases){
+    const s1={...span("S1",a),language:language as "en"|"fr"};
+    const s2={...span("S2",b),language:language as "en"|"fr"};
+    const l=ledger([atom("A1","S1","Supported",a),atom("A2","S2","Supported",b)],[s1,s2]);
+    l.evidence.forEach(x=>{x.provenance.language=language as "en"|"fr";});
+    const proposal={id:name,headline:"placeholder",evidence_ids:["A1","A2"],question_back:null};
+    const floor=deterministicHeadlineFloor(l,proposal);
+    const checked=verifyD15BSemanticThreadProposals(l,[{...proposal,headline:floor}]);
+    assert.equal(checked.accepted.length,1,`${name} floor rejected: ${checked.rejected.flatMap(x=>x.reasons).join(" | ")}`);
+  }
 });
 
 test("D15-B shared boundary rejects contradicted evidence",()=>{
