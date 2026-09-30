@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures, supportGroundingPreclear, semanticScopePreclear } from "@/lib/d15-gold-gate";
+import type { D15BGoldScorerInput } from "@/lib/d15-gold-gate";
 import type { D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
 
 test("D15-B Gold fixtures are frozen as Nancy/Marie/David/Elena/Thomas",()=>{
@@ -307,7 +308,7 @@ test("semantic scope preclear makes Nancy A semantic criticism observational onl
 
 test("Gold v2.1 Elena accepts grounded premise-free CV-level pattern question only in genuine restraint state",()=>{
   const elena=d15BGoldFixtures()[3]!;
-  const r=result([]) as D15BVerificationResult & {completion_state:string;cv_question_back:string|null};
+  const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
   r.completion_state="COMPLETED_NO_QUALIFYING_RELATIONSHIP";
   r.cv_question_back='Your CV includes “Answered incoming calls and welcomed visitors.”, “Processed routine invoices according to established procedures.” Without assuming they form one pattern, is there a recurring way of working or responsibility that connects some of these elements?';
   assert.deepEqual(assessD15BGoldDeterministically(elena,r).errors,[]);
@@ -316,7 +317,7 @@ test("Gold v2.1 Elena accepts grounded premise-free CV-level pattern question on
 test("Gold v2.1 Elena rejects fabricated or paraphrased CV anchors",()=>{
   const elena=d15BGoldFixtures()[3]!;
   for(const anchor of ["Led executive office operations.","Managed incoming calls and visitors."]){
-    const r=result([]) as D15BVerificationResult & {completion_state:string;cv_question_back:string|null};
+    const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
     r.completion_state="COMPLETED_NO_QUALIFYING_RELATIONSHIP";
     r.cv_question_back=`Your CV includes “${anchor}”. Without assuming they form one pattern, is there a recurring way of working that connects some of these elements?`;
     assert.ok(assessD15BGoldDeterministically(elena,r).errors.some(e=>e.includes("non-verbatim")));
@@ -325,8 +326,8 @@ test("Gold v2.1 Elena rejects fabricated or paraphrased CV anchors",()=>{
 
 test("Gold v2.1 Elena rejects fallback question on ALL_REJECTED or ERROR",()=>{
   const elena=d15BGoldFixtures()[3]!;
-  for(const state of ["ALL_REJECTED","ERROR"]){
-    const r=result([]) as D15BVerificationResult & {completion_state:string;cv_question_back:string|null};
+  for(const state of ["ALL_REJECTED","ERROR"] as const){
+    const r=result([]) as D15BVerificationResult & {completion_state:D15BGoldScorerInput["completion_state"];cv_question_back:string|null};
     r.completion_state=state;
     r.cv_question_back='Your CV includes “Answered incoming calls and welcomed visitors.” Without assuming they form one pattern, is there a recurring way of working that connects some of these elements?';
     assert.ok(assessD15BGoldDeterministically(elena,r).errors.some(e=>e.includes("genuine completed no-relationship")));
