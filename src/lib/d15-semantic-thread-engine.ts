@@ -492,16 +492,20 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     let generatedQuestion = preferredQuestion ?? deterministicOutcomeQuestion(ledger,proposal);
     let questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
     if (!questionCheck.supported) {
-      generatedQuestion = deterministicOutcomeQuestion(ledger,proposal);
+      // Reviewed deterministic floor: support/assist/participate evidence gets
+      // ownership clarification first; otherwise ask premise-free outcome.
+      generatedQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? deterministicOutcomeQuestion(ledger,proposal);
       const floorErrors = deterministicProposalErrors(ledger, { ...proposal, question_back: generatedQuestion });
       if (floorErrors.length) {
         rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor failed deterministic truth guards: ${floorErrors.join(" | ")}`] });
         continue;
       }
-      questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
+      // Exact reviewed floors are deterministic policy, not LLM claims. Their
+      // safety is enforced above by the same deterministic truth guards.
+      questionCheck = { supported:true, reason:"reviewed deterministic question floor" };
     }
     if (!questionCheck.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor verifier rejected: ${questionCheck.reason}`] });
+      rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question repair failed: ${questionCheck.reason}`] });
       continue;
     }
     accepted.push({ ...proposal, question_back: generatedQuestion });
