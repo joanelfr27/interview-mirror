@@ -46,10 +46,13 @@ async function main(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
   await assertSyntheticSignificanceStability(out);
-  const scoredRuns = new Map<string, Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>();\n  for(const fixture of fixtures){
+  const scoredRuns = new Map<string, Array<Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>>();\n  for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
     for(let run=1;run<=2;run++){
-      const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));\n      if(run===2) scoredRuns.set(fixture.id,result);
+      const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));
+      const recorded=scoredRuns.get(fixture.id) ?? [];
+      recorded.push(result);
+      scoredRuns.set(fixture.id,recorded);
       out.push(`\nRUN ${run}\n`,`MIRROR_STATUS: ${result.completion_state}`,`CV_QUESTION_BACK: ${result.cv_question_back ?? "—"}`);
       if(!result.accepted.length) out.push("ACCEPTED: none");
       for(const thread of result.accepted){
@@ -62,14 +65,21 @@ async function main(){
     }
     out.push("");
   }
-  out.push("=".repeat(72),"GOLD SCORER — SCORES PRINTED RUN 2","=".repeat(72));
+  out.push("=".repeat(72),"GOLD SCORER — SCORES RECORDED PRINTED RUNS","=".repeat(72));
   for(const fixture of fixtures){
-    const engine=scoredRuns.get(fixture.id);
-    if(!engine) throw new Error(`missing printed RUN 2 for ${fixture.id}`);
-    out.push(`SCORER_INPUT ${fixture.id}: RUN 2 evidence_keys=[${engine.accepted.map(t=>[...t.evidence_ids].sort().join("+")).join(", ") || "none"}]`);
-    const assessment=assessD15BGoldDeterministically(fixture,engine);
-    out.push(`${fixture.id}: ${assessment.errors.length===0 ? "DETERMINISTIC PASS" : "DETERMINISTIC FAIL"}`);
-    for(const error of assessment.errors) out.push(`  deterministic: ${error}`);
+    const runs=scoredRuns.get(fixture.id) ?? [];
+    if(runs.length!==2) throw new Error(`expected two recorded runs for ${fixture.id}, got ${runs.length}`);
+    const verdicts:string[]=[];
+    for(let i=0;i<runs.length;i++){
+      const engine=runs[i]!;
+      const keys=engine.accepted.map(t=>[...t.evidence_ids].sort().join("+"));
+      out.push(`SCORER_INPUT ${fixture.id}: RUN ${i+1} evidence_keys=[${keys.join(", ") || "none"}]`);
+      const assessment=assessD15BGoldDeterministically(fixture,engine);
+      const passed=assessment.errors.length===0;
+      verdicts.push(`RUN ${i+1} ${passed?"PASS":"FAIL"}`);
+      for(const error of assessment.errors) out.push(`  RUN ${i+1} deterministic: ${error}`);
+    }
+    out.push(`${fixture.id}: ${verdicts.join(" · ")} · PERSONA ${verdicts.every(v=>v.endsWith("PASS"))?"PASS":"FAIL"}`);
   }
   out.push("");
   const text=out.join("\n");
