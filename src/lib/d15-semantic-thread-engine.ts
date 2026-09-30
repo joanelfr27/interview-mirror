@@ -327,8 +327,10 @@ async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15B
     response_format: jsonSchemaFormat("d15_b_interpretation", INTERPRETATION_SCHEMA),
     messages: [
       { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
-Explain the relationship/function that emerges when the lines are considered together. Do not merely name a topic, role, activity category, or repeat the reasoning-dimension label.
-Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, or causality.
+Describe ONLY the relationship/function that emerges when the lines are considered together. Do not explain why that relationship is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
+Prefer relationship-descriptive constructions such as "Connecting X with Y", "Linking X to Y", "Combining X with Y", or an equally concise factual relationship. Do not merely name a topic, role, activity category, or repeat the reasoning-dimension label.
+Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
+Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
 The headline is interpretation, never evidence. Return JSON only.` },
       { role: "user", content: JSON.stringify({ dimension: candidate.dimension, cited_atoms: atoms }) },
     ],
