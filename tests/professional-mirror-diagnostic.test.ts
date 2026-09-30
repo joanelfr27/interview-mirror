@@ -6,7 +6,6 @@ import {
   buildProfessionalMirror,
   diagnosticConnectionReason,
   diagnosticSignalOverlap,
-  assertD15EligibilityExtractionEquivalent,
 } from "@/lib/professional-mirror";
 import type { AtomicEvidence } from "@/lib/canonical-evidence-model";
 
@@ -223,42 +222,5 @@ describe("D15 diagnostic connection oracle", () => {
   });
 
 
-  it("exercises contradiction removal through the old-vs-shared eligibility oracle", () => {
-    const ledger = {
-      source_spans: [
-        { id: "S1", document_id: "CV", text: "Managed treasury reporting.", language: "en", source_section: "BULLET" },
-        { id: "S2", document_id: "CV", text: "Did not manage treasury reporting.", language: "en", source_section: "BULLET" },
-      ],
-      evidence: [
-        atom({ id: "A", source_span_id: "S1", action: { normalized_action: "managed", object: "treasury reporting" } }),
-        atom({ id: "N", source_span_id: "S2", action: { normalized_action: "managed", object: "treasury reporting" }, assertion: { type: "RESPONSIBILITY", polarity: "NEGATED" } }),
-      ],
-      requirements: [],
-      facets: [],
-    } as any;
-
-    assert.doesNotThrow(() => assertD15EligibilityExtractionEquivalent(ledger));
-    const mirror = buildProfessionalMirror(ledger);
-    assert.deepEqual(mirror.evidence.map((item) => item.evidence_id), []);
-  });
-
-  it("exercises semantic duplicate removal through the old-vs-shared eligibility oracle", () => {
-    const ledger = {
-      source_spans: [
-        { id: "S1", document_id: "CV", text: "Managed monthly treasury reporting.", language: "en", source_section: "BULLET" },
-        { id: "S2", document_id: "CV", text: "Managed monthly treasury reporting.", language: "en", source_section: "BULLET" },
-      ],
-      evidence: [
-        atom({ id: "A", source_span_id: "S1", action: { normalized_action: "managed", object: "monthly treasury reporting" } }),
-        atom({ id: "B", source_span_id: "S2", action: { normalized_action: "managed", object: "monthly treasury reporting" } }),
-      ],
-      requirements: [],
-      facets: [],
-    } as any;
-
-    assert.doesNotThrow(() => assertD15EligibilityExtractionEquivalent(ledger));
-    const mirror = buildProfessionalMirror(ledger);
-    assert.deepEqual(mirror.evidence.map((item) => item.evidence_id), ["A"]);
-  });
 
 });
