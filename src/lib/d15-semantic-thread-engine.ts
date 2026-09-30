@@ -1,0 +1,216 @@
+import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
+import type { MirrorMaturity } from "@/lib/professional-mirror";
+
+export type D15BSemanticThreadProposal = {
+  id: string;
+  headline: string;
+  evidence_ids: string[];
+  question_back: string | null;
+};
+
+export type D15BVerifiedThread = D15BSemanticThreadProposal & {
+  maturity: MirrorMaturity;
+  verification: "SUPPORTED";
+};
+
+export type D15BVerificationResult = {
+  accepted: D15BVerifiedThread[];
+  rejected: Array<{ proposal_id: string; reasons: string[] }>;
+};
+
+const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
+  UNKNOWN: 0,
+  SUPERVISED: 1,
+  TEAM: 1,
+  SHARED: 2,
+  INDIVIDUAL: 3,
+};
+
+const OWNERSHIP_ESCALATION = /\b(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for)\b/i;
+const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved)\b/i;
+const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
+const YEAR_OR_DURATION = /(?:\b(?:19|20)\d{2}\b|\b\d+\s*(?:years?|months?|weeks?|days?)\b)/i;
+
+function supportedAtoms(ledger: EvidenceLedger): AtomicEvidence[] {
+  const spanIds = new Set(ledger.source_spans.map((span) => span.id));
+  return ledger.evidence
+    .filter((atom) => atom.assertion.polarity === "AFFIRMATIVE")
+    .filter((atom) => atom.provenance.source_type !== "CANDIDATE_ELICITED")
+    .filter((atom) => spanIds.has(atom.source_span_id));
+}
+
+function normalized(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
+  const wanted = new Set(evidenceIds);
+  return supportedAtoms(ledger)
+    .filter((atom) => wanted.has(atom.id))
+    .map((atom) => {
+      const span = ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+      return [
+        span?.text ?? "",
+        atom.action.normalized_action,
+        atom.action.object,
+        atom.context.domain ?? "",
+        atom.scale.quantity ?? "",
+        atom.scale.currency ?? "",
+        atom.scale.scope ?? "",
+        atom.outcome ?? "",
+        atom.time.start ?? "",
+        atom.time.end ?? "",
+        atom.time.recency ?? "",
+      ].join(" ");
+    })
+    .join(" ");
+}
+
+function threadMaturity(evidenceCount: number): MirrorMaturity {
+  // D15-A invariant: canonical role context is unavailable, so any supported
+  // semantic thread remains capped at Emerging.
+  return evidenceCount > 0 ? "EMERGING_PATTERN" : "INSUFFICIENT_EVIDENCE";
+}
+
+function deterministicProposalErrors(
+  ledger: EvidenceLedger,
+  proposal: D15BSemanticThreadProposal,
+): string[] {
+  const errors: string[] = [];
+  const atoms = supportedAtoms(ledger);
+  const byId = new Map(atoms.map((atom) => [atom.id, atom]));
+  const uniqueIds = [...new Set(proposal.evidence_ids)];
+
+  if (uniqueIds.length !== proposal.evidence_ids.length) errors.push("duplicate evidence IDs");
+  if (uniqueIds.length < 2) errors.push("semantic thread requires at least two evidence atoms");
+  if (!proposal.headline.trim()) errors.push("headline is empty");
+
+  const cited = uniqueIds.map((id) => byId.get(id));
+  if (cited.some((atom) => !atom)) errors.push("proposal cites unknown or ineligible evidence");
+
+  const citedSpans = new Set(cited.filter(Boolean).map((atom) => atom!.source_span_id));
+  if (citedSpans.size < 2) errors.push("semantic thread requires at least two independent source spans");
+
+  const source = citedText(ledger, uniqueIds);
+  const sourceNorm = normalized(source);
+  const claimNorm = normalized(proposal.headline);
+
+  if (NUMBER_OR_PERCENT.test(proposal.headline) && !NUMBER_OR_PERCENT.test(source)) {
+    errors.push("headline introduces an unsupported number or percentage");
+  }
+  if (YEAR_OR_DURATION.test(proposal.headline) && !YEAR_OR_DURATION.test(source)) {
+    errors.push("headline introduces unsupported timing");
+  }
+  if (OUTCOME_ESCALATION.test(proposal.headline) && !OUTCOME_ESCALATION.test(source)) {
+    errors.push("headline introduces an unsupported outcome");
+  }
+
+  if (OWNERSHIP_ESCALATION.test(proposal.headline)) {
+    const strongest = cited
+      .filter((atom): atom is AtomicEvidence => Boolean(atom))
+      .reduce((rank, atom) => Math.max(rank, OWNERSHIP_RANK[atom.subject.ownership]), 0);
+    const ownershipWordGrounded = proposal.headline
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= 3 && OWNERSHIP_ESCALATION.test(word))
+      .some((word) => sourceNorm.includes(normalized(word)));
+    if (strongest < OWNERSHIP_RANK.INDIVIDUAL || !ownershipWordGrounded) {
+      errors.push("headline risks ownership escalation");
+    }
+  }
+
+  if (proposal.question_back && !proposal.question_back.trim()) {
+    errors.push("question_back is blank");
+  }
+
+  // A question may ask about an uncertainty, but it must not state a new fact.
+  if (proposal.question_back && !proposal.question_back.trim().endsWith("?")) {
+    errors.push("question_back must be phrased as a question");
+  }
+
+  return errors;
+}
+
+export function verifyD15BSemanticThreadProposals(
+  ledger: EvidenceLedger,
+  proposals: D15BSemanticThreadProposal[],
+): D15BVerificationResult {
+  const accepted: D15BVerifiedThread[] = [];
+  const rejected: D15BVerificationResult["rejected"] = [];
+  const seenEvidenceSets = new Set<string>();
+
+  for (const proposal of proposals) {
+    const errors = deterministicProposalErrors(ledger, proposal);
+    const evidenceKey = [...new Set(proposal.evidence_ids)].sort().join("|");
+    if (seenEvidenceSets.has(evidenceKey)) errors.push("duplicate semantic evidence group");
+
+    if (errors.length) {
+      rejected.push({ proposal_id: proposal.id, reasons: errors });
+      continue;
+    }
+
+    seenEvidenceSets.add(evidenceKey);
+    accepted.push({
+      ...proposal,
+      evidence_ids: [...new Set(proposal.evidence_ids)].sort(),
+      maturity: threadMaturity(proposal.evidence_ids.length),
+      verification: "SUPPORTED",
+    });
+  }
+
+  return { accepted, rejected };
+}
+
+export type D15BSemanticInput = {
+  atoms: Array<{
+    evidence_id: string;
+    source_span_id: string;
+    source_quote: string;
+    ownership: AtomicEvidence["subject"]["ownership"];
+    action: string;
+    object: string;
+    domain: string | null;
+    outcome: string | null;
+    scale: {
+      quantity: string | null;
+      currency: string | null;
+      team_size: number | null;
+      scope: string | null;
+    };
+    time: {
+      start: string | null;
+      end: string | null;
+      recency: string | null;
+    };
+  }>;
+};
+
+export function buildD15BSemanticInput(ledger: EvidenceLedger): D15BSemanticInput {
+  const atoms = supportedAtoms(ledger);
+  return {
+    atoms: atoms.map((atom) => {
+      const span = ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+      if (!span) throw new Error(`D15-B invariant failed: missing source span for ${atom.id}`);
+      return {
+        evidence_id: atom.id,
+        source_span_id: atom.source_span_id,
+        source_quote: span.text,
+        ownership: atom.subject.ownership,
+        action: atom.action.normalized_action,
+        object: atom.action.object,
+        domain: atom.context.domain ?? null,
+        outcome: atom.outcome ?? null,
+        scale: {
+          quantity: atom.scale.quantity ?? null,
+          currency: atom.scale.currency ?? null,
+          team_size: atom.scale.team_size ?? null,
+          scope: atom.scale.scope ?? null,
+        },
+        time: {
+          start: atom.time.start ?? null,
+          end: atom.time.end ?? null,
+          recency: atom.time.recency ?? null,
+        },
+      };
+    }),
+  };
+}
