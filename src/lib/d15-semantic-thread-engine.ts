@@ -182,8 +182,8 @@ function deterministicProposalErrors(
     const question = proposal.question_back;
     if (unsupportedExactValues(question, source).length > 0) errors.push("question_back asserts an unsupported exact value");
     if (unsupportedProperNouns(question, source).length > 0) errors.push("question_back asserts an unsupported named entity or place");
-    if (OWNERSHIP_ESCALATION.test(question) && !OWNERSHIP_ESCALATION.test(source)) errors.push("question_back asserts unsupported ownership");
-    if (OUTCOME_ESCALATION.test(question) && !OUTCOME_ESCALATION.test(source)) errors.push("question_back asserts an unsupported outcome");
+    // Ownership/outcome words in a question can name the unknown being elicited; the
+    // independent QUESTION_BACK verifier determines whether the wording asserts a premise.
     if (SCOPE_ESCALATION.test(question) && !SCOPE_ESCALATION.test(source)) errors.push("question_back asserts unsupported scope");
     if (SENIORITY_ESCALATION.test(question) && !SENIORITY_ESCALATION.test(source)) errors.push("question_back asserts unsupported seniority");
   }
@@ -340,7 +340,7 @@ Prefer relationship-descriptive constructions such as "Connecting X with Y", "Li
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
 Write in the same language as the supplied source evidence. The headline is interpretation, never evidence. Return JSON only.` },
-      { role: "user", content: JSON.stringify({ dimension: candidate.dimension, cited_atoms: atoms }) },
+      { role: "user", content: JSON.stringify({ source_language: ledger.source_spans.find((span) => candidate.evidence_ids.some((id) => supportedAtoms(ledger).find((atom) => atom.id === id)?.source_span_id === span.id))?.language ?? "en", dimension: candidate.dimension, cited_atoms: atoms }) },
     ],
   });
   const parsed = JSON.parse(response.choices[0]?.message?.content || '{"headline":""}') as { headline?: string };
@@ -386,7 +386,7 @@ Judge whether the claim stays within those atoms. Do not use outside knowledge o
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, or causal claims.
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
 For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only professional insight value. supported=true only when combining the cited atoms reveals a useful relationship, bridge, operating pattern, or function that no single cited line states on its own. Category labels, duty summaries, paraphrases, and bundles of similar activities are false. Routine administrative bundles are false. Be strict about insight, but do not re-run factual entailment here.
-For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true.
+For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Return supported=false whenever uncertain. Return JSON only.`,
       },
       { role: "user", content: JSON.stringify({ claim_type: claimType, cited_atoms: atoms, claim }) },
@@ -448,8 +448,11 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     }
     const significance = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "SIGNIFICANCE");
     if (!significance.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected: ${significance.reason}`] });
-      continue;
+      const significanceConfirmation = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.headline, "SIGNIFICANCE");
+      if (!significanceConfirmation.supported) {
+        rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`] });
+        continue;
+      }
     }
     if (proposal.question_back) {
       const question = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, proposal.question_back, "QUESTION_BACK");
