@@ -1,5 +1,4 @@
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
-import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
 
 export type D15BGoldScorerInput = {
@@ -330,17 +329,11 @@ export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerifica
   return preclear.errors;
 }
 
-export async function runD15BGoldGate():Promise<D15BGoldCaseResult[]> {
-  const results:D15BGoldCaseResult[]=[];
-  for(const fixture of FIXTURES){
-    const ledger=buildD15BGoldLedger(fixture);
-    const engine=await runD15BSemanticThreadEngine(ledger);
-    const deterministic=assessD15BGoldDeterministically(fixture,engine);
-    const deterministic_errors=deterministic.errors;
-    const semantic_errors=deterministic_errors.length?[]:await semanticGoldErrors(fixture,engine,deterministic.unmatched_thread_ids);
-    results.push({fixture_id:fixture.id,passed:deterministic_errors.length===0&&semantic_errors.length===0,engine,deterministic_errors,semantic_errors,unmatched_thread_ids:deterministic.unmatched_thread_ids});
-  }
-  return results;
+export async function scoreRecordedD15BGoldResult(fixture:GoldFixture,result:D15BGoldScorerInput):Promise<D15BGoldCaseResult> {
+  const deterministic=assessD15BGoldDeterministically(fixture,result);
+  const deterministic_errors=deterministic.errors;
+  const semantic_errors=deterministic_errors.length?[]:await semanticGoldErrors(fixture,result,deterministic.unmatched_thread_ids);
+  return {fixture_id:fixture.id,passed:deterministic_errors.length===0&&semantic_errors.length===0,engine:result,deterministic_errors,semantic_errors,unmatched_thread_ids:deterministic.unmatched_thread_ids};
 }
 
 export function d15BGoldFixtures():readonly GoldFixture[]{ return FIXTURES; }
