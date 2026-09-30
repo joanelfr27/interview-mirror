@@ -87,3 +87,52 @@ test("Gold v2.1 unmatched extra thread routes to legitimacy review instead of de
   assert.deepEqual(a.errors,[]);
   assert.deepEqual(a.unmatched_thread_ids,["EXTRA"]);
 });
+
+
+test("Gold v2.1 Marie E5+E3 fails specifically when required outcome question is missing",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([
+    proposal("A","Analyser les retards de livraison et déployer de nouvelles procédures de suivi des commandes.",["E5","E3"],null),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],"Quel résultat concret cette coordination a-t-elle produit ?"),
+  ]);
+  const a=assessD15BGoldDeterministically(marie,r);
+  assert.ok(a.errors.includes("Marie A E5+E3 requires a neutral outcome question"));
+});
+
+test("Gold v2.1 Marie E5+E8 fails specifically when required ownership question is missing",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([
+    proposal("A","Analyser les retards de livraison et participer à la réorganisation du traitement des commandes.",["E5","E8"],null),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],"Quel résultat concret cette coordination a-t-elle produit ?"),
+  ]);
+  const a=assessD15BGoldDeterministically(marie,r);
+  assert.ok(a.errors.includes("Marie A E5+E8 requires a neutral ownership question about participation"));
+});
+
+test("Gold v2.1 Marie full branch fails specifically without explicit Deployait/Participait contrast",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([
+    proposal("A","Analyser les retards, déployer des procédures et participer à la réorganisation du traitement des commandes.",["E5","E3","E8"],"Qu’avez-vous personnellement pris en charge dans ce travail ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],"Quel résultat concret cette coordination a-t-elle produit ?"),
+  ]);
+  const a=assessD15BGoldDeterministically(marie,r);
+  assert.ok(a.errors.includes("Marie A full recall requires an explicit Déployait-versus-Participait ownership question"));
+});
+
+test("Gold v2.1 Thomas fails specifically when ownership clarification is absent",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],null)]);
+  const a=assessD15BGoldDeterministically(thomas,r);
+  assert.ok(a.errors.includes("Thomas A requires a premise-free personal-ownership clarification"));
+});
+
+test("Gold v2.1 unmatched extra is observable without deterministic pass/fail",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  const r=result([
+    proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"What did you personally own, and what did you mainly support?"),
+    proposal("EXTRA","Project delivery issues across technical teams.",["E3","E6"],null),
+  ]);
+  const a=assessD15BGoldDeterministically(thomas,r);
+  assert.equal(a.errors.length,0);
+  assert.deepEqual(a.unmatched_thread_ids,["EXTRA"]);
+});
