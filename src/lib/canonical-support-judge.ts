@@ -296,16 +296,20 @@ export async function judgeCanonicalSupport(
     compactEvidence,
     requestCharacterCount: userContent.length,
   });
-  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) {
-    throw new CanonicalSupportJudgmentError(
-      "Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "),
-      diagnostic,
-    );
-  }
+  // Sanitize before asserting completeness. Missing model judgments are an
+  // epistemic gap, not evidence of support: sanitizeJudgments deterministically
+  // fills each missing facet with an abstained NONE. Unknown/duplicate/invalid
+  // judgments still fail closed through sanitized.errors.
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
+  }
+  const completenessErrors = assertCompleteFacetJudgments(sanitized.judgments, ledger.requirements.flatMap(r => r.facets));
+  if (completenessErrors.length) {
+    throw new CanonicalSupportJudgmentError(
+      "Sanitized canonical support judgments were incomplete or structurally invalid: " + completenessErrors.join(" | "),
+      diagnostic,
+    );
   }
   const judgments = sanitized.judgments;
   const next: EvidenceLedger = {
