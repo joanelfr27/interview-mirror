@@ -165,6 +165,17 @@ function diagnosisChangeMeaning(text:string):boolean {
   const change=/procéd|proced|réorgan|reorgan|déploi|deploy|process|traitement des commandes|order process/i.test(text);
   return diagnosis && change;
 }
+function normalizedFrenchMatch(text:string|null|undefined):string {
+  return (text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+}
+function explicitDeploymentParticipationContrast(text:string|null|undefined):boolean {
+  if(!isQuestion(text)) return false;
+  const normalized=normalizedFrenchMatch(text);
+  const hasDeployment=/\bdeploy/.test(normalized);
+  const hasParticipation=/\bparticip/.test(normalized);
+  const hasContrast=/\b(?:et|mais|plutot|versus|vs)\b/.test(normalized);
+  return hasDeployment && hasParticipation && hasContrast;
+}
 
 export type D15BDeterministicGoldAssessment = {
   errors:string[];
@@ -205,7 +216,7 @@ export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BV
       if(key===setKey(["E5","E8"]) && !ownershipQuestion(p.question_back))
         errors.push("Marie A E5+E8 requires a neutral ownership question about participation");
       if(key===setKey(["E5","E3","E8"])){
-        if(!ownershipQuestion(p.question_back) || !/déploi|deploy/i.test(p.question_back??"") || !/particip/i.test(p.question_back??""))
+        if(!ownershipQuestion(p.question_back) || !explicitDeploymentParticipationContrast(p.question_back))
           errors.push("Marie A full recall requires an explicit Déployait-versus-Participait ownership question");
       }
     }
