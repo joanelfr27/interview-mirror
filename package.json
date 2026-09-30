@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test:d15-acronym": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-acronym-regression.test.ts",
     "test:d15-object-overlap": "node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-object-overlap-regression.test.ts",
-    "explore:d15": "node --experimental-loader ./tests/ts-alias-loader.mjs scripts/d15-explore.ts"
+    "explore:d15": "node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-explore.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",
