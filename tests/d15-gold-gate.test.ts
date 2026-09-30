@@ -218,3 +218,32 @@ test("semantic preclear upgrade boundary catches wider English and French leader
     assert.deepEqual(supportGroundingPreclear(marie,result([proposal("A",headline,["E8"],null)]),raw).errors,raw);
   }
 });
+
+
+test("semantic preclear does not mistake Nancy B management audience for a management verb",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const r=result([proposal("B","Connecting financial information with internal stakeholders and management.",["E8","E10"],"What decision or action changed because of the information you provided?")]);
+  const raw=["The headline implies unsupported leadership."];
+  const x=supportGroundingPreclear(nancy,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+test("semantic preclear does not mistake known or ahead for ownership or heading verbs",()=>{
+  const thomas=d15BGoldFixtures()[4]!;
+  for(const headline of ["Connecting known issues with user feedback.","Working ahead of rollout with user feedback."]){
+    const raw=["Candidate implies unsupported leadership."];
+    const x=supportGroundingPreclear(thomas,result([proposal("A",headline,["E4","E5"],null)]),raw);
+    assert.deepEqual(x.errors,[]);
+    assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+  }
+});
+
+test("semantic preclear does not mistake French direction audience noun for leadership verb",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([proposal("A","Analyser les retards de livraison et présenter les causes principales à la direction.",["E5"],null)]);
+  const raw=["Le texte implique un leadership non étayé."];
+  const x=supportGroundingPreclear(marie,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
