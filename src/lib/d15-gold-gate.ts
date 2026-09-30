@@ -190,9 +190,8 @@ export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BV
 
   if(fixture.id==="ELENA"){
     if(result.accepted.length!==0) errors.push("Elena restraint failed: expected zero displayed professional threads");
-    // v2.1 makes the CV-level pattern-seeking question part of complete D15-B.
-    // The current D15BVerificationResult contract has no CV-level question field, so this remains an explicit product-capability failure.
-    errors.push("Elena CV-level pattern-seeking question capability is absent from the current D15-B output contract");
+    // v2.1 makes the premise-free CV-level pattern-seeking question part of complete D15-B.
+    if(!result.cv_question_back?.trim()) errors.push("Elena CV-level pattern-seeking question capability is absent from the current D15-B output contract");
     return {errors,unmatched_thread_ids:unmatched.map(x=>x.id),matched};
   }
 
