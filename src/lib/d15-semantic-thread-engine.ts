@@ -28,8 +28,8 @@ const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
   INDIVIDUAL: 3,
 };
 
-const OWNERSHIP_ESCALATION = /\b(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for)\b/i;
-const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved)\b/i;
+const OWNERSHIP_ESCALATION = /\b(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))\b/iu;
+const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved|réduit|réduite|réduits|réduites|réduire|diminué|diminuée|amélioré|améliorée|augmenté|augmentée)\b/iu;
 const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
 const YEAR_OR_DURATION = /(?:\b(?:19|20)\d{2}\b|\b\d+\s*(?:years?|months?|weeks?|days?)\b)/i;
 const SCOPE_ESCALATION = /\b(global|regional|enterprise(?:-wide)?|company(?:-wide)?|group(?:-wide)?|organization(?:-wide)?|organisation(?:-wide)?|across\s+\d+\s+(?:countries|markets|teams|entities)|executive|c-suite|board)\b/i;
@@ -69,11 +69,27 @@ function citedText(ledger: EvidenceLedger, evidenceIds: string[]): string {
     .join(" ");
 }
 
+const TITLE_CASE_CONNECTORS = new Set(["and","or","of","the","through","its","for","to","in","with","across","during","et","ou","de","du","des","la","le","les","pour","avec","dans"]);
 function unsupportedProperNouns(claim: string, source: string): string[] {
   const sourceNorm = normalized(source);
   const tokens = claim.match(PROPER_NOUN_TOKEN) ?? [];
-  return [...new Set(tokens.filter((token, index) => index > 0 || !claim.trim().startsWith(token))
+  return [...new Set(tokens
+    .filter((token) => !TITLE_CASE_CONNECTORS.has(normalized(token)))
     .filter((token) => !sourceNorm.includes(normalized(token))))];
+}
+function exactNumericTokens(value: string): string[] {
+  return value.match(/\b\d+(?:[.,]\d+)?\b/g) ?? [];
+}
+function exactYears(value: string): string[] {
+  return value.match(/\b(?:19|20)\d{2}\b/g) ?? [];
+}
+function unsupportedExactValues(claim: string, source: string): string[] {
+  const sourceNumbers = new Set(exactNumericTokens(source));
+  const sourceYears = new Set(exactYears(source));
+  return [...new Set([
+    ...exactNumericTokens(claim).filter((value) => !sourceNumbers.has(value)),
+    ...exactYears(claim).filter((value) => !sourceYears.has(value)),
+  ])];
 }
 
 function threadMaturity(evidenceCount: number): MirrorMaturity {
@@ -105,11 +121,11 @@ function deterministicProposalErrors(
   const sourceNorm = normalized(source);
   const claimNorm = normalized(proposal.headline);
 
-  if (NUMBER_OR_PERCENT.test(proposal.headline) && !NUMBER_OR_PERCENT.test(source)) {
-    errors.push("headline introduces an unsupported number or percentage");
+  if (NUMBER_OR_PERCENT.test(proposal.headline) && unsupportedExactValues(proposal.headline, source).length > 0) {
+    errors.push("headline introduces an unsupported exact number or percentage");
   }
-  if (YEAR_OR_DURATION.test(proposal.headline) && !YEAR_OR_DURATION.test(source)) {
-    errors.push("headline introduces unsupported timing");
+  if (YEAR_OR_DURATION.test(proposal.headline) && unsupportedExactValues(proposal.headline, source).length > 0) {
+    errors.push("headline introduces unsupported exact timing");
   }
   if (OUTCOME_ESCALATION.test(proposal.headline) && !OUTCOME_ESCALATION.test(source)) {
     errors.push("headline introduces an unsupported outcome");
@@ -144,6 +160,16 @@ function deterministicProposalErrors(
   // A question may ask about an uncertainty, but it must not state a new fact.
   if (proposal.question_back && !proposal.question_back.trim().endsWith("?")) {
     errors.push("question_back must be phrased as a question");
+  }
+
+  if (proposal.question_back) {
+    const question = proposal.question_back;
+    if (unsupportedExactValues(question, source).length > 0) errors.push("question_back asserts an unsupported exact value");
+    if (unsupportedProperNouns(question, source).length > 0) errors.push("question_back asserts an unsupported named entity or place");
+    if (OWNERSHIP_ESCALATION.test(question) && !OWNERSHIP_ESCALATION.test(source)) errors.push("question_back asserts unsupported ownership");
+    if (OUTCOME_ESCALATION.test(question) && !OUTCOME_ESCALATION.test(source)) errors.push("question_back asserts an unsupported outcome");
+    if (SCOPE_ESCALATION.test(question) && !SCOPE_ESCALATION.test(source)) errors.push("question_back asserts unsupported scope");
+    if (SENIORITY_ESCALATION.test(question) && !SENIORITY_ESCALATION.test(source)) errors.push("question_back asserts unsupported seniority");
   }
 
   return errors;
