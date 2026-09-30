@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
-import { buildD15BSemanticInput, deterministicOutcomeQuestion, deterministicOwnershipQuestion, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
+import { buildD15BSemanticInput, deterministicOutcomeQuestion, deterministicOwnershipQuestion, parseD15BCandidateDiscoveryContent, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 
 const span=(id:string,text:string)=>({id,document_id:"CV",text,start_offset:0,end_offset:text.length,language:"en"});
 const atom=(id:string,spanId:string,action:string,object:string,ownership:AtomicEvidence["subject"]["ownership"]="UNKNOWN"):AtomicEvidence=>({
@@ -216,4 +216,10 @@ test("D15-B reviewed outcome floors are exact premise-free templates in both lan
   const a2={...atom("E3","F2","Déployait","de nouvelles procédures"),provenance:{source_type:"CV" as const,language:"fr" as const,extraction_method:"LLM" as const}};
   const fr=ledger([a1,a2],[fr1,fr2]);
   assert.equal(deterministicOutcomeQuestion(fr,{...p,evidence_ids:["E5","E3"]}),"Cela a-t-il changé quelque chose de mesurable ? Si oui, quoi ?");
+});
+
+test("D15-B discovery distinguishes genuine empty candidates from engine-content failure",()=>{
+  assert.deepEqual(parseD15BCandidateDiscoveryContent('{"candidates":[]}'),[]);
+  assert.throws(()=>parseD15BCandidateDiscoveryContent(""),/empty model content/);
+  assert.throws(()=>parseD15BCandidateDiscoveryContent('{"unexpected":[]}'),/invalid candidates payload/);
 });
