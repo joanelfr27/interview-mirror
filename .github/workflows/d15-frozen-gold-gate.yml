@@ -6,6 +6,11 @@ on:
       expected_sha:
         description: "Exact frozen replay SHA"
         required: true
+      run_semantic:
+        description: "Run paid semantic Gate 2"
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,7 +33,7 @@ jobs:
           test "$actual" = "${{ inputs.expected_sha }}"
           scorer="$(git hash-object src/lib/d15-gold-gate.ts)"
           echo "scorer_blob=$scorer"
-          test "$scorer" = "c6338cfe199b2a12a3c561d053951caf87eeb409"
+          test "$scorer" = "93caab3b5f3062d94e18d7d4c01caebca1c737be"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -43,6 +48,7 @@ jobs:
           D15_REPLAY_DETERMINISTIC_ONLY: "1"
         run: npm run replay:d15:saved
       - name: Semantic replay twice
+        if: ${{ inputs.run_semantic }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npm run replay:d15:saved
