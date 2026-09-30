@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures, supportGroundingPreclear } from "@/lib/d15-gold-gate";
+import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures, supportGroundingPreclear, semanticScopePreclear } from "@/lib/d15-gold-gate";
 import type { D15BVerificationResult } from "@/lib/d15-semantic-thread-engine";
 
 test("D15-B Gold fixtures are frozen as Nancy/Marie/David/Elena/Thomas",()=>{
@@ -260,4 +260,47 @@ test("semantic preclear excludes only exact system ownership questions from upgr
   assert.deepEqual(supportGroundingPreclear(thomas,exact,raw).errors,[]);
   const presupposing=result([proposal("A","Combining support for the rollout of a new customer portal with user feedback.",["E4","E5"],"How did you lead the rollout?")]);
   assert.deepEqual(supportGroundingPreclear(thomas,presupposing,raw).errors,raw);
+});
+
+
+test("semantic scope preclear sets aside full-branch contrast demand on Marie E5+E8 only",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const partial=result([
+    proposal("A","Analyser les retards de livraison et participer à la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge et à quoi avez-vous seulement participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  const raw=["Marie A requires the Déployait versus Participait contrast."];
+  assert.deepEqual(semanticScopePreclear(marie,partial,raw).errors,[]);
+  const full=result([
+    proposal("A","Analyser les retards, déployer des procédures et participer à la réorganisation.",["E5","E3","E8"],"Qu’avez-vous personnellement déployé, et à quoi avez-vous plutôt participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  assert.deepEqual(semanticScopePreclear(marie,full,raw).errors,raw);
+});
+
+test("semantic scope preclear makes Marie B SHOULD outcome criticism observational",()=>{
+  const marie=d15BGoldFixtures()[1]!;
+  const r=result([
+    proposal("A","Analyser les retards de livraison et participer à la réorganisation du traitement des commandes.",["E5","E8"],"Qu’avez-vous personnellement pris en charge et à quoi avez-vous seulement participé ?"),
+    proposal("B","Organiser plusieurs parties autour de la résolution des incidents clients.",["E2","E6"],null),
+  ]);
+  const raw=["Marie B fails to clarify the concrete outcome."];
+  const x=semanticScopePreclear(marie,r,raw);
+  assert.deepEqual(x.errors,[]);
+  assert.deepEqual(x.set_aside.map(v=>v.raw),raw);
+});
+
+test("semantic scope preclear makes Nancy A semantic criticism observational only when deterministic recall is missing",()=>{
+  const nancy=d15BGoldFixtures()[0]!;
+  const missing=result([
+    proposal("A","Connecting acquisition accounting with systems integration following business changes.",["E4","E5"],"What did you personally own?"),
+    proposal("B","Connecting financial information with management and internal stakeholders who use it for decisions.",["E8","E10"],null),
+  ]);
+  const raw=["Nancy A does not surface the ownership tension."];
+  assert.deepEqual(semanticScopePreclear(nancy,missing,raw).errors,[]);
+  const recovered=result([
+    proposal("A","Keeping finance operating through acquisition integration, systems integration, and accounting-process change.",["E4","E5","E6"],"What did you personally own, and what did you mainly support?"),
+    proposal("B","Connecting financial information with management and internal stakeholders who use it for decisions.",["E8","E10"],null),
+  ]);
+  assert.deepEqual(semanticScopePreclear(nancy,recovered,raw).errors,raw);
 });
