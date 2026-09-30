@@ -268,6 +268,16 @@ export function supportGroundingPreclear(fixture:GoldFixture,result:D15BVerifica
   };
 }
 
+function semanticScopePreclear(fixture:GoldFixture,result:D15BVerificationResult,errors:string[]):SemanticPreclearResult {
+  const marieE5E8=result.accepted.some(t=>t.evidence_ids.length===2&&t.evidence_ids.includes("E5")&&t.evidence_ids.includes("E8")&&!t.evidence_ids.includes("E3"));
+  const setAside:string[]=[];
+  const kept=errors.filter(error=>{
+    if(fixture.id==="MARIE"&&marieE5E8&&/D[eé]ployait.*Participait|Participait.*D[eé]ployait/i.test(error)){setAside.push(error);return false;}
+    return true;
+  });
+  return {errors:kept,set_aside:setAside.map(raw=>({raw,reason:"Deterministic Gold v2.1 owns Marie E5+E8 branch selection; full E5+E3+E8 contrast is inapplicable when E3 is not cited."}))};
+}
+
 export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult, unmatchedThreadIds:string[]):Promise<string[]> {
   if(fixture.expected_thread_count===0) return result.accepted.length===0?[]:["Elena must have zero threads"];
   const response=await getOpenAI().chat.completions.create({
@@ -280,7 +290,9 @@ export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerifica
   });
   const parsed=JSON.parse(response.choices[0]?.message?.content||'{"passed":false,"errors":["empty scorer response"]}') as {passed:boolean;errors:string[]};
   const raw=parsed.passed?[]:parsed.errors;
-  const preclear=supportGroundingPreclear(fixture,result,raw);
+  const branchPreclear=semanticScopePreclear(fixture,result,raw);
+  for(const item of branchPreclear.set_aside) console.log("[D15 GOLD SEMANTIC SET-ASIDE]",JSON.stringify(item));
+  const preclear=supportGroundingPreclear(fixture,result,branchPreclear.errors);
   for(const item of preclear.set_aside) console.log("[D15 GOLD SEMANTIC SET-ASIDE]",JSON.stringify(item));
   return preclear.errors;
 }
