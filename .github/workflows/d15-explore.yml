@@ -22,6 +22,15 @@ jobs:
           ref: ${{ github.ref_name }}
           persist-credentials: false
 
+      - name: Assert trusted frozen Gold scorer
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git hash-object src/lib/d15-gold-gate.ts)"
+          expected="d53dabd324be266017515c758df497ecfb3b0b12"
+          echo "Gold scorer blob: $actual"
+          test "$actual" = "$expected"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
