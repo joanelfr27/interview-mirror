@@ -1,0 +1,32 @@
+name: D15-B Offline Gold Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gold-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Canonical suite
+        run: npm run test:canonical
+      - name: Production build
+        run: npm run build
+      - name: Run frozen five-CV D15-B Gold Gate
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs tests/d15-gold-gate-runtime.ts
