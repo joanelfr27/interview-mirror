@@ -20,7 +20,7 @@ async function main(){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
     for(let run=1;run<=2;run++){
       const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));
-      out.push(`\nRUN ${run}\n`);
+      out.push(`\nRUN ${run}\n`,`MIRROR_STATUS: ${result.completion_state}`,`CV_QUESTION_BACK: ${result.cv_question_back ?? "—"}`);
       if(!result.accepted.length) out.push("ACCEPTED: none");
       for(const thread of result.accepted){
         out.push(`ACCEPTED: ${thread.headline}`,evidenceLines(fixture,thread.evidence_ids),`QUESTION: ${thread.question_back ?? "—"}`,"");
