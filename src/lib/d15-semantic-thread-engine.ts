@@ -344,7 +344,10 @@ Do not infer facts from titles, employers, typical duties, or outside knowledge.
       { role: "user", content: JSON.stringify(input) },
     ],
   });
-  const content=response.choices[0]?.message?.content;
+  return parseD15BCandidateDiscoveryContent(response.choices[0]?.message?.content);
+}
+
+export function parseD15BCandidateDiscoveryContent(content:string|null|undefined):D15BCandidateSet[]{
   if(!content?.trim()) throw new Error("candidate discovery returned empty model content");
   const parsed = JSON.parse(content) as { candidates?: D15BCandidateSet[] };
   if(!Array.isArray(parsed.candidates)) throw new Error("candidate discovery returned invalid candidates payload");
