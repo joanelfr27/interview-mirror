@@ -82,3 +82,27 @@ test("D15-B question-back must remain a question",()=>{
   assert.equal(result.accepted.length,0);
   assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("question")));
 });
+
+
+test("D15-B rejects unsupported scope and seniority",()=>{
+  const s1=span("S1","Supported accounting integration activities.");
+  const s2=span("S2","Supported systems integration.");
+  const l=ledger([atom("A1","S1","Supported","accounting integration activities"),atom("A2","S2","Supported","systems integration")],[s1,s2]);
+  const result=verifyD15BSemanticThreadProposals(l,[{
+    id:"P1",headline:"Executive leadership of global integration",evidence_ids:["A1","A2"],question_back:null,
+  }]);
+  assert.equal(result.accepted.length,0);
+  assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("scope")));
+  assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("seniority")));
+});
+
+test("D15-B rejects unsupported named entities or places",()=>{
+  const s1=span("S1","Supported a customer portal rollout.");
+  const s2=span("S2","Collected user feedback during rollout.");
+  const l=ledger([atom("A1","S1","Supported","a customer portal rollout"),atom("A2","S2","Collected","user feedback during rollout")],[s1,s2]);
+  const result=verifyD15BSemanticThreadProposals(l,[{
+    id:"P1",headline:"Portal rollout for Microsoft in Abidjan",evidence_ids:["A1","A2"],question_back:null,
+  }]);
+  assert.equal(result.accepted.length,0);
+  assert.ok(result.rejected[0]?.reasons.some((x)=>x.includes("named entity")));
+});
