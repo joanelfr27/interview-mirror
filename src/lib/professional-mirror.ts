@@ -260,9 +260,41 @@ function legacyIndependentAtomsForEquivalence(ledger: EvidenceLedger): AtomicEvi
   return accepted;
 }
 
+const eligibilityEquivalenceCoverage = {
+  ledgers_checked: 0,
+  contradiction_ledgers: 0,
+  duplicate_ledgers: 0,
+  excluded_section_ledgers: 0,
+};
+
 export function assertD15EligibilityExtractionEquivalent(ledger: EvidenceLedger): void {
-  const legacyIds = legacyIndependentAtomsForEquivalence(ledger).map((atom) => atom.id);
+  const legacy = legacyIndependentAtomsForEquivalence(ledger);
+  const legacyIds = legacy.map((atom) => atom.id);
   const sharedIds = d15EligibleIndependentAtoms(ledger).map((atom) => atom.id);
+
+  const contradictoryKeys = new Set(
+    ledger.evidence
+      .filter((atom) => atom.assertion.polarity === "NEGATED")
+      .map(contradictionKey)
+      .filter(Boolean),
+  );
+  const contradictionRemoved = ledger.evidence.some(
+    (atom) => atom.assertion.polarity === "AFFIRMATIVE" && contradictoryKeys.has(contradictionKey(atom)),
+  );
+
+  const preDedupe = affirmativeAtoms(ledger);
+  const duplicateRemoved = legacy.length < preDedupe.length;
+  const excludedSectionSeen = legacy.some(
+    (atom) => spanFor(ledger, atom)?.source_section === "EXPERIENCE_NON_BULLET",
+  );
+
+  eligibilityEquivalenceCoverage.ledgers_checked += 1;
+  if (contradictionRemoved) eligibilityEquivalenceCoverage.contradiction_ledgers += 1;
+  if (duplicateRemoved) eligibilityEquivalenceCoverage.duplicate_ledgers += 1;
+  if (excludedSectionSeen) eligibilityEquivalenceCoverage.excluded_section_ledgers += 1;
+
+  console.log("[D15 ELIGIBILITY EQUIVALENCE]", JSON.stringify(eligibilityEquivalenceCoverage));
+
   if (JSON.stringify(legacyIds) !== JSON.stringify(sharedIds)) {
     throw new Error(`D15 eligibility extraction mismatch: legacy=${JSON.stringify(legacyIds)} shared=${JSON.stringify(sharedIds)}`);
   }
