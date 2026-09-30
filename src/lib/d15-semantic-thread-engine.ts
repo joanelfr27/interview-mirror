@@ -437,8 +437,8 @@ function deterministicOwnershipQuestion(ledger: EvidenceLedger, proposal: D15BSe
 
 function deterministicOutcomeQuestion(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
   return sourceLanguageForEvidence(ledger,proposal.evidence_ids)==="fr"
-    ? "Quel résultat concret a suivi ce travail, s’il y en a eu un ?"
-    : "What concrete result followed from this work, if any?";
+    ? "Cela a-t-il changé quelque chose de mesurable ? Si oui, quoi ?"
+    : "Did this change anything measurable? If so, what?";
 }
 
 async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): Promise<string | null> {
@@ -491,12 +491,17 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     const preferredQuestion = deterministicOwnershipQuestion(ledger, proposal) ?? await enrichD15BQuestion(ledger, proposal);
     let generatedQuestion = preferredQuestion ?? deterministicOutcomeQuestion(ledger,proposal);
     let questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
-    if (!questionCheck.supported && preferredQuestion) {
+    if (!questionCheck.supported) {
       generatedQuestion = deterministicOutcomeQuestion(ledger,proposal);
+      const floorErrors = deterministicProposalErrors(ledger, { ...proposal, question_back: generatedQuestion });
+      if (floorErrors.length) {
+        rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor failed deterministic truth guards: ${floorErrors.join(" | ")}`] });
+        continue;
+      }
       questionCheck = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, generatedQuestion, "QUESTION_BACK");
     }
     if (!questionCheck.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`required question verifier rejected: ${questionCheck.reason}`] });
+      rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor verifier rejected: ${questionCheck.reason}`] });
       continue;
     }
     accepted.push({ ...proposal, question_back: generatedQuestion });
