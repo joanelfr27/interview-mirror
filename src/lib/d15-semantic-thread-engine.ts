@@ -96,11 +96,11 @@ const ENTITY_PREPOSITIONS=new Set(["for","with","at","in","from","chez","avec","
 /** High-confidence entity guard only. Capitalisation alone is presentation, not entity evidence. */
 function unsupportedProperNouns(claim:string,source:string):string[]{
   const sourceNorm=normalized(source);
-  const words=claim.trim().match(/[\\p{L}][\\p{L}'’.-]*/gu)??[];
+  const words=claim.trim().match(/[\p{L}][\p{L}'’.-]*/gu)??[];
   const unsupported:string[]=[];
   for(let i=0;i<words.length;i++){
     const word=words[i]!;
-    if(!/^\\p{Lu}/u.test(word)) continue;
+    if(!/^\p{Lu}/u.test(word)) continue;
     const norm=normalized(word);
     if(PROPER_NOUN_STOP_WORDS.has(norm)||sourceNorm.includes(norm)) continue;
     if(i===0){
@@ -110,16 +110,16 @@ function unsupportedProperNouns(claim:string,source:string):string[]{
     }
     const prev=normalized(words[i-1]??"");
     const next=words[i+1];
-    const consecutive=!!next&&/^\\p{Lu}/u.test(next)&&!PROPER_NOUN_STOP_WORDS.has(normalized(next));
+    const consecutive=!!next&&/^\p{Lu}/u.test(next)&&!PROPER_NOUN_STOP_WORDS.has(normalized(next));
     if(ENTITY_PREPOSITIONS.has(prev)||consecutive||!isFullyTitleCaseHeadline(claim)) unsupported.push(word);
   }
   return [...new Set(unsupported)];
 }
 
 function isFullyTitleCaseHeadline(value:string):boolean {
-  const words=value.match(/[\\p{L}][\\p{L}'’.-]*/gu)??[];
+  const words=value.match(/[\p{L}][\p{L}'’.-]*/gu)??[];
   const lexical=words.filter(word=>!PROPER_NOUN_STOP_WORDS.has(normalized(word)));
-  return lexical.length>=2&&lexical.every(word=>/^\\p{Lu}/u.test(word));
+  return lexical.length>=2&&lexical.every(word=>/^\p{Lu}/u.test(word));
 }
 
 function obviousHeadlineLanguageMismatch(expected:"en"|"fr",value:string):boolean {
