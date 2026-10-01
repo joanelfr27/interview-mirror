@@ -114,4 +114,8 @@ test("pre-change atoms retain today's candidate interpretation through compatibi
   const legacy = atom("Reconciled payroll cutoffs.", "IMPLICIT_CANDIDATE", "candidate");
   delete legacy.subject.actor_basis;
   assert.equal(effectiveActorBasis(legacy), "IMPLICIT_CANDIDATE");
+
+  const legacyOther = atom("The payroll team reconciled cutoffs.", "EXPLICIT_OTHER", "payroll team");
+  delete legacyOther.subject.actor_basis;
+  assert.equal(effectiveActorBasis(legacyOther), "EXPLICIT_OTHER");
 });
