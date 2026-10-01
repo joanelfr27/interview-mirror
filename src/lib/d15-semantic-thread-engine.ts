@@ -32,7 +32,7 @@ const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
 
 const OWNERSHIP_ESCALATION = /(?<!\p{L})(led|lead|leading|owned|owner|ownership|managed|manager|managing|directed|headed|responsible for|pilot(?:e|é|ée|és|ées|er|ait|aient))(?!\p{L})/iu;
 const OWNERSHIP_PREMISE = /(?:^|[.!?]\\s*)(?:since|as|given that|because|after)\\s+you\\s+/iu;
-const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|achieved|réduit|réduite|réduits|réduites|réduire|diminué|diminuée|amélioré|améliorée|augmenté|augmentée|garantissant|garantit|garantir|efficace|efficacement)\b/iu;
+const OUTCOME_ESCALATION = /\b(improved|increased|reduced|saved|grew|accelerated|optimized|optimised|successful|successfully|delivered|delivering|achieved|ensuring|ensures|guaranteeing|guarantees|effective|effectively|réduit|réduite|réduits|réduites|réduire|diminué|diminuée|amélioré|améliorée|augmenté|augmentée|garantissant|garantit|garantir|efficace|efficacement)\b/iu;
 const NUMBER_OR_PERCENT = /(?:\b\d+(?:[.,]\d+)?\b|%)/;
 const YEAR_OR_DURATION = /(?:\b(?:19|20)\d{2}\b|\b\d+\s*(?:years?|months?|weeks?|days?)\b)/i;
 const SCOPE_ESCALATION = /\b(global|regional|enterprise(?:-wide)?|company(?:-wide)?|group(?:-wide)?|organization(?:-wide)?|organisation(?:-wide)?|across\s+\d+\s+(?:countries|markets|teams|entities)|executive|c-suite|board)\b/i;
@@ -154,7 +154,7 @@ function threadMaturity(evidenceCount: number): MirrorMaturity {
 function deterministicProposalErrors(
   ledger: EvidenceLedger,
   proposal: D15BSemanticThreadProposal,
-  options: { headlineSource?: "model" | "deterministic_floor" } = {},
+  options: { headlineSource?: "model" | "deterministic_floor"; questionSource?: "model" | "deterministic_floor" } = {},
 ): string[] {
   const errors: string[] = [];
   const atoms = supportedAtoms(ledger);
@@ -224,7 +224,7 @@ function deterministicProposalErrors(
   if (proposal.question_back) {
     const question = proposal.question_back;
     if (unsupportedExactValues(question, source).length > 0) errors.push("question_back asserts an unsupported exact value");
-    if (unsupportedProperNouns(question, source).length > 0) errors.push("question_back asserts an unsupported named entity or place");
+    if (options.questionSource !== "deterministic_floor" && unsupportedProperNouns(question, source).length > 0) errors.push("question_back asserts an unsupported named entity or place");
     if (OWNERSHIP_PREMISE.test(question) && OWNERSHIP_ESCALATION.test(question) && !OWNERSHIP_ESCALATION.test(source)) errors.push("question_back asserts unsupported ownership premise");
     // Ownership/outcome words in a question can name the unknown being elicited; the
     // independent QUESTION_BACK verifier determines whether the wording asserts a premise.
@@ -608,7 +608,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       // Reviewed deterministic floor: support/assist/participate evidence gets
       // ownership clarification first; otherwise ask premise-free outcome.
       generatedQuestion = deterministicOwnershipQuestion(ledger, workingProposal) ?? deterministicOutcomeQuestion(ledger,workingProposal);
-      const floorErrors = deterministicProposalErrors(ledger, { ...workingProposal, question_back: generatedQuestion });
+      const floorErrors = deterministicProposalErrors(ledger, { ...workingProposal, question_back: generatedQuestion }, { questionSource:"deterministic_floor" });
       if (floorErrors.length) {
         rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question floor failed deterministic truth guards: ${floorErrors.join(" | ")}`] });
         continue;
