@@ -23,6 +23,7 @@ export type EvidenceSourceSection =
   | "EXPERIENCE_NON_BULLET"
   | "UNKNOWN_SECTION";
 export type EvidenceOwnership = "INDIVIDUAL" | "TEAM" | "SHARED" | "SUPERVISED" | "UNKNOWN";
+export type ActorBasis = "EXPLICIT_CANDIDATE" | "IMPLICIT_CANDIDATE" | "EXPLICIT_OTHER" | "UNSPECIFIED";
 export type AssertionType =
   | "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT"
   | "RESPONSIBILITY" | "OUTCOME_CLAIM" | "ELICITED";
@@ -52,7 +53,7 @@ export type AtomicEvidence = {
     language: EvidenceLanguage;
     extraction_method: "PARSER" | "LLM" | "USER";
   };
-  subject: { actor: string; ownership: EvidenceOwnership };
+  subject: { actor: string; ownership: EvidenceOwnership; actor_basis?: ActorBasis };
   action: { normalized_action: string; object: string };
   context: {
     domain?: string;
@@ -184,6 +185,12 @@ const SUPPORT_STATUSES = new Set<SupportStatus>([
   "DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE",
 ]);
 const OWNERSHIPS = new Set<EvidenceOwnership>(["INDIVIDUAL","TEAM","SHARED","SUPERVISED","UNKNOWN"]);
+const ACTOR_BASES = new Set<ActorBasis>(["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDATE","EXPLICIT_OTHER","UNSPECIFIED"]);
+
+/** Backward-compatible read policy for atoms persisted before actor_basis existed. */
+export function effectiveActorBasis(atom: AtomicEvidence): ActorBasis {
+  return atom.subject.actor_basis ?? "IMPLICIT_CANDIDATE";
+}
 const ASSERTIONS = new Set<AssertionType>([
   "STATED","QUANTIFIED","CREDENTIAL","EMPLOYMENT","RESPONSIBILITY","OUTCOME_CLAIM","ELICITED",
 ]);
@@ -259,12 +266,28 @@ export function validateAtomicEvidenceAgainstSource(
     }
   };
 
-  // "candidate" is a canonical actor placeholder, not a claim about a named person.
+  // "candidate" and "unspecified" are canonical actor placeholders, not named source phrases.
   if (
     value.subject.actor.trim() &&
-    !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(value.subject.actor.trim())
+    !/^(?:candidate|the candidate|candidat|le candidat|unspecified)$/i.test(value.subject.actor.trim())
   ) {
     requireExact("subject.actor", value.subject.actor);
+  }
+
+  if (value.subject.actor_basis === "EXPLICIT_CANDIDATE") {
+    const candidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
+    if (!candidateMarker.test(source)) {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_CANDIDATE requires an explicit candidate-involving marker in the source quote.");
+    }
+  }
+  if (value.subject.actor_basis === "EXPLICIT_OTHER") {
+    if (/^(?:candidate|the candidate|candidat|le candidat|unspecified)$/i.test(value.subject.actor.trim()) ||
+        !source.includes(value.subject.actor.trim())) {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_OTHER requires an exact other-actor phrase grounded in the source quote.");
+    }
+  }
+  if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.actor !== "unspecified") {
+    errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires the canonical actor placeholder unspecified.");
   }
 
   // Free-text semantic fields are deliberately fail-closed: normalization may
@@ -341,6 +364,7 @@ export function validateAtomicEvidence(value: AtomicEvidence): string[] {
   if (!["PARSER","LLM","USER"].includes(value.provenance?.extraction_method)) e.push("AtomicEvidence.provenance.extraction_method is invalid.");
   if (!value.subject?.actor) e.push("AtomicEvidence.subject.actor is required.");
   if (!OWNERSHIPS.has(value.subject?.ownership)) e.push("AtomicEvidence.subject.ownership is invalid.");
+  if (value.subject?.actor_basis !== undefined && !ACTOR_BASES.has(value.subject.actor_basis)) e.push("AtomicEvidence.subject.actor_basis is invalid.");
   if (!value.action?.normalized_action) e.push("AtomicEvidence.action.normalized_action is required.");
   if (!value.action?.object) e.push("AtomicEvidence.action.object is required.");
   if (!ASSERTIONS.has(value.assertion?.type)) e.push("AtomicEvidence.assertion.type is invalid.");
