@@ -44,14 +44,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Pre-spend reject fused literal newline artifacts
+      - name: Pre-spend reject source encoding artifacts
         shell: bash
         run: |
           set -euo pipefail
-          if grep -nE '[;){}]\\\\n' scripts/*.ts src/lib/d15-*.ts; then
+          files=(scripts/*.ts src/lib/d15-*.ts)
+          if grep -nE '[;){}]\\\\n' "${files[@]}"; then
             echo "Found literal \\n after code punctuation; replace it with a real line break."
             exit 1
           fi
+          if LC_ALL=C grep -nP '[\\x{200B}\\x{200C}\\x{200D}\\x{FEFF}\\x{00A0}]' "${files[@]}"; then
+            echo "Found forbidden invisible Unicode source character."
+            exit 1
+          fi
+          echo "Raw harness line 49:"
+          sed -n '49p' scripts/d15-explore.ts | od -An -tx1c
 
       - name: Pre-spend typecheck
         run: npm run typecheck
