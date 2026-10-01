@@ -1,0 +1,24 @@
+{
+  "pilot": "D15 Pilot #4",
+  "status": "SEALED BEFORE ROUND 1 RELEASE",
+  "protocol_commit": "7f06a6f811e5495b80713917b95971b39aeb0811",
+  "codebook": {
+    "commit": "b2fcea37b5c18c79d2330b60d8ea95fd83a270c1",
+    "git_blob_sha": "56f753c50e50aeb8532d7e7a70eeea04f0e69255",
+    "sha256": "b81be37d8bd60b87179771151b66d5f595fd81d3e1a9a2d05d39157ca1796582",
+    "byte_length": 21157
+  },
+  "artifact_hashes": {
+    "round1_blind_sha256": "73f83c56c948998913ebaad94067efce724c4df13095b8888d2e8d5b96d9fe08",
+    "round2_blind_sha256": "02ac43c811ec7dfe57c86b16943ba0c20ed75656ce3cf4a9ce499e044d6621e7",
+    "hidden_admin_key_sha256": "197dc261738d591e201ba1581f5f42fa63b2f64583041073ac6182d1e2618f9b",
+    "sealed_designer_intent_sha256": "204199184820d73dbb1ba6444ba945019ca4aa77e6aac8eafac98833642ebcd8"
+  },
+  "counts": {
+    "round1_cases": 6,
+    "round2_cases": 6,
+    "total_presentations": 12,
+    "pair_count": 6
+  },
+  "custody_note": "Round 2, hidden administration key, and designer intent are withheld until both labelers lock both rounds."
+}
