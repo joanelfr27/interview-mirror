@@ -118,3 +118,17 @@ No rewritten/easier prompt is permitted.
 ## Stop condition
 
 The first qualification model call freezes this artifact operationally. After that call, any change to cases, evidence, claims, expected labels, prompt, settings, scoring rule, or qualification threshold invalidates the experiment and requires a newly declared experiment rather than silently continuing this one.
+
+## Frozen candidate model ladder
+
+Frozen before the first qualification call, using current official OpenAI API pricing and required Chat Completions + Structured Outputs compatibility.
+
+Test in this order and stop at the first 30/30 qualifier:
+
+1. `gpt-5.6-luna` — $0.20 / 1M input tokens; $1.20 / 1M output tokens.
+2. `gpt-5.4-mini` — $0.75 / 1M input tokens; $4.50 / 1M output tokens.
+3. `gpt-5.6-terra` — $2.00 / 1M input tokens; $12.00 / 1M output tokens.
+
+The previously tested `gpt-6-astra` is not a qualification candidate: it already produced a systematic false rejection on the known-good David rhythm relationship. `gpt-5.6-sol` is not in the preregistered three-model ladder; adding it after observing results would violate the no-post-result-model-iteration rule.
+
+Candidate model IDs are the only model-specific variable permitted by this experiment. All six cases, five repetitions, production SIGNIFICANCE prompt, schema, cited canonical-atom representation, expected labels and scoring remain unchanged.
