@@ -1,12 +1,18 @@
-# D15 Semantic Significance Codebook — v1.0 Candidate
+# D15 Semantic Significance Codebook — v1.1 Candidate
 
-Status: FROZEN FOR DISPOSABLE BLIND PILOT  
+Status: CANDIDATE — BOUNDED CLARIFICATION AFTER PILOT #3  
 Purpose: human annotation of D15 semantic relationship grounding (G) and independent Mirror significance (S).  
 Scope: this codebook evaluates only the evidence atoms and proposed relationship/headline presented to the labeler.
 
 ## 1. Annotation independence
 
-Judge G and S independently.
+Judge G and S independently, but evaluate the same asserted proposition.
+
+### 1.1 Single-reading rule
+
+Before assigning G or S, record the semantic proposition asserted by the headline in `asserted_proposition`. G and S must evaluate that same proposition. A word, connector, or construction must not be interpreted more weakly for G and more strongly for S merely to satisfy one axis.
+
+When a headline supports both a weaker and a stronger reading, use the reading a reasonable candidate would take from it. If that remains unclear, use the stronger reading. This default is truth-protective: the Mirror is read by the candidate, so potentially relational wording is not silently weakened during grounding.
 
 - G asks whether the asserted relationship is licensed by the cited evidence.
 - S asks what kind of professional claim the asserted relationship would make, assuming the relationship were true.
@@ -65,6 +71,8 @@ For G=NO, identify the unsupported connector or relationship.
 **Response/adaptation requires an explicit connection.** A claim that one activity was performed in response to another requires evidence linking them.
 
 **Recurrence requires recurrence evidence.** Words such as "rhythm", "regularly", "recurring", or equivalent French expressions require evidence of repetition or recurrence.
+
+**Shared cadence licenses co-recurrence, not interaction.** Evidence that activities A and B occur on the same explicit recurring cadence licenses a proposition that A and B both recur on that cadence. Shared cadence alone does not license a proposition that A links to, feeds, informs, structures, drives, changes, or otherwise interacts with B. Such relational language requires evidence of the corresponding connection.
 
 **Abstraction cannot manufacture a connector.** A broader description may summarize supported activities, but it cannot introduce a mechanism, purpose, causal link, interface, or outcome absent from the evidence.
 
@@ -210,13 +218,32 @@ If S=YES, choose exactly one:
 - PATTERN — a meaningful characteristic configuration in how professional activities relate; use PATTERN when the significance does not depend on an asserted cadence or repeated cycle.
 - INTERFACE — a meaningful connection across distinct functions, activities, processes, or professional domains.
 - MECHANISM — a meaningful account of how one professional activity informs, changes, structures, or operates through another.
-- RECURRENCE — a meaningful repeated cadence, cycle, or rhythm between activities; use RECURRENCE when repetition itself is part of the professional significance.
+- RECURRENCE — a meaningful repeated relationship between activities for which repetition itself is part of the professional significance. Shared timing or common scheduling alone is not sufficient.
 
 Type precedence: choose MECHANISM when the central claim is how one activity informs or changes another; choose RECURRENCE when cadence/repetition is central; choose INTERFACE when the central claim is the cross-domain/process connection without a mechanism; otherwise use PATTERN for a characteristic configuration that is meaningful but not dependent on recurrence.
 
 If S=NO, use NONE.
 
-### 3.5 Intrinsic-purpose test
+### 3.5 Cadence-removal test
+
+For a proposed RECURRENCE claim, remove the cadence from the asserted proposition.
+
+- If no relationship between the activities remains, S=NO: cadence was only timestamping a list.
+- If a relationship remains (for example, a handoff, loop, or one activity feeding another) and repetition is central to that relationship, S=YES / RECURRENCE.
+
+Example — shared cadence only, S=NO:
+
+- "Every Monday, you reconcile tickets and review overdue cases."
+
+Removing "Every Monday" leaves an additive duty list: "you reconcile tickets and review overdue cases."
+
+Example — repeated relationship, S=YES / RECURRENCE:
+
+- "Each month, the forecast feeds the commercial review."
+
+Removing the cadence leaves the relationship "the forecast feeds the commercial review"; the monthly repetition is central to the claim.
+
+### 3.6 Intrinsic-purpose test
 
 Label S=NO when the asserted relationship merely states the inherent purpose of the activity itself. Removing the purpose language would still describe essentially the same professional duty.
 
@@ -235,19 +262,19 @@ Example — distinct activities connected, S can be YES/MECHANISM:
 
 This connects diagnosis with process redesign and describes how findings are acted on.
 
-### 3.6 Generic actors do not create an interface
+### 3.7 Generic actors do not create an interface
 
 A relationship merely between the candidate and unspecified or generic actors such as "teams", "stakeholders", "colleagues", or "management" does not by itself constitute an INTERFACE.
 
 The claim must express a meaningful relationship across distinct professional activities, functions, processes, or domains.
 
-### 3.7 Atomicity-neutral S
+### 3.8 Atomicity-neutral S
 
 S must not change solely because the same underlying source meaning is represented as one evidence atom or several.
 
 Do not use atom count as a proxy for significance.
 
-### 3.8 S teaching examples
+### 3.9 S teaching examples
 
 #### S1 — Meaningful interface: YES / INTERFACE
 
@@ -277,12 +304,12 @@ Claim:
 
 Without a substantive relationship beyond category membership, "intersection" is packaging rather than a Mirror insight.
 
-#### S5 — Recurring professional rhythm: YES / RECURRENCE
+#### S5 — Recurring professional relationship: YES / RECURRENCE
 
 Claim:
-- "You create a regular rhythm between forecasting and commercial review."
+- "Each month, the forecast feeds the commercial review."
 
-Assuming recurrence is true, this expresses a repeated relationship between distinct activities.
+Assuming true, removing the monthly cadence still leaves the substantive relationship "the forecast feeds the commercial review"; repetition is central to the professional claim.
 
 #### S6 — Fluent duty summary: NO / NONE
 
@@ -291,7 +318,7 @@ Claim:
 
 This remains essentially a description of the ordinary purpose of the communication duty.
 
-### 3.9 Anti-shortcut examples
+### 3.10 Anti-shortcut examples
 
 **Relational vocabulary does not guarantee significance.**
 
@@ -373,6 +400,7 @@ This matrix does not change the requirement to annotate G and S independently.
 For every case record:
 
 - case_id
+- asserted_proposition: the single semantic reading of the headline that both G and S evaluate
 - G: YES | NO
 - G_connector: relationship asserted by the headline
 - G_minimal_atom_subset: atom IDs required for the G judgment
@@ -396,12 +424,15 @@ Labelers must not:
 - count atoms as a proxy for significance;
 - change G because S feels weak;
 - change S because G is unsupported;
+- use one semantic reading of the headline for G and a different reading for S;
 - use English/French lexical tokens as automatic labels; or
 - assess whether the extraction system should have preserved additional source context.
 
 ## 8. Borderline cases
 
-A case is not "borderline" because a labeler is uncertain. Borderline status is empirical: the two blind human labelers disagree on G or S before reconciliation.
+A case is not "borderline" because a labeler is uncertain. Borderline status is empirical under a protocol that actually uses two blind human labelers: those two human labelers disagree on G or S before reconciliation.
+
+A disagreement involving an AI reference labeler is diagnostic evidence, not automatically a two-human borderline case or freeze-block trigger. An owner may nevertheless block freeze when such a disagreement exposes a genuine codebook gap; that decision must be recorded explicitly rather than represented as the frozen two-human rule firing.
 
 Disagreements are preserved and diagnosed before any reconciliation.
 
@@ -427,7 +458,15 @@ System evaluation may track:
 
 These fields are not part of G or S annotation in the blind pilot.
 
-## 10. Pre-pilot protocol context
+## 10. Pilot protocol context
+
+The semantic codebook does not require a particular labeler composition. Each disposable pilot must freeze its own roles, blinding/custody procedure, and acceptance gates before annotation. A human-vs-AI reference pilot must not be described as human inter-rater reliability, and AI-reference consistency with prior-round context available must be reported as memory-qualified rather than memory-free blind invariance.
+
+The Pilot #3 role/procedure record superseded the earlier two-human procedural assumptions below; those historical assumptions are retained only as provenance and are not semantic annotation rules.
+
+### 10.1 Historical pre-pilot assumptions
+
+
 
 This codebook is evaluated through a disposable blind pilot.
 
