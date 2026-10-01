@@ -260,6 +260,25 @@ export function deriveDeterministicVerifiability(source: string): VerifiabilityS
   return { has_quantifiable_metric, has_third_party_entity, has_time_anchor };
 }
 
+export function hasActionLocalCandidateMarker(source: string, normalizedAction: string): boolean {
+  const action = normalizedAction.trim();
+  if (!action) return false;
+  const actionIndex = source.toLocaleLowerCase().indexOf(action.toLocaleLowerCase());
+  if (actionIndex < 0) return false;
+
+  const prefix = source.slice(0, actionIndex);
+  const markerPattern = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|je|j['’][a-zà-öø-ÿ]+|nous)\b/gi;
+  const matches = [...prefix.matchAll(markerPattern)];
+  const marker = matches.at(-1);
+  if (!marker || marker.index === undefined) return false;
+
+  const between = prefix.slice(marker.index + marker[0].length);
+  // A relative-clause boundary means the first-person marker belongs to a
+  // neighboring action, not necessarily to this atom's asserted action.
+  if (/\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/i.test(between)) return false;
+  return true;
+}
+
 export function validateAtomicEvidenceAgainstSource(
   value: AtomicEvidence,
   sourceSpan: SourceSpan,
