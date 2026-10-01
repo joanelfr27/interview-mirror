@@ -320,6 +320,15 @@ test("D15-B Thomas exact support evidence selects English ownership floor from c
   assert.equal(deterministicOwnershipQuestion(l,proposal),"In this work, what did you personally own or do, and what did you mainly support or assist with?");
 });
 
+test("D15-B David introduced pipeline review backs create-rhythm ownership wording",()=>{
+  const s1=span("S1","Prepared monthly sales forecasts and reviewed variances with the sales team.");
+  const s2=span("S2","Introduced a structured pipeline review for the sales team.");
+  const l=ledger([atom("E2","S1","Prepared","monthly sales forecasts and reviewed variances with the sales team"),atom("E4","S2","Introduced","a structured pipeline review for the sales team")],[s1,s2]);
+  const result=verifyD15BSemanticThreadProposals(l,[{id:"DAVID-A",headline:"You create a rhythm for the sales team by aligning forecasts with structured reviews.",evidence_ids:["E2","E4"],question_back:null}]);
+  assert.equal(result.rejected.length,0);
+  assert.equal(result.accepted.length,1);
+});
+
 test("D15-B reviewed outcome floors are exact premise-free templates in both languages",()=>{
   const en1=span("S1","Prepared monthly sales forecasts.");
   const en2=span("S2","Introduced a structured pipeline review.");
