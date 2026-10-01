@@ -131,6 +131,20 @@ test("D15-B guard spec: Title-Case headline containing unsupported entity is rej
   assert.ok(r.rejected[0]?.reasons.some(reason=>reason.includes("named entity")));
 });
 
+test("D15-B You/Vous opener is presentation, while unsupported entities remain guarded",()=>{
+  const s1=span("S1","Supported a customer portal rollout.");
+  const s2=span("S2","Collected user feedback during rollout.");
+  const l=ledger([atom("A1","S1","Supported","a customer portal rollout"),atom("A2","S2","Collected","user feedback during rollout")],[s1,s2]);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"EN",headline:"You connect portal rollout with user feedback",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,1);
+  assert.equal(verifyD15BSemanticThreadProposals(l,[{id:"BAD",headline:"You connect portal rollout with Microsoft",evidence_ids:["A1","A2"],question_back:null}]).accepted.length,0);
+
+  const f1={...span("F1","Déployait de nouvelles procédures de suivi des commandes dans les agences."),language:"fr" as const};
+  const f2={...span("F2","Analysait les retards de livraison et présentait les causes principales à la direction."),language:"fr" as const};
+  const fr=ledger([atom("E1","F1","Déployait","de nouvelles procédures"),atom("E2","F2","Analysait","les retards de livraison")],[f1,f2]);
+  fr.evidence.forEach(x=>{x.provenance.language="fr";});
+  assert.equal(verifyD15BSemanticThreadProposals(fr,[{id:"FR",headline:"Vous reliez l’analyse des retards aux changements de procédure",evidence_ids:["E1","E2"],question_back:null}]).accepted.length,1);
+});
+
 test("D15-B deterministic headline floor survives truth guards for every Gold evidence group",()=>{
   const lines={
     NANCY:[
