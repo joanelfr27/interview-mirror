@@ -93,6 +93,36 @@ const PROPER_NOUN_STOP_WORDS = new Set([
 ]);
 const SENTENCE_INITIAL_VERB_MORPHOLOGY=/(?:ing|ed|ant|ent|é|ée|és|ées)$/iu;
 const ENTITY_PREPOSITIONS=new Set(["for","with","at","in","from","chez","avec","à","a","dans","pour"]);
+const SUPPORT_LEVEL_VERBS=new Set([
+  "assist","assisted","assisting","support","supported","supporting","help","helped","helping",
+  "contribute","contributed","contributing","participate","participated","participating",
+  "collect","collected","collecting","organise","organised","organising","organize","organized","organizing",
+  "follow","followed","following","aid","aided","aiding",
+  "participait","participer","participé","participée","participés","participées",
+  "aidait","aider","aidé","aidée","aidés","aidées","organisait","organiser","organisé","organisée","organisés","organisées",
+  "suivait","suivre","suivi","suivie","suivis","suivies","assistait","assister","assisté","assistée","assistés","assistées",
+  "soutenait","soutenir","soutenu","soutenue","soutenus","soutenues","contribuait","contribuer","contribué","contribuée","contribués","contribuées",
+]);
+const OWNERSHIP_LEVEL_VERBS=new Set([
+  "provide","provided","providing","deliver","delivered","delivering","lead","led","leading",
+  "manage","managed","managing","own","owned","owning","direct","directed","directing","run","ran","running",
+  "gérer","gère","gérez","géré","gérée","gérés","gérées","gérant",
+  "piloter","pilote","piloté","pilotée","pilotés","pilotées","pilotant",
+  "diriger","dirige","dirigé","dirigée","dirigés","dirigées","dirigeant",
+  "assurer","assure","assuré","assurée","assurés","assurées","assurant",
+]);
+
+function lexicalWords(value:string):string[]{
+  return (normalized(value).match(/[\p{L}][\p{L}'’.-]*/gu)??[]).map(word=>word.replace(/[.'’-]/gu,""));
+}
+
+function unsupportedOwnershipVerbUpgrades(headline:string,source:string):string[]{
+  const sourceWords=new Set(lexicalWords(source));
+  const headlineWords=lexicalWords(headline);
+  const sourceHasSupport=headlineWords.length>0 && [...sourceWords].some(word=>SUPPORT_LEVEL_VERBS.has(word));
+  if(!sourceHasSupport) return [];
+  return [...new Set(headlineWords.filter(word=>OWNERSHIP_LEVEL_VERBS.has(word)&&!sourceWords.has(word)))];
+}
 
 /** High-confidence entity guard only. Capitalisation alone is presentation, not entity evidence. */
 function unsupportedProperNouns(claim:string,source:string):string[]{
@@ -189,6 +219,10 @@ function deterministicProposalErrors(
   }
   if (SENIORITY_ESCALATION.test(proposal.headline) && !SENIORITY_ESCALATION.test(source)) {
     errors.push("headline introduces unsupported seniority");
+  }
+  const ownershipVerbUpgrades=unsupportedOwnershipVerbUpgrades(proposal.headline,source);
+  if(ownershipVerbUpgrades.length>0){
+    errors.push(`headline introduces unsupported ownership-level verb(s): ${ownershipVerbUpgrades.join(", ")}; cited evidence contains only weaker support/participation wording for that activity`);
   }
   // Candidate-facing model headlines are contractually anchored with You/Vous.
   // Do not classify the sentence-opening token as an entity; inspect only the
