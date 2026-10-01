@@ -43,11 +43,46 @@ async function assertSyntheticSignificanceStability(out:string[]){
   out.push("");
 }
 
+async function assertObservedTruthSlipRegressions(out:string[]){
+  const cases=[
+    {
+      name:"Marie causal purpose slip",
+      fixtureId:"MARIE",
+      ids:["E5","E8"],
+      claim:"Vous contribuez à la réorganisation des processus pour résoudre les retards de livraison.",
+    },
+    {
+      name:"Thomas assisted-training ownership slip",
+      fixtureId:"THOMAS",
+      ids:["E4","E5","E7"],
+      claim:"You support users during the rollout of a new customer portal while gathering their feedback and providing training.",
+    },
+    {
+      name:"Marie organised-resolution ownership slip",
+      fixtureId:"MARIE",
+      ids:["E2","E6"],
+      claim:"Vous gérez la résolution des incidents clients avec les équipes concernées.",
+    },
+  ] as const;
+  out.push("=".repeat(72),"OBSERVED TRUTH-SLIP REGRESSIONS","=".repeat(72));
+  for(const control of cases){
+    const fixture=fixtures.find(item=>item.id===control.fixtureId);
+    if(!fixture) throw new Error(`missing Gold fixture ${control.fixtureId}`);
+    const gold=buildD15BGoldLedger(fixture);
+    const verdicts:boolean[]=[];
+    for(let i=0;i<3;i++) verdicts.push((await verifyD15BClaimIndependently(gold,[...control.ids],control.claim,"HEADLINE")).supported);
+    out.push(`${control.name}: ${verdicts.join(",")} expected=false`);
+    if(verdicts.some(Boolean)) throw new Error(`truth-slip regression accepted for ${control.name}: ${verdicts.join(",")}`);
+  }
+  out.push("");
+}
+
 async function main(){
   const note=process.argv.slice(2).join(" ").trim() || "no change note supplied";
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
   await assertSyntheticSignificanceStability(out);
+  await assertObservedTruthSlipRegressions(out);
   const scoredRuns = new Map<string, Array<Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>>();
   for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
