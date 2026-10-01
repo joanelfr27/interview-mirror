@@ -3,10 +3,6 @@ name: D15 Explore Mirrors
 on:
   workflow_dispatch:
     inputs:
-      target_ref:
-        description: "Branch/ref containing the D15 experiment"
-        required: true
-        default: "d15-bounded-fixes"
       change_note:
         description: "One-line note describing this exploration iteration"
         required: false
@@ -20,23 +16,76 @@ jobs:
     runs-on: ubuntu-latest
     environment: e1-runtime
     steps:
-      - name: Checkout exploration ref
-        uses: actions/checkout@v5
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref }}
+          ref: ${{ github.ref_name }}
           persist-credentials: false
+
+      - name: Assert trusted frozen Gold scorer
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git hash-object src/lib/d15-gold-gate.ts)"
+          expected="2304f2f4b0bc443e1732a12471a4521c795f138f"
+          echo "Gold scorer blob: $actual"
+          test_blob="$(git hash-object tests/d15-gold-gate.test.ts)"
+          expected_test_blob="97435a5a7c2369158a58f01b3e4a54d3972bbdfd"
+          echo "Gold test blob: $test_blob"
+          test "$test_blob" = "$expected_test_blob"
+          test "$actual" = "$expected"
+
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Pre-spend reject source encoding artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          bad_unicode = {chr(0x200B), chr(0x200C), chr(0x200D), chr(0xFEFF), chr(0xA0)}
+          slash = chr(92)
+          punctuation = set(";)}")
+          statement_starts = ("const ", "let ", "var ", "if ", "for ", "return ", "throw ", "out.", "console.")
+          failed = False
+          for pattern in ("scripts/*.ts", "src/lib/d15-*.ts"):
+              for path in Path(".").glob(pattern):
+                  for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                      for index in range(len(line) - 2):
+                          if line[index] in punctuation and line[index + 1] == slash and line[index + 2] == "n":
+                              tail = line[index + 3:].lstrip()
+                              if tail.startswith(statement_starts):
+                                  print(f"{path}:{number}: fused literal newline before statement")
+                                  failed = True
+                      hits = sorted({f"U+{ord(ch):04X}" for ch in line if ch in bad_unicode})
+                      if hits:
+                          print(f"{path}:{number}: {','.join(hits)}")
+                          failed = True
+          if failed:
+              sys.exit(1)
+          PY
+          echo "Raw harness line 49:"
+          sed -n '49p' scripts/d15-explore.ts | od -An -tx1c
+      - name: Pre-spend typecheck
+        run: npm run typecheck
+
+      - name: Pre-spend D15 engine and Gold regressions
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-semantic-thread-engine.test.ts tests/d15-gold-gate.test.ts
+
       - name: Print ten Mirrors and Gold scores
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           CHANGE_NOTE: ${{ inputs.change_note }}
         run: npm run explore:d15 -- "$CHANGE_NOTE"
+
       - name: Upload exploration output
         if: always()
         uses: actions/upload-artifact@v4

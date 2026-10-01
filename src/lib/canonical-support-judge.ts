@@ -1,4 +1,4 @@
-import { AI_MODEL, createOpenAICompletion } from "@/lib/openai";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
 import { createHash } from "node:crypto";
 
 import type { SessionRecord } from "@/types";
@@ -218,6 +218,7 @@ export async function judgeCanonicalSupport(
   session: SessionRecord,
   ledger: EvidenceLedger,
 ): Promise<{ ledger: EvidenceLedger; diagnostics: string[] }> {
+  const openai = getOpenAI();
 
   const compactEvidence = ledger.evidence.map(atom => ({
     id: atom.id,
@@ -247,7 +248,7 @@ export async function judgeCanonicalSupport(
     "rationale must describe evidentiary relationship, not imagined interviewer belief; confidence is mapping confidence; return one judgment per facet. A broader credential/category does not directly satisfy a narrower credential subtype: for example, an MBA in Global Business & Management Studies does not DIRECTLY satisfy a requirement specifically for a Master's degree in Finance or Accounting unless Finance or Accounting is explicitly stated in the cited evidence.";
 
   const userContent = "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) + "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements);
-  const response = await createOpenAICompletion({
+  const response = await openai.chat.completions.create({
     model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments", SCHEMA),
     messages: [
       { role: "system", content: system },
@@ -295,16 +296,20 @@ export async function judgeCanonicalSupport(
     compactEvidence,
     requestCharacterCount: userContent.length,
   });
-  const completenessErrors = assertCompleteFacetJudgments(rawJudgments, ledger.requirements.flatMap(r => r.facets));
-  if (completenessErrors.length) {
-    throw new CanonicalSupportJudgmentError(
-      "Canonical support judgment response was incomplete or structurally invalid: " + completenessErrors.join(" | "),
-      diagnostic,
-    );
-  }
+  // Sanitize before asserting completeness. Missing model judgments are an
+  // epistemic gap, not evidence of support: sanitizeJudgments deterministically
+  // fills each missing facet with an abstained NONE. Unknown/duplicate/invalid
+  // judgments still fail closed through sanitized.errors.
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
     throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
+  }
+  const completenessErrors = assertCompleteFacetJudgments(sanitized.judgments, ledger.requirements.flatMap(r => r.facets));
+  if (completenessErrors.length) {
+    throw new CanonicalSupportJudgmentError(
+      "Sanitized canonical support judgments were incomplete or structurally invalid: " + completenessErrors.join(" | "),
+      diagnostic,
+    );
   }
   const judgments = sanitized.judgments;
   const next: EvidenceLedger = {

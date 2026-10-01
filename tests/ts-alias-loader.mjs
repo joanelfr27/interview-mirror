@@ -3,7 +3,7 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export async function resolve(specifier, context, nextResolve) {
-  if (specifier === "openai") {
+  if (specifier === "openai" && process.env.ALLOW_REAL_OPENAI !== "1") {
     const stub = join(dirname(fileURLToPath(import.meta.url)), "openai-test-stub.mjs");
     return nextResolve(pathToFileURL(stub).href, context);
   }

@@ -1,10 +1,11 @@
-import { AI_MODEL, createOpenAICompletion, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence,
   type EvidenceLedger, detectSourceLanguage, detectQuoteLanguage,
   type EvidenceOwnership,
   type EvidenceSourceType,
+  type EvidenceSourceSection,
   type Requirement,
   type RequirementFacet,
   type RequirementFacetType,
@@ -197,7 +198,33 @@ function canonicalize(value: string): string {
 
 
 
-function findExactSpan(
+function sourceSectionAt(document: string, startOffset: number, quote: string): EvidenceSourceSection {
+  const lineStart = document.lastIndexOf("\n", Math.max(0, startOffset - 1)) + 1;
+  const lineEndIndex = document.indexOf("\n", startOffset);
+  const lineEnd = lineEndIndex >= 0 ? lineEndIndex : document.length;
+  const line = document.slice(lineStart, lineEnd).trim();
+
+  if (/^[•*-]\s+/.test(line)) return "BULLET";
+
+  const experienceStart = document.search(/(?:^|\n)\s*(?:PROFESSIONAL EXPERIENCE|EXPÉRIENCE PROFESSIONNELLE)\s*(?:\n|$)/i);
+  if (experienceStart >= 0 && startOffset > experienceStart) {
+    const remainder = document.slice(experienceStart);
+    const nextMajorSection = remainder.search(/\n\s*(?:EDUCATION|ÉDUCATION|CORE SKILLS|ADDITIONAL SKILLS|COMPÉTENCES|FORMATION|PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFIL PROFESSIONNEL)\s*(?:\n|$)/i);
+    const experienceEnd = nextMajorSection >= 0 ? experienceStart + nextMajorSection : document.length;
+    if (startOffset < experienceEnd) return "EXPERIENCE_NON_BULLET";
+  }
+
+  const prefix = document.slice(0, startOffset);
+  const headings = [...prefix.matchAll(/(?:^|\n)\s*([A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý &/\-]{3,})\s*(?=\n|$)/g)]
+    .map((match) => match[1].trim());
+  const heading = headings.at(-1) ?? "";
+  if (/PROFESSIONAL SUMMARY|PROFESSIONAL PROFILE|PROFIL PROFESSIONNEL/.test(heading)) return "SUMMARY_OR_PROFILE";
+  if (/CORE SKILLS|ADDITIONAL SKILLS|COMPÉTENCES/.test(heading)) return "SKILLS";
+  void quote;
+  return "UNKNOWN_SECTION";
+}
+
+export function findExactSpan(
   documentId: string,
   document: string,
   quote: string,
@@ -222,9 +249,26 @@ function findExactSpan(
         start_offset: index,
         end_offset: index + target.length,
         language,
+        source_section: sourceSectionAt(document, index, target),
       };
     }
     cursor = index + Math.max(1, target.length);
+  }
+
+  // Multiple atomic propositions may legitimately be grounded in the same
+  // exact source sentence. Prefer an unused occurrence above, but if every
+  // exact occurrence is already claimed, reuse the first exact position.
+  const reusedIndex = document.indexOf(target);
+  if (reusedIndex >= 0) {
+    return {
+      id: `SPAN-${documentId}-${spanKind}-${reusedIndex}-${reusedIndex + target.length}`,
+      document_id: documentId,
+      text: target,
+      start_offset: reusedIndex,
+      end_offset: reusedIndex + target.length,
+      language,
+      source_section: sourceSectionAt(document, reusedIndex, target),
+    };
   }
 
   return null;
@@ -245,6 +289,7 @@ export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "F
     start_offset: start,
     end_offset: start + target.length,
     language: parent.language,
+    source_section: parent.source_section,
   };
 }
 
@@ -356,7 +401,8 @@ function toAtomicEvidence(
 async function extractAtoms(
   cv: string,
 ): Promise<RawCandidateAtom[]> {
-  const response = await createOpenAICompletion({
+  const openai = getOpenAI();
+  const response = await openai.chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
     response_format: responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA),
@@ -388,7 +434,11 @@ ${OWNERSHIP_EXTRACTION_RULE}
 - Do not judge candidate fit.
 - Do not claim that an atom proves a capability; extraction only.
 - Extraction confidence measures source representation accuracy only, not candidate fit.
-- Prefer multiple small atoms over one enriched atom. Split role/date facts, responsibilities, tools, metrics, outcomes, and explicit scope into separate atoms when their source quotes differ.
+- Prefer multiple small atoms over one enriched atom.
+- ONE ATOM = ONE EXPLICIT ACTION PROPOSITION. If one source sentence contains multiple explicit actions, create separate atoms for each action where each atom can be grounded to its own exact source quote.
+- An atom's object must describe only the noun/object of that atom's asserted action. Never include a second action verb or a second independently asserted action inside the object.
+- Example: "Booked travel and maintained calendars for managers." must produce separate atoms for "Booked travel..." and "maintained calendars..." rather than one atom whose object contains both actions.
+- Split role/date facts, responsibilities, tools, metrics, outcomes, and explicit scope into separate atoms when their source quotes differ.
 - has_time_anchor MUST be true only when the atom's source_quote contains an explicit four-digit year. Otherwise false.
 - has_quantifiable_metric MUST be true only when the atom's source_quote contains an explicit numeric/percentage/currency metric; otherwise false.
 - has_third_party_entity MUST be true only when the atom's source_quote itself explicitly names a third-party entity; otherwise false.
@@ -414,7 +464,8 @@ ${OWNERSHIP_EXTRACTION_RULE}
 async function extractRequirements(
   jd: string,
 ): Promise<RawRequirement[]> {
-  const response = await createOpenAICompletion({
+  const openai = getOpenAI();
+  const response = await openai.chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
     response_format: responseFormat("canonical_jd_requirements", REQUIREMENT_SCHEMA),
@@ -526,7 +577,10 @@ export async function extractCanonicalShadow(
     const span = findExactSpan(`CV-${session.id}`, session.cv_text ?? "", raw.source_quote, spanLanguage, cvUsed, "ATOM");
     if (!span) {
       rejectedAtoms.push(raw.id);
-      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.`);
+      const probeDiagnostic = process.env.E1_PROBE_DIAGNOSTICS === "true"
+        ? ` Rejected source_quote: ${JSON.stringify(raw.source_quote)}.`
+        : "";
+      warnings.push(`Candidate atom ${raw.id} was rejected because its source quote was not an exact CV substring.${probeDiagnostic}`);
       continue;
     }
 
@@ -542,11 +596,16 @@ export async function extractCanonicalShadow(
 
     if (atomErrors.length) {
       rejectedAtoms.push(raw.id);
-      errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}`));
+      const probeDiagnostic = process.env.E1_PROBE_DIAGNOSTICS === "true"
+        ? ` Probe raw normalized_action: ${JSON.stringify(raw.normalized_action)}; canonical normalized_action: ${JSON.stringify(canonicalRaw.normalized_action)}; object: ${JSON.stringify(canonicalRaw.object)}; source_quote: ${JSON.stringify(raw.source_quote)}.`
+        : "";
+      errors.push(...atomErrors.map((error) => `[${raw.id}] ${error}${probeDiagnostic}`));
       continue;
     }
 
-    sourceSpans.push(span);
+    if (!sourceSpans.some((existing) => existing.id === span.id)) {
+      sourceSpans.push(span);
+    }
     atoms.push(atom);
   }
 

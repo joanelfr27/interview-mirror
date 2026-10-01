@@ -1,4 +1,4 @@
-import { AI_MODEL, createOpenAICompletion, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { AtomicFactRequirementRelation, CanonicalJDRequirement, CvAnalysis, EvidenceChainItem, InterviewStrategy, SessionLanguage, SessionRecord } from "@/types";
 import type { StrategicPlan } from "@/lib/strategy-plan-types";
 
@@ -482,7 +482,8 @@ function structuredResponseFormat(name: string, schema: unknown) {  return { typ
 }
 
 async function requestStructuredJson(system: string, user: string, name: string, schema: unknown, temperature = 0.2): Promise<any> {
-  const completion = await createOpenAICompletion({ model: AI_MODEL, temperature, response_format: structuredResponseFormat(name, schema), messages: [{ role: "system", content: system }, { role: "user", content: user }] });
+  const openai = getOpenAI();
+  const completion = await openai.chat.completions.create({ model: AI_MODEL, temperature, response_format: structuredResponseFormat(name, schema), messages: [{ role: "system", content: system }, { role: "user", content: user }] });
   const raw = completion.choices[0]?.message?.content;
   if (!raw) throw new Error("Empty structured response: " + name);
   return JSON.parse(raw);

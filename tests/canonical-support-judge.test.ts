@@ -69,3 +69,19 @@ test("generic MBA does not directly satisfy Finance/Accounting-specific Master's
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "PARTIAL");
 });
+
+
+test("judge sanitizer fills a missing facet with fail-closed abstained NONE", () => {
+  const l = ledger();
+  l.requirements[0].facets.push({
+    id: "F-2", type: "SCOPE", requirement: "Regional scope", source_span_id: "S-REQ",
+  });
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  const missing = result.judgments.find((judgment) => judgment.facet_id === "F-2");
+  assert.ok(missing);
+  assert.equal(missing.status, "NONE");
+  assert.equal(missing.abstained, true);
+  assert.deepEqual(missing.supporting_evidence_ids, []);
+  assert.equal(missing.confidence, 0);
+});

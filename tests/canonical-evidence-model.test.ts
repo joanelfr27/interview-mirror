@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spanWithinParent } from "../src/lib/canonical-shadow-extractor.ts";
+import { findExactSpan, spanWithinParent } from "../src/lib/canonical-shadow-extractor.ts";
 import {
   aggregateRequirementStatus,
   validateAtomicEvidence,
@@ -66,6 +66,110 @@ function judgment(facet_id: string, status: SupportJudgment["status"], ids: stri
     support_basis: "DOCUMENTED",
   };
 }
+
+
+
+test("multiple atoms may share one exact source span without duplicating the ledger span", () => {
+  const document = "Booked travel and maintained calendars for managers.";
+  const used = new Set<string>();
+  const first = findExactSpan("CV-test", document, document, "en", used, "ATOM");
+  const second = findExactSpan("CV-test", document, document, "en", used, "ATOM");
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(second.id, first.id);
+
+  const firstAtom = { ...atom("A1"), source_span_id: first.id };
+  const secondAtom = { ...atom("A2"), source_span_id: second.id };
+  const sourceSpans = [...new Map([first, second].map((span) => [span.id, span])).values()];
+  const ledger: EvidenceLedger = {
+    source_spans: sourceSpans,
+    evidence: [firstAtom, secondAtom],
+    requirements: [],
+    support_judgments: [],
+    requirement_statuses: [],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+
+  assert.equal(ledger.evidence.length, 2);
+  assert.equal(ledger.source_spans.length, 1);
+  assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
+});
+
+test("source section detection classifies bullets, experience prose, summary, and skills", () => {
+  const document = [
+    "PROFESSIONAL SUMMARY",
+    "Finance leader with regional experience.",
+    "",
+    "PROFESSIONAL EXPERIENCE",
+    "Finance Manager at Example SA",
+    "• Managing accounting systems",
+    "",
+    "CORE SKILLS",
+    "Financial reporting",
+  ].join("\n");
+  const used = new Set<string>();
+
+  const summary = findExactSpan("CV-sections", document, "Finance leader with regional experience.", "en", used, "ATOM");
+  const experience = findExactSpan("CV-sections", document, "Finance Manager at Example SA", "en", used, "ATOM");
+  const bullet = findExactSpan("CV-sections", document, "• Managing accounting systems", "en", used, "ATOM");
+  const skills = findExactSpan("CV-sections", document, "Financial reporting", "en", used, "ATOM");
+
+  assert.equal(bullet?.source_section, "BULLET");
+  assert.equal(experience?.source_section, "EXPERIENCE_NON_BULLET");
+  assert.equal(summary?.source_section, "SUMMARY_OR_PROFILE");
+  assert.equal(skills?.source_section, "SKILLS");
+});
+
+test("multiple requirements may share one exact JD span without duplicating the ledger span", () => {
+  const document = "Manage finance and report results to leadership.";
+  const used = new Set<string>();
+  const first = findExactSpan("JD-test", document, document, "en", used, "REQUIREMENT");
+  const second = findExactSpan("JD-test", document, document, "en", used, "REQUIREMENT");
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(second.id, first.id);
+
+  const req1: Requirement = {
+    id: "REQ-SHARED-1",
+    source_span_id: first.id,
+    normalized_requirement: "Manage finance",
+    category: "CAPABILITY",
+    salience: "CORE",
+    facets: [{ id: "F-SHARED-1", type: "FUNCTION", requirement: "Manage finance", source_span_id: first.id }],
+    extraction_confidence: 1,
+  };
+  const req2: Requirement = {
+    id: "REQ-SHARED-2",
+    source_span_id: second.id,
+    normalized_requirement: "Report results to leadership",
+    category: "RESPONSIBILITY",
+    salience: "IMPORTANT",
+    facets: [{ id: "F-SHARED-2", type: "STAKEHOLDER", requirement: "leadership", source_span_id: second.id }],
+    extraction_confidence: 1,
+  };
+  const sourceSpans = [...new Map([first, second].map((span) => [span.id, span])).values()];
+  const ledger: EvidenceLedger = {
+    source_spans: sourceSpans,
+    evidence: [],
+    requirements: [req1, req2],
+    support_judgments: [],
+    requirement_statuses: [
+      { requirement_id: req1.id, status: "UNRESOLVED" },
+      { requirement_id: req2.id, status: "UNRESOLVED" },
+    ],
+    unresolved_items: [],
+    candidate_elicitations: [],
+    demonstration_objectives: [],
+  };
+
+  assert.equal(ledger.requirements.length, 2);
+  assert.equal(ledger.source_spans.length, 1);
+  assert.deepEqual(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }), []);
+});
 
 test("requirement aggregation is deterministic", () => {
   const req = requirement();
@@ -423,6 +527,41 @@ test("final requirement graph rejects incomplete facet judgments", () => {
   assert.equal(validateRequirementGraph(ledger, { allowUnjudgedFacets: true }).length, 0);
 });
 
+
+test("normalized action grounding accepts case-only differences but rejects a different verb", () => {
+  const evidence = atom("A1");
+  evidence.action.normalized_action = "Maintained";
+  evidence.action.object = "action logs";
+  evidence.subject.ownership = "UNKNOWN";
+  const span = {
+    id: "span-A1",
+    document_id: "CV",
+    text: "Coordinated project meetings and maintained action logs.",
+    start_offset: 0,
+    end_offset: 53,
+    language: "en",
+  };
+
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(evidence, span), []);
+
+  evidence.action.normalized_action = "Managed";
+  const errors = validateAtomicEvidenceAgainstSource(evidence, span);
+  assert.ok(errors.some(e => e.includes("action.normalized_action is not grounded")));
+
+  const french = atom("A2");
+  french.action.normalized_action = "Organisait";
+  french.action.object = "leur résolution";
+  french.subject.ownership = "UNKNOWN";
+  const frenchSpan = {
+    id: "span-A2",
+    document_id: "CV",
+    text: "Coordonnait les incidents et organisait leur résolution.",
+    start_offset: 0,
+    end_offset: 53,
+    language: "fr",
+  };
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(french, frenchSpan), []);
+});
 
 test("field-level grounding rejects an invented structured outcome despite an exact source quote", () => {
   const evidence = atom("A1");

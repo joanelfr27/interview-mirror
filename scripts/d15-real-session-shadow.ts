@@ -8,6 +8,7 @@ import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import {
   diagnoseProfessionalMirrorConnections,
   diagnosticSignalOverlap,
+  diagnosticSharedObjectWords,
 } from "@/lib/professional-mirror";
 import {
   buildD16DependencySnapshot,
@@ -206,6 +207,7 @@ function buildOwnershipStratification(
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
+
 function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
   return {
     version: "rcm-v1",
@@ -239,7 +241,6 @@ if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== reque
 
 const chosen: SessionRow[] = [];
 const seenCv = new Set<string>();
-const seenJd = new Set<string>();
 for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
   let sessionQuery = supabase
     .from("sessions")
@@ -261,10 +262,8 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
     const sessionKey = fingerprint(row.id);
     if (sessionFingerprintFilter.size > 0 && !sessionFingerprintFilter.has(sessionKey)) continue;
     const cvKey = fingerprint(row.cv_text);
-    const jdKey = fingerprint(row.job_description);
-    if (seenCv.has(cvKey) || seenJd.has(jdKey)) continue;
+    if (seenCv.has(cvKey)) continue;
     seenCv.add(cvKey);
-    seenJd.add(jdKey);
     chosen.push(row);
     if (chosen.length === requestedSessionCount) break;
   }
@@ -273,7 +272,7 @@ for (let offset = 0; chosen.length < requestedSessionCount; offset += 500) {
 }
 
 if (chosen.length < requestedSessionCount) {
-  throw new Error(`Expected at least ${requestedSessionCount} distinct CV/JD sessions after exhausting session history, found ${chosen.length}.`);
+  throw new Error(`Expected at least ${requestedSessionCount} distinct CV sessions after exhausting session history, found ${chosen.length}.`);
 }
 
 
@@ -357,6 +356,7 @@ for (const row of chosen) {
       outcome: "PASS",
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
+      e1_atom_rejection: rejectionRate(result.extraction_diagnostics),
       evidence_with_domain: domains.length,
       evidence_domain_rate: result.ledger.evidence.length
         ? Number((domains.length / result.ledger.evidence.length).toFixed(3))
@@ -403,6 +403,38 @@ for (const row of chosen) {
       },
       diagnostics_count: result.diagnostics.length,
       d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
+      ...(process.env.D15_GOLD_DIAGNOSTICS === "true"
+        ? {
+            d15_gold_object_diagnostic: (() => {
+              const atoms = result.ledger.evidence.map((atom) => {
+                const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+                return {
+                  evidence_id: atom.id,
+                  source_span_id: atom.source_span_id,
+                  source_quote: span?.text ?? "",
+                  source_section: span?.source_section ?? "UNKNOWN_SECTION",
+                  assertion_type: atom.assertion.type,
+                  action_object: atom.action.object,
+                };
+              });
+              const atomById = new Map(result.ledger.evidence.map((atom) => [atom.id, atom]));
+              const pairs = diagnoseProfessionalMirrorConnections(result.ledger).pairs
+                .filter((pair) => pair.connection_reason)
+                .map((pair) => ({
+                  left_id: pair.left_id,
+                  right_id: pair.right_id,
+                  connection_reason: pair.connection_reason,
+                  left_object: atomById.get(pair.left_id)?.action.object ?? "",
+                  right_object: atomById.get(pair.right_id)?.action.object ?? "",
+                  shared_object_words: diagnosticSharedObjectWords(
+                    atomById.get(pair.left_id)?.action.object ?? "",
+                    atomById.get(pair.right_id)?.action.object ?? "",
+                  ),
+                }));
+              return { atoms, connected_pairs: pairs };
+            })(),
+          }
+        : {}),
       ownership_diagnostic: result.ledger.evidence
         .filter((atom) => atom.subject.ownership === "UNKNOWN")
         .map((atom) => {
@@ -458,11 +490,22 @@ for (const row of chosen) {
       ...(caught instanceof CanonicalShadowExtractionEarlyReturnError
         ? {
             extraction_diagnostics: caught.extraction,
+            e1_atom_rejection: rejectionRate(caught.extraction),
             extraction_early_return_reasons: caught.reasons,
           }
         : {}),
     });
   }
+}
+
+function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_atoms: ReadonlyArray<string> }) {
+  const attempted = diagnostics.candidate_atom_count + diagnostics.rejected_atoms.length;
+  return {
+    attempted_atom_count: attempted,
+    accepted_atom_count: diagnostics.candidate_atom_count,
+    rejected_atom_count: diagnostics.rejected_atoms.length,
+    rejected_atom_rate: attempted ? Number((diagnostics.rejected_atoms.length / attempted).toFixed(3)) : 0,
+  };
 }
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");

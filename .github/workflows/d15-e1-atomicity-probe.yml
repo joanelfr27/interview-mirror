@@ -12,13 +12,13 @@ jobs:
     environment: e1-runtime
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -38,4 +38,5 @@ jobs:
       - name: Run real-runtime atomicity probe
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          E1_PROBE_DIAGNOSTICS: "true"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-e1-atomicity-probe.ts
