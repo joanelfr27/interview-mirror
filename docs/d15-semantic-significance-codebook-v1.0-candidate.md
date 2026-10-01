@@ -1,6 +1,6 @@
 # D15 Semantic Significance Codebook — v1.1 Candidate
 
-Status: CANDIDATE — BOUNDED CLARIFICATION AFTER PILOT #3  
+Status: FROZEN FOR DISPOSABLE BLIND PILOT #4  
 Purpose: human annotation of D15 semantic relationship grounding (G) and independent Mirror significance (S).  
 Scope: this codebook evaluates only the evidence atoms and proposed relationship/headline presented to the labeler.
 
