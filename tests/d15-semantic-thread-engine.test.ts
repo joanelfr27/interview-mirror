@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
-import { buildD15BSemanticInput, deterministicHeadlineFloor, deterministicOutcomeQuestion, deterministicOwnershipQuestion, parseD15BCandidateDiscoveryContent, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
+import { buildD15BSemanticInput, deterministicHeadlineFloor, verifyD15BDeterministicFloorForTest, deterministicOutcomeQuestion, deterministicOwnershipQuestion, parseD15BCandidateDiscoveryContent, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 
 const span=(id:string,text:string)=>({id,document_id:"CV",text,start_offset:0,end_offset:text.length,language:"en"});
 const atom=(id:string,spanId:string,action:string,object:string,ownership:AtomicEvidence["subject"]["ownership"]="UNKNOWN"):AtomicEvidence=>({
@@ -206,8 +206,8 @@ test("D15-B deterministic headline floor survives truth guards for every Gold ev
     l.evidence.forEach(x=>{x.provenance.language=language;});
     const proposal={id:name,headline:"placeholder",evidence_ids:[...evidenceIds],question_back:null};
     const floor=deterministicHeadlineFloor(l,proposal);
-    const checked=verifyD15BSemanticThreadProposals(l,[{...proposal,headline:floor}]);
-    assert.equal(checked.accepted.length,1,`${name} floor rejected: ${checked.rejected.flatMap(x=>x.reasons).join(" | ")}; floor=${JSON.stringify(floor)}`);
+    const checked=verifyD15BDeterministicFloorForTest(l,{...proposal,headline:floor});
+    assert.equal(checked.length,0,`${name} floor rejected: ${checked.join(" | ")}; floor=${JSON.stringify(floor)}`);
   }
 });
 
