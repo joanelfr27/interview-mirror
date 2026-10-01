@@ -17,10 +17,12 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
 
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
-  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string }>;
+  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; diagnostic_headline_rewritten?: boolean }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
+
+const D15_JUDGE_MODEL = process.env.D15_JUDGE_MODEL?.trim() || "gpt-5.6-sol";
 
 const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
   UNKNOWN: 0,
@@ -468,7 +470,7 @@ export async function verifyD15BClaimIndependently(
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
   if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
   const response = await getOpenAI().chat.completions.create({
-    model: AI_MODEL,
+    model: D15_JUDGE_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_claim_verification", VERIFIER_SCHEMA),
     messages: [
@@ -612,6 +614,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   // headline overclaims. Give presentation-only guard failures one constrained rewrite,
   // then run the exact same deterministic guards again. Evidence IDs never change.
   const guardRepaired:D15BSemanticThreadProposal[]=[];
+  const rewrittenHeadlineIds=new Set<string>();
   for(const proposal of proposed){
     const initialErrors=deterministicProposalErrors(ledger,proposal);
     const presentationOnly=initialErrors.length>0 && initialErrors.every(reason =>
@@ -622,6 +625,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       continue;
     }
     const repaired=await repairGuardRejectedHeadlineOnce(ledger,proposal,initialErrors);
+    if(repaired) rewrittenHeadlineIds.add(proposal.id);
     guardRepaired.push(repaired ? {...proposal,headline:repaired} : proposal);
   }
   const deterministic = verifyD15BSemanticThreadProposals(ledger, guardRepaired);
@@ -639,6 +643,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
       workingProposal=floorProposal;
+      rewrittenHeadlineIds.add(proposal.id);
     }
     let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
     if (!headline.supported) {
@@ -647,7 +652,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         const repairedProposal={...workingProposal,headline:repaired};
         const guardErrors=deterministicProposalErrors(ledger,repairedProposal);
         const repairedCheck=guardErrors.length ? {supported:false,reason:guardErrors.join(" | ")} : await verifyD15BClaimIndependently(ledger,proposal.evidence_ids,repaired,"HEADLINE");
-        if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; }
+        if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; rewrittenHeadlineIds.add(proposal.id); }
       }
     }
     if (!headline.supported) {
@@ -659,13 +664,19 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
         continue;
       }
       workingProposal=floorProposal;
+      rewrittenHeadlineIds.add(proposal.id);
       headline={supported:true,reason:"reviewed deterministic headline floor"};
     }
     const significance = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
     if (!significance.supported) {
       const significanceConfirmation = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
       if (!significanceConfirmation.supported) {
-        rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`] });
+        rejected.push({
+          proposal_id: proposal.id,
+          reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`],
+          diagnostic_headline: workingProposal.headline,
+          diagnostic_headline_rewritten: rewrittenHeadlineIds.has(proposal.id),
+        });
         continue;
       }
     }
