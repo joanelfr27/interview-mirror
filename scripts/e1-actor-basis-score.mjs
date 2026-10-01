@@ -10,11 +10,21 @@ if (!file) {
 const rows = JSON.parse(fs.readFileSync(file, "utf8"));
 const bases = ["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDATE","EXPLICIT_OTHER","UNSPECIFIED"];
 const languages = ["en","fr"];
+const requiredConstructions = [
+  "subjectless_verb",
+  "nominal",
+  "passive_no_agent",
+  "passive_with_agent",
+  "impersonal",
+  "explicit_first_person",
+  "explicit_team",
+  "mixed_action_actor",
+];
 
 if (!Array.isArray(rows)) throw new Error("Qualification input must be a JSON array.");
 const seenIds = new Set();
 for (const row of rows) {
-  if (!row.id || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted)) {
+  if (!row.id || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted) || !requiredConstructions.includes(row.construction)) {
     throw new Error("Invalid row: " + JSON.stringify({ id: row.id, language: row.language, gold: row.gold, predicted: row.predicted }));
   }
   if (seenIds.has(row.id)) throw new Error("Duplicate qualification row id: " + row.id);
@@ -60,7 +70,10 @@ const samplePass =
   languages.every(l => count(r => r.language === l && r.gold === "IMPLICIT_CANDIDATE") >= 40) &&
   languages.every(l => count(r => r.language === l && r.gold === "UNSPECIFIED") >= 40) &&
   languages.every(l => count(r => r.language === l && r.gold === "EXPLICIT_OTHER") >= 15) &&
-  nominal >= 30 && frNominal >= 20;
+  nominal >= 30 && frNominal >= 20 &&
+  languages.every(language => requiredConstructions.every(construction =>
+    count(r => r.language === language && r.construction === construction) >= 1
+  ));
 
 const thresholdPass =
   rate(fu, implicit) !== null && rate(fu, implicit) <= 0.02 &&
@@ -72,6 +85,13 @@ const thresholdPass =
 const report = {
   rows: rows.length,
   sample: { implicit, unspecified, explicit_other: explicitOther, explicit_candidate: explicitCandidate, nominal, fr_nominal: frNominal },
+  construction_coverage: Object.fromEntries(languages.map(language => [
+    language,
+    Object.fromEntries(requiredConstructions.map(construction => [
+      construction,
+      count(r => r.language === language && r.construction === construction),
+    ])),
+  ])),
   primary_rates: {
     false_unspecified: { count: fu, denominator: implicit, rate: pct(rate(fu, implicit)) },
     false_implicit_candidate: { count: fi, denominator: unspecified, rate: pct(rate(fi, unspecified)) },
