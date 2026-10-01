@@ -53,15 +53,18 @@ jobs:
           import sys
           bad_unicode = {chr(0x200B), chr(0x200C), chr(0x200D), chr(0xFEFF), chr(0xA0)}
           slash = chr(92)
-          suspicious = (")" + slash + "n", ";" + slash + "n", "}" + slash + "n")
+          punctuation = set(";)}")
+          statement_starts = ("const ", "let ", "var ", "if ", "for ", "return ", "throw ", "out.", "console.")
           failed = False
           for pattern in ("scripts/*.ts", "src/lib/d15-*.ts"):
               for path in Path(".").glob(pattern):
                   for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                      stripped = line.lstrip()
-                      if not stripped.startswith("//") and any(token in line for token in suspicious):
-                          print(f"{path}:{number}: fused literal newline")
-                          failed = True
+                      for index in range(len(line) - 2):
+                          if line[index] in punctuation and line[index + 1] == slash and line[index + 2] == "n":
+                              tail = line[index + 3:].lstrip()
+                              if tail.startswith(statement_starts):
+                                  print(f"{path}:{number}: fused literal newline before statement")
+                                  failed = True
                       hits = sorted({f"U+{ord(ch):04X}" for ch in line if ch in bad_unicode})
                       if hits:
                           print(f"{path}:{number}: {','.join(hits)}")
