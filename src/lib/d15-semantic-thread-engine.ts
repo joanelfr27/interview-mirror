@@ -108,6 +108,12 @@ const SUPPORT_LEVEL_VERBS=new Set([
 const OWNERSHIP_LEVEL_VERBS=new Set([
   "provide","provided","providing","deliver","delivered","delivering","lead","led","leading",
   "manage","managed","managing","own","owned","owning","direct","directed","directing","run","ran","running",
+  "introduce","introduced","introducing","implement","implemented","implementing","establish","established","establishing",
+  "create","created","creating","build","built","building","launch","launched","launching","design","designed","designing","set","setup",
+  "introduire","introduit","introduisait","introduisaient","implémenter","implémenté","implémentée","implémentés","implémentées","implémentait",
+  "établir","établi","établie","établis","établies","établissait","créer","créé","créée","créés","créées","créait",
+  "construire","construit","construite","construits","construites","construisait","lancer","lancé","lancée","lancés","lancées","lançait",
+  "concevoir","conçu","conçue","conçus","conçues","concevait","mettre","mettait","mise","mises",
   "gérer","gère","gérez","géré","gérée","gérés","gérées","gérant",
   "piloter","pilote","piloté","pilotée","pilotés","pilotées","pilotant",
   "diriger","dirige","dirigé","dirigée","dirigés","dirigées","dirigeant",
@@ -573,7 +579,7 @@ async function repairGuardRejectedHeadlineOnce(
       type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
     }),
     messages:[
-      {role:"system",content:`Rewrite only the presentation of an already-discovered semantic relationship after deterministic truth guards rejected its headline. Preserve the SAME relationship and use ONLY the cited atoms; do not add, remove, or reinterpret evidence. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. It MUST begin exactly with ${language==="fr"?'"Vous "':'"You "'}. Remove every problem identified in guard_reasons. Do not add outcomes, ownership, scope, dates, numbers, entities, seniority, causality, or responsibilities not explicitly supported by the cited atoms. Do not discover a new relationship. Return JSON only.`},
+      {role:"system",content:`Rewrite only the presentation of an already-discovered semantic relationship after deterministic truth guards rejected its headline. Preserve the SAME relationship and use ONLY the cited atoms; do not add, remove, or reinterpret evidence. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. It MUST begin exactly with ${language==="fr"?'"Vous "':'"You "'}. Remove every problem identified in guard_reasons. KEEP THE INSIGHT: preserve the relational meaning of the discovered pattern while removing only the unsupported wording; do not collapse the headline into a list, generic category, or mere concatenation of the cited activities. Do not add outcomes, ownership, scope, dates, numbers, entities, seniority, causality, or responsibilities not explicitly supported by the cited atoms. Do not discover a new relationship. Return JSON only.`},
       {role:"user",content:JSON.stringify({rejected_headline:proposal.headline,guard_reasons:guardReasons,cited_atoms:atoms})},
     ],
   });
