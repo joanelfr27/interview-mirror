@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOpenAI, AI_MODEL } from "@/lib/openai";
+import { createOpenAICompletion, AI_MODEL } from "@/lib/openai";
 
 const RESULT_SCHEMA = {
   type: "object", additionalProperties: false,
@@ -76,8 +76,7 @@ Do not call an unconfirmed detail a gap. Make the uncertainty itself the strateg
 }
 
 async function runVariant(variant: Variant, cv: string, jd: string) {
-  const openai = getOpenAI();
-  const completion = await openai.chat.completions.create({
+  const completion = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: { type: "json_schema", json_schema: { name: `strategy_${variant}`, strict: true, schema: RESULT_SCHEMA as Record<string, unknown> } },

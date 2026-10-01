@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: e1-runtime
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.expected_sha }}
           persist-credentials: false
@@ -29,7 +29,7 @@ jobs:
           scorer="$(git hash-object src/lib/d15-gold-gate.ts)"
           echo "scorer_blob=$scorer"
           test "$scorer" = "38a51a9a6667283d545e87f36610dfda7e130cf2"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

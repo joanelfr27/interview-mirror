@@ -1,4 +1,4 @@
-import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, createOpenAICompletion, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence,
@@ -356,8 +356,7 @@ function toAtomicEvidence(
 async function extractAtoms(
   cv: string,
 ): Promise<RawCandidateAtom[]> {
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: responseFormat("canonical_candidate_atoms", CANDIDATE_SCHEMA),
@@ -415,8 +414,7 @@ ${OWNERSHIP_EXTRACTION_RULE}
 async function extractRequirements(
   jd: string,
 ): Promise<RawRequirement[]> {
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: responseFormat("canonical_jd_requirements", REQUIREMENT_SCHEMA),

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, createOpenAICompletion, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import { createClient } from "@/lib/supabase/server";
 
 function normalizeFocusKey(value: string): string {
@@ -29,9 +29,7 @@ export async function POST(request: Request) {
     const focusKey = normalizeFocusKey(focusArea);
     const language = normalizeLanguage(sourceSession.preparation_language ?? sourceSession.language);
     if (!focusKey) return NextResponse.json({ error: "Invalid coaching focus" }, { status: 400 });
-
-    const openai = getOpenAI();
-    const completion = await openai.chat.completions.create({
+    const completion = await createOpenAICompletion({
       model: AI_MODEL,
       response_format: { type: "json_object" },
       temperature: 0.4,

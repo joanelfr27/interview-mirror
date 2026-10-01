@@ -36,7 +36,7 @@ jobs:
           grep -Fq "6 cases × 5 independent raw judgments = 30 raw verdicts" docs/d15-significance-judge-qualification-frozen.md
           grep -Fq "No majority voting." docs/d15-significance-judge-qualification-frozen.md
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

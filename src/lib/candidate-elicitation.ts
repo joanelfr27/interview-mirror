@@ -1,4 +1,4 @@
-import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, createOpenAICompletion, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence, type CandidateElicitation, type CandidateGapClassification,
@@ -66,7 +66,7 @@ export async function classifyCandidateElicitation(
   if (!item) throw new Error("Unknown unresolved item: " + elicitation.unresolved_item_id);
 
   const requirement = ledger.requirements.find(x => x.id === item.requirement_id);
-  const response = await getOpenAI().chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL, temperature: 0,
     response_format: responseFormat("candidate_elicitation_classification", SCHEMA),
     messages: [
