@@ -108,6 +108,7 @@ async function main(){
         const diagnosticHeadline=rejection.diagnostic_headline ? ` HEADLINE: ${rejection.diagnostic_headline}` : "";
         const rewriteState=rejection.diagnostic_headline ? ` REWRITTEN: ${rejection.diagnostic_headline_rewritten===true}` : "";
         out.push(`REJECTED ${rejection.proposal_id}:${diagnosticHeadline}${rewriteState} ${rejection.reasons.join(" | ")}`);
+        for(const traceLine of rejection.diagnostic_trace ?? []) out.push(`  TRACE: ${traceLine}`);
       }
     }
     out.push("");
