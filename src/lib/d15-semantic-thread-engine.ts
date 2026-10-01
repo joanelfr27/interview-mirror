@@ -100,7 +100,7 @@ function unsupportedProperNouns(claim:string,source:string):string[]{
   const unsupported:string[]=[];
   for(let i=0;i<words.length;i++){
     const word=words[i]!;
-    if(!word.length > 0 && word[0] === word[0]!.toLocaleUpperCase() && word[0] !== word[0]!.toLocaleLowerCase()) continue;
+    if(!(word.length > 0 && word[0] === word[0]!.toLocaleUpperCase() && word[0] !== word[0]!.toLocaleLowerCase())) continue;
     const norm=normalized(word);
     if(PROPER_NOUN_STOP_WORDS.has(norm)||sourceNorm.includes(norm)) continue;
     if(i===0){
