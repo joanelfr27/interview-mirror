@@ -1,6 +1,6 @@
 # D15 Semantic Significance Codebook — v1.0 Candidate
 
-Status: PRE-PILOT FROZEN CANDIDATE  
+Status: PRE-PILOT FREEZE CANDIDATE  
 Purpose: human annotation of D15 semantic relationship grounding (G) and independent Mirror significance (S).  
 Scope: this codebook evaluates only the evidence atoms and proposed relationship/headline presented to the labeler.
 
@@ -160,7 +160,7 @@ Evidence:
 Proposed relationship:
 - "You apply verification controls across invoice and payment processing."
 
-G=YES. "Verification controls" faithfully abstracts the checking/reviewing activity without adding a new mechanism.
+G=YES. "Verification controls" is a category-level abstraction of the two explicitly evidenced checking/reviewing controls. It does not assert that the invoice control affects the payment control, or that either control causes an outcome. The word "across" scopes the abstraction to two evidenced process stages; it does not assert interaction between them.
 
 #### G8 — Abstraction creating a mechanism: NO
 
@@ -207,10 +207,12 @@ A generic statement is one whose asserted meaning does not go beyond describing 
 
 If S=YES, choose exactly one:
 
-- PATTERN — a meaningful repeated or characteristic way in which professional activities relate.
+- PATTERN — a meaningful characteristic configuration in how professional activities relate; use PATTERN when the significance does not depend on an asserted cadence or repeated cycle.
 - INTERFACE — a meaningful connection across distinct functions, activities, processes, or professional domains.
 - MECHANISM — a meaningful account of how one professional activity informs, changes, structures, or operates through another.
-- RECURRENCE — a meaningful recurring rhythm or repeated relationship between activities.
+- RECURRENCE — a meaningful repeated cadence, cycle, or rhythm between activities; use RECURRENCE when repetition itself is part of the professional significance.
+
+Type precedence: choose MECHANISM when the central claim is how one activity informs or changes another; choose RECURRENCE when cadence/repetition is central; choose INTERFACE when the central claim is the cross-domain/process connection without a mechanism; otherwise use PATTERN for a characteristic configuration that is meaningful but not dependent on recurrence.
 
 If S=NO, use NONE.
 
@@ -430,14 +432,17 @@ These fields are not part of G or S annotation in the blind pilot.
 This codebook is evaluated through a disposable blind pilot.
 
 - Two independent bilingual, finance-literate human labelers annotate the cases.
-- The case designer does not act as a labeler.
-- Paired segmentation and EN/FR cases are split across two annotation rounds.
+- Pilot case designer: ChatGPT (OpenAI), acting only as disposable-pilot case designer and sealed-intent author; the designer does not act as a pilot labeler.
+- The hidden administration key contains case ID, round, pair ID, pair type (translation or segmentation), and test dimension; it contains no gold labels or designer intent.
+- Blind labeler packs contain no pair ID, pair type, test dimension, designer intent, or gold label.
+- Paired segmentation and EN/FR translation cases are split across two annotation rounds, with one member of every pair in each round.
 - Round 2 is opened only after Round 1 is locked.
-- Pair identities and designer intent remain hidden until both labelers complete both rounds.
+- The designer-intent record is sealed and hashed before either human labeler sees Round 1.
+- Pair identities, test dimensions, and designer intent remain hidden until both labelers complete and lock both rounds.
 - A case counts as a disagreement when either G or S differs between labelers.
 - With 12 pilot cases, 0–2 case-level disagreements pass the aggregate raw-count gate; 3 or more fail it.
 - G and S raw agreement are also reported separately.
-- Cohen's kappa for G and S is descriptive only at n=12 and is not a pass/fail criterion.
+- Cohen's kappa for G and S is descriptive only at n=12 and is not a pass/fail criterion; at this sample size it may be unstable or undefined under extreme label prevalence.
 - Even when the aggregate gate passes, systematic disagreement concentrated on one semantic boundary blocks codebook freeze.
 - If a material rule changes after the pilot, a fresh disposable pilot is required.
 - Pilot cases are never reused in development or qualification corpora.
