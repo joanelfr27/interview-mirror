@@ -92,8 +92,8 @@ test("true agentless passives and impersonal forms remain unspecified", () => {
 });
 
 test("explicit candidate-involving actors require a source marker and remain separate from ownership", () => {
-  for (const source of ["I reconciled payroll cutoffs.", "We reconciled payroll cutoffs.", "J'ai rapproché les dates de paie.", "J’assure le suivi des clôtures.", "Nous avons rapproché les dates de paie."]) {
-    const action = source.replace(/^(?:I|We|J['’][a-zà-öø-ÿ]+|Nous avons)\s+/i, "");
+  for (const source of ["I reconciled payroll cutoffs.", "We reconciled payroll cutoffs.", "Our team reconciled payroll cutoffs.", "J'ai rapproché les dates de paie.", "J’assure le suivi des clôtures.", "Nous avons rapproché les dates de paie.", "Notre équipe a rapproché les dates de paie."]) {
+    const action = source.replace(/^(?:I|We|Our team|J['’][a-zà-öø-ÿ]+|Nous avons|Notre équipe)\s+/i, "");
     const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", action), source);
     assert.equal(out.actor, "candidate", source);
     assert.equal(out.actor_basis, "EXPLICIT_CANDIDATE", source);
