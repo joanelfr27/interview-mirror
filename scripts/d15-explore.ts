@@ -84,12 +84,24 @@ async function assertObservedTruthSlipRegressions(out:string[]){
   if(failures.length) throw new Error(`truth-slip regressions accepted:\n${failures.join("\n")}`);
 }
 
+async function assertDavidRhythmJudgeStability(out:string[]){
+  const david=fixtures.find(f=>f.id==="DAVID");
+  if(!david) throw new Error("DAVID Gold fixture missing");
+  const ledger=buildD15BGoldLedger(david);
+  const claim="You create a rhythm for the sales team by aligning forecasts with structured reviews.";
+  const verdicts=[] as boolean[];
+  for(let i=0;i<3;i++) verdicts.push((await verifyD15BClaimIndependently(ledger,["E2","E4"],claim,"HEADLINE")).supported);
+  out.push(`DAVID RHYTHM HEADLINE JUDGE: ${verdicts.join(",")} expected=true,true,true`);
+  if(!verdicts.every(Boolean)) throw new Error(`David rhythm headline judge unstable/rejected: ${verdicts.join(",")}`);
+}
+
 async function main(){
   const note=process.argv.slice(2).join(" ").trim() || "no change note supplied";
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
   await assertSyntheticSignificanceStability(out);
   await assertObservedTruthSlipRegressions(out);
+  await assertDavidRhythmJudgeStability(out);
   const scoredRuns = new Map<string, Array<Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>>();
   for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
