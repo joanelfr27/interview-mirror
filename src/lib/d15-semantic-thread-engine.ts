@@ -119,8 +119,11 @@ function lexicalWords(value:string):string[]{
 function unsupportedOwnershipVerbUpgrades(headline:string,source:string):string[]{
   const sourceWords=new Set(lexicalWords(source));
   const headlineWords=lexicalWords(headline);
-  const sourceHasSupport=headlineWords.length>0 && [...sourceWords].some(word=>SUPPORT_LEVEL_VERBS.has(word));
-  if(!sourceHasSupport) return [];
+  const sourceHasSupport=[...sourceWords].some(word=>SUPPORT_LEVEL_VERBS.has(word));
+  const sourceHasOwnership=[...sourceWords].some(word=>OWNERSHIP_LEVEL_VERBS.has(word));
+  // Fail closed only for the unambiguous class: the cited evidence expresses
+  // support/participation and contains no ownership-level action at all.
+  if(!sourceHasSupport||sourceHasOwnership) return [];
   return [...new Set(headlineWords.filter(word=>OWNERSHIP_LEVEL_VERBS.has(word)&&!sourceWords.has(word)))];
 }
 
