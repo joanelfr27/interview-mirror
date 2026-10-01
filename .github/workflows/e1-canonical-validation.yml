@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run test:canonical
+      - run: npm run test:mechanical
       - run: npm run build
       - name: Package exact audit repository
         run: git archive --format=zip --output=Interview_Mirror_D13_Audit_${GITHUB_SHA}.zip HEAD

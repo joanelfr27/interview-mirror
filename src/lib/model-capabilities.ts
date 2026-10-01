@@ -1,9 +1,13 @@
 export type ResponseFormatName = "json_object" | "json_schema";
 
 export interface ModelRequestOptions {
-  temperature?: number;
+  temperature?: number | null;
   response_format?: { type?: string } | null;
-  [key: string]: unknown;
+  top_p?: number | null;
+  presence_penalty?: number | null;
+  frequency_penalty?: number | null;
+  logprobs?: boolean | null;
+  top_logprobs?: number | null;
 }
 
 interface ModelCapabilities {
@@ -52,7 +56,7 @@ export function validateModelRequestCapabilities(model: string, options: ModelRe
   if (!capabilities) return [`Unsupported model "${model}"; add an explicit capability entry before use.`];
 
   const errors: string[] = [];
-  if (options.temperature !== undefined) {
+  if (options.temperature !== undefined && options.temperature !== null) {
     if (typeof options.temperature !== "number" || !Number.isFinite(options.temperature)) {
       errors.push("temperature must be a finite number.");
     } else if (capabilities.temperature === "default-only" && options.temperature !== 1) {
@@ -64,7 +68,9 @@ export function validateModelRequestCapabilities(model: string, options: ModelRe
 
   if (REASONING_ONLY_MODELS.has(model)) {
     for (const parameter of REASONING_INCOMPATIBLE_PARAMETERS) {
-      if (options[parameter] !== undefined) errors.push(`Model "${model}" does not support "${parameter}".`);
+      if ((options as Record<string, unknown>)[parameter] !== undefined) {
+        errors.push(`Model "${model}" does not support "${parameter}".`);
+      }
     }
   }
 
