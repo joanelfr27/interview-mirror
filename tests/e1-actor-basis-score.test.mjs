@@ -8,18 +8,19 @@ import { spawnSync } from "node:child_process";
 function rows() {
   const out = [];
   let n = 0;
-  const add = (language, gold, count, nominal = false) => {
-    for (let i = 0; i < count; i++) out.push({ id: "R" + (++n), language, construction: "fixture", gold, predicted: gold, nominal });
+  const add = (language, gold, count, construction, nominal = false) => {
+    for (let i = 0; i < count; i++) out.push({ id: "R" + (++n), language, construction, gold, predicted: gold, nominal });
   };
-  add("en", "IMPLICIT_CANDIDATE", 50, false);
-  add("fr", "IMPLICIT_CANDIDATE", 30, true);
-  add("fr", "IMPLICIT_CANDIDATE", 20, false);
-  add("en", "UNSPECIFIED", 50);
-  add("fr", "UNSPECIFIED", 50);
-  add("en", "EXPLICIT_OTHER", 20);
-  add("fr", "EXPLICIT_OTHER", 20);
-  add("en", "EXPLICIT_CANDIDATE", 20);
-  add("fr", "EXPLICIT_CANDIDATE", 20);
+  for (const language of ["en", "fr"]) {
+    add(language, "IMPLICIT_CANDIDATE", language === "fr" ? 20 : 25, "subjectless_verb");
+    add(language, "IMPLICIT_CANDIDATE", language === "fr" ? 30 : 25, "nominal", true);
+    add(language, "UNSPECIFIED", 25, "passive_no_agent");
+    add(language, "UNSPECIFIED", 25, "impersonal");
+    add(language, "EXPLICIT_OTHER", 10, "passive_with_agent");
+    add(language, "EXPLICIT_OTHER", 10, "mixed_action_actor");
+    add(language, "EXPLICIT_CANDIDATE", 20, "explicit_first_person");
+    add(language, "EXPLICIT_CANDIDATE", 1, "explicit_team");
+  }
   return out;
 }
 
@@ -70,5 +71,14 @@ test("qualification scorer enforces the three-percent per-language guard", () =>
   assert.equal(result.status, 1);
   assert.equal(result.report.primary_rates.false_unspecified.rate, "2.00%");
   assert.equal(result.report.by_language.en.false_unspecified_rate, "4.00%");
+  assert.equal(result.report.qualification_pass, false);
+});
+
+
+test("qualification scorer rejects missing required construction coverage", () => {
+  const data = rows().map(row => row.construction === "mixed_action_actor" ? { ...row, construction: "passive_with_agent" } : row);
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report.sample_pass, false);
   assert.equal(result.report.qualification_pass, false);
 });
