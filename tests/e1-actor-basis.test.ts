@@ -124,7 +124,6 @@ test("source validator mechanically verifies explicit actor bases", () => {
   assert.ok(validateAtomicEvidenceAgainstSource(atom("I supported the payroll team that reconciled accounts.", "EXPLICIT_CANDIDATE", "candidate", "reconciled accounts"), span("I supported the payroll team that reconciled accounts.")).some(e => e.includes("EXPLICIT_CANDIDATE")));
   assert.ok(validateAtomicEvidenceAgainstSource(atom("Nous avons aidé l'équipe qui a rapproché les comptes.", "EXPLICIT_CANDIDATE", "candidate", "a rapproché les comptes"), span("Nous avons aidé l'équipe qui a rapproché les comptes.")).some(e => e.includes("EXPLICIT_CANDIDATE")));
 });
-});
 
 test("pre-change atoms retain today's candidate interpretation through compatibility policy", () => {
   const legacy = atom("Reconciled payroll cutoffs.", "IMPLICIT_CANDIDATE", "candidate");
