@@ -46,12 +46,16 @@ test("corpus validator requires both EN and FR coverage", () => {
   assert.ok(validateCorpus(corpus).some((error) => error.includes('include language "fr"')));
 });
 
-test("corpus validator rejects an incomplete EN/FR pair and invalid or duplicate IDs", () => {
+test("corpus validator rejects invalid labels, duplicate IDs, and pair metadata", () => {
   const corpus = validCorpus();
   corpus[2] = { ...corpus[2], case_id: corpus[0].case_id, gold_G: 2 as 0 | 1 };
   const errors = validateCorpus(corpus);
   assert.ok(errors.some((error) => error.includes("is not unique")));
   assert.ok(errors.some((error) => error.includes("gold_G must be 0 or 1")));
+  const pairMetadataInGold = validCorpus().map((row, index) =>
+    index === 0 ? { ...row, pair_id: "pair-metadata-not-gold" } : row,
+  );
+  assert.ok(validateCorpus(pairMetadataInGold).some((error) => error.includes("unsupported field(s): pair_id")));
 });
 
 function blindCase(case_id: string, language: "en" | "fr") {
@@ -155,7 +159,10 @@ test("cross-record validation fails closed for missing, duplicated, and extra ca
     adminEntry("opaque-b", 2, "pair-a", "translation"),
   ];
 
-  assert.ok(validateBlindPilotCrossRecords({ round1, round2: [] }, key).some((error) => error.includes("opaque-b") && error.includes("missing from round packs")));
+  assert.ok(validateBlindPilotCrossRecords(
+    { round1, round2: [blindCase("opaque-unlisted", "fr")] },
+    key,
+  ).some((error) => error.includes("opaque-b") && error.includes("missing from round packs")));
   assert.ok(validateBlindPilotCrossRecords({ round1, round2: [round1[0]] }, key).some((error) => error.includes("must appear exactly once")));
   assert.ok(validateBlindPilotCrossRecords(
     { round1: [...round1, blindCase("opaque-extra", "en")], round2 },

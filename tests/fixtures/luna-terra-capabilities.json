@@ -1,7 +1,7 @@
 {
   "fixtures": [
     {
-      "provider": "D15",
+      "provider": "OpenAI",
       "model": "gpt-5.4-mini",
       "supported": {
         "temperature": 0,

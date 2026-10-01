@@ -62,6 +62,7 @@ export function validateCorpus(input: unknown): string[] {
   const seenIds = new Set<string>();
   const languages = new Set<string>();
   const cells = new Set<string>();
+  const allowedFields = new Set(["case_id", "exact_cited_atoms", "headline", "language", "gold_G", "gold_S", "labeler_id"]);
 
   input.forEach((item, index) => {
     const prefix = `cases[${index}]`;
@@ -69,6 +70,8 @@ export function validateCorpus(input: unknown): string[] {
       errors.push(`${prefix} must be an object.`);
       return;
     }
+    const unexpectedFields = Object.keys(item).filter((field) => !allowedFields.has(field));
+    if (unexpectedFields.length) errors.push(`${prefix} contains unsupported field(s): ${unexpectedFields.join(", ")}.`);
 
     if (!nonEmptyString(item.case_id)) errors.push(`${prefix}.case_id must be a non-empty string.`);
     else if (seenIds.has(item.case_id)) errors.push(`${prefix}.case_id "${item.case_id}" is not unique.`);
@@ -104,6 +107,7 @@ export function validateCorpus(input: unknown): string[] {
 export function validateBlindLabelerCases(input: unknown): string[] {
   const errors: string[] = [];
   if (!Array.isArray(input)) return ["Blind-labeler cases must be an array."];
+  if (input.length === 0) return ["Blind-labeler cases must not be empty."];
   const ids = new Set<string>();
   const allowedFields = new Set(["case_id", "exact_cited_atoms", "headline", "language"]);
 

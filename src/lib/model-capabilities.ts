@@ -6,31 +6,30 @@ export interface ModelRequestOptions {
 }
 
 interface ModelCapabilities {
-  temperature: "any" | "default-only";
+  temperatureValues: readonly number[];
+  temperatureConstraint: "observed-values" | "default-only";
   responseFormats?: readonly ResponseFormatName[];
   provenance: string;
 }
 
 export const MODEL_CAPABILITIES: Readonly<Record<string, ModelCapabilities>> = Object.freeze({
   "gpt-5.4-mini": {
-    temperature: "any",
+    temperatureValues: [0],
+    temperatureConstraint: "observed-values",
     responseFormats: ["json_schema"],
     provenance: "Observed D15 experiment request accepted with temperature 0 and strict json_schema.",
   },
   "gpt-5.6-luna": {
-    temperature: "default-only",
+    temperatureValues: [1],
+    temperatureConstraint: "default-only",
     provenance: "Observed D15 pre-spend investigation: temperature 0 rejected; only default 1 supported.",
   },
   "gpt-5.6-terra": {
-    temperature: "default-only",
+    temperatureValues: [1],
+    temperatureConstraint: "default-only",
     provenance: "D15 qualification workflow run 36887606029: API rejected temperature 0; only default 1 supported.",
   },
 });
-
-export const LUNA_TERRA_CAPABILITY_FIXTURES = Object.freeze([
-  { provider: "Luna", model: "gpt-5.6-luna", unsupported: { temperature: 0 } },
-  { provider: "Terra", model: "gpt-5.6-terra", unsupported: { temperature: 0 } },
-] as const);
 
 export function validateModelRequestCapabilities(model: string, options: ModelRequestOptions): string[] {
   const capabilities = MODEL_CAPABILITIES[model];
@@ -40,10 +39,12 @@ export function validateModelRequestCapabilities(model: string, options: ModelRe
   if (options.temperature !== undefined && options.temperature !== null) {
     if (typeof options.temperature !== "number" || !Number.isFinite(options.temperature)) {
       errors.push("temperature must be a finite number.");
-    } else if (capabilities.temperature === "default-only" && options.temperature !== 1) {
-      errors.push(`Model "${model}" only supports the default temperature value (1).`);
-    } else if (capabilities.temperature === "any" && (options.temperature < 0 || options.temperature > 2)) {
-      errors.push(`temperature for model "${model}" must be between 0 and 2.`);
+    } else if (!capabilities.temperatureValues.includes(options.temperature)) {
+      if (capabilities.temperatureConstraint === "default-only") {
+        errors.push(`Model "${model}" only supports the default temperature value (1).`);
+      } else {
+        errors.push(`Model "${model}" only has observed support for temperature values ${capabilities.temperatureValues.join(", ")}.`);
+      }
     }
   }
 
@@ -62,3 +63,5 @@ export function assertModelRequestCapabilities(model: string, options: ModelRequ
   const errors = validateModelRequestCapabilities(model, options);
   if (errors.length) throw new Error(`Model capability validation failed: ${errors.join(" ")}`);
 }
+
+// Future v2 G/S batch experiments must build and validate every planned request before client creation or sending request #1.

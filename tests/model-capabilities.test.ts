@@ -10,10 +10,28 @@ import {
 
 test("the frozen gpt-5.4-mini request settings are accepted", () => {
   const frozenRequest = {
+    model: "gpt-5.4-mini",
     temperature: 0,
-    response_format: { type: "json_schema" },
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "d15_b_claim_verification",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: { supported: { type: "boolean" }, reason: { type: "string" } },
+          required: ["supported", "reason"],
+        },
+      },
+    },
+    messages: [
+      { role: "system", content: "Capability-only frozen request settings." },
+      { role: "user", content: "Capability-only frozen request input." },
+    ],
   };
-  assert.deepEqual(validateModelRequestCapabilities("gpt-5.4-mini", frozenRequest), []);
+  assert.deepEqual(validateModelRequestCapabilities(frozenRequest.model, frozenRequest), []);
+  assert.ok(validateModelRequestCapabilities("gpt-5.4-mini", { temperature: 0.1 }).length > 0);
   assert.ok(MODEL_CAPABILITIES["gpt-5.4-mini"]);
   assert.match(MODEL_CAPABILITIES["gpt-5.4-mini"]!.provenance, /Observed D15 experiment/);
 });
