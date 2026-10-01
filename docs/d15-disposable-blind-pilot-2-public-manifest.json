@@ -1,0 +1,13 @@
+{
+  "pilot": "D15 Disposable Blind Pilot #2",
+  "status": "SEALED_FOR_ROUND_1",
+  "codebook_commit": "cb232a97fc9c7e1f7a796744ce6ba0c5d332ff6b",
+  "codebook_sha256": "13095ac257ee8ef1797c77721556dfff2c7f1aac2fb65ae0dc668ea50b27df22",
+  "protocol_sha256": "180e50380921ce4b139d20ad136b0e7c0ff5763a882d5c6b9038abce1bbeb285",
+  "round1_blind_sha256": "fc5a7e3e755b4c13996dd85dc06d8202cd02acd4fa69165a5e5c93adc5eab4bb",
+  "round2_blind_sha256": "4838929303c260c897ea740675260f38b524be987d92b32cb349e7f4bff25fac",
+  "hidden_admin_key_sha256": "bf52cf8ab564a53a7a39cf58220a6ed1595d036b51ffdc79de666e14a0ded60e",
+  "sealed_designer_intent_sha256": "9510661fd04b696f989ad0be75eb8451dcff363462bf971174b313d5ea7fab7d",
+  "annotation_template_sha256": "25556ae3a81fbd47435fe71c49453403f2a3501bdf61cfab26d148301caf87c0",
+  "custody_note": "Round 2, hidden administration key, and designer intent are withheld from both labelers until protocol release conditions are met."
+}
