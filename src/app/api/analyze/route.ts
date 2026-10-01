@@ -82,32 +82,160 @@ function groundingOverlap(claim: string, source: string): number {
   return common / Math.min(claimTokens.size, sourceTokens.size);
 }
 
-function isValidAnalysis(value: unknown, cvText?: string, jobDescription?: string): value is CvAnalysis {
-  if (!value || typeof value !== "object") return false;
-  const a = value as any;
-  if (!Number.isFinite(Number(a.matchScore)) || !Array.isArray(a.strengths) || !Array.isArray(a.gaps) || !Array.isArray(a.keywordAlignment) || typeof a.summary !== "string" || !Array.isArray(a.suggestedFocusAreas) || !Array.isArray(a.evidenceChain) || !a.evidenceChain.length) return false;
-  const generic = /\b(prepare examples|be ready|prepare for|show your|improve your|prepare simple examples|préparez des exemples|soyez prêt|améliorez votre|clear professional story|parcours professionnel clair|experience in line with|expérience en lien avec|elements importants|éléments importants|based on the cv|à partir du cv)\b/i;
-  const cvSource = cvText ? canonicalize(cvText) : "";
-  const jdSource = jobDescription ? canonicalize(jobDescription) : "";
-  const evidenceGrounded = a.evidenceChain.every((item: any) => {
-    if (!item || typeof item.jd_requirement !== "string" || !item.jd_requirement.trim() || typeof item.cv_evidence !== "string" || !item.cv_evidence.trim() || typeof item.gap_identified !== "string" || !item.gap_identified.trim() || typeof item.interview_implication !== "string" || !item.interview_implication.trim() || typeof item.actionable_recommendation !== "string" || !item.actionable_recommendation.trim() || generic.test(item.actionable_recommendation)) return false;
-    const jdGrounded = !jdSource
-      ? item.jd_requirement === "NO JOB DESCRIPTION PROVIDED"
-      : item.jd_requirement === NO_EVIDENCE
-        ? false
-        : groundingOverlap(item.jd_requirement, jdSource) >= 0.20;
-    const cvGrounded = item.cv_evidence === NO_EVIDENCE
-      ? true
-      : groundingOverlap(item.cv_evidence, cvSource) >= 0.20;
-    return jdGrounded && cvGrounded;
-  });
-  return evidenceGrounded
-    && a.strengths.every((x: any) => typeof x === "string" && x.trim())
-    && a.gaps.every((x: any) => typeof x === "string" && x.trim())
-    && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
+type AnalysisDiagnosticPredicates = {
+  response_present: boolean;
+  response_json_parseable: boolean;
+  match_score_valid: boolean;
+  strengths_array: boolean;
+  gaps_array: boolean;
+  keyword_alignment_array: boolean;
+  summary_string: boolean;
+  focus_areas_array: boolean;
+  evidence_chain_array: boolean;
+  evidence_chain_nonempty: boolean;
+  evidence_item_shape: boolean;
+  actionable_recommendations_non_generic: boolean;
+  jd_grounding: boolean;
+  cv_grounding: boolean;
+  strengths_items_valid: boolean;
+  gaps_items_valid: boolean;
+  focus_area_items_valid: boolean;
+};
+
+type AnalysisInputFingerprint = {
+  length: number;
+  md5: string;
+};
+
+type AnalysisInputDiagnostics = {
+  raw_request: {
+    cv: AnalysisInputFingerprint;
+    job_description: AnalysisInputFingerprint;
+  };
+  canonical: {
+    cv: AnalysisInputFingerprint;
+    job_description: AnalysisInputFingerprint;
+  };
+  reusable_cv_id: string;
+};
+
+type AnalysisFailureCode =
+  | "EMPTY_AI_RESPONSE"
+  | "INVALID_AI_JSON"
+  | "INVALID_EVIDENCE_GROUNDED_ANALYSIS"
+  | "ANALYSIS_RUNTIME_FAILURE";
+
+class AnalysisFailure extends Error {
+  readonly code: AnalysisFailureCode;
+  readonly predicates: AnalysisDiagnosticPredicates | null;
+
+  constructor(code: AnalysisFailureCode, predicates: AnalysisDiagnosticPredicates) {
+    super(code);
+    this.name = "AnalysisFailure";
+    this.code = code;
+    this.predicates = predicates;
+  }
 }
 
-async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext?: { sessions: unknown[]; coaching_progress: unknown[] }): Promise<CvAnalysis> {
+function md5(value: string): string {
+  return createHash("md5").update(value, "utf8").digest("hex");
+}
+
+function inputFingerprint(value: string): AnalysisInputFingerprint {
+  return {
+    length: Array.from(value).length,
+    md5: md5(value),
+  };
+}
+
+function validateAnalysis(value: unknown, cvText: string, jobDescription: string): { valid: boolean; predicates: AnalysisDiagnosticPredicates } {
+  const predicates: AnalysisDiagnosticPredicates = {
+    response_present: value !== null && value !== undefined,
+    response_json_parseable: true,
+    match_score_valid: false,
+    strengths_array: false,
+    gaps_array: false,
+    keyword_alignment_array: false,
+    summary_string: false,
+    focus_areas_array: false,
+    evidence_chain_array: false,
+    evidence_chain_nonempty: false,
+    evidence_item_shape: false,
+    actionable_recommendations_non_generic: false,
+    jd_grounding: false,
+    cv_grounding: false,
+    strengths_items_valid: false,
+    gaps_items_valid: false,
+    focus_area_items_valid: false,
+  };
+  if (!value || typeof value !== "object") return { valid: false, predicates };
+
+  const a = value as any;
+  predicates.match_score_valid = Number.isFinite(Number(a.matchScore));
+  predicates.strengths_array = Array.isArray(a.strengths);
+  predicates.gaps_array = Array.isArray(a.gaps);
+  predicates.keyword_alignment_array = Array.isArray(a.keywordAlignment);
+  predicates.summary_string = typeof a.summary === "string";
+  predicates.focus_areas_array = Array.isArray(a.suggestedFocusAreas);
+  predicates.evidence_chain_array = Array.isArray(a.evidenceChain);
+  predicates.evidence_chain_nonempty = predicates.evidence_chain_array && a.evidenceChain.length > 0;
+
+  // Match only standalone generic recommendations. Common action verbs such as "prepare for"
+  // must not invalidate a recommendation that names the specific requirement or evidence.
+  const generic = /^(?:prepare examples|be ready|prepare simple examples|préparez des exemples|soyez prêt|clear professional story|parcours professionnel clair|elements importants|éléments importants|based on the cv|à partir du cv|connect your experience|connect your experiences|improve your skills|améliorez vos compétences|show your experience|montrez votre expérience|prepare for the interview|préparez-vous pour l entretien)\.?$/i;
+  const cvSource = canonicalize(cvText);
+  const jdSource = canonicalize(jobDescription);
+  let evidenceItemShape = true;
+  let recommendationsNonGeneric = true;
+  let jdGrounding = true;
+  let cvGrounding = true;
+
+  if (predicates.evidence_chain_array) {
+    for (const item of a.evidenceChain) {
+      const shapeValid = !!item
+        && typeof item.jd_requirement === "string" && !!item.jd_requirement.trim()
+        && typeof item.cv_evidence === "string" && !!item.cv_evidence.trim()
+        && typeof item.gap_identified === "string" && !!item.gap_identified.trim()
+        && typeof item.interview_implication === "string" && !!item.interview_implication.trim()
+        && typeof item.actionable_recommendation === "string" && !!item.actionable_recommendation.trim();
+      evidenceItemShape = evidenceItemShape && shapeValid;
+
+      if (!shapeValid) {
+        recommendationsNonGeneric = false;
+        jdGrounding = false;
+        cvGrounding = false;
+        continue;
+      }
+
+      recommendationsNonGeneric = recommendationsNonGeneric && !generic.test(item.actionable_recommendation);
+      const itemJdGrounded = !jdSource
+        ? item.jd_requirement === "NO JOB DESCRIPTION PROVIDED"
+        : item.jd_requirement !== NO_EVIDENCE && groundingOverlap(item.jd_requirement, jdSource) >= 0.20;
+      const itemCvGrounded = item.cv_evidence === NO_EVIDENCE
+        ? true
+        : groundingOverlap(item.cv_evidence, cvSource) >= 0.20;
+      jdGrounding = jdGrounding && itemJdGrounded;
+      cvGrounding = cvGrounding && itemCvGrounded;
+    }
+  } else {
+    evidenceItemShape = false;
+    recommendationsNonGeneric = false;
+    jdGrounding = false;
+    cvGrounding = false;
+  }
+
+  predicates.evidence_item_shape = evidenceItemShape;
+  predicates.actionable_recommendations_non_generic = recommendationsNonGeneric;
+  predicates.jd_grounding = jdGrounding;
+  predicates.cv_grounding = cvGrounding;
+  predicates.strengths_items_valid = predicates.strengths_array && a.strengths.every((x: any) => typeof x === "string" && x.trim());
+  predicates.gaps_items_valid = predicates.gaps_array && a.gaps.every((x: any) => typeof x === "string" && x.trim());
+  predicates.focus_area_items_valid = predicates.focus_areas_array && a.suggestedFocusAreas.every((x: any) => typeof x === "string" && x.trim());
+
+  return { valid: Object.values(predicates).every(Boolean), predicates };
+}
+
+async function runAnalysis(cvText: string, jobDescription: string, language: "en" | "fr", priorContext: { sessions: unknown[]; coaching_progress: unknown[] } | undefined, inputDiagnostics: AnalysisInputDiagnostics): Promise<CvAnalysis> {
   const openai = getOpenAI();
   try {
     const completion = await openai.chat.completions.create({ model: AI_MODEL, response_format: { type: "json_object" }, temperature: 0.2, messages: [
@@ -116,12 +244,76 @@ async function runAnalysis(cvText: string, jobDescription: string, language: "en
       { role: "user", content: `CV:\n${cvText.slice(0, 12000)}\n\nJOB DESCRIPTION:\n${jobDescription.slice(0, 8000)}\n\nPRIOR PREPARATION CONTEXT:\n${JSON.stringify(priorContext ?? { sessions: [], coaching_progress: [] }).slice(0, 12000)}\n\nAnalyze only the current CV and JD as evidence.` }
     ]});
     const raw = completion.choices[0]?.message?.content;
-    if (!raw) throw new Error("Empty AI response");
-    const parsed = JSON.parse(raw) as CvAnalysis;
-    if (!isValidAnalysis(parsed, cvText, jobDescription)) throw new Error("Invalid evidence-grounded analysis");
+    if (!raw) {
+      throw new AnalysisFailure("EMPTY_AI_RESPONSE", {
+        response_present: false, response_json_parseable: false, match_score_valid: false,
+        strengths_array: false, gaps_array: false, keyword_alignment_array: false, summary_string: false,
+        focus_areas_array: false, evidence_chain_array: false, evidence_chain_nonempty: false,
+        evidence_item_shape: false, actionable_recommendations_non_generic: false, jd_grounding: false,
+        cv_grounding: false, strengths_items_valid: false, gaps_items_valid: false, focus_area_items_valid: false,
+      });
+    }
+
+    let parsed: CvAnalysis;
+    try {
+      parsed = JSON.parse(raw) as CvAnalysis;
+    } catch {
+      throw new AnalysisFailure("INVALID_AI_JSON", {
+        response_present: true, response_json_parseable: false, match_score_valid: false,
+        strengths_array: false, gaps_array: false, keyword_alignment_array: false, summary_string: false,
+        focus_areas_array: false, evidence_chain_array: false, evidence_chain_nonempty: false,
+        evidence_item_shape: false, actionable_recommendations_non_generic: false, jd_grounding: false,
+        cv_grounding: false, strengths_items_valid: false, gaps_items_valid: false, focus_area_items_valid: false,
+      });
+    }
+
+    const validation = validateAnalysis(parsed, cvText, jobDescription);
+    if (!validation.valid) throw new AnalysisFailure("INVALID_EVIDENCE_GROUNDED_ANALYSIS", validation.predicates);
     return parsed;
   } catch (error) {
-    console.error("[ANALYSIS FAILED]", error instanceof Error ? error.message : "analysis failure");
+    const failure = error instanceof AnalysisFailure
+      ? error
+      : new AnalysisFailure("ANALYSIS_RUNTIME_FAILURE", {
+          response_present: false,
+          response_json_parseable: false,
+          match_score_valid: false,
+          strengths_array: false,
+          gaps_array: false,
+          keyword_alignment_array: false,
+          summary_string: false,
+          focus_areas_array: false,
+          evidence_chain_array: false,
+          evidence_chain_nonempty: false,
+          evidence_item_shape: false,
+          actionable_recommendations_non_generic: false,
+          jd_grounding: false,
+          cv_grounding: false,
+          strengths_items_valid: false,
+          gaps_items_valid: false,
+          focus_area_items_valid: false,
+        });
+    console.error("[ANALYSIS DIAGNOSTIC]", JSON.stringify({
+      code: failure.code,
+      predicates: failure.predicates,
+      inputs: inputDiagnostics,
+    }));
+    if (failure.code === "ANALYSIS_RUNTIME_FAILURE") {
+      const runtimeError = error as {
+        name?: unknown;
+        status?: unknown;
+        type?: unknown;
+        code?: unknown;
+        message?: unknown;
+      };
+      console.error("[ANALYSIS RUNTIME ERROR]", JSON.stringify({
+        name: error instanceof Error ? error.name : typeof error,
+        status: typeof runtimeError.status === "number" ? runtimeError.status : undefined,
+        type: typeof runtimeError.type === "string" ? runtimeError.type : undefined,
+        code: typeof runtimeError.code === "string" ? runtimeError.code : undefined,
+        message: typeof runtimeError.message === "string" ? runtimeError.message.slice(0, 300) : undefined,
+      }));
+    }
+    console.error("[ANALYSIS FAILED]", failure.code);
     throw new Error("ANALYSIS_GENERATION_FAILED");
   }
 }
@@ -133,8 +325,10 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
-  const rawCvText = typeof body.cvText === "string" ? body.cvText : "";
-  let rawJobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
+  const rawRequestCvText = typeof body.cvText === "string" ? body.cvText : "";
+  const rawRequestJobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
+  const rawCvText = rawRequestCvText;
+  let rawJobDescription = rawRequestJobDescription;
   let jobDescriptionUrl = String(body.jobDescriptionUrl ?? "").trim() || null;
   let cvDocument: IngestedDocument;
   let jobDescriptionDocument: IngestedDocument | null = null;
@@ -178,7 +372,25 @@ export async function POST(request: Request) {
   if (preparationPurpose === "upcoming_interview" && jobDescription.length < 300) return NextResponse.json({ code: "JD_EXTRACTION_FAILED", error: "The job description is too short to analyze reliably. Please paste the full job description or upload the PDF." }, { status: 422 });
   const parsedInterviewDate = interviewDate ? new Date(`${interviewDate}T12:00:00.000Z`) : null;
   if (parsedInterviewDate && Number.isNaN(parsedInterviewDate.getTime())) return NextResponse.json({ error: "Invalid interview date" }, { status: 400 });
-  try { await ensureReusableCv(supabase, user.id, cvText, String(body.fileName ?? "CV")); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to persist CV" }, { status: 500 }); }
+  let reusableCv: { id: string; storage_path: string | null };
+  try {
+    reusableCv = await ensureReusableCv(supabase, user.id, cvText, String(body.fileName ?? "CV"));
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to persist CV" }, { status: 500 });
+  }
+
+  const inputDiagnostics: AnalysisInputDiagnostics = {
+    raw_request: {
+      cv: inputFingerprint(rawRequestCvText),
+      job_description: inputFingerprint(rawRequestJobDescription),
+    },
+    canonical: {
+      cv: inputFingerprint(cvText),
+      job_description: inputFingerprint(jobDescription),
+    },
+    reusable_cv_id: reusableCv.id,
+  };
+  console.info("[ANALYSIS INPUT DIAGNOSTIC]", JSON.stringify(inputDiagnostics));
   let priorContext: { sessions: unknown[]; coaching_progress: unknown[] } | undefined;
   if (!sessionId || journey === "continue_skills") {
     const { data, error } = await supabase.rpc("get_candidate_preparation_context", { p_user_id: user.id });
@@ -188,7 +400,7 @@ export async function POST(request: Request) {
   }
   const canonicalCv = cvDocument.text; const canonicalJd = jobDescriptionDocument?.text ?? "";
   let analysis: CvAnalysis;
-  try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext); }
+  try { analysis = await runAnalysis(canonicalCv, canonicalJd, language, priorContext, inputDiagnostics); }
   catch { return NextResponse.json({ code: "ANALYSIS_GENERATION_FAILED", error: "We could not produce a reliable Professional Mirror analysis. Please retry." }, { status: 422 }); }
   const validatedAnalysis = { ...analysis, provenance: buildProvenance(language, canonicalCv, canonicalJd) } satisfies CvAnalysis;
   const sessionFields = { title, cv_text: canonicalCv, job_description: canonicalJd, job_description_url: jobDescriptionUrl, preparation_purpose: preparationPurpose, preparation_language: language, experience_language: language, interview_language: interviewLanguage, interview_date: parsedInterviewDate?.toISOString() ?? null, cv_analysis: validatedAnalysis, status: "analyzed" };
