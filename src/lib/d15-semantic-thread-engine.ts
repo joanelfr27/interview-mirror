@@ -523,6 +523,28 @@ export function deterministicHeadlineFloor(ledger: EvidenceLedger, proposal:D15B
     : `Documented connection between ${objects.join(" and ")}`;
 }
 
+async function repairGuardRejectedHeadlineOnce(
+  ledger: EvidenceLedger,
+  proposal: D15BSemanticThreadProposal,
+  guardReasons: string[],
+): Promise<string | null> {
+  const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
+  const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
+  const response=await getOpenAI().chat.completions.create({
+    model:AI_MODEL,temperature:0,response_format:jsonSchemaFormat("d15_b_guard_headline_repair",{
+      type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
+    }),
+    messages:[
+      {role:"system",content:`Rewrite only the presentation of an already-discovered semantic relationship after deterministic truth guards rejected its headline. Preserve the SAME relationship and use ONLY the cited atoms; do not add, remove, or reinterpret evidence. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. It MUST begin exactly with ${language==="fr"?'"Vous "':'"You "'}. Remove every problem identified in guard_reasons. Do not add outcomes, ownership, scope, dates, numbers, entities, seniority, causality, or responsibilities not explicitly supported by the cited atoms. Do not discover a new relationship. Return JSON only.`},
+      {role:"user",content:JSON.stringify({rejected_headline:proposal.headline,guard_reasons:guardReasons,cited_atoms:atoms})},
+    ],
+  });
+  try{
+    const parsed=JSON.parse(response.choices[0]?.message?.content||"{}") as {headline?:unknown};
+    return typeof parsed.headline==="string"&&parsed.headline.trim()?parsed.headline.trim():null;
+  }catch{return null;}
+}
+
 async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThreadProposal):Promise<string|null>{
   const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
   const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
@@ -549,7 +571,23 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     const reason=error instanceof Error ? error.message : String(error);
     return { accepted:[], rejected:[{proposal_id:"ENGINE",reasons:[`ENGINE_ERROR: ${reason}`]}], cv_question_back:null, completion_state:"ERROR" };
   }
-  const deterministic = verifyD15BSemanticThreadProposals(ledger, proposed);
+  // A correct semantic grouping must not be lost solely because its model-written
+  // headline overclaims. Give presentation-only guard failures one constrained rewrite,
+  // then run the exact same deterministic guards again. Evidence IDs never change.
+  const guardRepaired:D15BSemanticThreadProposal[]=[];
+  for(const proposal of proposed){
+    const initialErrors=deterministicProposalErrors(ledger,proposal);
+    const presentationOnly=initialErrors.length>0 && initialErrors.every(reason =>
+      reason.startsWith("headline ")
+    );
+    if(!presentationOnly){
+      guardRepaired.push(proposal);
+      continue;
+    }
+    const repaired=await repairGuardRejectedHeadlineOnce(ledger,proposal,initialErrors);
+    guardRepaired.push(repaired ? {...proposal,headline:repaired} : proposal);
+  }
+  const deterministic = verifyD15BSemanticThreadProposals(ledger, guardRepaired);
   const accepted: D15BVerifiedThread[] = [];
   const rejected = [...deterministic.rejected];
 
