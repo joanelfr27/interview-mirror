@@ -29,7 +29,7 @@ function score(data) {
   fs.writeFileSync(file, JSON.stringify(data));
   const run = spawnSync(process.execPath, ["scripts/e1-actor-basis-score.mjs", file], { encoding: "utf8" });
   fs.rmSync(dir, { recursive: true, force: true });
-  return { status: run.status, report: JSON.parse(run.stdout) };
+  return { status: run.status, report: run.stdout.trim() ? JSON.parse(run.stdout) : null, stderr: run.stderr };
 }
 
 test("qualification scorer passes a threshold-complete perfect corpus", () => {
@@ -48,4 +48,14 @@ test("qualification scorer hard-fails explicit-other candidate misattribution", 
   assert.equal(result.status, 1);
   assert.equal(result.report.primary_rates.explicit_other_false_candidate, 1);
   assert.equal(result.report.qualification_pass, false);
+});
+
+
+test("qualification scorer rejects duplicate row IDs before sample counting", () => {
+  const data = rows();
+  data[1].id = data[0].id;
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report, null);
+  assert.match(result.stderr, /Duplicate qualification row id/);
 });
