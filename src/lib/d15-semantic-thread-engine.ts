@@ -88,7 +88,7 @@ const PROPER_NOUN_STOP_WORDS = new Set([
   "and","or","of","the","through","its","for","to","in","with","across","during","a","an",
   "et","ou","de","du","des","la","le","les","pour","avec","dans","un","une",
   "finance","change","operating","rhythm","customer","portal","rollout","user","feedback",
-  "integration","accounting","systems","support","process","processes","delivery","delays",
+  "integration","accounting","systems","support","process","processes","delivery","delays","lien","documenté","documentee","documente",
 ]);
 const SENTENCE_INITIAL_VERB_MORPHOLOGY=/(?:ing|ed|ant|ent|é|ée|és|ées)$/iu;
 const ENTITY_PREPOSITIONS=new Set(["for","with","at","in","from","chez","avec","à","a","dans","pour"]);
