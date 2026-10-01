@@ -4,6 +4,7 @@ import {
   type AtomicEvidence,
   type EvidenceLedger, detectSourceLanguage, detectQuoteLanguage,
   type EvidenceOwnership,
+  type ActorBasis,
   type EvidenceSourceType,
   type EvidenceSourceSection,
   type Requirement,
@@ -38,6 +39,7 @@ type RawCandidateAtom = {
   id: string;
   source_quote: string;
   actor: string;
+  actor_basis: ActorBasis;
   ownership: EvidenceOwnership;
   normalized_action: string;
   object: string;
@@ -90,6 +92,7 @@ const CANDIDATE_SCHEMA = {
           id: { type: "string" },
           source_quote: { type: "string" },
           actor: { type: "string" },
+          actor_basis: { type: "string", enum: ["EXPLICIT_CANDIDATE", "IMPLICIT_CANDIDATE", "EXPLICIT_OTHER", "UNSPECIFIED"] },
           ownership: { type: "string", enum: ["INDIVIDUAL", "TEAM", "SHARED", "SUPERVISED", "UNKNOWN"] },
           normalized_action: { type: "string" },
           object: { type: "string" },
@@ -114,7 +117,7 @@ const CANDIDATE_SCHEMA = {
           extraction_confidence: { type: "number", minimum: 0, maximum: 1 }
         },
         required: [
-          "id","source_quote","actor","ownership","normalized_action","object",
+          "id","source_quote","actor","actor_basis","ownership","normalized_action","object",
           "domain","jurisdiction","situation","tools_or_systems","standards",
           "quantity","currency","team_size","scope","start","end","recency",
           "outcome","assertion_type","polarity","has_quantifiable_metric",
@@ -125,6 +128,18 @@ const CANDIDATE_SCHEMA = {
   },
   required: ["atoms"]
 } as const;
+
+export const ACTOR_BASIS_EXTRACTION_RULE = `
+Actor basis answers only how the actor of THIS atom's asserted action is attributable. It is separate from ownership level.
+
+- EXPLICIT_CANDIDATE: the source explicitly makes the candidate or a candidate-including group the actor of this action (for example I/je or we/nous attached to the action).
+- IMPLICIT_CANDIDATE: ordinary CV convention makes the candidate the actor even though no grammatical subject is written. This includes subjectless action bullets ("Reconciled payroll cutoffs..."; "Rapprochait les dates...") and nominal CV bullets that name the candidate's work ("Rapprochement des dates..."; "Implementation of controls...").
+- EXPLICIT_OTHER: another actor is explicitly stated as performing this action. Copy that actor phrase exactly into actor. This includes active other actors and passive by/par agents.
+- UNSPECIFIED: the source does not safely identify who performed the action. Use this for true agentless passives ("Payroll cutoffs were reconciled"; "Un calendrier a été mis en place") and impersonal constructions where candidate agency is not explicit (including French "on" when the actor cannot be grounded).
+- Atom-local rule: in mixed sentences, classify the actor of the atom's own asserted action, not the actor of a neighboring action. "Supported the team that reconciled accounts" must not make the candidate the actor of "reconciled accounts."
+- Never use job title, section placement, typical responsibility, or plausibility to turn a true passive/impersonal action into candidate agency.
+- Never paraphrase another actor. If an explicit other actor cannot be copied exactly from the source quote, actor attribution must fail closed to UNSPECIFIED.
+`;
 
 export const OWNERSHIP_EXTRACTION_RULE = `
 Ownership answers who explicitly performs or owns the atom's asserted action. Assertion type is a separate field and does not determine ownership.
@@ -304,10 +319,33 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
 
 function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
-  const groundedActor =
-    actor && /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
-      ? "candidate"
-      : exactOrNull(actor, source) ?? "candidate";
+  const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
+  let actorBasis: ActorBasis = raw.actor_basis;
+  let groundedActor: string;
+
+  if (actorBasis === "EXPLICIT_OTHER") {
+    const exactOther = exactOrNull(actor, source);
+    if (exactOther && !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(exactOther)) {
+      groundedActor = exactOther;
+    } else {
+      // E1-ACTOR-F1: a non-grounded/paraphrased other actor must never collapse
+      // to candidate attribution.
+      groundedActor = "unspecified";
+      actorBasis = "UNSPECIFIED";
+    }
+  } else if (actorBasis === "EXPLICIT_CANDIDATE") {
+    if (explicitCandidateMarker.test(source)) {
+      groundedActor = "candidate";
+    } else {
+      groundedActor = "unspecified";
+      actorBasis = "UNSPECIFIED";
+    }
+  } else if (actorBasis === "IMPLICIT_CANDIDATE") {
+    groundedActor = "candidate";
+  } else {
+    groundedActor = "unspecified";
+    actorBasis = "UNSPECIFIED";
+  }
 
   const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
     INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
@@ -326,6 +364,7 @@ function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): Ra
   return {
     ...raw,
     actor: groundedActor,
+    actor_basis: actorBasis,
     ownership,
     domain: exactOrNull(raw.domain, source),
     jurisdiction: exactOrNull(raw.jurisdiction, source),
@@ -363,6 +402,7 @@ function toAtomicEvidence(
     },
     subject: {
       actor: raw.actor,
+      actor_basis: raw.actor_basis,
       ownership: raw.ownership,
     },
     action: {
@@ -420,8 +460,9 @@ Hard rules:
 - Every populated structured field is an ATOM-LOCAL EXTRACTION, not a semantic summary. The value must be an exact contiguous phrase or literal value that appears inside that atom's source_quote.
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
-- actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
-- ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
+- actor: for EXPLICIT_OTHER, copy the exact actor phrase from the quote. For EXPLICIT_CANDIDATE or IMPLICIT_CANDIDATE use the canonical placeholder "candidate". For UNSPECIFIED use "unspecified". Never invent or paraphrase a person, employer, team, or role as actor.
+- actor_basis: apply the actor-basis rule below. Subjectless action bullets and nominal CV bullets are IMPLICIT_CANDIDATE; genuine agentless passives and unresolved impersonal constructions are UNSPECIFIED.
+- ACTOR BASIS RULE:\n${ACTOR_BASIS_EXTRACTION_RULE}\n- ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
 - OWNERSHIP RULE:
 ${OWNERSHIP_EXTRACTION_RULE}
 - domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied from the same source_quote when present. If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
