@@ -15,6 +15,7 @@ import {
   validateAtomicEvidence,
   deriveDeterministicVerifiability,
   validateAtomicEvidenceAgainstSource,
+  hasActionLocalCandidateMarker,
   validateSourceSpan,
   validateSpanBounds,
   forbiddenInferenceViolations,
@@ -319,9 +320,15 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
 
 export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
-  const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|je|j['’][a-zà-öø-ÿ]+|nous)\b/i;
   // Compatibility for pre-change mocked/raw atoms; the strict production schema now requires actor_basis.
-  let actorBasis: ActorBasis = raw.actor_basis ?? "IMPLICIT_CANDIDATE";
+  // Preserve an exact legacy other actor and the explicit unspecified sentinel;
+  // only historical candidate placeholders default to implicit candidate agency.
+  let actorBasis: ActorBasis = raw.actor_basis ??
+    (/^unspecified$/i.test(actor)
+      ? "UNSPECIFIED"
+      : /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
+        ? "IMPLICIT_CANDIDATE"
+        : "EXPLICIT_OTHER");
   let groundedActor: string;
 
   if (actorBasis === "EXPLICIT_OTHER") {
@@ -335,7 +342,7 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
       actorBasis = "UNSPECIFIED";
     }
   } else if (actorBasis === "EXPLICIT_CANDIDATE") {
-    if (explicitCandidateMarker.test(source)) {
+    if (hasActionLocalCandidateMarker(source, raw.normalized_action)) {
       groundedActor = "candidate";
     } else {
       groundedActor = "unspecified";
