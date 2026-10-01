@@ -59,3 +59,16 @@ test("qualification scorer rejects duplicate row IDs before sample counting", ()
   assert.equal(result.report, null);
   assert.match(result.stderr, /Duplicate qualification row id/);
 });
+
+
+test("qualification scorer enforces the three-percent per-language guard", () => {
+  const data = rows();
+  const enImplicit = data.filter(x => x.language === "en" && x.gold === "IMPLICIT_CANDIDATE");
+  enImplicit[0].predicted = "UNSPECIFIED";
+  enImplicit[1].predicted = "UNSPECIFIED";
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report.primary_rates.false_unspecified.rate, "2.00%");
+  assert.equal(result.report.by_language.en.false_unspecified_rate, "4.00%");
+  assert.equal(result.report.qualification_pass, false);
+});
