@@ -189,7 +189,13 @@ const ACTOR_BASES = new Set<ActorBasis>(["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDAT
 
 /** Backward-compatible read policy for atoms persisted before actor_basis existed. */
 export function effectiveActorBasis(atom: AtomicEvidence): ActorBasis {
-  return atom.subject.actor_basis ?? "IMPLICIT_CANDIDATE";
+  if (atom.subject.actor_basis) return atom.subject.actor_basis;
+  // Legacy atoms already carrying an exact non-candidate actor must remain
+  // other-attributed; only the historical candidate placeholder receives the
+  // compatibility default.
+  return /^(?:candidate|the candidate|candidat|le candidat)$/i.test(atom.subject.actor.trim())
+    ? "IMPLICIT_CANDIDATE"
+    : "EXPLICIT_OTHER";
 }
 const ASSERTIONS = new Set<AssertionType>([
   "STATED","QUANTIFIED","CREDENTIAL","EMPLOYMENT","RESPONSIBILITY","OUTCOME_CLAIM","ELICITED",
