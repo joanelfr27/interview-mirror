@@ -224,6 +224,8 @@ Type precedence: choose MECHANISM when the central claim is how one activity inf
 
 If S=NO, use NONE.
 
+S relationship type is a separate descriptive annotation from the binary S judgment. Pilot acceptance/disagreement gates must state explicitly whether type disagreement is gate-relevant. Unless a pilot protocol explicitly says otherwise, G and S binary disagreements are reported separately from S-type disagreements; a type-only disagreement does not silently become a G or S disagreement.
+
 ### 3.5 Cadence-removal test
 
 For a proposed RECURRENCE claim, remove the cadence from the asserted proposition.
@@ -279,9 +281,9 @@ Do not use atom count as a proxy for significance.
 #### S1 — Meaningful interface: YES / INTERFACE
 
 Claim:
-- "You connect customer-feedback analysis with changes to the intake process."
+- "You work at the point where the payroll cycle and the tax-filing calendar have to agree."
 
-This links two distinct professional activities.
+Assuming true, this describes a meaningful interface between two distinct professional processes without asserting that one informs, changes, structures, or flows into the other.
 
 #### S2 — Enumeration: NO / NONE
 
@@ -458,33 +460,13 @@ System evaluation may track:
 
 These fields are not part of G or S annotation in the blind pilot.
 
-## 10. Pilot protocol context
+## 10. Protocol neutrality
 
-The semantic codebook does not require a particular labeler composition. Each disposable pilot must freeze its own roles, blinding/custody procedure, and acceptance gates before annotation. A human-vs-AI reference pilot must not be described as human inter-rater reliability, and AI-reference consistency with prior-round context available must be reported as memory-qualified rather than memory-free blind invariance.
+This codebook defines semantic annotation rules only. It does not prescribe labeler composition, blinding/custody procedure, disagreement thresholds, or pilot acceptance gates.
 
-The Pilot #3 role/procedure record superseded the earlier two-human procedural assumptions below; those historical assumptions are retained only as provenance and are not semantic annotation rules.
+Each disposable pilot must freeze those procedural choices in its own protocol before annotation begins. Human-vs-AI reference results must not be described as human inter-rater reliability. If an AI reference labeler retains prior-round context, its cross-round consistency must be reported as memory-qualified rather than memory-free blind invariance.
 
-### 10.1 Historical pre-pilot assumptions
-
-
-
-This codebook is evaluated through a disposable blind pilot.
-
-- Two independent bilingual, finance-literate human labelers annotate the cases.
-- Pilot case designer: ChatGPT (OpenAI), acting only as disposable-pilot case designer and sealed-intent author; the designer does not act as a pilot labeler.
-- The hidden administration key contains case ID, round, pair ID, pair type (translation or segmentation), and test dimension; it contains no gold labels or designer intent.
-- Blind labeler packs contain no pair ID, pair type, test dimension, designer intent, or gold label.
-- Paired segmentation and EN/FR translation cases are split across two annotation rounds, with one member of every pair in each round.
-- Round 2 is opened only after Round 1 is locked.
-- The designer-intent record is sealed and hashed before either human labeler sees Round 1.
-- Pair identities, test dimensions, and designer intent remain hidden until both labelers complete and lock both rounds.
-- A case counts as a disagreement when either G or S differs between labelers.
-- With 12 pilot cases, 0–2 case-level disagreements pass the aggregate raw-count gate; 3 or more fail it.
-- G and S raw agreement are also reported separately.
-- Cohen's kappa for G and S is descriptive only at n=12 and is not a pass/fail criterion; at this sample size it may be unstable or undefined under extreme label prevalence.
-- Even when the aggregate gate passes, systematic disagreement concentrated on one semantic boundary blocks codebook freeze.
-- If a material rule changes after the pilot, a fresh disposable pilot is required.
-- Pilot cases are never reused in development or qualification corpora.
+Pilot #1–#3 procedures and dispositions belong in a separate provenance record, not in this operative semantic codebook.
 
 ## 11. Freeze and reproducibility
 
