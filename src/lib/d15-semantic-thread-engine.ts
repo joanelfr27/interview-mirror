@@ -154,7 +154,7 @@ function threadMaturity(evidenceCount: number): MirrorMaturity {
 function deterministicProposalErrors(
   ledger: EvidenceLedger,
   proposal: D15BSemanticThreadProposal,
-  options: { codeBuiltHeadline?: boolean } = {},
+  options: { headlineSource?: "model" | "deterministic_floor" } = {},
 ): string[] {
   const errors: string[] = [];
   const atoms = supportedAtoms(ledger);
@@ -190,7 +190,7 @@ function deterministicProposalErrors(
   if (SENIORITY_ESCALATION.test(proposal.headline) && !SENIORITY_ESCALATION.test(source)) {
     errors.push("headline introduces unsupported seniority");
   }
-  const unsupportedHeadlineEntities=options.codeBuiltHeadline ? [] : unsupportedProperNouns(proposal.headline,source);
+  const unsupportedHeadlineEntities=options.headlineSource==="deterministic_floor" ? [] : unsupportedProperNouns(proposal.headline,source);
   if(unsupportedHeadlineEntities.length>0){
     errors.push(`headline introduces an unsupported named entity or place: headline=${JSON.stringify(proposal.headline)} flagged_tokens=${JSON.stringify(unsupportedHeadlineEntities)}`);
   }
@@ -535,7 +535,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
       const floor=deterministicHeadlineFloor(ledger,workingProposal);
       const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{codeBuiltHeadline:true});
+      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
       if(floorErrors.length){
         rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: Title Case headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
         continue;
@@ -555,7 +555,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     if (!headline.supported) {
       const floor=deterministicHeadlineFloor(ledger,workingProposal);
       const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{codeBuiltHeadline:true});
+      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
       if(floorErrors.length){
         rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
         continue;
