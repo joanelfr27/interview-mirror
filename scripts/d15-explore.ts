@@ -63,7 +63,8 @@ async function main(){
       }
       if(!result.rejected.length) out.push("REJECTED: none");
       for(const rejection of result.rejected){
-        out.push(`REJECTED ${rejection.proposal_id}: ${rejection.reasons.join(" | ")}`);
+        const diagnosticHeadline=rejection.diagnostic_headline ? ` HEADLINE: ${rejection.diagnostic_headline}` : "";
+        out.push(`REJECTED ${rejection.proposal_id}:${diagnosticHeadline} ${rejection.reasons.join(" | ")}`);
       }
     }
     out.push("");
