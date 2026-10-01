@@ -116,3 +116,38 @@ Three-way interpretation:
 This reveal strengthens the closure rather than changing it: the S split has consistent diagnostic support; G-F1 is settled by the existing frozen rule; G-F2 requires specification before any truth-boundary implementation.
 
 No labels were changed after reveal and no Pilot #4 case was rescored.
+
+
+## 9. G-F2 specification inputs before implementation
+
+The Pilot #4 reveal provides the first diagnostic evidence about reader defaults for the agent-attribution gap. On 3F71A8CE, the human primary and precommitted designer intent both treated the agentless passive as candidate work, while the AI reference rejected candidate ownership. This 2-of-3 pattern is not a rule and does not resolve G-F2, but it establishes a user-facing cost for an automatically strict rejection policy: a strict interpretation may protect truth while conflicting with the reading candidates naturally expect.
+
+G-F2 must distinguish at least three surface-form families in both English and French:
+
+1. **Subjectless verb bullets.** Examples: "Reconciled payroll cutoffs..." and French CV-style verb bullets such as "Rapprochait les dates...". These normally carry implicit candidate agency in CV context and must not be rejected merely because an explicit grammatical subject is absent.
+2. **Nominal CV bullets.** Examples: "Rapprochement des dates de paie et des échéances fiscales" and "Mise en place d'un calendrier de conformité". These contain no finite verb and no explicit agent but are common French CV constructions. For ownership handling they must not be mechanically classified as true passives. French nominal bullets are a high-risk false-rejection class and require explicit adversarial coverage.
+3. **True passives.** Agentless passives such as "were reconciled" / "a été mis en place" leave actor identity ambiguous. Passives with a different stated agent such as "by the payroll team" / "par l'équipe paie" affirmatively attribute the action elsewhere and therefore cannot license candidate ownership of that action.
+
+### Candidate-elicitation option
+
+G-F2 does not have to collapse ambiguous agency into an ACCEPT-versus-REJECT binary. D15 already contains a QUESTION_BACK / candidate-elicitation concept. A genuine agentless passive with unresolved actor identity is a candidate for a neutral clarification path, for example:
+
+"Did you do this reconciliation yourself, or support it?"
+
+The French equivalent must preserve the same neutral ownership question rather than presume either direct ownership or non-ownership.
+
+This option is preferable to silently manufacturing candidate agency and may preserve useful evidence that a strict rejection policy would discard. It remains a truth-boundary behavior change and is not authorized by this note alone.
+
+### Required adversarial matrix before any G-F2 implementation
+
+The full-rigor test design must include, at minimum, EN and FR examples covering:
+- subjectless verb bullet with implicit candidate agency;
+- nominal CV bullet with implicit candidate agency;
+- true agentless passive with ambiguous agency;
+- passive with another agent explicitly stated;
+- explicit first-person/candidate agency control;
+- negative controls where candidate ownership would be an unsupported upgrade.
+
+Tests must check both false acceptance and false rejection. In particular, they must demonstrate that French nominal bullets and ordinary subjectless CV bullets are not swept into the ambiguous-passive path.
+
+No G-F2 production implementation should begin until the specification chooses and documents the behavior for genuine agentless passives: reject, QUESTION_BACK, or another truth-safe state. The choice must then receive the full-rigor locked-truth-boundary review before external/CodeRabbit review.
