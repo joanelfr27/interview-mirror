@@ -302,9 +302,8 @@ export function validateAtomicEvidenceAgainstSource(
   }
 
   if (value.subject.actor_basis === "EXPLICIT_CANDIDATE") {
-    const candidateMarker = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|je|j['’][a-zà-öø-ÿ]+|nous)\b/i;
-    if (!candidateMarker.test(source)) {
-      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_CANDIDATE requires an explicit candidate-involving marker in the source quote.");
+    if (!hasActionLocalCandidateMarker(source, value.action.normalized_action)) {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_CANDIDATE requires an action-local candidate-involving marker in the source quote.");
     }
   }
   if (value.subject.actor_basis === "EXPLICIT_OTHER") {
