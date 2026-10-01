@@ -317,7 +317,7 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
   return (values ?? []).map(value => value.trim()).filter(value => value && source.includes(value));
 }
 
-function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
+export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
   const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
   let actorBasis: ActorBasis = raw.actor_basis;
