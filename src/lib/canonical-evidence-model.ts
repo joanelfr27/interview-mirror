@@ -193,7 +193,9 @@ export function effectiveActorBasis(atom: AtomicEvidence): ActorBasis {
   // Legacy atoms already carrying an exact non-candidate actor must remain
   // other-attributed; only the historical candidate placeholder receives the
   // compatibility default.
-  return /^(?:candidate|the candidate|candidat|le candidat)$/i.test(atom.subject.actor.trim())
+  const actor = atom.subject.actor.trim();
+  if (/^unspecified$/i.test(actor)) return "UNSPECIFIED";
+  return /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
     ? "IMPLICIT_CANDIDATE"
     : "EXPLICIT_OTHER";
 }
