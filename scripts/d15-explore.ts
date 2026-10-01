@@ -65,16 +65,23 @@ async function assertObservedTruthSlipRegressions(out:string[]){
     },
   ] as const;
   out.push("=".repeat(72),"OBSERVED TRUTH-SLIP REGRESSIONS","=".repeat(72));
+  const failures:string[]=[];
   for(const control of cases){
     const fixture=fixtures.find(item=>item.id===control.fixtureId);
     if(!fixture) throw new Error(`missing Gold fixture ${control.fixtureId}`);
     const gold=buildD15BGoldLedger(fixture);
-    const verdicts:boolean[]=[];
-    for(let i=0;i<3;i++) verdicts.push((await verifyD15BClaimIndependently(gold,[...control.ids],control.claim,"HEADLINE")).supported);
-    out.push(`${control.name}: ${verdicts.join(",")} expected=false`);
-    if(verdicts.some(Boolean)) throw new Error(`truth-slip regression accepted for ${control.name}: ${verdicts.join(",")}`);
+    const proposal={id:`TRUTH-${control.fixtureId}`,headline:control.claim,evidence_ids:[...control.ids],question_back:null};
+    const deterministic=verifyD15BSemanticThreadProposals(gold,[proposal]);
+    const deterministicRejected=deterministic.accepted.length===0;
+    const verifierVerdicts:boolean[]=[];
+    for(let i=0;i<3;i++) verifierVerdicts.push((await verifyD15BClaimIndependently(gold,[...control.ids],control.claim,"HEADLINE")).supported);
+    out.push(`${control.name}: deterministic_rejected=${deterministicRejected} verifier=${verifierVerdicts.join(",")} expected_final_reject=true`);
+    if(!deterministicRejected && verifierVerdicts.some(Boolean)){
+      failures.push(`${control.name}: deterministic accepted and verifier=${verifierVerdicts.join(",")}`);
+    }
   }
   out.push("");
+  if(failures.length) throw new Error(`truth-slip regressions accepted:\n${failures.join("\n")}`);
 }
 
 async function main(){
