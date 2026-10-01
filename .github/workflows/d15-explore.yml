@@ -53,10 +53,21 @@ jobs:
             echo "Found literal \\n after code punctuation; replace it with a real line break."
             exit 1
           fi
-          if LC_ALL=C grep -nP '[\\x{200B}\\x{200C}\\x{200D}\\x{FEFF}\\x{00A0}]' "${files[@]}"; then
-            echo "Found forbidden invisible Unicode source character."
-            exit 1
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          forbidden = {0x200B, 0x200C, 0x200D, 0xFEFF, 0x00A0}
+          paths = list(Path("scripts").glob("*.ts")) + list(Path("src/lib").glob("d15-*.ts"))
+          hits = []
+          for path in paths:
+              text = path.read_text(encoding="utf-8")
+              for lineno, line in enumerate(text.splitlines(), 1):
+                  found = [f"U+{ord(ch):04X}" for ch in line if ord(ch) in forbidden]
+                  if found:
+                      hits.append(f"{path}:{lineno}: {','.join(found)}")
+          if hits:
+              print("\\n".join(hits))
+              raise SystemExit("Found forbidden invisible Unicode source character.")
+          PY
           echo "Raw harness line 49:"
           sed -n '49p' scripts/d15-explore.ts | od -An -tx1c
 
