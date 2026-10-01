@@ -190,7 +190,11 @@ function deterministicProposalErrors(
   if (SENIORITY_ESCALATION.test(proposal.headline) && !SENIORITY_ESCALATION.test(source)) {
     errors.push("headline introduces unsupported seniority");
   }
-  const unsupportedHeadlineEntities=options.headlineSource==="deterministic_floor" ? [] : unsupportedProperNouns(proposal.headline,source);
+  // Candidate-facing model headlines are contractually anchored with You/Vous.
+  // Do not classify the sentence-opening token as an entity; inspect only the
+  // substantive remainder. Deterministic floors remain code-built.
+  const headlineForEntityCheck=proposal.headline.replace(/^\s*(?:You|Vous)\b[\s,:;—–-]*/u,"");
+  const unsupportedHeadlineEntities=options.headlineSource==="deterministic_floor" ? [] : unsupportedProperNouns(headlineForEntityCheck,source);
   if(unsupportedHeadlineEntities.length>0){
     errors.push(`headline introduces an unsupported named entity or place: headline=${JSON.stringify(proposal.headline)} flagged_tokens=${JSON.stringify(unsupportedHeadlineEntities)}`);
   }
@@ -385,11 +389,13 @@ async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15B
     response_format: jsonSchemaFormat("d15_b_interpretation", INTERPRETATION_SCHEMA),
     messages: [
       { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
-Describe ONLY the relationship/function that emerges when the lines are considered together. Do not explain why that relationship is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
-Prefer relationship-descriptive constructions such as "Connecting X with Y", "Linking X to Y", "Combining X with Y", or an equally concise factual relationship. Do not merely name a topic, role, activity category, or repeat the reasoning-dimension label.
+Address the candidate directly. If source_language is "en", the headline MUST begin exactly with "You ". If source_language is "fr", it MUST begin exactly with "Vous ". Never output the other language.
+State what the cross-line pattern MEANS about how the candidate works; do not simply concatenate, enumerate, or relabel the activities. The insight must reveal a relationship/function that no single cited line states alone while remaining a reasonable reading of the lines together.
+Good shape: "You work where a new system meets the people who have to use it." Bad shape: "You combine rollout support with feedback collection and training assistance."
+Do not explain why the pattern is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
-Write in the same language as the supplied source evidence. The headline is interpretation, never evidence. Return JSON only.` },
+The headline is interpretation, never evidence. Return JSON only.` },
       { role: "user", content: JSON.stringify({ source_language: sourceLanguageForEvidence(ledger,candidate.evidence_ids), dimension: candidate.dimension, cited_atoms: atoms }) },
     ],
   });
@@ -435,7 +441,7 @@ export async function verifyD15BClaimIndependently(
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, or causal claims.
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
-For SIGNIFICANCE, ignore whether the wording is an exact paraphrase. Judge only whether combining the cited atoms reveals a relationship, bridge, operating pattern, or function that no single cited line states on its own. Significance does NOT require prestige, strategic scope, a measured outcome, or unusual work. A functional input-to-use, diagnosis-to-response, observation-to-audience, recurring-activity-to-review, or implementation-to-user relationship can be significant when the connection genuinely emerges across atoms. Category labels, duty summaries, paraphrases, and bundles of merely similar activities are false. Routine administrative bundles with no cross-atom functional relationship are false. Do not re-run factual entailment here.
+For SIGNIFICANCE, do NOT ask whether the cited lines explicitly state the relationship; by definition the Mirror synthesis may reveal a relationship that no single line states. Truth and factual entailment are handled by the deterministic guards and HEADLINE verifier. Ask only: (1) is the proposed connection more informative than merely naming, listing, paraphrasing, or categorising the activities, and (2) is that connection a reasonable reading of the cited lines considered together? A functional input-to-use, diagnosis-to-response, observation-to-audience, recurring-activity-to-review, or implementation-to-user relationship can be significant without an explicit linking sentence in the CV. Significance does NOT require prestige, strategic scope, a measured outcome, unusual work, or an explicitly stated causal link. Category labels, duty summaries, paraphrases, and bundles of merely similar activities are false. Routine administrative bundles with no cross-atom functional relationship are false. Do not re-run factual entailment here.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Reject the claim when its language differs from expected_language. Return supported=false whenever uncertain. Return JSON only.`,
       },
@@ -512,7 +518,7 @@ async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThr
       type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
     }),
     messages:[
-      {role:"system",content:`Repair only the presentation of an already-discovered relationship. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. Use only the cited atoms. Do not add outcomes, ownership, scale, dates, entities, seniority, causality, or responsibilities. Preserve the relationship; do not discover a new one. Return JSON only.`},
+      {role:"system",content:`Repair only the presentation of an already-discovered relationship. Write one concise candidate-facing headline in ${language==="fr"?"French":"English"}. It MUST begin exactly with ${language==="fr"?'"Vous "':'"You "'}. Say what the cross-line pattern means rather than listing or concatenating the activities. Use only the cited atoms. Do not add outcomes, ownership, scale, dates, entities, seniority, causality, or responsibilities. Preserve the relationship; do not discover a new one. Return JSON only.`},
       {role:"user",content:JSON.stringify({rejected_headline:proposal.headline,cited_atoms:atoms})},
     ],
   });
