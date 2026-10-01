@@ -22,7 +22,7 @@ export type D15BVerificationResult = {
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
 
-const D15_JUDGE_MODEL = process.env.D15_JUDGE_MODEL?.trim() || "gpt-5.6-sol";
+const D15_JUDGE_MODEL = process.env.D15_JUDGE_MODEL?.trim() || "gpt-6-astra";
 
 const OWNERSHIP_RANK: Record<AtomicEvidence["subject"]["ownership"], number> = {
   UNKNOWN: 0,
