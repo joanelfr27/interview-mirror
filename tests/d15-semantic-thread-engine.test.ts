@@ -131,23 +131,83 @@ test("D15-B guard spec: Title-Case headline containing unsupported entity is rej
   assert.ok(r.rejected[0]?.reasons.some(reason=>reason.includes("named entity")));
 });
 
-test("D15-B deterministic headline floor survives truth guards across representative Gold-language atoms",()=>{
-  const cases:[string,string,string,string][]=[
-    ["NANCY","Supported acquisition accounting and financial integration activities.","Supporting systems integration following business changes.","en"],
-    ["MARIE","Analysait les causes des retards de livraison.","Participait aux projets d’amélioration des processus.","fr"],
-    ["DAVID","Maintained sales operating routines.","Coordinated recurring sales reporting activities.","en"],
-    ["THOMAS","Supported the rollout of a new customer portal.","Collected user feedback during rollout.","en"],
-    ["ELENA","Maintained office records and correspondence.","Supported routine administrative activities.","en"],
-  ];
-  for(const [name,a,b,language] of cases){
-    const s1={...span("S1",a),language:language as "en"|"fr"};
-    const s2={...span("S2",b),language:language as "en"|"fr"};
-    const l=ledger([atom("A1","S1","Supported",a),atom("A2","S2","Supported",b)],[s1,s2]);
-    l.evidence.forEach(x=>{x.provenance.language=language as "en"|"fr";});
-    const proposal={id:name,headline:"placeholder",evidence_ids:["A1","A2"],question_back:null};
+test("D15-B deterministic headline floor survives truth guards for every Gold evidence group",()=>{
+  const lines={
+    NANCY:[
+      "Managing accounting systems and financial procedures.",
+      "Preparing and analysing actual, forecast and budget financial information.",
+      "Managing statutory financial reporting and taxation requirements.",
+      "Supporting acquisition accounting and financial integration activities.",
+      "Supporting systems integration following business changes.",
+      "Implementing and improving accounting systems and processes.",
+      "Training and developing finance staff.",
+      "Providing financial information to management to support business decisions.",
+      "Maintaining effective financial controls and reporting processes.",
+      "Communicating financial information to internal stakeholders.",
+    ],
+    MARIE:[
+      "Coordonnait les opérations quotidiennes de trois agences régionales.",
+      "Suivait les incidents clients et organisait leur résolution avec les équipes concernées.",
+      "Déployait de nouvelles procédures de suivi des commandes dans les agences.",
+      "Formait les nouveaux superviseurs aux procédures opérationnelles.",
+      "Analysait les retards de livraison et présentait les causes principales à la direction.",
+      "Coordonnait le suivi des fournisseurs et des équipes internes lors des périodes de forte activité.",
+      "Mettre à jour les tableaux de bord hebdomadaires pour la direction.",
+      "Participait à la réorganisation du processus de traitement des commandes.",
+    ],
+    DAVID:[
+      "Managed a portfolio of business customers across the northern region.",
+      "Prepared monthly sales forecasts and reviewed variances with the sales team.",
+      "Visited key accounts to understand customer priorities and coordinate follow-up.",
+      "Introduced a structured pipeline review for the sales team.",
+      "Worked with marketing colleagues to coordinate product launches.",
+      "Presented customer and market observations to senior management.",
+      "Coached new account executives on customer planning and reporting routines.",
+      "Supported negotiations with several strategic customers.",
+    ],
+    THOMAS:[
+      "Coordinated project meetings and maintained action logs.",
+      "Prepared status updates for project stakeholders.",
+      "Worked with technical teams to track delivery issues.",
+      "Supported the rollout of a new customer portal.",
+      "Collected user feedback during the portal rollout.",
+      "Maintained project documentation and risk registers.",
+      "Assisted with training sessions for users of the new portal.",
+      "Helped project managers prepare steering-committee materials.",
+    ],
+  } as const;
+  const cases=[
+    ["NANCY-A",lines.NANCY,"en",["E4","E5","E6"]],
+    ["NANCY-B",lines.NANCY,"en",["E8","E10"]],
+    ["MARIE-A-E5-E3",lines.MARIE,"fr",["E5","E3"]],
+    ["MARIE-A-E5-E8",lines.MARIE,"fr",["E5","E8"]],
+    ["MARIE-A-FULL",lines.MARIE,"fr",["E5","E3","E8"]],
+    ["MARIE-B",lines.MARIE,"fr",["E2","E6"]],
+    ["DAVID-A-E2-E4",lines.DAVID,"en",["E2","E4"]],
+    ["DAVID-A-E4-E7",lines.DAVID,"en",["E4","E7"]],
+    ["DAVID-A-FULL",lines.DAVID,"en",["E2","E4","E7"]],
+    ["DAVID-B",lines.DAVID,"en",["E3","E6"]],
+    ["THOMAS-A-E4-E5",lines.THOMAS,"en",["E4","E5"]],
+    ["THOMAS-A-E4-E7",lines.THOMAS,"en",["E4","E7"]],
+    ["THOMAS-A-E5-E7",lines.THOMAS,"en",["E5","E7"]],
+    ["THOMAS-A-FULL",lines.THOMAS,"en",["E4","E5","E7"]],
+  ] as const;
+  for(const [name,fixtureLines,language,evidenceIds] of cases){
+    const selected=evidenceIds.map(id=>{
+      const index=Number(id.slice(1))-1;
+      const text=fixtureLines[index]!;
+      const source={...span(`S${index+1}`,text),language};
+      return {id,text,source};
+    });
+    const l=ledger(
+      selected.map(({id,text},i)=>atom(id,`S${Number(id.slice(1))}`,text.split(/\\s+/)[0]??"Performed",text)),
+      selected.map(({source})=>source),
+    );
+    l.evidence.forEach(x=>{x.provenance.language=language;});
+    const proposal={id:name,headline:"placeholder",evidence_ids:[...evidenceIds],question_back:null};
     const floor=deterministicHeadlineFloor(l,proposal);
     const checked=verifyD15BSemanticThreadProposals(l,[{...proposal,headline:floor}]);
-    assert.equal(checked.accepted.length,1,`${name} floor rejected: ${checked.rejected.flatMap(x=>x.reasons).join(" | ")}`);
+    assert.equal(checked.accepted.length,1,`${name} floor rejected: ${checked.rejected.flatMap(x=>x.reasons).join(" | ")}; floor=${JSON.stringify(floor)}`);
   }
 });
 
