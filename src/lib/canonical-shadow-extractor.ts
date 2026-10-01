@@ -331,7 +331,16 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
         : "EXPLICIT_OTHER");
   let groundedActor: string;
 
-  if (actorBasis === "EXPLICIT_OTHER") {
+  const candidatePlaceholder = /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor);
+  if (
+    (actorBasis === "IMPLICIT_CANDIDATE" || actorBasis === "EXPLICIT_CANDIDATE") &&
+    !candidatePlaceholder
+  ) {
+    // A grounded/non-placeholder other actor conflicts with candidate attribution.
+    // Fail closed rather than discarding the actor signal and manufacturing candidate agency.
+    groundedActor = "unspecified";
+    actorBasis = "UNSPECIFIED";
+  } else if (actorBasis === "EXPLICIT_OTHER") {
     const exactOther = exactOrNull(actor, source);
     if (exactOther && !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(exactOther)) {
       groundedActor = exactOther;
