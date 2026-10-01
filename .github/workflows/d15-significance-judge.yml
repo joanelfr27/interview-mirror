@@ -1,0 +1,51 @@
+name: D15 Significance Judge Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_model:
+        description: "Preregistered candidate judge"
+        required: true
+        type: choice
+        options:
+          - gpt-5.6-luna
+          - gpt-5.4-mini
+          - gpt-5.6-terra
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: false
+      - name: Assert frozen experiment lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor 4b8c19ae31f6bf6749c1be48bf4a3d03f50ff510 HEAD
+          test -f docs/d15-significance-judge-qualification-frozen.md
+          grep -Fq "6 cases × 5 independent raw judgments = 30 raw verdicts" docs/d15-significance-judge-qualification-frozen.md
+          grep -Fq "No majority voting." docs/d15-significance-judge-qualification-frozen.md
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Pre-spend typecheck
+        run: npm run typecheck
+      - name: Pre-spend D15 regressions
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/d15-semantic-thread-engine.test.ts tests/d15-gold-gate.test.ts
+      - name: Run frozen raw qualification
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          D15_JUDGE_MODEL: ${{ inputs.candidate_model }}
+        run: npm run experiment:d15-significance
