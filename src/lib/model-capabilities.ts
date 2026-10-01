@@ -3,62 +3,34 @@ export type ResponseFormatName = "json_object" | "json_schema";
 export interface ModelRequestOptions {
   temperature?: number | null;
   response_format?: { type?: string } | null;
-  top_p?: number | null;
-  presence_penalty?: number | null;
-  frequency_penalty?: number | null;
-  logprobs?: boolean | null;
-  top_logprobs?: number | null;
 }
 
 interface ModelCapabilities {
   temperature: "any" | "default-only";
-  responseFormats: readonly ResponseFormatName[];
+  responseFormats?: readonly ResponseFormatName[];
+  provenance: string;
 }
 
 export const MODEL_CAPABILITIES: Readonly<Record<string, ModelCapabilities>> = Object.freeze({
-  "gpt-4o-mini": { temperature: "any", responseFormats: ["json_object", "json_schema"] },
-  "gpt-4o-mini-2024-07-18": { temperature: "any", responseFormats: ["json_object", "json_schema"] },
-  "gpt-4o": { temperature: "any", responseFormats: ["json_object", "json_schema"] },
-  "gpt-4o-2024-08-06": { temperature: "any", responseFormats: ["json_object", "json_schema"] },
-  "o1": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "o1-mini": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "o1-preview": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "o3": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "o3-mini": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "o4-mini": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "gpt-5": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "gpt-5-mini": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "gpt-5-nano": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "gpt-5.6-luna": { temperature: "default-only", responseFormats: ["json_schema"] },
-  "gpt-5.6-terra": { temperature: "default-only", responseFormats: ["json_schema"] },
+  "gpt-5.4-mini": {
+    temperature: "any",
+    responseFormats: ["json_schema"],
+    provenance: "Observed D15 experiment request accepted with temperature 0 and strict json_schema.",
+  },
+  "gpt-5.6-luna": {
+    temperature: "default-only",
+    provenance: "Observed D15 pre-spend investigation: temperature 0 rejected; only default 1 supported.",
+  },
+  "gpt-5.6-terra": {
+    temperature: "default-only",
+    provenance: "D15 qualification workflow run 36887606029: API rejected temperature 0; only default 1 supported.",
+  },
 });
-
-const REASONING_ONLY_MODELS = new Set([
-  "o1",
-  "o1-mini",
-  "o1-preview",
-  "o3",
-  "o3-mini",
-  "o4-mini",
-  "gpt-5",
-  "gpt-5-mini",
-  "gpt-5-nano",
-  "gpt-5.6-luna",
-  "gpt-5.6-terra",
-]);
 
 export const LUNA_TERRA_CAPABILITY_FIXTURES = Object.freeze([
   { provider: "Luna", model: "gpt-5.6-luna", unsupported: { temperature: 0 } },
   { provider: "Terra", model: "gpt-5.6-terra", unsupported: { temperature: 0 } },
 ] as const);
-
-const REASONING_INCOMPATIBLE_PARAMETERS = [
-  "top_p",
-  "presence_penalty",
-  "frequency_penalty",
-  "logprobs",
-  "top_logprobs",
-] as const;
 
 export function validateModelRequestCapabilities(model: string, options: ModelRequestOptions): string[] {
   const capabilities = MODEL_CAPABILITIES[model];
@@ -75,17 +47,10 @@ export function validateModelRequestCapabilities(model: string, options: ModelRe
     }
   }
 
-  if (REASONING_ONLY_MODELS.has(model)) {
-    for (const parameter of REASONING_INCOMPATIBLE_PARAMETERS) {
-      if ((options as Record<string, unknown>)[parameter] !== undefined) {
-        errors.push(`Model "${model}" does not support "${parameter}".`);
-      }
-    }
-  }
-
   if (options.response_format !== undefined && options.response_format !== null) {
     const format = options.response_format.type;
-    if (typeof format !== "string" || !capabilities.responseFormats.includes(format as ResponseFormatName)) {
+    if (capabilities.responseFormats &&
+        (typeof format !== "string" || !capabilities.responseFormats.includes(format as ResponseFormatName))) {
       errors.push(`Model "${model}" does not support response_format "${String(format)}".`);
     }
   }

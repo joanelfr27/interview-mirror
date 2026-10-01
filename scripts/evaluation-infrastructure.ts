@@ -10,16 +10,32 @@ export interface BlindLabelerCase {
   exact_cited_atoms: string[];
   headline: string;
   language: CorpusLanguage;
-  pair_id: string | null;
 }
 
-export interface GoldCase extends BlindLabelerCase {
+export interface GoldCase {
+  case_id: string;
+  exact_cited_atoms: string[];
+  headline: string;
+  language: CorpusLanguage;
   gold_G: GoldLabel;
   gold_S: GoldLabel;
   labeler_id: string;
 }
 
 export type CorpusCase = GoldCase;
+
+export interface BlindPilotAdministrationEntry {
+  case_id: string;
+  round: 1 | 2;
+  pair_id: string;
+  pair_type: "translation" | "segmentation";
+  test_dimension: string;
+}
+
+export interface BlindPilotRoundPack {
+  round: 1 | 2;
+  cases: BlindLabelerCase[];
+}
 
 export interface CorpusFixture {
   fixture_type: "qualification" | "diagnostic-only";
@@ -46,7 +62,6 @@ export function validateCorpus(input: unknown): string[] {
   const seenIds = new Set<string>();
   const languages = new Set<string>();
   const cells = new Set<string>();
-  const pairs = new Map<string, CorpusLanguage[]>();
 
   input.forEach((item, index) => {
     const prefix = `cases[${index}]`;
@@ -72,12 +87,6 @@ export function validateCorpus(input: unknown): string[] {
       languages.add(item.language);
     }
 
-    if (item.pair_id !== null && !nonEmptyString(item.pair_id)) {
-      errors.push(`${prefix}.pair_id must be null or a non-empty string.`);
-    } else if (typeof item.pair_id === "string" && (item.language === "en" || item.language === "fr")) {
-      pairs.set(item.pair_id, [...(pairs.get(item.pair_id) ?? []), item.language]);
-    }
-
     if (!validLabel(item.gold_G)) errors.push(`${prefix}.gold_G must be 0 or 1.`);
     if (!validLabel(item.gold_S)) errors.push(`${prefix}.gold_S must be 0 or 1.`);
     if (!nonEmptyString(item.labeler_id)) errors.push(`${prefix}.labeler_id must be a non-empty string.`);
@@ -89,12 +98,6 @@ export function validateCorpus(input: unknown): string[] {
   for (const [g, s] of [[0, 0], [0, 1], [1, 0], [1, 1]]) {
     if (!cells.has(`${g},${s}`)) errors.push(`Corpus is missing G×S cell (${g},${s}).`);
   }
-  for (const [pairId, pairLanguages] of pairs) {
-    if (pairLanguages.length !== 2 || pairLanguages.filter((language) => language === "en").length !== 1 ||
-        pairLanguages.filter((language) => language === "fr").length !== 1) {
-      errors.push(`Translation pair "${pairId}" must contain exactly one EN case and one FR case.`);
-    }
-  }
   return errors;
 }
 
@@ -102,8 +105,7 @@ export function validateBlindLabelerCases(input: unknown): string[] {
   const errors: string[] = [];
   if (!Array.isArray(input)) return ["Blind-labeler cases must be an array."];
   const ids = new Set<string>();
-  const languages = new Set<string>();
-  const pairs = new Map<string, CorpusLanguage[]>();
+  const allowedFields = new Set(["case_id", "exact_cited_atoms", "headline", "language"]);
 
   input.forEach((item, index) => {
     const prefix = `cases[${index}]`;
@@ -111,9 +113,8 @@ export function validateBlindLabelerCases(input: unknown): string[] {
       errors.push(`${prefix} must be an object.`);
       return;
     }
-    if ("gold_G" in item || "gold_S" in item || "labeler_id" in item) {
-      errors.push(`${prefix} must not contain gold labels or labeler identity.`);
-    }
+    const unexpectedFields = Object.keys(item).filter((field) => !allowedFields.has(field));
+    if (unexpectedFields.length) errors.push(`${prefix} contains forbidden field(s): ${unexpectedFields.join(", ")}.`);
     if (!nonEmptyString(item.case_id)) errors.push(`${prefix}.case_id must be a non-empty string.`);
     else if (ids.has(item.case_id)) errors.push(`${prefix}.case_id "${item.case_id}" is not unique.`);
     else ids.add(item.case_id);
@@ -125,22 +126,121 @@ export function validateBlindLabelerCases(input: unknown): string[] {
     if (!nonEmptyString(item.headline)) errors.push(`${prefix}.headline must be a non-empty string.`);
     if (item.language !== "en" && item.language !== "fr") {
       errors.push(`${prefix}.language must be "en" or "fr".`);
-    } else {
-      languages.add(item.language);
-    }
-    if (item.pair_id !== null && !nonEmptyString(item.pair_id)) {
-      errors.push(`${prefix}.pair_id must be null or a non-empty string.`);
-    } else if (typeof item.pair_id === "string" && (item.language === "en" || item.language === "fr")) {
-      pairs.set(item.pair_id, [...(pairs.get(item.pair_id) ?? []), item.language]);
     }
   });
 
-  if (!languages.has("en")) errors.push('Blind-labeler cases must include language "en".');
-  if (!languages.has("fr")) errors.push('Blind-labeler cases must include language "fr".');
-  for (const [pairId, pairLanguages] of pairs) {
-    if (pairLanguages.length !== 2 || pairLanguages.filter((language) => language === "en").length !== 1 ||
-        pairLanguages.filter((language) => language === "fr").length !== 1) {
-      errors.push(`Translation pair "${pairId}" must contain exactly one EN case and one FR case.`);
+  return errors;
+}
+
+const ADMINISTRATION_KEY_FIELDS = new Set(["case_id", "round", "pair_id", "pair_type", "test_dimension"]);
+
+export function validateBlindPilotAdministrationKey(
+  input: unknown,
+  caseLanguages?: ReadonlyMap<string, CorpusLanguage>,
+): string[] {
+  const errors: string[] = [];
+  if (!Array.isArray(input)) return ["Administration key must be an array."];
+  if (input.length === 0) return ["Administration key must not be empty."];
+  const caseIds = new Set<string>();
+  const pairs = new Map<string, BlindPilotAdministrationEntry[]>();
+
+  input.forEach((item, index) => {
+    const prefix = `administration_key[${index}]`;
+    if (!isRecord(item)) {
+      errors.push(`${prefix} must be an object.`);
+      return;
+    }
+    const unexpectedFields = Object.keys(item).filter((field) => !ADMINISTRATION_KEY_FIELDS.has(field));
+    if (unexpectedFields.length) errors.push(`${prefix} contains unsupported field(s): ${unexpectedFields.join(", ")}.`);
+    if (!nonEmptyString(item.case_id)) errors.push(`${prefix}.case_id must be a non-empty string.`);
+    else if (caseIds.has(item.case_id)) errors.push(`${prefix}.case_id "${item.case_id}" must occur exactly once.`);
+    else caseIds.add(item.case_id);
+    if (item.round !== 1 && item.round !== 2) errors.push(`${prefix}.round must be 1 or 2.`);
+    if (!nonEmptyString(item.pair_id)) errors.push(`${prefix}.pair_id must be a non-empty string.`);
+    if (item.pair_type !== "translation" && item.pair_type !== "segmentation") {
+      errors.push(`${prefix}.pair_type must be "translation" or "segmentation".`);
+    }
+    if (!nonEmptyString(item.test_dimension)) errors.push(`${prefix}.test_dimension must be a non-empty string.`);
+
+    if (nonEmptyString(item.case_id) && (item.round === 1 || item.round === 2) &&
+        nonEmptyString(item.pair_id) &&
+        (item.pair_type === "translation" || item.pair_type === "segmentation") &&
+        nonEmptyString(item.test_dimension)) {
+      const entry = item as unknown as BlindPilotAdministrationEntry;
+      pairs.set(entry.pair_id, [...(pairs.get(entry.pair_id) ?? []), entry]);
+    }
+  });
+
+  for (const [pairId, members] of pairs) {
+    if (members.length !== 2) {
+      errors.push(`Pair "${pairId}" must have exactly two administration-key members.`);
+      continue;
+    }
+    const [first, second] = members as [BlindPilotAdministrationEntry, BlindPilotAdministrationEntry];
+    if (first.pair_type !== second.pair_type || first.test_dimension !== second.test_dimension) {
+      errors.push(`Pair "${pairId}" members must share pair_type and test_dimension.`);
+    }
+    if (first.round === second.round) errors.push(`Pair "${pairId}" members must be in different rounds.`);
+    if (caseLanguages) {
+      const firstLanguage = caseLanguages.get(first.case_id);
+      const secondLanguage = caseLanguages.get(second.case_id);
+      if (first.pair_type === "translation" &&
+          !(firstLanguage === "en" && secondLanguage === "fr" || firstLanguage === "fr" && secondLanguage === "en")) {
+        errors.push(`Translation pair "${pairId}" must contain exactly one EN case and one FR case.`);
+      }
+      if (first.pair_type === "segmentation" && firstLanguage !== secondLanguage) {
+        errors.push(`Segmentation pair "${pairId}" members must have the same language.`);
+      }
+    }
+  }
+  return errors;
+}
+
+export function validateBlindPilotRoundPack(input: unknown): string[] {
+  if (!isRecord(input) || (input.round !== 1 && input.round !== 2)) {
+    return ["Round pack must have round 1 or 2."];
+  }
+  return validateBlindLabelerCases(input.cases).map((error) => `round${input.round}: ${error}`);
+}
+
+export function validateBlindPilotCrossRecords(
+  roundPacks: { round1: unknown; round2: unknown },
+  administrationKey: unknown,
+): string[] {
+  const errors = [
+    ...validateBlindPilotRoundPack({ round: 1, cases: roundPacks.round1 }),
+    ...validateBlindPilotRoundPack({ round: 2, cases: roundPacks.round2 }),
+    ...validateBlindPilotAdministrationKey(administrationKey),
+  ];
+  if (errors.length) return errors;
+
+  const caseLanguages = new Map<string, CorpusLanguage>();
+  const packRounds = new Map<string, 1 | 2>();
+  for (const [round, pack] of [[1, roundPacks.round1], [2, roundPacks.round2]] as const) {
+    for (const item of pack as BlindLabelerCase[]) {
+      caseLanguages.set(item.case_id, item.language);
+      packRounds.set(item.case_id, round);
+    }
+  }
+  errors.push(...validateBlindPilotAdministrationKey(administrationKey, caseLanguages));
+
+  const packOccurrences = new Map<string, number>();
+  for (const pack of [roundPacks.round1, roundPacks.round2] as unknown[][]) {
+    for (const item of pack as BlindLabelerCase[]) {
+      packOccurrences.set(item.case_id, (packOccurrences.get(item.case_id) ?? 0) + 1);
+    }
+  }
+  const keyIds = new Set((administrationKey as BlindPilotAdministrationEntry[]).map((entry) => entry.case_id));
+  for (const [caseId, count] of packOccurrences) {
+    if (count !== 1) errors.push(`Round-pack case_id "${caseId}" must appear exactly once across both rounds.`);
+    if (!keyIds.has(caseId)) errors.push(`Round-pack case_id "${caseId}" is missing from the administration key.`);
+  }
+  for (const caseId of keyIds) {
+    if (!packOccurrences.has(caseId)) errors.push(`Administration-key case_id "${caseId}" is missing from round packs.`);
+  }
+  for (const entry of administrationKey as BlindPilotAdministrationEntry[]) {
+    if (packRounds.has(entry.case_id) && packRounds.get(entry.case_id) !== entry.round) {
+      errors.push(`Administration-key case_id "${entry.case_id}" is in the wrong round pack.`);
     }
   }
   return errors;

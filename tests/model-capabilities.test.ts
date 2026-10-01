@@ -8,44 +8,36 @@ import {
   validateModelRequestCapabilities,
 } from "../src/lib/model-capabilities.ts";
 
-test("explicit capability table allows the configured model request shape", () => {
-  assert.ok(MODEL_CAPABILITIES["gpt-4o-mini"]);
-  assert.deepEqual(
-    validateModelRequestCapabilities("gpt-4o-mini", {
-      temperature: 0,
-      response_format: { type: "json_schema" },
-    }),
-    [],
-  );
-});
-
-test("validator rejects known incompatible reasoning-model parameters", () => {
-  assert.ok(
-    validateModelRequestCapabilities("o1-mini", { temperature: 0 }).some((error) =>
-      error.includes("default temperature"),
-    ),
-  );
-  assert.ok(
-    validateModelRequestCapabilities("o3-mini", { top_p: 0.5 }).some((error) =>
-      error.includes("top_p"),
-    ),
-  );
-  assert.ok(
-    validateModelRequestCapabilities("o1", { response_format: { type: "json_object" } }).some((error) =>
-      error.includes("response_format"),
-    ),
-  );
+test("the frozen gpt-5.4-mini request settings are accepted", () => {
+  const frozenRequest = {
+    temperature: 0,
+    response_format: { type: "json_schema" },
+  };
+  assert.deepEqual(validateModelRequestCapabilities("gpt-5.4-mini", frozenRequest), []);
+  assert.ok(MODEL_CAPABILITIES["gpt-5.4-mini"]);
+  assert.match(MODEL_CAPABILITIES["gpt-5.4-mini"]!.provenance, /Observed D15 experiment/);
 });
 
 test("Luna and Terra capability fixtures reject temperature zero", async () => {
   const path = join(process.cwd(), "tests/fixtures/luna-terra-capabilities.json");
   const { fixtures } = JSON.parse(await readFile(path, "utf8")) as {
-    fixtures: Array<{ provider: string; model: string; unsupported: { temperature: number } }>;
+    fixtures: Array<{
+      provider: string;
+      model: string;
+      unsupported?: { temperature: number };
+      supported?: { temperature: number; response_format: { type: string } };
+      provenance: string;
+    }>;
   };
-  assert.deepEqual(fixtures.map(({ provider }) => provider), ["Luna", "Terra"]);
-  for (const fixture of fixtures) {
+  const negativeFixtures = fixtures.filter((fixture) => fixture.unsupported);
+  const positiveFixture = fixtures.find((fixture) => fixture.supported);
+  assert.ok(positiveFixture);
+  assert.deepEqual(negativeFixtures.map(({ provider }) => provider), ["Luna", "Terra"]);
+  assert.deepEqual(validateModelRequestCapabilities(positiveFixture.model, positiveFixture.supported!), []);
+  assert.ok(fixtures.every(({ provenance }) => provenance.length > 0));
+  for (const fixture of negativeFixtures) {
     assert.ok(
-      validateModelRequestCapabilities(fixture.model, fixture.unsupported)
+      validateModelRequestCapabilities(fixture.model, fixture.unsupported!)
         .some((error) => error.includes("default temperature")),
       `${fixture.provider} must reject temperature zero`,
     );

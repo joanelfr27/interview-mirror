@@ -1,18 +1,31 @@
 {
   "fixtures": [
     {
+      "provider": "D15",
+      "model": "gpt-5.4-mini",
+      "supported": {
+        "temperature": 0,
+        "response_format": {
+          "type": "json_schema"
+        }
+      },
+      "provenance": "Observed D15 experiment request accepted with temperature 0 and strict json_schema."
+    },
+    {
       "provider": "Luna",
       "model": "gpt-5.6-luna",
       "unsupported": {
         "temperature": 0
-      }
+      },
+      "provenance": "Observed D15 pre-spend investigation: temperature 0 rejected; only default 1 supported."
     },
     {
       "provider": "Terra",
       "model": "gpt-5.6-terra",
       "unsupported": {
         "temperature": 0
-      }
+      },
+      "provenance": "D15 qualification workflow run 36887606029: API rejected temperature 0; only default 1 supported."
     }
   ]
 }

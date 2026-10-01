@@ -10,6 +10,9 @@ import {
   qualificationCasesFromFixture,
   validateCorpus,
   validateBlindLabelerCases,
+  validateBlindPilotAdministrationKey,
+  validateBlindPilotCrossRecords,
+  validateBlindPilotRoundPack,
   verifySha256Manifest,
   writeAgreementOutputs,
   type CorpusCase,
@@ -23,14 +26,13 @@ function validCorpus(): CorpusCase[] {
     exact_cited_atoms: [`opaque-${index}`],
     headline: `Fixture ${index}`,
     language: index % 2 === 0 ? "en" : "fr",
-    pair_id: index < 2 ? "pair-a" : null,
     gold_G,
     gold_S,
     labeler_id: "labeler-test",
   }));
 }
 
-test("corpus validator accepts required bilingual coverage, four cells, and a complete pair", () => {
+test("corpus validator accepts required bilingual coverage and all four G×S cells", () => {
   assert.deepEqual(validateCorpus(validCorpus()), []);
 });
 
@@ -46,20 +48,123 @@ test("corpus validator requires both EN and FR coverage", () => {
 
 test("corpus validator rejects an incomplete EN/FR pair and invalid or duplicate IDs", () => {
   const corpus = validCorpus();
-  corpus[1] = { ...corpus[1], language: "en", pair_id: "pair-a" };
   corpus[2] = { ...corpus[2], case_id: corpus[0].case_id, gold_G: 2 as 0 | 1 };
   const errors = validateCorpus(corpus);
-  assert.ok(errors.some((error) => error.includes("exactly one EN case and one FR case")));
   assert.ok(errors.some((error) => error.includes("is not unique")));
   assert.ok(errors.some((error) => error.includes("gold_G must be 0 or 1")));
 });
 
-test("blind-labeler cases contain no labels or labeler IDs and retain complete translation pairs", () => {
-  const blindCases = validCorpus().slice(0, 2).map(({ case_id, exact_cited_atoms, headline, language, pair_id }) =>
-    ({ case_id, exact_cited_atoms, headline, language, pair_id }));
-  assert.deepEqual(validateBlindLabelerCases(blindCases), []);
-  assert.ok(validateBlindLabelerCases(validCorpus()).some((error) => error.includes("must not contain gold labels")));
-  assert.ok(validateBlindLabelerCases([blindCases[0]]).some((error) => error.includes("exactly one EN case and one FR case")));
+function blindCase(case_id: string, language: "en" | "fr") {
+  return { case_id, exact_cited_atoms: [`atom-${case_id}`], headline: `Headline ${case_id}`, language };
+}
+
+function adminEntry(
+  case_id: string,
+  round: 1 | 2,
+  pair_id: string,
+  pair_type: "translation" | "segmentation",
+): { case_id: string; round: 1 | 2; pair_id: string; pair_type: "translation" | "segmentation"; test_dimension: string } {
+  return { case_id, round, pair_id, pair_type, test_dimension: "dimension-a" };
+}
+
+test("a blind-labeler Round 1 pack validates independently with exactly four blind fields", () => {
+  const pack = [blindCase("opaque-a", "en")];
+  assert.deepEqual(Object.keys(pack[0]!).sort(), ["case_id", "exact_cited_atoms", "headline", "language"]);
+  assert.deepEqual(validateBlindPilotRoundPack({ round: 1, cases: pack }), []);
+  assert.deepEqual(validateBlindLabelerCases(pack), []);
+});
+
+test("blind pack rejects pairing metadata and hidden administration fields", () => {
+  for (const extra of [
+    { pair_id: "hidden" },
+    { round: 1 },
+    { pair_type: "translation" },
+    { test_dimension: "dimension-a" },
+    { labeler_id: "labeler-a" },
+  ]) {
+    assert.ok(
+      validateBlindLabelerCases([{ ...blindCase("opaque-a", "en"), ...extra }]).length > 0,
+      `must reject field ${Object.keys(extra)[0]}`,
+    );
+  }
+});
+
+test("administration key accepts EN/FR translation and same-language segmentation pairs", () => {
+  const packs = {
+    round1: [blindCase("opaque-en", "en"), blindCase("opaque-seg-1", "fr")],
+    round2: [blindCase("opaque-fr", "fr"), blindCase("opaque-seg-2", "fr")],
+  };
+  const key = [
+    adminEntry("opaque-en", 1, "pair-translation", "translation"),
+    adminEntry("opaque-fr", 2, "pair-translation", "translation"),
+    adminEntry("opaque-seg-1", 1, "pair-segmentation", "segmentation"),
+    adminEntry("opaque-seg-2", 2, "pair-segmentation", "segmentation"),
+  ];
+  assert.deepEqual(validateBlindPilotAdministrationKey(key), []);
+  assert.deepEqual(validateBlindPilotCrossRecords(packs, key), []);
+});
+
+test("administration-key pair validation rejects same-round and malformed pairs", () => {
+  const sameRound = [
+    adminEntry("opaque-en", 1, "pair-a", "translation"),
+    adminEntry("opaque-fr", 1, "pair-a", "translation"),
+  ];
+  assert.ok(validateBlindPilotAdministrationKey(sameRound).some((error) => error.includes("different rounds")));
+
+  const incomplete = [adminEntry("opaque-en", 1, "pair-a", "translation")];
+  assert.ok(validateBlindPilotAdministrationKey(incomplete).some((error) => error.includes("exactly two")));
+
+  const inconsistentDimension = [
+    adminEntry("opaque-a", 1, "pair-a", "segmentation"),
+    { ...adminEntry("opaque-b", 2, "pair-a", "segmentation"), test_dimension: "dimension-b" },
+  ];
+  assert.ok(validateBlindPilotAdministrationKey(inconsistentDimension).some((error) => error.includes("share pair_type and test_dimension")));
+  assert.ok(validateBlindPilotAdministrationKey([
+    { ...adminEntry("opaque-a", 1, "pair-a", "segmentation"), private_note: "not permitted" },
+    adminEntry("opaque-b", 2, "pair-a", "segmentation"),
+  ]).some((error) => error.includes("unsupported field")));
+});
+
+test("administration key rejects wrong translation and segmentation language pairings", () => {
+  const wrongTranslation = {
+    round1: [blindCase("opaque-en1", "en")],
+    round2: [blindCase("opaque-en2", "en")],
+  };
+  const translationKey = [
+    adminEntry("opaque-en1", 1, "pair-a", "translation"),
+    adminEntry("opaque-en2", 2, "pair-a", "translation"),
+  ];
+  assert.ok(validateBlindPilotCrossRecords(wrongTranslation, translationKey).some((error) => error.includes("exactly one EN case and one FR case")));
+
+  const wrongSegmentation = {
+    round1: [blindCase("opaque-en", "en")],
+    round2: [blindCase("opaque-fr", "fr")],
+  };
+  const segmentationKey = [
+    adminEntry("opaque-en", 1, "pair-a", "segmentation"),
+    adminEntry("opaque-fr", 2, "pair-a", "segmentation"),
+  ];
+  assert.ok(validateBlindPilotCrossRecords(wrongSegmentation, segmentationKey).some((error) => error.includes("same language")));
+});
+
+test("cross-record validation fails closed for missing, duplicated, and extra case IDs", () => {
+  const round1 = [blindCase("opaque-a", "en")];
+  const round2 = [blindCase("opaque-b", "fr")];
+  const key = [
+    adminEntry("opaque-a", 1, "pair-a", "translation"),
+    adminEntry("opaque-b", 2, "pair-a", "translation"),
+  ];
+
+  assert.ok(validateBlindPilotCrossRecords({ round1, round2: [] }, key).some((error) => error.includes("opaque-b") && error.includes("missing from round packs")));
+  assert.ok(validateBlindPilotCrossRecords({ round1, round2: [round1[0]] }, key).some((error) => error.includes("must appear exactly once")));
+  assert.ok(validateBlindPilotCrossRecords(
+    { round1: [...round1, blindCase("opaque-extra", "en")], round2 },
+    key,
+  ).some((error) => error.includes("opaque-extra") && error.includes("missing from the administration key")));
+  assert.ok(validateBlindPilotCrossRecords(
+    { round1: round2, round2: round1 },
+    key,
+  ).some((error) => error.includes("wrong round pack")));
 });
 
 test("qualification loader rejects diagnostic-only fixtures and paths", async () => {
