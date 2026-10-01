@@ -46,7 +46,8 @@ async function main(){
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const out:string[]=[`D15 EXPLORE — ${stamp}`,`CHANGE: ${note}`,""];
   await assertSyntheticSignificanceStability(out);
-  const scoredRuns = new Map<string, Array<Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>>();\n  for(const fixture of fixtures){
+  const scoredRuns = new Map<string, Array<Awaited<ReturnType<typeof runD15BSemanticThreadEngine>>>>();
+  for(const fixture of fixtures){
     out.push("=".repeat(72),fixture.id,"=".repeat(72));
     for(let run=1;run<=2;run++){
       const result=await runD15BSemanticThreadEngine(buildD15BGoldLedger(fixture));
