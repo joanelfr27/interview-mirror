@@ -319,7 +319,7 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
 
 export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
-  const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
+  const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|je|j['’]ai|nous)\b/i;
   // Compatibility for pre-change mocked/raw atoms; the strict production schema now requires actor_basis.
   let actorBasis: ActorBasis = raw.actor_basis ?? "IMPLICIT_CANDIDATE";
   let groundedActor: string;
