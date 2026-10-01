@@ -35,8 +35,8 @@ test("validator rejects known incompatible reasoning-model parameters", () => {
   );
 });
 
-test("unsupported model/parameter combinations fail before getOpenAI", async () => {
-  await assert.rejects(
+test("unsupported model/parameter combinations fail before getOpenAI", () => {
+  assert.throws(
     () => createOpenAICompletion({
       model: "o1-mini",
       temperature: 0,

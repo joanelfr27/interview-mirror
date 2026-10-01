@@ -38,6 +38,11 @@ test("corpus validator reports a missing G×S cell", () => {
   assert.ok(validateCorpus(corpus).some((error) => error.includes("missing G×S cell (1,1)")));
 });
 
+test("corpus validator requires both EN and FR coverage", () => {
+  const corpus = validCorpus().map((row) => ({ ...row, language: "en" as const, pair_id: null }));
+  assert.ok(validateCorpus(corpus).some((error) => error.includes('include language "fr"')));
+});
+
 test("corpus validator rejects an incomplete EN/FR pair and invalid or duplicate IDs", () => {
   const corpus = validCorpus();
   corpus[1] = { ...corpus[1], language: "en", pair_id: "pair-a" };
@@ -70,8 +75,11 @@ test("SHA-256 manifest verifies identical bytes and rejects a byte mismatch", as
   try {
     await writeFile(path, Buffer.from([0, 1, 2, 255]));
     const manifest = await createSha256Manifest(path);
+    const manifestPath = join(directory, "input.bin.sha256.json");
+    assert.deepEqual(JSON.parse(await readFile(manifestPath, "utf8")), manifest);
     assert.equal(manifest.sha256.length, 64);
     assert.equal(await verifySha256Manifest(path, manifest), true);
+    assert.equal(await verifySha256Manifest(path, manifestPath), true);
     await writeFile(path, Buffer.from([0, 1, 2, 254]));
     assert.equal(await verifySha256Manifest(path, manifest), false);
   } finally {

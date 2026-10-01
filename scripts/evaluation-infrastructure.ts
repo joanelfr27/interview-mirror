@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, sep } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 
 export type GoldLabel = 0 | 1;
 export type CorpusLanguage = "en" | "fr";
@@ -120,18 +120,30 @@ export interface Sha256Manifest {
   byte_length: number;
 }
 
-export async function createSha256Manifest(inputPath: string): Promise<Sha256Manifest> {
+export async function createSha256Manifest(
+  inputPath: string,
+  manifestPath = fixtureManifestPath(inputPath),
+): Promise<Sha256Manifest> {
   if (!isAbsolute(inputPath)) throw new Error("Input fixture path must be absolute.");
   const bytes = await readFile(inputPath);
-  return {
+  const manifest: Sha256Manifest = {
     algorithm: "SHA-256",
     sha256: createHash("sha256").update(bytes).digest("hex"),
     byte_length: bytes.byteLength,
   };
+  if (!isAbsolute(manifestPath)) throw new Error("Manifest path must be absolute.");
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  return manifest;
 }
 
-export async function verifySha256Manifest(inputPath: string, manifest: Sha256Manifest): Promise<boolean> {
+export async function verifySha256Manifest(
+  inputPath: string,
+  manifestOrPath: Sha256Manifest | string,
+): Promise<boolean> {
   if (!isAbsolute(inputPath)) throw new Error("Input fixture path must be absolute.");
+  const manifest = typeof manifestOrPath === "string"
+    ? JSON.parse(await readFile(manifestOrPath, "utf8")) as Sha256Manifest
+    : manifestOrPath;
   if (manifest.algorithm !== "SHA-256" || !/^[a-f0-9]{64}$/.test(manifest.sha256) ||
       !Number.isSafeInteger(manifest.byte_length) || manifest.byte_length < 0) {
     throw new Error("Invalid SHA-256 manifest.");
@@ -178,7 +190,7 @@ function validateLabelFile(rows: unknown, name: string): asserts rows is Indepen
 
 function dimensionAgreement(left: GoldLabel[], right: GoldLabel[]): AgreementDimension {
   const count = left.length;
-  const matches = left.reduce((total, value, index) => total + Number(value === right[index]), 0);
+  const matches = left.reduce<number>((total, value, index) => total + Number(value === right[index]), 0);
   const rawAgreement = matches / count;
   const leftZero = left.filter((value) => value === 0).length / count;
   const rightZero = right.filter((value) => value === 0).length / count;
@@ -241,6 +253,20 @@ export async function writeAgreementOutputs(outputDirectory: string, result: Agr
   ];
   await Promise.all(outputs.map(([file, value]) =>
     writeFile(join(outputDirectory, file), `${JSON.stringify(value, null, 2)}\n`, "utf8")));
+}
+
+export async function compareLabelFiles(
+  leftPath: string,
+  rightPath: string,
+  outputDirectory: string,
+): Promise<AgreementResult> {
+  const [left, right] = await Promise.all([
+    readFile(leftPath, "utf8").then((contents) => JSON.parse(contents) as unknown),
+    readFile(rightPath, "utf8").then((contents) => JSON.parse(contents) as unknown),
+  ]);
+  const result = compareIndependentLabels(left, right);
+  await writeAgreementOutputs(outputDirectory, result);
+  return result;
 }
 
 export function fixtureManifestPath(inputPath: string): string {
