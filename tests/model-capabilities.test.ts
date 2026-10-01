@@ -36,6 +36,14 @@ test("the frozen gpt-5.4-mini request settings are accepted", () => {
   assert.match(MODEL_CAPABILITIES["gpt-5.4-mini"]!.provenance, /Observed D15 experiment/);
 });
 
+test("models without observed response-format support reject supplied formats", () => {
+  assert.deepEqual(validateModelRequestCapabilities("gpt-5.6-luna", { temperature: 1 }), []);
+  assert.ok(validateModelRequestCapabilities("gpt-5.6-luna", {
+    temperature: 1,
+    response_format: { type: "json_schema" },
+  }).some((error) => error.includes("does not support response_format")));
+});
+
 test("Luna and Terra capability fixtures reject temperature zero", async () => {
   const path = join(process.cwd(), "tests/fixtures/luna-terra-capabilities.json");
   const { fixtures } = JSON.parse(await readFile(path, "utf8")) as {

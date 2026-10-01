@@ -50,8 +50,9 @@ export function validateModelRequestCapabilities(model: string, options: ModelRe
 
   if (options.response_format !== undefined && options.response_format !== null) {
     const format = options.response_format.type;
-    if (capabilities.responseFormats &&
-        (typeof format !== "string" || !capabilities.responseFormats.includes(format as ResponseFormatName))) {
+    if (!capabilities.responseFormats ||
+        typeof format !== "string" ||
+        !capabilities.responseFormats.includes(format as ResponseFormatName)) {
       errors.push(`Model "${model}" does not support response_format "${String(format)}".`);
     }
   }
