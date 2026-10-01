@@ -101,6 +101,10 @@ test("explicit candidate-involving actors require a source marker and remain sep
   const unsupported = canonicalizeRawCandidateAtom(raw("Payroll cutoffs were reconciled.", "EXPLICIT_CANDIDATE"), "Payroll cutoffs were reconciled.");
   assert.equal(unsupported.actor_basis, "UNSPECIFIED");
   assert.equal(unsupported.actor, "unspecified");
+
+  const possessiveOther = canonicalizeRawCandidateAtom(raw("My manager reconciled payroll cutoffs.", "EXPLICIT_CANDIDATE"), "My manager reconciled payroll cutoffs.");
+  assert.equal(possessiveOther.actor_basis, "UNSPECIFIED");
+  assert.equal(possessiveOther.actor, "unspecified");
 });
 
 test("source validator mechanically verifies explicit actor bases", () => {
