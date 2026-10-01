@@ -151,3 +151,72 @@ The full-rigor test design must include, at minimum, EN and FR examples covering
 Tests must check both false acceptance and false rejection. In particular, they must demonstrate that French nominal bullets and ordinary subjectless CV bullets are not swept into the ambiguous-passive path.
 
 No G-F2 production implementation should begin until the specification chooses and documents the behavior for genuine agentless passives: reject, QUESTION_BACK, or another truth-safe state. The choice must then receive the full-rigor locked-truth-boundary review before external/CodeRabbit review.
+
+
+## 10. E1 actor-attribution finding and pre-implementation specification inputs
+
+### E1-ACTOR-F1 — unsafe actor canonicalization fallback
+
+Inspection of the locked E1 extractor identified a distinct attribution defect in `canonicalizeRawCandidateAtom()`. The current actor canonicalization uses an exact-source check for a non-placeholder actor and falls back to the canonical placeholder `"candidate"` when that actor phrase is not found literally in the source.
+
+This can misattribute another actor's work to the candidate. For example, if the source names `"équipe paie"` but the extractor correctly identifies that another actor performed the action while paraphrasing the actor as `"payroll team"`, the exact-source check fails and today's fallback becomes `"candidate"`. The safe failure state for a non-grounded actor is not candidate attribution; it is unspecified actor.
+
+This finding is independent of G-F2 and must be tracked as a locked truth-boundary attribution error even if the eventual actor-basis design changes.
+
+### Proposed additive actor-basis representation
+
+Do not redefine or remove `subject.actor` for existing consumers. Specify an additive actor-attribution field, provisionally `actor_basis`, with these semantic states:
+
+- `EXPLICIT_CANDIDATE`: source explicitly identifies the candidate as actor, including applicable first-person candidate markers.
+- `IMPLICIT_CANDIDATE`: CV convention supports candidate agency without an explicit grammatical subject, including ordinary subjectless action bullets and nominal CV bullets.
+- `EXPLICIT_OTHER`: source explicitly identifies another actor/agent as performing the asserted action.
+- `UNSPECIFIED`: actor cannot safely be attributed, including genuine agentless passives and applicable impersonal constructions.
+
+`actor_basis` answers the attribution basis question. It must remain separate from `subject.ownership`, which answers ownership level and retains its existing strict semantics.
+
+For backward compatibility, existing stored atoms that predate `actor_basis` require an explicit migration/read policy. Candidate policy for evaluation: missing `actor_basis` is interpreted as `IMPLICIT_CANDIDATE` to preserve today's behavior. This is not approved until corpus impact and truth-safety are evaluated.
+
+The unsafe fallback identified in E1-ACTOR-F1 must not survive the new representation: a model-returned actor that cannot be grounded to the source must never become candidate merely because exact matching failed.
+
+### Validation asymmetry
+
+The states are not equally mechanically verifiable.
+
+`EXPLICIT_CANDIDATE` and `EXPLICIT_OTHER` should have source-grounding checks appropriate to their semantics. The `IMPLICIT_CANDIDATE` versus `UNSPECIFIED` distinction necessarily includes semantic/form judgment and therefore requires measured validation rather than pretending it can be completely guaranteed by a regex.
+
+Before implementation, pre-register quantitative acceptance thresholds for at least:
+
+1. **False-UNSPECIFIED rate** on genuine subjectless action bullets and nominal CV bullets. This must be near zero because false ambiguity would over-trigger candidate elicitation and turn the Mirror into a questionnaire.
+2. **False-IMPLICIT_CANDIDATE rate** on genuine agentless passives/impersonal constructions. This must be low because false candidate attribution recreates G-F2 and can manufacture involvement.
+
+Exact numeric thresholds must be frozen before the evaluation corpus is run, not chosen after observing results.
+
+Evaluation must include real EN and FR CV text in addition to synthetic/adversarial controls.
+
+### Required EN/FR adversarial dimensions
+
+The full-rigor actor-attribution matrix must cover each relevant construction in English and French, including:
+
+- subjectless verb/action bullet;
+- nominal CV bullet, including forms such as `Rapprochement...` and `Implementation of...`;
+- true passive without an agent;
+- passive with an explicitly named agent (`by...` / `par...`);
+- impersonal construction, including French `on`;
+- explicit first-person candidate actor (`I` / `je`);
+- team actor (`we` / `nous`);
+- mixed construction such as `Supported the team that reconciled...`, ensuring the atom-local actor belongs to the asserted action rather than a nearby action;
+- paraphrased-other-actor grounding failure corresponding to E1-ACTOR-F1.
+
+Tests must check false candidate attribution and false ambiguity, not only schema validity.
+
+### Intended downstream D15 behavior, conditional on E1 qualification
+
+If and only if the E1 actor-basis change qualifies under the full-rigor truth-boundary process, the narrow D15 G-F2 routing condition becomes:
+
+`actor_basis === "UNSPECIFIED"` **and** the proposed Mirror claim asserts candidate involvement.
+
+That condition should route to the existing canonical unresolved-item / CandidateElicitation architecture rather than a D15-specific reparser or second evidence path.
+
+Claims requiring ownership level remain governed by the existing ownership truth guards. `actor_basis` must not be used to upgrade UNKNOWN ownership to INDIVIDUAL, TEAM, SHARED, SUPERVISED, leadership, ownership, or other stronger claims.
+
+No production implementation is authorized by this specification note. Next gates are specification audit, frozen thresholds/corpus design, adversarial tests, and external review before locked E1 code changes.
