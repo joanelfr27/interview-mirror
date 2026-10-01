@@ -27,8 +27,10 @@ function syntheticSignificanceLedger(lines:[string,string]):EvidenceLedger{
 
 async function assertSyntheticSignificanceStability(out:string[]){
   const controls=[
-    {name:"functional relationship",expected:true,lines:["Reviewed recurring causes in customer complaints.","Changed the intake checklist after reviewing recurring complaint causes."] as [string,string],claim:"Connecting recurring complaint diagnosis with intake-process changes"},
-    {name:"mere administrative bundle",expected:false,lines:["Filed supplier invoices each week.","Archived supplier invoices each month."] as [string,string],claim:"Invoice administration"},
+    {name:"Thomas portal Gold relationship",expected:true,lines:["Supported the rollout of a new customer portal and coordinated user testing.","Collected user feedback during the rollout and shared recurring issues with the project team."] as [string,string],claim:"You work where a new system meets the people who have to use it."},
+    {name:"Nancy integration Gold relationship",expected:true,lines:["Supporting acquisition accounting and financial integration activities.","Supporting systems integration following business changes."] as [string,string],claim:"You keep finance working through business change by connecting financial integration with systems integration."},
+    {name:"functional relationship",expected:true,lines:["Reviewed recurring causes in customer complaints.","Changed the intake checklist after reviewing recurring complaint causes."] as [string,string],claim:"You connect recurring complaint diagnosis with intake-process changes."},
+    {name:"Elena-like mere administrative bundle",expected:false,lines:["Filed supplier invoices each week.","Archived supplier invoices each month."] as [string,string],claim:"You work across invoice administration."},
   ];
   out.push("=".repeat(72),"SYNTHETIC SIGNIFICANCE STABILITY","=".repeat(72));
   for(const control of controls){
