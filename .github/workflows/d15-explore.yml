@@ -17,7 +17,7 @@ jobs:
     environment: e1-runtime
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.ref_name }}
           persist-credentials: false
@@ -36,7 +36,7 @@ jobs:
           test "$actual" = "$expected"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
