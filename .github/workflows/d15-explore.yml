@@ -49,28 +49,27 @@ jobs:
         run: |
           set -euo pipefail
           files=(scripts/*.ts src/lib/d15-*.ts)
-          if grep -nE '[;){}]\\\\n' "${files[@]}"; then
-            echo "Found literal \\n after code punctuation; replace it with a real line break."
+          if grep -nE '[;){}][\]n' "${files[@]}"; then
+            echo "Found literal newline escape after code punctuation; replace it with a real line break."
             exit 1
           fi
-          python3 - <<'PY'
+          python - <<'PY'
           from pathlib import Path
-          forbidden = {0x200B, 0x200C, 0x200D, 0xFEFF, 0x00A0}
-          paths = list(Path("scripts").glob("*.ts")) + list(Path("src/lib").glob("d15-*.ts"))
-          hits = []
-          for path in paths:
-              text = path.read_text(encoding="utf-8")
-              for lineno, line in enumerate(text.splitlines(), 1):
-                  found = [f"U+{ord(ch):04X}" for ch in line if ord(ch) in forbidden]
-                  if found:
-                      hits.append(f"{path}:{lineno}: {','.join(found)}")
-          if hits:
-              print("\\n".join(hits))
-              raise SystemExit("Found forbidden invisible Unicode source character.")
+          import sys
+          bad = {chr(0x200B), chr(0x200C), chr(0x200D), chr(0xFEFF), chr(0xA0)}
+          failed = False
+          for pattern in ("scripts/*.ts", "src/lib/d15-*.ts"):
+              for path in Path(".").glob(pattern):
+                  for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                      hits = sorted({f"U+{ord(ch):04X}" for ch in line if ch in bad})
+                      if hits:
+                          print(f"{path}:{number}: {','.join(hits)}")
+                          failed = True
+          if failed:
+              sys.exit(1)
           PY
           echo "Raw harness line 49:"
           sed -n '49p' scripts/d15-explore.ts | od -An -tx1c
-
       - name: Pre-spend typecheck
         run: npm run typecheck
 
