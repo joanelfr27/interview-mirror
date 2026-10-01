@@ -65,8 +65,8 @@ const samplePass =
 const thresholdPass =
   rate(fu, implicit) !== null && rate(fu, implicit) <= 0.02 &&
   rate(fi, unspecified) !== null && rate(fi, unspecified) <= 0.02 &&
-  languages.every(l => rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) !== null && rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) <= 0.05) &&
-  languages.every(l => rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) !== null && rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) <= 0.05) &&
+  languages.every(l => rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) !== null && rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) <= 0.03) &&
+  languages.every(l => rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) !== null && rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) <= 0.03) &&
   explicitOtherFalseCandidate === 0;
 
 const report = {
