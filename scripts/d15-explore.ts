@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync } from "node:fs";
-import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently } from "@/lib/d15-semantic-thread-engine";
+import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
 import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
 
