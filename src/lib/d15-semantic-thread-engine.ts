@@ -600,7 +600,7 @@ async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThr
   }catch{return null;}
 }
 
-async function verifyD15BSignificanceByMajority(
+export async function verifyD15BSignificanceByMajority(
   ledger: EvidenceLedger,
   evidenceIds: string[],
   claim: string,
