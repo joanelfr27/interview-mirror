@@ -17,7 +17,7 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
 
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
-  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; diagnostic_headline_rewritten?: boolean }>;
+  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; diagnostic_headline_rewritten?: boolean; diagnostic_trace?: string[] }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
@@ -620,8 +620,12 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   // then run the exact same deterministic guards again. Evidence IDs never change.
   const guardRepaired:D15BSemanticThreadProposal[]=[];
   const rewrittenHeadlineIds=new Set<string>();
+  const headlineTrace=new Map<string,string[]>();
   for(const proposal of proposed){
+    const trace=[`ORIGINAL: ${proposal.headline}`];
+    headlineTrace.set(proposal.id,trace);
     const initialErrors=deterministicProposalErrors(ledger,proposal);
+    if(initialErrors.length) trace.push(`INITIAL_GUARD: ${initialErrors.join(" | ")}`);
     const presentationOnly=initialErrors.length>0 && initialErrors.every(reason =>
       reason.startsWith("headline ")
     );
@@ -630,7 +634,14 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       continue;
     }
     const repaired=await repairGuardRejectedHeadlineOnce(ledger,proposal,initialErrors);
-    if(repaired) rewrittenHeadlineIds.add(proposal.id);
+    if(repaired){
+      rewrittenHeadlineIds.add(proposal.id);
+      trace.push(`GUARD_REWRITE: ${repaired}`);
+      const repairedGuardErrors=deterministicProposalErrors(ledger,{...proposal,headline:repaired});
+      trace.push(`GUARD_REWRITE_CHECK: ${repairedGuardErrors.length ? repairedGuardErrors.join(" | ") : "PASS"}`);
+    }else{
+      trace.push("GUARD_REWRITE: none");
+    }
     guardRepaired.push(repaired ? {...proposal,headline:repaired} : proposal);
   }
   const deterministic = verifyD15BSemanticThreadProposals(ledger, guardRepaired);
@@ -640,37 +651,42 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   for (const proposal of deterministic.accepted) {
     let workingProposal={...proposal};
     if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: Title Case headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
-        continue;
-      }
-      workingProposal=floorProposal;
-      rewrittenHeadlineIds.add(proposal.id);
+      const trace=headlineTrace.get(proposal.id) ?? [];
+      trace.push(`PRESENTATION_FLOOR_TRIGGER: ${workingProposal.headline}`);
+      rejected.push({
+        proposal_id:proposal.id,
+        reasons:["PRESENTATION_UNREPAIRABLE: deterministic fallback headline would be non-significant; thread not shown"],
+        diagnostic_headline:workingProposal.headline,
+        diagnostic_headline_rewritten:rewrittenHeadlineIds.has(proposal.id),
+        diagnostic_trace:trace,
+      });
+      continue;
     }
     let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
+    const trace=headlineTrace.get(proposal.id) ?? [];
+    trace.push(`HEADLINE_VERIFIER: ${headline.supported ? "PASS" : "REJECT"} — ${headline.reason}`);
     if (!headline.supported) {
       const repaired=await repairHeadlineOnce(ledger,workingProposal);
       if(repaired){
         const repairedProposal={...workingProposal,headline:repaired};
         const guardErrors=deterministicProposalErrors(ledger,repairedProposal);
+        trace.push(`VERIFIER_REWRITE: ${repaired}`);
+        if(guardErrors.length) trace.push(`VERIFIER_REWRITE_GUARD: ${guardErrors.join(" | ")}`);
         const repairedCheck=guardErrors.length ? {supported:false,reason:guardErrors.join(" | ")} : await verifyD15BClaimIndependently(ledger,proposal.evidence_ids,repaired,"HEADLINE");
+        trace.push(`VERIFIER_REWRITE_CHECK: ${repairedCheck.supported ? "PASS" : "REJECT"} — ${repairedCheck.reason}`);
         if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; rewrittenHeadlineIds.add(proposal.id); }
       }
     }
     if (!headline.supported) {
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
-        continue;
-      }
-      workingProposal=floorProposal;
-      rewrittenHeadlineIds.add(proposal.id);
-      headline={supported:true,reason:"reviewed deterministic headline floor"};
+      trace.push("PRESENTATION_FLOOR_SUPPRESSED: deterministic fallback headline is non-significant by design");
+      rejected.push({
+        proposal_id:proposal.id,
+        reasons:[`PRESENTATION_UNREPAIRABLE: headline verifier and one repair rejected; thread not shown: ${headline.reason}`],
+        diagnostic_headline:workingProposal.headline,
+        diagnostic_headline_rewritten:rewrittenHeadlineIds.has(proposal.id),
+        diagnostic_trace:trace,
+      });
+      continue;
     }
     const significance = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
     if (!significance.supported) {
@@ -681,6 +697,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
           reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`],
           diagnostic_headline: workingProposal.headline,
           diagnostic_headline_rewritten: rewrittenHeadlineIds.has(proposal.id),
+          diagnostic_trace: headlineTrace.get(proposal.id),
         });
         continue;
       }
