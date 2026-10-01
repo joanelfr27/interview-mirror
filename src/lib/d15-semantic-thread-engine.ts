@@ -471,7 +471,6 @@ export async function verifyD15BClaimIndependently(
   if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
   const response = await getOpenAI().chat.completions.create({
     model: D15_JUDGE_MODEL,
-    temperature: 0,
     response_format: jsonSchemaFormat("d15_b_claim_verification", VERIFIER_SCHEMA),
     messages: [
       {
