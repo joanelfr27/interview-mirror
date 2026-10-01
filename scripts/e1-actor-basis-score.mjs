@@ -12,10 +12,13 @@ const bases = ["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDATE","EXPLICIT_OTHER","UNSPE
 const languages = ["en","fr"];
 
 if (!Array.isArray(rows)) throw new Error("Qualification input must be a JSON array.");
+const seenIds = new Set();
 for (const row of rows) {
   if (!row.id || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted)) {
     throw new Error("Invalid row: " + JSON.stringify({ id: row.id, language: row.language, gold: row.gold, predicted: row.predicted }));
   }
+  if (seenIds.has(row.id)) throw new Error("Duplicate qualification row id: " + row.id);
+  seenIds.add(row.id);
 }
 
 const count = (predicate) => rows.filter(predicate).length;
