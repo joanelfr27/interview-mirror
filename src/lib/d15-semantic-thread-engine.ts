@@ -490,6 +490,10 @@ Do not ask generic ownership merely because ownership metadata is unknown. Do no
   return typeof q === "string" && q.trim() ? q.trim() : null;
 }
 
+export function verifyD15BDeterministicFloorForTest(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string[] {
+  return deterministicProposalErrors(ledger,proposal,{headlineSource:"deterministic_floor"});
+}
+
 export function deterministicHeadlineFloor(ledger: EvidenceLedger, proposal:D15BSemanticThreadProposal):string {
   const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
   const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
