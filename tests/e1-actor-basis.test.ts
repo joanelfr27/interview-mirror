@@ -12,10 +12,10 @@ import {
   type ActorBasis,
 } from "../src/lib/canonical-evidence-model.ts";
 
-function raw(source_quote: string, actor_basis: ActorBasis, actor = "candidate"): RawCandidateAtom {
+function raw(source_quote: string, actor_basis: ActorBasis, actor = "candidate", normalized_action = source_quote): RawCandidateAtom {
   return {
     id: "A1", source_quote, actor, actor_basis, ownership: "UNKNOWN",
-    normalized_action: source_quote, object: source_quote,
+    normalized_action, object: source_quote,
     domain: null, jurisdiction: null, situation: null, tools_or_systems: [], standards: [],
     quantity: null, currency: null, team_size: null, scope: null, start: null, end: null,
     recency: null, outcome: null, assertion_type: "RESPONSIBILITY", polarity: "AFFIRMATIVE",
@@ -24,12 +24,12 @@ function raw(source_quote: string, actor_basis: ActorBasis, actor = "candidate")
   };
 }
 
-function atom(source: string, basis: ActorBasis, actor: string): AtomicEvidence {
+function atom(source: string, basis: ActorBasis, actor: string, normalized_action = source): AtomicEvidence {
   return {
     id: "A1", source_span_id: "S1",
     provenance: { source_type: "CV", language: "en", extraction_method: "LLM" },
     subject: { actor, ownership: "UNKNOWN", actor_basis: basis },
-    action: { normalized_action: source, object: source },
+    action: { normalized_action, object: source },
     context: {}, scale: {}, time: {}, outcome: null,
     assertion: { type: "RESPONSIBILITY", polarity: "AFFIRMATIVE" },
     verifiability: { has_quantifiable_metric: false, has_third_party_entity: false, has_time_anchor: false },
@@ -93,7 +93,8 @@ test("true agentless passives and impersonal forms remain unspecified", () => {
 
 test("explicit candidate-involving actors require a source marker and remain separate from ownership", () => {
   for (const source of ["I reconciled payroll cutoffs.", "We reconciled payroll cutoffs.", "J'ai rapproché les dates de paie.", "J’assure le suivi des clôtures.", "Nous avons rapproché les dates de paie."]) {
-    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE"), source);
+    const action = source.replace(/^(?:I|We|J['’][a-zà-öø-ÿ]+|Nous avons)\s+/i, "");
+    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", action), source);
     assert.equal(out.actor, "candidate", source);
     assert.equal(out.actor_basis, "EXPLICIT_CANDIDATE", source);
     assert.equal(out.ownership, "UNKNOWN", source);
@@ -102,16 +103,27 @@ test("explicit candidate-involving actors require a source marker and remain sep
   assert.equal(unsupported.actor_basis, "UNSPECIFIED");
   assert.equal(unsupported.actor, "unspecified");
 
-  const possessiveOther = canonicalizeRawCandidateAtom(raw("My manager reconciled payroll cutoffs.", "EXPLICIT_CANDIDATE"), "My manager reconciled payroll cutoffs.");
+  const possessiveOther = canonicalizeRawCandidateAtom(raw("My manager reconciled payroll cutoffs.", "EXPLICIT_CANDIDATE", "candidate", "reconciled payroll cutoffs"), "My manager reconciled payroll cutoffs.");
   assert.equal(possessiveOther.actor_basis, "UNSPECIFIED");
   assert.equal(possessiveOther.actor, "unspecified");
+
+  const mixedEn = canonicalizeRawCandidateAtom(raw("I supported the payroll team that reconciled accounts.", "EXPLICIT_CANDIDATE", "candidate", "reconciled accounts"), "I supported the payroll team that reconciled accounts.");
+  assert.equal(mixedEn.actor_basis, "UNSPECIFIED");
+  assert.equal(mixedEn.actor, "unspecified");
+
+  const mixedFr = canonicalizeRawCandidateAtom(raw("Nous avons aidé l'équipe qui a rapproché les comptes.", "EXPLICIT_CANDIDATE", "candidate", "a rapproché les comptes"), "Nous avons aidé l'équipe qui a rapproché les comptes.");
+  assert.equal(mixedFr.actor_basis, "UNSPECIFIED");
+  assert.equal(mixedFr.actor, "unspecified");
 });
 
 test("source validator mechanically verifies explicit actor bases", () => {
   const span = (text: string) => ({ id: "S1", document_id: "CV", text, start_offset: 0, end_offset: text.length, language: "en" });
-  assert.deepEqual(validateAtomicEvidenceAgainstSource(atom("I reconciled payroll cutoffs.", "EXPLICIT_CANDIDATE", "candidate"), span("I reconciled payroll cutoffs.")), []);
+  assert.deepEqual(validateAtomicEvidenceAgainstSource(atom("I reconciled payroll cutoffs.", "EXPLICIT_CANDIDATE", "candidate", "reconciled payroll cutoffs"), span("I reconciled payroll cutoffs.")), []);
   assert.ok(validateAtomicEvidenceAgainstSource(atom("Payroll cutoffs were reconciled.", "EXPLICIT_CANDIDATE", "candidate"), span("Payroll cutoffs were reconciled.")).some(e => e.includes("EXPLICIT_CANDIDATE")));
   assert.deepEqual(validateAtomicEvidenceAgainstSource(atom("The payroll team reconciled cutoffs.", "EXPLICIT_OTHER", "payroll team"), span("The payroll team reconciled cutoffs.")), []);
+  assert.ok(validateAtomicEvidenceAgainstSource(atom("I supported the payroll team that reconciled accounts.", "EXPLICIT_CANDIDATE", "candidate", "reconciled accounts"), span("I supported the payroll team that reconciled accounts.")).some(e => e.includes("EXPLICIT_CANDIDATE")));
+  assert.ok(validateAtomicEvidenceAgainstSource(atom("Nous avons aidé l'équipe qui a rapproché les comptes.", "EXPLICIT_CANDIDATE", "candidate", "a rapproché les comptes"), span("Nous avons aidé l'équipe qui a rapproché les comptes.")).some(e => e.includes("EXPLICIT_CANDIDATE")));
+});
 });
 
 test("pre-change atoms retain today's candidate interpretation through compatibility policy", () => {
