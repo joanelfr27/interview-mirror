@@ -101,9 +101,12 @@ EN and FR coverage must include:
 - passive with explicit agent (by/par);
 - impersonal construction, including French `on`;
 - explicit I/je;
-- explicit we/nous;
+- explicit first-person candidate (I/je);
+- explicit candidate-including team subject (we/nous; our team/notre équipe);
 - mixed actor/action construction (“Supported the team that reconciled…”);
 - paraphrased-other-actor grounding failure.
+
+The real-CV qualification scorer requires at least one EN and one FR example of each naturally occurring construction family: subjectless verb, nominal, agentless passive, explicit-agent passive, impersonal, explicit first-person, explicit team, and mixed actor/action. The paraphrased-other-actor case remains a deterministic adversarial grounding test rather than a natural-source corpus quota.
 
 Both false attribution and false ambiguity are scored.
 
