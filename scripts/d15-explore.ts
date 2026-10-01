@@ -106,7 +106,8 @@ async function main(){
       if(!result.rejected.length) out.push("REJECTED: none");
       for(const rejection of result.rejected){
         const diagnosticHeadline=rejection.diagnostic_headline ? ` HEADLINE: ${rejection.diagnostic_headline}` : "";
-        out.push(`REJECTED ${rejection.proposal_id}:${diagnosticHeadline} ${rejection.reasons.join(" | ")}`);
+        const rewriteState=rejection.diagnostic_headline ? ` REWRITTEN: ${rejection.diagnostic_headline_rewritten===true}` : "";
+        out.push(`REJECTED ${rejection.proposal_id}:${diagnosticHeadline}${rewriteState} ${rejection.reasons.join(" | ")}`);
       }
     }
     out.push("");
