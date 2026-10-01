@@ -35,7 +35,7 @@ import {
  * No legacy summary is supplied to either extraction prompt.
  */
 
-type RawCandidateAtom = {
+export type RawCandidateAtom = {
   id: string;
   source_quote: string;
   actor: string;
