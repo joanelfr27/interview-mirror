@@ -21,14 +21,16 @@ jobs:
     environment: e1-runtime
     steps:
       - name: Checkout selected ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.ref_name }}
           persist-credentials: false
+          fetch-depth: 0
       - name: Assert frozen experiment lineage
         shell: bash
         run: |
           set -euo pipefail
+          git cat-file -e '4b8c19ae31f6bf6749c1be48bf4a3d03f50ff510^{commit}'
           git merge-base --is-ancestor 4b8c19ae31f6bf6749c1be48bf4a3d03f50ff510 HEAD
           test -f docs/d15-significance-judge-qualification-frozen.md
           grep -Fq "6 cases × 5 independent raw judgments = 30 raw verdicts" docs/d15-significance-judge-qualification-frozen.md
