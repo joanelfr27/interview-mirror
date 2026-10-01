@@ -281,7 +281,7 @@ export function validateAtomicEvidenceAgainstSource(
   }
 
   if (value.subject.actor_basis === "EXPLICIT_CANDIDATE") {
-    const candidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
+    const candidateMarker = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|je|j['’]ai|nous)\b/i;
     if (!candidateMarker.test(source)) {
       errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_CANDIDATE requires an explicit candidate-involving marker in the source quote.");
     }
