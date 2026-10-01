@@ -90,3 +90,29 @@ Any truth-boundary change requires internal audit before external/CodeRabbit rev
 Pilot #4 is closed.
 
 The G/S split is supported for continuation but is not yet qualified. The 6/6 S agreement is an encouraging diagnostic signal. G-F1 is an explicit-rule divergence; G-F2 is an unresolved specification gap. Invariance remains a qualification gate. No additional disposable annotation round is required now.
+
+
+## 8. Precommitted designer-intent reveal
+
+The sealed designer intent is now unsealed because Pilot #4 is closed. It remains diagnostic and is not retroactively promoted to gold.
+
+| Case | Human primary | AI reference | Precommitted designer intent | Three-way result |
+|---|---|---|---|---|
+| 7D3A91C4 | G=YES, S=NO, NONE | G=YES, S=NO, NONE | G=YES, S=NO, NONE | Full match |
+| C84F2B17 | G=YES, S=YES, RECURRENCE | G=NO, S=YES, RECURRENCE | G=NO, S=YES, RECURRENCE | AI + intent match; human diverges on G |
+| 51E7D2A9 | G=YES, S=YES, MECHANISM | G=YES, S=YES, RECURRENCE | G=YES, S=YES, RECURRENCE | Binary full match; human type differs |
+| A26C8F53 | G=NO, S=YES, INTERFACE | G=NO, S=YES, INTERFACE | G=NO, S=YES, INTERFACE | Full match |
+| E93B4D61 | G=YES, S=NO, NONE | G=YES, S=NO, NONE | G=YES, S=NO, NONE | Full match |
+| 3F71A8CE | G=YES, S=YES, INTERFACE | G=NO, S=YES, INTERFACE | G=YES, S=YES, INTERFACE | Human + intent match; AI diverges on G |
+
+Three-way interpretation:
+
+- S is 6/6 aligned across human primary, AI reference, and precommitted designer intent.
+- C84F2B17 confirms G-F1 as an explicit-rule divergence: the precommitted intent was G=NO, matching the frozen v1.1 rule and the AI reference.
+- 51E7D2A9 confirms that the only disagreement is descriptive type: the precommitted intent was RECURRENCE, matching the AI reference. Binary G/S is unanimous.
+- 3F71A8CE confirms G-F2 remains genuinely unresolved by the codebook: the precommitted intent was G=YES, matching the human primary, while the AI reference applied a stricter unstated-responsibility reading and returned G=NO. Designer intent does not resolve a rule the frozen codebook does not contain.
+- The remaining three cases are full three-way matches.
+
+This reveal strengthens the closure rather than changing it: the S split has consistent diagnostic support; G-F1 is settled by the existing frozen rule; G-F2 requires specification before any truth-boundary implementation.
+
+No labels were changed after reveal and no Pilot #4 case was rescored.
