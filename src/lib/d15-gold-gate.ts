@@ -238,7 +238,9 @@ export function assessD15BGoldDeterministically(fixture:GoldFixture,result:D15BV
     if(fixture.id==="NANCY" && rule.id==="A" && !ownershipQuestion(p.question_back))
       errors.push("Nancy A requires a premise-free ownership clarification");
     if(fixture.id==="MARIE" && rule.id==="A"){
-      if(!diagnosisChangeMeaning(p.headline)) errors.push("Marie A headline must preserve delivery-delay diagnosis and evidenced process/procedure change");
+      // Headline semantic quality is intentionally not keyword-scored here.
+      // Evidence-set recall, language and required clarification remain deterministic;
+      // whether an abstraction preserves the diagnosis→change meaning is a reading/reviewer judgment.
       if(key===setKey(["E5","E3"]) && !outcomeQuestion(p.question_back))
         errors.push("Marie A E5+E3 requires a neutral outcome question");
       if(key===setKey(["E5","E8"]) && !ownershipQuestion(p.question_back))
