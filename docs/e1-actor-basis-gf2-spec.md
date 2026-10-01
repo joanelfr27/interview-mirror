@@ -24,7 +24,7 @@ This field does **not** encode ownership level. `subject.ownership` remains unch
 
 ## 3. Backward compatibility
 
-Atoms persisted before this field existed are read as `IMPLICIT_CANDIDATE` by `effectiveActorBasis()`. This preserves current behavior for historical data rather than retroactively converting old evidence into unresolved agency.
+Atoms persisted before this field existed use a compatibility read rule: an existing exact non-candidate `subject.actor` remains `EXPLICIT_OTHER`; the historical canonical candidate placeholder is read as `IMPLICIT_CANDIDATE`. This preserves the actor distinction already present in legacy atoms while avoiding retroactive conversion of ordinary candidate-placeholder evidence into unresolved agency.
 
 This compatibility rule is a migration/read rule only. Newly extracted atoms must emit `actor_basis`.
 
