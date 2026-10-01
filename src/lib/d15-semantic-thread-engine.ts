@@ -1,6 +1,6 @@
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
-import { AI_MODEL, getOpenAI } from "@/lib/openai";
+import { AI_MODEL, createOpenAICompletion } from "@/lib/openai";
 import { d15ThreadEligibleAtoms } from "@/lib/d15-evidence-eligibility";
 
 export type D15BSemanticThreadProposal = {
@@ -385,7 +385,7 @@ const INTERPRETATION_SCHEMA = {
 async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCandidateSet[]> {
   const input = buildD15BSemanticInput(ledger);
   if (input.atoms.length < 2) return [];
-  const response = await getOpenAI().chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_candidate_sets", CANDIDATE_SET_SCHEMA),
@@ -420,7 +420,7 @@ export function parseD15BCandidateDiscoveryContent(content:string|null|undefined
 
 async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15BCandidateSet): Promise<string> {
   const atoms = citedAtomsForVerifier(ledger, candidate.evidence_ids);
-  const response = await getOpenAI().chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_interpretation", INTERPRETATION_SCHEMA),
@@ -467,7 +467,7 @@ export async function verifyD15BClaimIndependently(
 ): Promise<D15BClaimVerification> {
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
   if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
-  const response = await getOpenAI().chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_claim_verification", VERIFIER_SCHEMA),
@@ -528,7 +528,7 @@ export function deterministicOutcomeQuestion(ledger: EvidenceLedger, proposal:D1
 
 async function enrichD15BQuestion(ledger: EvidenceLedger, proposal: D15BSemanticThreadProposal): Promise<string | null> {
   const atoms = citedAtomsForVerifier(ledger, proposal.evidence_ids);
-  const response = await getOpenAI().chat.completions.create({
+  const response = await createOpenAICompletion({
     model: AI_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_question", QUESTION_SCHEMA),
@@ -567,7 +567,7 @@ async function repairGuardRejectedHeadlineOnce(
 ): Promise<string | null> {
   const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
   const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
-  const response=await getOpenAI().chat.completions.create({
+  const response=await createOpenAICompletion({
     model:AI_MODEL,temperature:0,response_format:jsonSchemaFormat("d15_b_guard_headline_repair",{
       type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
     }),
@@ -585,7 +585,7 @@ async function repairGuardRejectedHeadlineOnce(
 async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThreadProposal):Promise<string|null>{
   const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
   const atoms=citedAtomsForVerifier(ledger,proposal.evidence_ids);
-  const response=await getOpenAI().chat.completions.create({
+  const response=await createOpenAICompletion({
     model:AI_MODEL,temperature:0,response_format:jsonSchemaFormat("d15_b_headline_repair",{
       type:"object",additionalProperties:false,properties:{headline:{type:"string"}},required:["headline"],
     }),
