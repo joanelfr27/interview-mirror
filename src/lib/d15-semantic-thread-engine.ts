@@ -17,7 +17,7 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
 
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
-  rejected: Array<{ proposal_id: string; reasons: string[] }>;
+  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
@@ -249,7 +249,7 @@ export function verifyD15BSemanticThreadProposals(
     if (seenEvidenceSets.has(evidenceKey)) errors.push("duplicate semantic evidence group");
 
     if (errors.length) {
-      rejected.push({ proposal_id: proposal.id, reasons: errors });
+      rejected.push({ proposal_id: proposal.id, reasons: errors, diagnostic_headline: proposal.headline });
       continue;
     }
 
