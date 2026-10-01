@@ -63,7 +63,9 @@ async function main(){
       }
       if(!result.rejected.length) out.push("REJECTED: none");
       for(const rejection of result.rejected){
-        out.push(`REJECTED ${rejection.proposal_id}: ${rejection.reasons.join(" | ")}`);
+        const rejectedProposal=result.proposed?.find?.((p:any)=>p.id===rejection.proposal_id);
+        const rejectedHeadline=rejectedProposal?.headline ? ` HEADLINE: ${rejectedProposal.headline}` : "";
+        out.push(`REJECTED ${rejection.proposal_id}:${rejectedHeadline} ${rejection.reasons.join(" | ")}`);
       }
     }
     out.push("");
