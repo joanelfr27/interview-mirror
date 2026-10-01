@@ -1,5 +1,5 @@
 import { writeFileSync, mkdirSync } from "node:fs";
-import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
+import { runD15BSemanticThreadEngine, verifyD15BClaimIndependently, verifyD15BSignificanceByMajority, verifyD15BSemanticThreadProposals } from "@/lib/d15-semantic-thread-engine";
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
 import { assessD15BGoldDeterministically, buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
 
@@ -36,9 +36,9 @@ async function assertSyntheticSignificanceStability(out:string[]){
   for(const control of controls){
     const ledger=syntheticSignificanceLedger(control.lines);
     const verdicts:boolean[]=[];
-    for(let i=0;i<3;i++) verdicts.push((await verifyD15BClaimIndependently(ledger,["SE1","SE2"],control.claim,"SIGNIFICANCE")).supported);
-    out.push(`${control.name}: ${verdicts.join(",")} expected=${control.expected}`);
-    if(verdicts.some(v=>v!==control.expected)) throw new Error(`significance stability failed for ${control.name}: ${verdicts.join(",")}`);
+    for(let i=0;i<3;i++) verdicts.push((await verifyD15BSignificanceByMajority(ledger,["SE1","SE2"],control.claim)).supported);
+    out.push(`${control.name} voted decisions: ${verdicts.join(",")} expected=${control.expected}`);
+    if(verdicts.some(v=>v!==control.expected)) throw new Error(`significance voted stability failed for ${control.name}: ${verdicts.join(",")}`);
   }
   out.push("");
 }
