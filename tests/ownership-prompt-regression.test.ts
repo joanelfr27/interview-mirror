@@ -10,6 +10,8 @@ test("ownership prompt recognizes explicit candidate ownership independently of 
   assert.match(OWNERSHIP_EXTRACTION_RULE, /"I managed the forecasting process." -> INDIVIDUAL/i);
   assert.match(OWNERSHIP_EXTRACTION_RULE, /"J'ai construit des modèles de forecast." -> INDIVIDUAL/i);
   assert.match(OWNERSHIP_EXTRACTION_RULE, /"J'ai piloté le processus budgétaire." -> INDIVIDUAL/i);
+  assert.match(OWNERSHIP_EXTRACTION_RULE, /If the quote explicitly states that the candidate and another person jointly perform or own the asserted action, return SHARED rather than INDIVIDUAL/i);
+  assert.match(OWNERSHIP_EXTRACTION_RULE, /"I jointly built the forecast models with my manager." -> SHARED/i);
 });
 
 test("ownership prompt keeps manager-assigned responsibility distinct from candidate ownership", () => {

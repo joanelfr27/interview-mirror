@@ -129,7 +129,8 @@ export const OWNERSHIP_EXTRACTION_RULE = `
 Ownership answers who explicitly performs or owns the atom's asserted action. Assertion type is a separate field and does not determine ownership.
 
 - First determine the actor of the asserted action represented by this atom.
-- If the candidate is explicitly the actor/owner of that action, return INDIVIDUAL.
+- If the candidate is explicitly the sole actor/owner of that action, return INDIVIDUAL.
+- If the quote explicitly states that the candidate and another person jointly perform or own the asserted action, return SHARED rather than INDIVIDUAL. Example: "I jointly built the forecast models with my manager." -> SHARED.
 - A first-person subject or possessive marker that is directly attached to the asserted action is explicit candidate ownership evidence. Examples:
   - "I built financial models." -> INDIVIDUAL
   - "I managed the forecasting process." -> INDIVIDUAL
