@@ -110,7 +110,7 @@ function unsupportedProperNouns(claim:string,source:string):string[]{
     }
     const prev=normalized(words[i-1]??"");
     const next=words[i+1];
-    const consecutive=!!next&&next.length > 0 && next[0] === next[0]!.toLocaleUpperCase() && next[0] !== next[0]!.toLocaleLowerCase()&&!PROPER_NOUN_STOP_WORDS.has(normalized(next));
+    const consecutive=!!next && (next.length > 0 && next[0] === next[0]!.toLocaleUpperCase() && next[0] !== next[0]!.toLocaleLowerCase()) && !PROPER_NOUN_STOP_WORDS.has(normalized(next));
     if(ENTITY_PREPOSITIONS.has(prev)||consecutive||!isFullyTitleCaseHeadline(claim)) unsupported.push(word);
   }
   return [...new Set(unsupported)];
