@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createOpenAICompletion } from "../src/lib/openai.ts";
 import {
   MODEL_CAPABILITIES,
   validateModelRequestCapabilities,
@@ -52,13 +52,32 @@ test("Luna and Terra capability fixtures reject temperature zero", async () => {
   }
 });
 
-test("unsupported model/parameter combinations fail before getOpenAI", () => {
-  assert.throws(
-    () => createOpenAICompletion({
-      model: "o1-mini",
-      temperature: 0,
-      messages: [],
-    }),
-    /Model capability validation failed/,
+test("real significance runner rejects Luna temperature zero before any API request", async () => {
+  const result = await new Promise<{ code: number | null; output: string }>((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      ["--experimental-loader", "./tests/real-runtime-loader.mjs", "scripts/d15-significance-judge-experiment.ts"],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          D15_JUDGE_MODEL: "gpt-5.6-luna",
+          OPENAI_API_KEY: "dummy-test-key",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let output = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => { output += chunk; });
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => { output += chunk; });
+    child.once("error", reject);
+    child.once("close", (code) => resolve({ code, output }));
+  });
+
+  assert.notEqual(result.code, 0);
+  assert.match(result.output, /Model capability validation failed: Model "gpt-5\.6-luna" only supports the default temperature value \(1\)\./);
+  assert.doesNotMatch(
+    result.output,
+    /\b(401|403)\b|unauthori[sz]ed|authentication|network|fetch|ECONN|ENOTFOUND|HTTP\/\d|OpenAI API|API request|request failed/i,
   );
 });

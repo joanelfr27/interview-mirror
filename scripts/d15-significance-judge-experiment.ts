@@ -2,13 +2,14 @@ import OpenAI from "openai";
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
 import { buildD15BGoldLedger, d15BGoldFixtures } from "@/lib/d15-gold-gate";
 import { buildD15BSemanticInput } from "@/lib/d15-semantic-thread-engine";
+import { assertModelRequestCapabilities } from "@/lib/model-capabilities";
 
 const MODELS = ["gpt-5.6-luna","gpt-5.4-mini","gpt-5.6-terra"] as const;
 const model = process.env.D15_JUDGE_MODEL;
 if (!model || !MODELS.includes(model as typeof MODELS[number])) throw new Error("D15_JUDGE_MODEL must be one of the preregistered candidates");
 const apiKey=process.env.OPENAI_API_KEY;
 if(!apiKey) throw new Error("OPENAI_API_KEY is not configured");
-const openai=new OpenAI({apiKey});
+let openai: OpenAI | undefined;
 
 const SYSTEM_PROMPT=`You are the independent D15-B claim verifier. You receive ONLY cited canonical evidence atoms and one candidate-facing claim.
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
@@ -56,10 +57,13 @@ for(const c of cases){
  const atoms=input.atoms.filter(a=>wanted.has(a.evidence_id));
  const language=c.id.startsWith("MARIE")?"fr":"en";
  for(let repetition=1;repetition<=5;repetition++){
-  const response=await openai.chat.completions.create({model,temperature:0,response_format:{type:"json_schema",json_schema:{name:"d15_b_claim_verification",strict:true,schema}},messages:[
+  const request: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming = {model,temperature:0,response_format:{type:"json_schema",json_schema:{name:"d15_b_claim_verification",strict:true,schema}},messages:[
    {role:"system",content:SYSTEM_PROMPT},
    {role:"user",content:JSON.stringify({claim_type:"SIGNIFICANCE",expected_language:language,cited_atoms:atoms,claim:c.claim})},
-  ]});
+  ]};
+  assertModelRequestCapabilities(model,request);
+  openai ??= new OpenAI({apiKey});
+  const response=await openai.chat.completions.create(request);
   const raw=response.choices[0]?.message?.content||'{"supported":false,"reason":"empty verifier response"}';
   const parsed=JSON.parse(raw) as {supported?:boolean;reason?:string};
   const supported=parsed.supported===true;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { STRATEGY_ENGINE_VERSION } from "@/lib/strategy-engine-version";
-import { AI_MODEL, createOpenAICompletion, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type { FeedbackQuestion, FeedbackResult, SessionRecord } from "@/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -82,6 +82,7 @@ function normalizeQuestionFeedback(value: unknown, pair: FeedbackPair): Question
 }
 
 async function generateFeedback(session: SessionRecord, pairs: FeedbackPair[]): Promise<FeedbackResult> {
+  const openai = getOpenAI();
   if (!session.interview_strategy) throw new Error("Interview Strategy is required for strategy-aware feedback");
   const strategy = session.interview_strategy;
   const strategyContext = JSON.stringify({
@@ -145,7 +146,7 @@ The stronger-answer fields are coaching guidance, not a script. suggestedRewrite
 ${coachingInstruction}`;
 
   const evaluations = await Promise.all(pairs.map(async (pair) => {
-    const requestEvaluation = async () => createOpenAICompletion({
+    const requestEvaluation = async () => openai.chat.completions.create({
       model: AI_MODEL,
       response_format: { type: "json_schema", json_schema: { name: "interview_question_feedback", strict: true, schema: questionSchema } },
       temperature: 0.3,

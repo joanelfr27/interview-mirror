@@ -1,4 +1,4 @@
-import { AI_MODEL, createOpenAICompletion, languageInstruction, normalizeLanguage } from "@/lib/openai";
+import { AI_MODEL, getOpenAI, languageInstruction, normalizeLanguage } from "@/lib/openai";
 import type {
   AtomicFactRequirementRelation,
   CanonicalJDRequirement,
@@ -152,7 +152,8 @@ function structuredResponseFormat(name: string, schema: unknown) {
 }
 
 async function requestStructuredJson(system: string, user: string, name: string, schema: unknown): Promise<any> {
-  const completion = await createOpenAICompletion({
+  const openai = getOpenAI();
+  const completion = await openai.chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
     response_format: structuredResponseFormat(name, schema),

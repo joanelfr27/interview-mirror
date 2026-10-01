@@ -1,5 +1,5 @@
 import type { AtomicEvidence, EvidenceLedger, SourceSpan } from "@/lib/canonical-evidence-model";
-import { AI_MODEL, createOpenAICompletion } from "@/lib/openai";
+import { AI_MODEL, getOpenAI } from "@/lib/openai";
 
 export type D15BGoldScorerInput = {
   accepted: Array<{
@@ -312,7 +312,7 @@ export function semanticScopePreclear(fixture:GoldFixture,result:D15BVerificatio
 
 export async function semanticGoldErrors(fixture:GoldFixture,result:D15BVerificationResult, unmatchedThreadIds:string[]):Promise<string[]> {
   if(fixture.expected_thread_count===0) return result.accepted.length===0?[]:["Elena must have zero threads"];
-  const response=await createOpenAICompletion({
+  const response=await getOpenAI().chat.completions.create({
     model:AI_MODEL,temperature:0,
     response_format:{type:"json_schema",json_schema:{name:"d15_b_gold_score",strict:true,schema:SCORE_SCHEMA}},
     messages:[
