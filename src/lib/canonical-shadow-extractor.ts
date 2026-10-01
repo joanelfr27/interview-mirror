@@ -39,7 +39,7 @@ export type RawCandidateAtom = {
   id: string;
   source_quote: string;
   actor: string;
-  actor_basis: ActorBasis;
+  actor_basis?: ActorBasis;
   ownership: EvidenceOwnership;
   normalized_action: string;
   object: string;
@@ -320,7 +320,8 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
 export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
   const explicitCandidateMarker = /\b(?:i|i['’]m|i['’]ve|me|my|mine|we|our|ours|je|j['’]ai|moi|mon|ma|mes|nous|notre|nos)\b/i;
-  let actorBasis: ActorBasis = raw.actor_basis;
+  // Compatibility for pre-change mocked/raw atoms; the strict production schema now requires actor_basis.
+  let actorBasis: ActorBasis = raw.actor_basis ?? "IMPLICIT_CANDIDATE";
   let groundedActor: string;
 
   if (actorBasis === "EXPLICIT_OTHER") {
@@ -402,7 +403,7 @@ function toAtomicEvidence(
     },
     subject: {
       actor: raw.actor,
-      actor_basis: raw.actor_basis,
+      ...(raw.actor_basis ? { actor_basis: raw.actor_basis } : {}),
       ownership: raw.ownership,
     },
     action: {
