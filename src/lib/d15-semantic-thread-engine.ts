@@ -600,6 +600,20 @@ async function repairHeadlineOnce(ledger:EvidenceLedger,proposal:D15BSemanticThr
   }catch{return null;}
 }
 
+async function verifyD15BSignificanceByMajority(
+  ledger: EvidenceLedger,
+  evidenceIds: string[],
+  claim: string,
+): Promise<{supported:boolean;reason:string}> {
+  const verdicts:D15BClaimVerification[]=[];
+  for(let i=0;i<3;i++) verdicts.push(await verifyD15BClaimIndependently(ledger,evidenceIds,claim,"SIGNIFICANCE"));
+  const yes=verdicts.filter(verdict=>verdict.supported).length;
+  return {
+    supported:yes>=2,
+    reason:`2-of-3 significance vote: ${verdicts.map(verdict=>verdict.supported).join(",")} — ${verdicts.map(verdict=>verdict.reason).join(" | ")}`,
+  };
+}
+
 export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promise<D15BVerificationResult> {
   let proposed:D15BSemanticThreadProposal[];
   try {
@@ -661,13 +675,10 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       workingProposal=floorProposal;
       headline={supported:true,reason:"reviewed deterministic headline floor"};
     }
-    const significance = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
+    const significance = await verifyD15BSignificanceByMajority(ledger, workingProposal.evidence_ids, workingProposal.headline);
     if (!significance.supported) {
-      const significanceConfirmation = await verifyD15BClaimIndependently(ledger, workingProposal.evidence_ids, workingProposal.headline, "SIGNIFICANCE");
-      if (!significanceConfirmation.supported) {
-        rejected.push({ proposal_id: proposal.id, reasons: [`significance judge rejected twice: ${significance.reason} | ${significanceConfirmation.reason}`] });
-        continue;
-      }
+      rejected.push({ proposal_id: proposal.id, reasons: [`significance majority rejected: ${significance.reason}`] });
+      continue;
     }
     if (workingProposal.question_back) {
       const question = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.question_back, "QUESTION_BACK");
