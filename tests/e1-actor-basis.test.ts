@@ -54,6 +54,17 @@ test("E1-ACTOR-F1: paraphrased explicit-other actor fails closed to unspecified,
   assert.equal(out.actor_basis, "UNSPECIFIED");
 });
 
+test("candidate basis cannot overwrite a grounded other actor", () => {
+  for (const basis of ["IMPLICIT_CANDIDATE", "EXPLICIT_CANDIDATE"] as const) {
+    const out = canonicalizeRawCandidateAtom(
+      raw("The payroll team reconciled the cutoffs.", basis, "payroll team", "reconciled the cutoffs"),
+      "The payroll team reconciled the cutoffs.",
+    );
+    assert.equal(out.actor, "unspecified", basis);
+    assert.equal(out.actor_basis, "UNSPECIFIED", basis);
+  }
+});
+
 test("exact explicit-other actors survive in EN and FR", () => {
   const en = canonicalizeRawCandidateAtom(raw("The payroll team reconciled the cutoffs.", "EXPLICIT_OTHER", "payroll team"), "The payroll team reconciled the cutoffs.");
   const fr = canonicalizeRawCandidateAtom(raw("Les écarts ont été rapprochés par l'équipe paie.", "EXPLICIT_OTHER", "l'équipe paie"), "Les écarts ont été rapprochés par l'équipe paie.");
