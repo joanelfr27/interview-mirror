@@ -44,6 +44,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Pre-spend reject fused literal newline artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -nE '[;){}]\\\\n' scripts/*.ts src/lib/d15-*.ts; then
+            echo "Found literal \\n after code punctuation; replace it with a real line break."
+            exit 1
+          fi
+
       - name: Pre-spend typecheck
         run: npm run typecheck
 
