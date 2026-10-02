@@ -691,6 +691,20 @@ test("numeric prose does not masquerade as an out-of-subset evidence ID", () => 
   assert.equal(result.errors.some(error => error.includes("evidence ID outside")), false);
 });
 
+test("ordinary numeric quantities do not masquerade as evidence IDs", () => {
+  const l = ledger();
+  for (const id of ["13", "14", "50", "50000"]) {
+    l.source_spans.push({ id: "S-N-" + id, document_id: "CV", text: "Background evidence " + id, start_offset: 0, end_offset: 20, language: "en" });
+    l.evidence.push({ ...l.evidence[0], id, source_span_id: "S-N-" + id });
+  }
+  const judgment = {
+    ...raw("DIRECT", ["A1"]),
+    rationale: "The candidate has 13+ years across 14 countries and handled USD 50,000 in restricted funds.",
+  };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.some(error => error.includes("outside the minimal supporting subset")), false);
+});
+
 test("explicit out-of-subset evidence ID reference remains rejected", () => {
   const l = ledger();
   l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed statutory audits.", start_offset: 0, end_offset: 25, language: "en" });
