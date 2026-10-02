@@ -50,9 +50,14 @@ try{
   const restored=JSON.parse(JSON.stringify(loop.ledger));
   const denial_remembered=scenario.expect!=='DENIED'||deniedClarification(restored,['E2','E4'],prior.asserted_proposition,scenario.language);
   const retained=restored.mirror_clarifications?.[0]?.responses[0]?.answer===scenario.answer;
-  const pass=retained&&denial_remembered&&(scenario.expect==='ACCEPT'?accepted.length===1&&exact&&shared_subject&&one_answer_maturity:scenario.expect==='REJECT'?accepted.length===0:accepted.length===0&&loop.status===scenario.expect&&!loop.repeat_question&&(scenario.expect!=='NEEDS_MORE_DETAIL'||Boolean(loop.follow_up&&loop.unresolved)));
-  results.push({...scenario,pass,exact,shared_subject,one_answer_maturity,denial_remembered,answer_retained_after_reload:retained,loop});report.cases=results;await save();
-  console.log(`CASE ${scenario.id}: pass=${pass} status=${loop.status} extracted=${loop.extraction.evidence.length} accepted=${accepted.length} shared_subject=${shared_subject} answer_retained=${retained} denial_remembered=${denial_remembered}`);
+  const checks:Record<string,boolean>={answer_retained_after_reload:retained};
+  if(scenario.expect==='ACCEPT') Object.assign(checks,{exact_proposition:accepted.length===1&&exact,shared_subject,single_answer_maturity:one_answer_maturity});
+  if(scenario.expect==='DENIED') Object.assign(checks,{denial_remembered,no_thread:accepted.length===0,no_repeat:!loop.repeat_question,status_denied:loop.status==='DENIED'});
+  if(scenario.expect==='NEEDS_MORE_DETAIL') Object.assign(checks,{no_thread:accepted.length===0,one_follow_up:Boolean(loop.follow_up&&loop.unresolved),status_pending:loop.status==='NEEDS_MORE_DETAIL'});
+  if(scenario.expect==='REJECT') Object.assign(checks,{no_candidate_thread:accepted.length===0,other_actor_question_closed:loop.status==='CLOSED_OTHER_ACTOR',no_redundant_follow_up:loop.follow_up===null});
+  const pass=Object.values(checks).every(Boolean);
+  results.push({...scenario,pass,checks,loop});report.cases=results;await save();
+  console.log(`CASE ${scenario.id}: pass=${pass} status=${loop.status} extracted=${loop.extraction.evidence.length} accepted=${accepted.length} checks=${JSON.stringify(checks)}`);
  }
  report.status=results.every(c=>c.pass)?'PASS_DEVELOPMENT_LOOP':'FAIL_DEVELOPMENT_LOOP';
  console.log(`LOOP ${report.status}: cases=${results.length}/5`);

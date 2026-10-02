@@ -16,3 +16,8 @@ export function rememberedClarification(ledger:EvidenceLedger,ids:string[],propo
 export function deniedClarification(ledger:EvidenceLedger,ids:string[],proposition:string,language:'en'|'fr'):boolean {
  return rememberedClarification(ledger,ids,proposition,language)?.status==='DENIED';
 }
+
+export function closedClarification(ledger:EvidenceLedger,ids:string[],proposition:string,language:'en'|'fr'):boolean {
+ const status=rememberedClarification(ledger,ids,proposition,language)?.status;
+ return status==='DENIED'||status==='CLOSED_OTHER_ACTOR';
+}

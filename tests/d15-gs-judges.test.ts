@@ -225,3 +225,20 @@ test('denial memory survives JSON reload and source atom-ID changes; partial get
  assert.equal(again.follow_up,null);assert.equal(again.unresolved?.responses.length,2);
  assert.equal(again.mirror.accepted.length,0);assert.equal(again.repeat_question,false);
 });
+
+test('named manager credit closes a rejected candidate claim without repeating the stated contribution',async()=>{
+ const {applyD15ClarificationAnswer}=await import('../src/lib/d15-conversational-mirror.ts');
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const {closedClarification}=await import('../src/lib/d15-clarification-state.ts');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ const headline='You use your monthly sales forecasts as an input to the structured pipeline review.';
+ const reading={language:'en' as const,actor:'CANDIDATE' as const,asserted_proposition:headline,component_claims:[headline],form:'RELATIONSHIP' as const,relationship_assertion:headline,reading_reason:'Input relationship.'};
+ const before={...combineGS(headline,{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:reading};
+ const target={proposal_id:'forecast',question:'What connection, if any?',evidence_ids:['E2','E4'],gs_decision:before};
+ const answer='My manager used my monthly sales forecasts as an input to the structured pipeline review. I only sent the forecasts to my manager.';
+ const services={extract:async(text:string,id:string)=>canonicalizeElicitedAtoms(text,id,[{id:'a',source_quote:'My manager used my monthly sales forecasts as an input to the structured pipeline review.',actor:'unspecified',actor_basis:'UNSPECIFIED',ownership:'UNKNOWN',normalized_action:'used',object:'my monthly sales forecasts',assertion_type:'STATED',polarity:'AFFIRMATIVE',has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1}]),judge:async()=>({...before})};
+ const r=await applyD15ClarificationAnswer(ledger,{id:'manager',answer,target},services);
+ assert.equal(r.status,'CLOSED_OTHER_ACTOR');assert.equal(r.follow_up,null);assert.equal(r.unresolved,null);assert.equal(r.mirror.accepted.length,0);
+ assert.equal(closedClarification(JSON.parse(JSON.stringify(r.ledger)),['E2','E4'],headline,'en'),true);
+ assert.equal(r.ledger.mirror_clarifications![0].responses[0].answer,answer);
+});

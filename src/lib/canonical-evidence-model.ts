@@ -165,7 +165,7 @@ export type DemonstrationObjective = {
 /** Conversation state only: never a support atom or an input to evidence judges. */
 export type MirrorClarificationRecord={
  key:string; headline:string; asserted_proposition:string; language:'en'|'fr';
- source_quotes:string[]; status:'DENIED'|'NEEDS_MORE_DETAIL'|'CONFIRMED';
+ source_quotes:string[]; status:'DENIED'|'CLOSED_OTHER_ACTOR'|'NEEDS_MORE_DETAIL'|'CONFIRMED';
  responses:Array<{id:string;answer:string}>; follow_up_issued:boolean;
 };
 

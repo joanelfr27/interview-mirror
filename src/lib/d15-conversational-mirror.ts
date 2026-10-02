@@ -35,23 +35,24 @@ export async function applyD15ClarificationAnswer(
  const remembered=rememberedClarification(ledger,target.evidence_ids,reading.asserted_proposition,reading.language);
  if(ledger.mirror_clarifications?.some(r=>r.responses.some(a=>a.id===response.id))) throw new Error('Clarification response id already exists');
  if(ledger.source_spans.some(s=>s.document_id==='ELICIT-'+response.id)) throw new Error('Clarification response id already exists');
- const disposition=remembered?.status==='DENIED'?'DENIED':shortAnswerDisposition(response.answer);
+ const disposition=remembered?.status==='DENIED'||remembered?.status==='CLOSED_OTHER_ACTOR'?'DENIED':shortAnswerDisposition(response.answer);
  // Negative/underspecified short answers cannot be promoted to affirmative atoms.
  const extraction=disposition==='DETAIL'
   ? await (services.extract??extractCanonicalElicitedAnswer)(response.answer,response.id)
   : {source_spans:[],evidence:[],rejected:[],answer:response.answer};
  const next={...ledger,source_spans:[...ledger.source_spans,...extraction.source_spans],evidence:[...ledger.evidence,...extraction.evidence]};
  const mirror:D15BVerificationResult={accepted:[],rejected:[],clarification_questions:[],cv_question_back:null,completion_state:'COMPLETED_NO_QUALIFYING_RELATIONSHIP'};
- const finish=(status:'DENIED'|'NEEDS_MORE_DETAIL'|'REJUDGED',decision:GSDecision|null,excluded_evidence:ReturnType<typeof attributionVetoDetails>)=>{
+ const finish=(status:'DENIED'|'CLOSED_OTHER_ACTOR'|'NEEDS_MORE_DETAIL'|'REJUDGED',decision:GSDecision|null,excluded_evidence:ReturnType<typeof attributionVetoDetails>)=>{
   const confirmed=mirror.accepted.length>0;
-  const unresolved=status!=='DENIED'&&!confirmed;
+  const unresolved=status!=='DENIED'&&status!=='CLOSED_OTHER_ACTOR'&&!confirmed;
   const follow_up=unresolved&&!remembered?.follow_up_issued
    ? reading.language==='fr'?'Pouvez-vous donner un exemple concret et préciser votre contribution personnelle, s’il y en avait une ?':'Could you give a concrete example and describe your own contribution, if any?'
    : null;
-  const record={key:clarificationKey(ledger,target.evidence_ids,reading.asserted_proposition,reading.language),headline:target.gs_decision.headline,asserted_proposition:reading.asserted_proposition,language:reading.language,source_quotes:clarificationSourceQuotes(ledger,target.evidence_ids),status:status==='DENIED'?'DENIED' as const:confirmed?'CONFIRMED' as const:'NEEDS_MORE_DETAIL' as const,responses:[...(remembered?.responses??[]),{id:response.id,answer:response.answer}],follow_up_issued:Boolean(remembered?.follow_up_issued||follow_up)};
+  const record={key:clarificationKey(ledger,target.evidence_ids,reading.asserted_proposition,reading.language),headline:target.gs_decision.headline,asserted_proposition:reading.asserted_proposition,language:reading.language,source_quotes:clarificationSourceQuotes(ledger,target.evidence_ids),status:status==='DENIED'?'DENIED' as const:status==='CLOSED_OTHER_ACTOR'?'CLOSED_OTHER_ACTOR' as const:confirmed?'CONFIRMED' as const:'NEEDS_MORE_DETAIL' as const,responses:[...(remembered?.responses??[]),{id:response.id,answer:response.answer}],follow_up_issued:Boolean(remembered?.follow_up_issued||follow_up)};
   next.mirror_clarifications=[...(ledger.mirror_clarifications??[]).filter(r=>r.key!==record.key),record];
   return {ledger:next,response,extraction,mirror,status,repeat_question:false,follow_up,unresolved:unresolved?record:null,decision,excluded_evidence};
  };
+ if(remembered?.status==='CLOSED_OTHER_ACTOR') return finish('CLOSED_OTHER_ACTOR',null,[]);
  if(disposition!=='DETAIL'||!extraction.evidence.length) return finish(disposition==='DENIED'?'DENIED':'NEEDS_MORE_DETAIL',null,[]);
  const graphErrors=validateRequirementGraph(next);
  if(graphErrors.length) throw new Error('Elicited graph validation failed: '+graphErrors.join(' | '));
@@ -75,5 +76,11 @@ export async function applyD15ClarificationAnswer(
   mirror.rejected=[{proposal_id:target.proposal_id,diagnostic_headline:target.gs_decision.headline,gs_decision:decision,reasons:[decision.accepted?'No new answer evidence licensed this claim':`G=${decision.G.supported}; S=${decision.S.supported}; vetoes=${decision.vetoes.join(',')}`]}];
   mirror.completion_state='ALL_REJECTED';
  }
- return finish('REJUDGED',decision,excluded_evidence);
+ // A named other actor explains the link; retain the candidate's stated role
+ // without asking them to repeat it or converting that actor's work to theirs.
+ const otherCredit=extraction.evidence.some(a=>a.subject.actor_basis==='EXPLICIT_OTHER'||(
+  a.subject.actor_basis==='UNSPECIFIED'&&next.source_spans.some(s=>s.id===a.source_span_id&&
+   /^(?:my manager|my supervisor|mon responsable|ma responsable|mon manager)\b/iu.test(s.text.trim()))
+ ));
+ return finish(!decision.G.supported&&otherCredit?'CLOSED_OTHER_ACTOR':'REJUDGED',decision,excluded_evidence);
 }
