@@ -82,3 +82,14 @@ test("qualification scorer rejects missing required construction coverage", () =
   assert.equal(result.report.sample_pass, false);
   assert.equal(result.report.qualification_pass, false);
 });
+
+
+test("qualification scorer counts explicit-candidate prediction on unspecified gold as false candidate attribution", () => {
+  const data = rows();
+  const row = data.find(x => x.gold === "UNSPECIFIED");
+  row.predicted = "EXPLICIT_CANDIDATE";
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report.primary_rates.false_implicit_candidate.count, 1);
+  assert.equal(result.report.qualification_pass, false);
+});
