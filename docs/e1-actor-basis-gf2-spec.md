@@ -72,12 +72,12 @@ Two primary error rates:
    - Additional language guard: **<= 3.0% in EN and <= 3.0% in FR separately**.
    - Rationale: questionnaire inflation is a product failure; near-zero is required, while the per-language guard avoids hiding a French nominal-bullet defect inside aggregate performance.
 
-2. **False-IMPLICIT-CANDIDATE rate (FI):** gold `UNSPECIFIED` classified `IMPLICIT_CANDIDATE`.
+2. **False-candidate-attribution rate (FI):** gold `UNSPECIFIED` classified as either `IMPLICIT_CANDIDATE` or `EXPLICIT_CANDIDATE`.
    - Qualification threshold: **<= 2.0% overall**.
    - Additional language guard: **<= 3.0% in EN and <= 3.0% in FR separately**.
    - Rationale: this is the truth-boundary error that recreates G-F2.
 
-Hard safety override: a false candidate attribution on a case with an explicit different actor is **0 tolerated**, regardless of aggregate rates.
+Hard safety override: a false candidate attribution on a case with an explicit different actor is **0 tolerated**, regardless of aggregate rates. An `UNSPECIFIED` atom must also carry `ownership = UNKNOWN`; validation must reject any contradictory non-UNKNOWN ownership.
 
 ### 6.3 Minimum scored sample
 
