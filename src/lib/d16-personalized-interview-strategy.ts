@@ -9,6 +9,9 @@ import {
   type RoleCapabilityModel,
 } from "@/lib/role-capability-model";
 import type { ProfessionalMirror } from "@/lib/professional-mirror";
+import type { D15BVerifiedThread } from "@/lib/d15-semantic-thread-engine";
+import { validateG, validateS } from "@/lib/d15-gs-judges";
+import { D15_CODEBOOK_BLOB } from "@/lib/d15-gs-v11-rules";
 
 export const D16_VERSION = "d16-v1" as const;
 
@@ -103,6 +106,132 @@ export type D16Strategy = {
   actions: D16Action[];
   dependency_snapshot: D16DependencySnapshot;
 };
+
+/** Explicit development selection; contextual relevance is curated, never proof. */
+export type D16PreparationSelection = {
+  requirement_id: string;
+  preparation_evidence_ids: string[];
+  relationship_ids: string[];
+};
+export type D16PreparationInputs = {
+  canonical: D16Inputs;
+  accepted_relationships: D15BVerifiedThread[];
+  selections: D16PreparationSelection[];
+  language: "en" | "fr";
+  dependency_fingerprint: string;
+};
+export type D16PreparationAction = {
+  version: "d16-preparation-v2-development";
+  id: string;
+  dispatcher: "PREP" | "PRACTICE";
+  requirement_id: string;
+  canonical_status: StrategicTension["canonical_status"];
+  requirement_proof_refs: Array<{ evidence_id: string; source_span_id: string; support_status: string }>;
+  preparation_anchor_refs: Array<{ evidence_id: string; source_span_id: string; source_type: string; actor: string; ownership: string }>;
+  d15_thread_refs: string[];
+  missing_facet_ids: string[];
+  evidence_reference_mode: D16EvidenceReferenceMode;
+  personalization: "CURATED_CONTEXTUAL_ANCHORS" | "NO_RELEVANT_ANCHOR";
+  instruction: string;
+  expected_artifact: string;
+  language: "en" | "fr";
+  truthfulness_boundary: StrategicTension["truthfulness_boundary"];
+  dependency_fingerprint: string;
+};
+
+export function buildD16PreparationFingerprint(input: Omit<D16PreparationInputs, "dependency_fingerprint">): string {
+  // Includes the ledger, support judgments and curated selection, unlike legacy D16's snapshot.
+  return fingerprint(input);
+}
+
+/** Shadow-only versioned projection over the existing deterministic D16 tensions. */
+export function buildD16PreparationActions(input: D16PreparationInputs): D16PreparationAction[] {
+  const { dependency_fingerprint, ...material } = input;
+  if (dependency_fingerprint !== buildD16PreparationFingerprint(material)) throw new Error("Stale D16 preparation dependencies.");
+  if (!["en", "fr"].includes(input.language)) throw new Error("Invalid D16 preparation language.");
+  const canonical = input.canonical;
+  const strategy = buildD16Strategy(canonical);
+  const atoms = new Map(canonical.ledger.evidence.map(a => [a.id, a]));
+  const spans = new Map(canonical.ledger.source_spans.map(s => [s.id, s]));
+  const relationships = new Map(input.accepted_relationships.map(t => [t.id, t]));
+  if (relationships.size !== input.accepted_relationships.length) throw new Error("Duplicate D15 relationship IDs.");
+  const chosen = new Map(input.selections.map(s => [s.requirement_id, s]));
+  if (chosen.size !== input.selections.length || input.selections.some(s => !strategy.tensions.some(t => t.requirement_id === s.requirement_id))) throw new Error("Invalid D16 preparation selection.");
+  function resolve(id: string) {
+    const atom = atoms.get(id), span = atom && spans.get(atom.source_span_id);
+    if (!atom || !span || !span.text.trim()) throw new Error("Forged or missing D16 preparation reference: " + id);
+    return { atom, span };
+  }
+  // Check the existing D15 result contract; never re-judge or infer a relationship in D16.
+  for (const t of input.accepted_relationships) {
+    const gs = t.gs_decision;
+    const cited = t.evidence_ids.map(id => { const { span } = resolve(id); return { evidence_id: id, source_text: span.text }; });
+    if (!gs || !gs.accepted || gs.codebook_blob !== D15_CODEBOOK_BLOB || gs.headline !== t.headline || t.verification !== "SUPPORTED" || gs.vetoes.length || !validateG(gs.G, cited).supported || !validateS(gs.S).supported) throw new Error("Unvalidated D15 relationship: " + t.id);
+  }
+  return strategy.tensions.flatMap(tension => {
+    const selection = chosen.get(tension.requirement_id);
+    const threadIds = [...new Set(selection?.relationship_ids ?? [])];
+    const anchorIds = [...new Set([...(selection?.preparation_evidence_ids ?? []), ...threadIds.flatMap(id => {
+      const t = relationships.get(id);
+      if (!t) throw new Error("Missing accepted D15 relationship: " + id);
+      return t.evidence_ids;
+    })])].sort();
+    const anchors = anchorIds.map(resolve);
+    const requirement = canonical.bridge.requirements.find(r => r.requirement_id === tension.requirement_id)!;
+    const proof = requirement.evidence.filter(e => ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(e.support_status));
+    const facets = canonical.ledger.requirements.find(r => r.id === tension.requirement_id)?.facets ?? [];
+    const missing = facets.filter(f => !canonical.ledger.support_judgments.some(j => j.requirement_id === tension.requirement_id && j.facet_id === f.id && j.status === "DIRECT" && !j.abstained)).map(f => f.id);
+    const fr = input.language === "fr";
+    const source = anchors.map(({ span }) => `« ${span.text} »`).join("\n");
+    const relationshipsText = threadIds.map(id => relationships.get(id)!.headline).join("; ");
+    const boundary = fr
+      ? "Ces éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier."
+      : "These are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.";
+    const topic = `« ${tension.requirement} »`;
+    const prep = anchors.length
+      ? (fr ? `Pour ${topic}, choisissez un exemple parmi ces éléments documentés :\n${source}\nPréparez le problème précis, votre tâche, les responsabilités des autres et ce qui pourrait justifier l'application de la règle pertinente.` : `For ${topic}, choose one example from these documented anchors:\n${source}\nPrepare the specific issue, your task, others' responsibilities and what could substantiate application of the relevant rule.`)
+      : (fr ? `Aucun élément pertinent n'a été sélectionné pour ${topic}. Préparez une réponse qui distingue l'exigence non établie de votre expérience documentée; n'inventez pas d'exemple.` : `No relevant candidate anchor was selected for ${topic}. Prepare an answer distinguishing the unestablished requirement from documented experience; do not invent an example.`);
+    const practice = anchors.length
+      ? (fr ? `Entraînez-vous à expliquer l'exemple sélectionné pour ${topic} :\n${source}\nPrésentez le problème, ce que vous avez personnellement fait, la règle appliquée si elle est établie, et les limites de ce que cet exemple démontre.` : `Practise explaining the selected example for ${topic}:\n${source}\nDescribe the issue, what you personally did, the rule applied if established, and the limits of what this example demonstrates.`)
+      : (fr ? `Entraînez-vous à expliquer que ${topic} reste non établi, sans attribuer à votre parcours une expérience absente.` : `Practise explaining that ${topic} remains unestablished without attributing undocumented experience to your history.`);
+    const selfReport = anchors.some(a => a.atom.provenance.source_type === "CANDIDATE_ELICITED");
+    const note = relationshipsText ? (fr ? `\nRelation D15 confirmée : ${relationshipsText}.` : `\nConfirmed D15 relationship: ${relationshipsText}.`) : "";
+    const selfNote = selfReport ? (fr ? " Déclaration du candidat; elle ne démontre pas une récurrence ou une vérification indépendante." : " Candidate self-report; it does not establish recurrence or independent verification.") : "";
+    const common = {
+      version: "d16-preparation-v2-development" as const, requirement_id: tension.requirement_id,
+      canonical_status: tension.canonical_status,
+      requirement_proof_refs: proof.map(e => ({ evidence_id: e.evidence_id, source_span_id: e.source_span_id, support_status: e.support_status })),
+      preparation_anchor_refs: anchors.map(({ atom }) => ({ evidence_id: atom.id, source_span_id: atom.source_span_id, source_type: atom.provenance.source_type, actor: atom.subject.actor, ownership: atom.subject.ownership })),
+      d15_thread_refs: threadIds, missing_facet_ids: missing,
+      evidence_reference_mode: (tension.contradiction_present && (proof.length || anchors.length) ? "MIXED_EVIDENCE" : proof.length || anchors.length ? "SUPPORTED_EVIDENCE" : "NO_CANDIDATE_EVIDENCE") as D16EvidenceReferenceMode,
+      personalization: anchors.length ? "CURATED_CONTEXTUAL_ANCHORS" as const : "NO_RELEVANT_ANCHOR" as const,
+      language: input.language, truthfulness_boundary: tension.truthfulness_boundary, dependency_fingerprint,
+    };
+    return [
+      { ...common, id: tension.id + "-PREP-V2", dispatcher: "PREP" as const, instruction: prep + note + "\n" + boundary + selfNote, expected_artifact: fr ? "Une fiche d'exemple avec contribution, justificatifs et limites." : "An example sheet with contribution, substantiation and limits." },
+      { ...common, id: tension.id + "-PRACTICE-V2", dispatcher: "PRACTICE" as const, instruction: practice + note + "\n" + boundary + selfNote, expected_artifact: fr ? "Une réponse de pratique; son évaluation appartient à D21." : "A practice response; evaluating it belongs to D21." },
+    ];
+  });
+}
+
+export function validateD16PreparationActions(actions: D16PreparationAction[], input: D16PreparationInputs): { valid: boolean; errors: string[] } {
+  try {
+    const expected = buildD16PreparationActions(input);
+    return JSON.stringify(actions) === JSON.stringify(expected) ? { valid: true, errors: [] } : { valid: false, errors: ["D16 preparation actions differ from the validated canonical projection."] };
+  } catch (e) { return { valid: false, errors: [e instanceof Error ? e.message : String(e)] }; }
+}
+
+export function reportD16PreparationCoverage(actions: D16PreparationAction[]) {
+  return {
+    action_count: actions.length,
+    actions_with_requirement_proof: actions.filter(a => a.requirement_proof_refs.length > 0).length,
+    actions_with_contextual_anchors: actions.filter(a => a.preparation_anchor_refs.length > 0).length,
+    actions_without_candidate_evidence: actions.filter(a => a.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE").length,
+    linked_reference_count: actions.reduce((n, a) => n + a.requirement_proof_refs.length + a.preparation_anchor_refs.length, 0),
+    // IDs alone cannot establish relevance or candidate-specific usefulness.
+    personalization_evaluation: "NOT_EVALUATED" as const,
+  };
+}
 
 const STATUS_PRIORITY: Record<StrategicTension["canonical_status"], number> = {
   CONTRADICTED: 4,
@@ -529,4 +658,3 @@ export function validateD16Strategy(strategy: D16Strategy, input: D16Inputs): { 
 
   return { valid: errors.length === 0, errors };
 }
-

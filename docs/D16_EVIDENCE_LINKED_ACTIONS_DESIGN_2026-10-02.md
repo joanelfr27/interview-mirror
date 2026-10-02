@@ -74,3 +74,17 @@ Report raw denominators separately: actions using requirement-proof references, 
 ## Exit and next step
 
 Review this amendment and the Nancy/Thomas expected behavior before modifying the D16 payload and validator. Then implement one controlled PREP/PRACTICE slice, run pre-spend tests and one pinned development comparison. Keep qualification, production cutover, database writes, live persistence and the Pre-D17 Live Validation Gate separate. The current five-case D15 artifact is development evidence, not a D16 release authorization.
+
+## Implemented first development slice — 2 October
+
+`buildD16PreparationActions` and its validator now provide `d16-preparation-v2-development` in the existing D16 module. The legacy D16 builder, validator and production routing remain unchanged. Tensions still come from the existing deterministic builder; the slice emits PREP/PRACTICE only, without inventing evaluation results.
+
+Preparation selections are explicit curated requirement-to-evidence mappings. This first slice does **not** automatically establish contextual relevance. Nancy/Thomas tests are controlled fixture comparisons using real source wording, not new assembled-CV/model runs. No personalization qualification follows from their passing. Coverage reports keep personalization NOT_EVALUATED until a separate content review.
+
+The payload separates D6 requirement-support references from contextual source references and accepted D15 relationship IDs. Canonical requirement status is copied without upgrades. A full dependency fingerprint includes ledger, D6, D15 result, selected anchors, RCM, JD, context and language. Tampering or stale material fails closed. Accepted D15 results must retain both positive validated axes, a matching headline, current codebook, exact licensing spans and no vetoes; D16 does not create or re-judge a relationship. This validates the supplied existing D15 result contract, not the semantic correctness of the judge itself.
+
+Instructions quote canonical sources, keep others' work distinct, mark self-reported relationships as self-report, and forbid turning support into leadership or unestablished standards into facts. Missing relevant anchors yield an explicit fallback. EN/FR wording is supplied; source text remains in its original language. No free-form action writer is enabled, which makes the v2 validator able to reject an altered instruction exactly.
+
+Pre-spend validation: typecheck and 338 tests (337 canonical plus the D14 runtime gate) passed. Six new checks cover Nancy's contextual accounting/non-IFRS boundary, Thomas's fallback against the same standards requirement, tampered claims/forged IDs/stale source, other-actor ownership, single-answer accepted D15 self-report, and French instructions.
+
+Remaining: independent review of this versioned amendment/implementation; an actual assembled Nancy/Thomas comparison; broader contradictory, facet, denial/partial and no-JD cases; candidate-relevant anchor selection beyond curation; and a pinned paid development run only when its outputs answer a new question. Production cutover, qualification, persistence and D17 remain closed. A matching source reference alone is not a semantic-relevance pass.
