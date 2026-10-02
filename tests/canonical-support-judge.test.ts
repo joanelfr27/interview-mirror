@@ -34,7 +34,7 @@ function raw(status: SupportJudgment["status"], ids: string[] = []): any {
   return {
     id: "SJ-1", requirement_id: "REQ-1", facet_id: "F-1", status, supporting_evidence_ids: ids,
     rationale: "test", confidence: 1, abstained: false, support_basis: "DOCUMENTED",
-    context_evidence_ids: [], relational: false, relationship_connector: null, licensing_spans: [],
+    context_evidence_ids: [], relationship_connector: null, licensing_spans: [],
     analogical_mapping: null, abstention_reason: null,
   };
 }
@@ -153,7 +153,6 @@ test("relational DIRECT rejects composition of separately documented activities"
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = {
     ...raw("DIRECT", ["A1", "A2"]),
-    relational: true,
     relationship_connector: "input to",
     licensing_spans: ["Prepared forecasts", "Introduced pipeline reviews"],
   };
@@ -168,7 +167,6 @@ test("relational DIRECT accepts an exact single-atom licensing span", () => {
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = {
     ...raw("DIRECT", ["A1"]),
-    relational: true,
     relationship_connector: "input to",
     licensing_spans: ["forecasts as input to pipeline reviews"],
   };
@@ -177,11 +175,11 @@ test("relational DIRECT accepts an exact single-atom licensing span", () => {
   assert.equal(result.judgments[0].status, "DIRECT");
 });
 
-test("relational classifier is enforced independently of the model declaration", () => {
+test("relational classifier independently requires licensing for DIRECT", () => {
   const l = ledger();
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
-  const result = sanitizeJudgments([raw("PARTIAL", ["A1"])], l);
-  assert.ok(result.errors.some(error => error.includes("relational classification")));
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")));
 });
 
 test("rationale cannot explicitly invoke an uncited evidence ID", () => {
@@ -216,7 +214,7 @@ test("relational DIRECT rejects extra support IDs even when one atom licenses th
   l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts as input to pipeline reviews" } };
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2", action: { normalized_action: "prepared", object: "monthly reports" } });
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
-  const judgment = { ...raw("DIRECT", ["A1", "A2"]), relational: true, relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
+  const judgment = { ...raw("DIRECT", ["A1", "A2"]), relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
   const result = sanitizeJudgments([judgment], l);
   assert.ok(result.errors.some(error => error.includes("minimal support must contain only")));
 });
@@ -230,4 +228,20 @@ test("abstention schema rejects context citations", () => {
   const l = ledger();
   const validate = new Ajv().compile(buildSupportJudgeSchema(l));
   assert.equal(validate({ judgments: [{ ...raw("NONE"), abstained: true, context_evidence_ids: ["A1"] }] }), false);
+});
+
+
+test("relational classifier covers sequence, dependency, recurrence and French response connectors", () => {
+  for (const requirementText of [
+    "Review pipeline after forecast updates",
+    "Pipeline review depends on forecast quality",
+    "Use a recurring forecast-to-review cadence",
+    "Réviser le pipeline en réponse à la prévision",
+    "Réviser le pipeline après la prévision",
+  ]) {
+    const l = ledger();
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+    assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+  }
 });
