@@ -22,3 +22,9 @@ export function assessDevelopmentEngine(result:D15BVerificationResult) {
     protocol_errors:result.accepted.flatMap(t=>!t.gs_decision?.accepted||!t.gs_decision.G.supported||!t.gs_decision.S.supported||t.gs_decision.vetoes.length?['Accepted thread lacks independent G AND S without veto: '+t.id]:[]),
     qualification_verdict:null};
 }
+
+// Explicit synthetic relationships: development controls, never candidate evidence.
+export const POSITIVE_DEVELOPMENT_CONTROLS = [
+ {id:'SYNTHETIC_EN_RESPONSE',language:'en' as const,lines:['Reviewed recurring invoice exceptions.','Based on that review, revised the invoice intake checklist.'],headline:'You use reviews of recurring invoice exceptions to revise the intake checklist.',G:true,S:true},
+ {id:'SYNTHETIC_FR_RESPONSE',language:'fr' as const,lines:['Analysait les incidents récurrents de traitement des commandes.','À partir de cette analyse, modifiait la procédure de traitement des commandes.'],headline:'Vous utilisez l’analyse des incidents récurrents pour modifier la procédure de traitement des commandes.',G:true,S:true},
+] as const;

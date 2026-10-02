@@ -57,3 +57,10 @@ test('chronology alone cannot license a stronger cause even if G says YES',()=>{
  assert.equal(clarificationQuestion({...result,vetoes:['OWNERSHIP_UPGRADE']},'en'),null);
  assert.equal(clarificationQuestion({...result,S:{...S,supported:false,relationship_type:'NONE'}},'en'),null);
  });
+
+ test('model capability gate rejects unresolved models and invalid strict-schema payloads',async()=>{
+ const {validateD15ModelPreflight}=await import('../src/lib/d15-model-preflight.ts');
+ assert.throws(()=>validateD15ModelPreflight({model:'unknown',choices:[{message:{content:'{"ready":true}'}}]}));
+ assert.throws(()=>validateD15ModelPreflight({model:'gpt-4o-mini-2024-07-18',choices:[{message:{content:'{"ready":false}'}}]}));
+ assert.equal(validateD15ModelPreflight({model:'gpt-4o-mini-2024-07-18',choices:[{message:{content:'{"ready":true}'}}]}).status,'PASS');
+ });
