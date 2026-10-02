@@ -1,3 +1,4 @@
+import {deniedClarification} from "@/lib/d15-clarification-state";
 import { openRelationshipQuestion, judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
@@ -15,6 +16,7 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
   maturity: MirrorMaturity;
   verification: "SUPPORTED";
   gs_decision?: GSDecision;
+  relationship_support_unit_count?: number;
 };
 
 export type D15BVerificationResult = {
@@ -393,7 +395,7 @@ async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCa
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_candidate_sets", CANDIDATE_SET_SCHEMA),
     messages: [
-      { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything.
+      { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything. denied_relationships is retained conversation state, never evidence: do not propose those relationships again, including semantic paraphrases, unless the candidate explicitly revises their denial.
 Return only candidate evidence sets; do NOT write headlines, summaries, questions, or candidate-facing prose.
 A candidate set may contain one atom with an explicit meaningful relationship, or several atoms suggesting a meaningful relationship to confirm. Do not require cross-line synthesis. An unconfirmed relationship is a hypothesis for a question, never evidence.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
@@ -408,7 +410,7 @@ Rank candidate relationships by professional information gain. Inspect explicit 
 When a stronger dimension above is supported, do not substitute a weaker OTHER or topical-coordination bundle using overlapping or nearby evidence. Choose at most ONE best evidence set per meaningful dimension and suppress generic project/administrative coordination when a more informative relationship exists.
 Prefer 1-2 strong relationships; maximum 2. Return zero when evidence contains only routine unrelated duties or category-level similarity.
 Do not infer facts from titles, employers, typical duties, or outside knowledge. Evidence IDs must come from input. Return JSON only.` },
-      { role: "user", content: JSON.stringify(input) },
+      { role: "user", content: JSON.stringify({...input,denied_relationships:(ledger.mirror_clarifications??[]).filter(r=>r.status==='DENIED').map(r=>({proposition:r.asserted_proposition,source_quotes:r.source_quotes}))}) },
     ],
   });
   return parseD15BCandidateDiscoveryContent(response.choices[0]?.message?.content);
@@ -637,6 +639,10 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   const clarification_questions: NonNullable<D15BVerificationResult["clarification_questions"]> = [];
 
   for (const proposal of deterministic.accepted) {
+    const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
+    if(deniedClarification(ledger,proposal.evidence_ids,proposal.headline,language)) {
+      rejected.push({proposal_id:proposal.id,diagnostic_headline:proposal.headline,reasons:['RELATIONSHIP_PREVIOUSLY_DENIED']});continue;
+    }
     let workingProposal={...proposal};
     if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
       const repaired=await repairHeadlineOnce(ledger,workingProposal);
@@ -647,6 +653,9 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       workingProposal={...workingProposal,headline:repaired};
     }
     const gs = await judgeD15GS(ledger, workingProposal.evidence_ids, workingProposal.headline);
+    if(deniedClarification(ledger,workingProposal.evidence_ids,gs.asserted_proposition,language)) {
+      rejected.push({proposal_id:proposal.id,diagnostic_headline:workingProposal.headline,gs_decision:gs,reasons:['RELATIONSHIP_PREVIOUSLY_DENIED']});continue;
+    }
     if (!gs.accepted) {
       const question=openRelationshipQuestion(ledger,workingProposal.evidence_ids,gs,sourceLanguageForEvidence(ledger,workingProposal.evidence_ids));
       if(question) clarification_questions.push({proposal_id:proposal.id,question,evidence_ids:workingProposal.evidence_ids,gs_decision:gs});

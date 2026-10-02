@@ -180,10 +180,48 @@ test('answer loop freezes proposition, accepts only anchored evidence, and close
  let extracts=0,judges=0;
  const services={extract:async(text:string,id:string)=>{extracts++;assert.equal(text,answer);return canonicalizeElicitedAtoms(text,id,[{id:'a',source_quote:text,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE',ownership:'INDIVIDUAL',normalized_action:'used',object:'monthly sales forecasts',assertion_type:'STATED',polarity:'AFFIRMATIVE',has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1}]);},judge:async(next:typeof ledger,ids:string[],claim:string,options?:Parameters<typeof import('../src/lib/d15-gs-judges.ts').judgeD15GS>[3])=>{judges++;assert.equal(claim,headline);assert.deepEqual(options?.reading,reading);const atom=next.evidence.find(a=>a.provenance.source_type==='CANDIDATE_ELICITED')!;assert.ok(ids.includes(atom.id));return combineGS(claim,{...G,minimal_atom_subset:[atom.id],licensing_spans:[{evidence_id:atom.id,text:answer}]},S,[],headline);}};
  const result=await applyD15ClarificationAnswer(ledger,{id:'coop',answer,target},services);
- assert.equal(result.mirror.accepted.length,1);assert.equal(result.mirror.accepted[0].headline,headline);assert.equal(extracts,1);assert.equal(judges,1);
+ assert.equal(result.mirror.accepted.length,1);assert.equal(result.mirror.accepted[0].maturity,'CONFIRMED_RELATIONSHIP');assert.equal(result.mirror.accepted[0].relationship_support_unit_count,1);assert.equal(result.mirror.accepted[0].headline,headline);assert.equal(extracts,1);assert.equal(judges,1);
  for(const [answer,status] of [["No, they weren't connected",'DENIED'],['Sometimes, informally','NEEDS_MORE_DETAIL']]){
   const other=await applyD15ClarificationAnswer(ledger,{id:status,answer,target},services);
   assert.equal(other.status,status);assert.equal(other.mirror.accepted.length,0);assert.equal(other.repeat_question,false);assert.equal(other.response.answer,answer);
  }
  assert.equal(extracts,1);assert.equal(judges,1);
+});
+
+test('observed full answer preserves I across and with a deictic that review',async()=>{
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const quote='I presented the forecast assumptions in that review and discussed the variances with the sales team.';
+ const base={id:'a',source_quote:quote,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE' as const,ownership:'INDIVIDUAL' as const,normalized_action:'presented',object:'the forecast assumptions',situation:'that review',assertion_type:'STATED' as const,polarity:'AFFIRMATIVE' as const,has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1};
+ const r=canonicalizeElicitedAtoms(quote,'exact',[base,{...base,id:'b',actor:'unspecified',actor_basis:'UNSPECIFIED',ownership:'UNKNOWN',normalized_action:'discussed',object:'the variances',situation:'with the sales team'}]);
+ assert.equal(r.rejected.length,0);assert.equal(r.evidence.length,2);
+ assert.equal(r.evidence[1].subject.actor_basis,'EXPLICIT_CANDIDATE');assert.equal(r.evidence[1].subject.ownership,'INDIVIDUAL');
+ assert.equal(r.attribution_corrections[0].from,'UNSPECIFIED');
+});
+test('French elision shares je across et but never transfers a manager’s action',async()=>{
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const quote='J’ai présenté les hypothèses dans cette revue et discuté des écarts avec l’équipe commerciale.';
+ const base={id:'a',source_quote:quote,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE' as const,ownership:'INDIVIDUAL' as const,normalized_action:'présenté',object:'les hypothèses',assertion_type:'STATED' as const,polarity:'AFFIRMATIVE' as const,has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1};
+ const r=canonicalizeElicitedAtoms(quote,'fr',[base,{...base,id:'b',actor:'unspecified',actor_basis:'UNSPECIFIED',ownership:'UNKNOWN',normalized_action:'discuté',object:'des écarts'}]);
+ assert.equal(r.evidence[1].subject.actor_basis,'EXPLICIT_CANDIDATE');
+ const other='My manager used my monthly sales forecasts as an input to the structured pipeline review.';
+ const result=canonicalizeElicitedAtoms(other,'manager',[{...base,source_quote:other,actor:'My manager',actor_basis:'EXPLICIT_OTHER',ownership:'UNKNOWN',normalized_action:'used',object:'my monthly sales forecasts'}]);
+ assert.equal(result.evidence[0].subject.actor_basis,'EXPLICIT_OTHER');assert.equal(result.evidence[0].subject.actor,'My manager');
+});
+test('denial memory survives JSON reload and source atom-ID changes; partial gets one follow-up then stays unresolved',async()=>{
+ const {applyD15ClarificationAnswer}=await import('../src/lib/d15-conversational-mirror.ts');
+ const {deniedClarification}=await import('../src/lib/d15-clarification-state.ts');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ const headline='You use forecasts as an input to the review.';
+ const reading={language:'en' as const,actor:'CANDIDATE' as const,asserted_proposition:headline,component_claims:[headline],form:'RELATIONSHIP' as const,relationship_assertion:headline,reading_reason:'Input relationship.'};
+ const target={proposal_id:'forecast',question:'What connection, if any?',evidence_ids:['E2','E4'],gs_decision:{...combineGS(headline,{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:reading}};
+ const denied=await applyD15ClarificationAnswer(ledger,{id:'denied',answer:"No, they weren't connected",target});
+ const restored=JSON.parse(JSON.stringify(denied.ledger));
+ restored.evidence.find((a:{id:string})=>a.id==='E2').id='NEW2';restored.evidence.find((a:{id:string})=>a.id==='E4').id='NEW4';
+ assert.equal(deniedClarification(restored,['NEW2','NEW4'],headline,'en'),true);
+ assert.equal(restored.mirror_clarifications[0].responses[0].answer,"No, they weren't connected");
+ const partial=await applyD15ClarificationAnswer(ledger,{id:'partial1',answer:'Sometimes, informally',target});
+ assert.ok(partial.follow_up);assert.ok(partial.unresolved);
+ const again=await applyD15ClarificationAnswer(JSON.parse(JSON.stringify(partial.ledger)),{id:'partial2',answer:'Sometimes, informally',target});
+ assert.equal(again.follow_up,null);assert.equal(again.unresolved?.responses.length,2);
+ assert.equal(again.mirror.accepted.length,0);assert.equal(again.repeat_question,false);
 });

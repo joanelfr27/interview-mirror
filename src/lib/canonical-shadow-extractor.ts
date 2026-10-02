@@ -16,6 +16,7 @@ import {
   deriveDeterministicVerifiability,
   validateAtomicEvidenceAgainstSource,
   hasActionLocalCandidateMarker,
+  hasActorRelativeClauseBoundary,
   validateSourceSpan,
   validateSpanBounds,
   forbiddenInferenceViolations,
@@ -490,6 +491,7 @@ Hard rules:
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
 - actor: for EXPLICIT_OTHER, copy the exact actor phrase from the quote. For EXPLICIT_CANDIDATE or IMPLICIT_CANDIDATE use the canonical placeholder "candidate". For UNSPECIFIED use "unspecified". Never invent or paraphrase a person, employer, team, or role as actor.
+- Coordinated verbs share an explicit first-person subject across and/et, including French elision (J’ai fait X et fait Y), unless a new actor or grammatical boundary intervenes. Include the subject marker and coordinated verb in each atom’s source_quote when needed to show this shared agency; multiple atoms may share the same exact sentence while keeping their action/object fields separate. Do not mark the second verb UNSPECIFIED merely because I/je is not repeated.
 - actor_basis: apply the actor-basis rule below. Subjectless action bullets and nominal CV bullets are IMPLICIT_CANDIDATE; genuine agentless passives and unresolved impersonal constructions are UNSPECIFIED.
 - ACTOR BASIS RULE:\n${ACTOR_BASIS_EXTRACTION_RULE}\n- ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
 - OWNERSHIP RULE:
@@ -831,6 +833,7 @@ export async function extractCanonicalShadow(
 export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAtoms:RawCandidateAtom[]) {
  const sourceSpans:SourceSpan[]=[];const evidence:AtomicEvidence[]=[];const rejected:Array<{id:string;errors:string[]}>=[];
  const used=new Set<string>();
+ const attribution_corrections:Array<{evidence_id:string;field:string;from:string;to:string;source_text:string}>=[];
  for(const [index,raw] of rawAtoms.entries()){
   const span=findExactSpan('ELICIT-'+responseId,answer,raw.source_quote,detectSourceLanguage(answer,''),used,'ATOM');
   if(!span){rejected.push({id:raw.id,errors:['Answer quote is not exact']});continue;}
@@ -846,9 +849,9 @@ export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAto
      if(start<0||target<=start) return false;
      const between=span.text.slice(start+a.normalized_action.trim().length,target);
      return /\s(?:and|et)\s*$/iu.test(between)&&!/[;.!?«»"“”]/u.test(between)&&
-      !/\b(?:and|et|that|who|which|que|qui|dont|said|reported|disait|dit)\b/iu.test(between.replace(/\s(?:and|et)\s*$/iu,''));
+      !hasActorRelativeClauseBoundary(between)&&!/\b(?:and|et|said|reported|disait|dit)\b/iu.test(between.replace(/\s(?:and|et)\s*$/iu,''));
     })());
-   if(sibling) attributed={...raw,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE'};
+   if(sibling) attributed={...raw,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE',ownership:canonicalizeRawCandidateAtom(sibling,span.text).ownership};
   }
   const canonical=canonicalizeRawCandidateAtom({...attributed,id:'ELICIT-ATOM-'+responseId+'-'+index},span.text);
   const extracted=toAtomicEvidence(canonical,span);
@@ -856,6 +859,7 @@ export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAto
   const errors=[...validateSourceSpan(span),...validateSpanBounds(span,answer),...validateAtomicEvidence(atom),...validateAtomicEvidenceAgainstSource(atom,span),...forbiddenInferenceViolations(atom)];
   if(errors.length){rejected.push({id:raw.id,errors});continue;}
   if(!sourceSpans.some(s=>s.id===span.id)) sourceSpans.push(span);evidence.push(atom);
+  if(raw.actor_basis!==atom.subject.actor_basis) attribution_corrections.push({evidence_id:atom.id,field:'subject.actor_basis',from:raw.actor_basis??'MISSING',to:atom.subject.actor_basis??'MISSING',source_text:span.text});
  }
  // Resolve only a unique, earlier, exact review noun phrase in this answer.
  // Keep the original deictic source text; offsets make the association auditable.
@@ -868,7 +872,7 @@ export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAto
   const match=matches[0];
   return [{evidence_id:atom.id,field:'context.situation',source_text:atom.context.situation!,antecedent:match[0],antecedent_start:match.index!,antecedent_end:match.index!+match[0].length,document_id:span.document_id}];
  });
- return {source_spans:sourceSpans,evidence,rejected,answer,resolved_references};
+ return {source_spans:sourceSpans,evidence,rejected,answer,resolved_references,attribution_corrections};
 }
 export async function extractCanonicalElicitedAnswer(answer:string,responseId:string) {
  if(!answer.trim()||/^(?:yes|no|oui|non)[.!\s]*$/iu.test(answer.trim())) return {source_spans:[] as SourceSpan[],evidence:[] as AtomicEvidence[],rejected:[{id:responseId,errors:['Bare confirmation is not relational evidence']}],answer};

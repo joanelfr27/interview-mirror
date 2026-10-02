@@ -162,6 +162,13 @@ export type DemonstrationObjective = {
   probe_family?: string;
 };
 
+/** Conversation state only: never a support atom or an input to evidence judges. */
+export type MirrorClarificationRecord={
+ key:string; headline:string; asserted_proposition:string; language:'en'|'fr';
+ source_quotes:string[]; status:'DENIED'|'NEEDS_MORE_DETAIL'|'CONFIRMED';
+ responses:Array<{id:string;answer:string}>; follow_up_issued:boolean;
+};
+
 export type EvidenceLedger = {
   source_spans: SourceSpan[];
   evidence: AtomicEvidence[];
@@ -171,6 +178,7 @@ export type EvidenceLedger = {
   unresolved_items: UnresolvedItem[];
   candidate_elicitations: CandidateElicitation[];
   demonstration_objectives: DemonstrationObjective[];
+  mirror_clarifications?: MirrorClarificationRecord[];
   // CompetencyInstance and CareerTheme remain virtual L2/L3 projections over L1.
   // They are intentionally not persisted in the reasoning ledger and never feed LLM support judgments.
 };
@@ -260,6 +268,12 @@ export function deriveDeterministicVerifiability(source: string): VerifiabilityS
   return { has_quantifiable_metric, has_third_party_entity, has_time_anchor };
 }
 
+/** A preposition + "that" noun phrase is deictic, not a relative clause. */
+export function hasActorRelativeClauseBoundary(text:string):boolean {
+ const clauses=text.replace(/\b(?:in|during|at|on|after|before|from|for|through|with)\s+that\s+(?=[\p{L}])/giu,' ');
+ return /\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/iu.test(clauses);
+}
+
 export function hasActionLocalCandidateMarker(source: string, normalizedAction: string): boolean {
   const action = normalizedAction.trim();
   if (!action) return false;
@@ -282,7 +296,7 @@ export function hasActionLocalCandidateMarker(source: string, normalizedAction: 
   }
 
   const between = prefix.slice(marker.index + marker[0].length);
-  if (/\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/i.test(between)) return false;
+  if (hasActorRelativeClauseBoundary(between)) return false;
 
   // Only the clause containing the asserted action can inherit the candidate
   // marker. If a hard/coordinating boundary follows the marker, any explicit
