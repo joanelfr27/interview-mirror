@@ -542,3 +542,74 @@ test("deterministic validator caps French elicited-only DIRECT at PARTIAL", () =
   assert.equal(result.judgments[0].status, "PARTIAL");
   assert.equal(result.judgments[0].support_basis, "CANDIDATE_SELF_REPORTED");
 });
+
+
+test("X3 prepositional association without facet relation verb is PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts in June for pipeline reviews.", start_offset: 0, end_offset: 48, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("X4 prepositional team association without facet relation verb is PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts with the pipeline review team.", start_offset: 0, end_offset: 49, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("true synonym understatement remains PARTIAL rather than unsupported DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Applied forecasts in pipeline reviews.", start_offset: 0, end_offset: 38, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("licensed use relation remains DIRECT under prepositional guard", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts in pipeline reviews.", start_offset: 0, end_offset: 35, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]), relationship_connector: "in", licensing_spans: ["Used forecasts in pipeline reviews."] }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("FR X3 association without exploiter relation is PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Préparé les prévisions en juin pour les revues du pipeline.", start_offset: 0, end_offset: 59, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("FR X4 team association without exploiter relation is PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Préparé les prévisions avec l'équipe des revues du pipeline.", start_offset: 0, end_offset: 60, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("FR true synonym understatement is PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Appliqué les prévisions dans les revues du pipeline.", start_offset: 0, end_offset: 52, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
