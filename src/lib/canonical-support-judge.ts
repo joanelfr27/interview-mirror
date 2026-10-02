@@ -270,12 +270,11 @@ function prepositionalFacetRelation(facetRequirement: string): { left: string[];
   return { left, right, verbStem: verbCandidate ? stemContentToken(verbCandidate) : null };
 }
 
-function clauseContainsRecognizedRelationalConnector(clause: string): boolean {
-  const canonical = normalizeEvidenceText(clause);
-  return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(canonical));
-}
-
 function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
+  // Recognized relational facets are governed by the stronger connector/licensing-span
+  // validator below. This conservative fallback only closes unclassified prepositional
+  // relationships such as "leverage X in Y".
+  if (isRelationalFacet(facetRequirement)) return false;
   const relation = prepositionalFacetRelation(facetRequirement);
   if (!relation) return false;
   for (const source of citedSourceTexts) {
@@ -285,7 +284,7 @@ function prepositionalDirectLacksRelationLicense(facetRequirement: string, cited
       const hasRight = relation.right.some(token => tokens.has(token));
       if (!hasLeft || !hasRight) continue;
       const hasFacetVerb = Boolean(relation.verbStem && tokens.has(relation.verbStem));
-      if (hasFacetVerb || clauseContainsRecognizedRelationalConnector(clause)) return false;
+      if (hasFacetVerb) return false;
     }
   }
   return true;
