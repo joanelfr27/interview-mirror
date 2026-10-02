@@ -470,3 +470,46 @@ it("v2 makes a contradiction explicit in the preparation task", () => {
   assert.match(conflict.instruction, /record contains a contradiction/);
   assert.equal(conflict.evidence_reference_mode, "NO_CANDIDATE_EVIDENCE");
 });
+
+it("does not imply an example was already selected for Nancy", () => {
+  const actions = buildD16PreparationActions(preparationFixture());
+  assert.match(actions[1].instruction, /your chosen example in PREP/);
+  assert.doesNotMatch(actions[1].instruction, /the selected example/);
+  assert.match(actions[0].instruction, /jurisdiction and period/);
+  assert.match(actions[0].instruction, /anonymized source/);
+  assert.match(actions[1].instruction, /What judgment did you make/);
+});
+it("Thomas gets a truthful gap-defense task without anchor-template leakage", () => {
+  const input = preparationFixture("Supported the rollout of a customer portal.");
+  input.selections[0].preparation_evidence_ids = [];
+  refreshPreparation(input);
+  const actions = buildD16PreparationActions(input);
+  assert.match(actions[0].instruction, /three-part answer/);
+  assert.match(actions[1].instruction, /how would you become ready/);
+  for (const a of actions) {
+    assert.doesNotMatch(a.instruction, /These are preparation anchors|Separate your contribution from other actors/);
+    assert.match(a.instruction, /not.*completed experience|not as completed experience/);
+  }
+});
+
+it("D16 preparation fingerprints survive JSON persistence of optional undefined fields", () => {
+  const input = preparationFixture();
+  input.canonical.ledger.evidence[0].context.domain = undefined;
+  refreshPreparation(input);
+  const loaded = JSON.parse(JSON.stringify(input));
+  assert.deepEqual(buildD16PreparationActions(loaded), buildD16PreparationActions(input));
+  loaded.canonical.ledger.evidence[0].context.domain = "changed";
+  assert.throws(() => buildD16PreparationActions(loaded), /Stale/);
+});
+
+it("non-standard requirements get a contribution probe rather than an accounting-standard probe", () => {
+  const input = preparationFixture();
+  input.canonical.bridge.requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  input.canonical.canonical_requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  input.canonical.role_capability_model.requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  refreshPreparation(input);
+  const actions = buildD16PreparationActions(input);
+  assert.match(actions[1].instruction, /how does it address this requirement/);
+  assert.doesNotMatch(actions[0].instruction, /jurisdiction|application of a standard/);
+  assert.doesNotMatch(actions[1].instruction, /Which rule or standard/);
+});
