@@ -45,6 +45,53 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
 }
 
 describe("D16 personalized interview strategy", () => {
+  it("exposes seniority and global scope mismatch without changing documented support", () => {
+    const input = fixture();
+    const requirement = "Senior director of global financial reporting";
+    input.canonical_requirements[0].normalized_requirement = requirement;
+    input.bridge.requirements[0].normalized_requirement = requirement;
+    input.role_capability_model.requirements[0].normalized_requirement = requirement;
+    input.canonical_requirements = input.canonical_requirements.slice(0, 1);
+    input.bridge.requirements = input.bridge.requirements.slice(0, 1);
+    input.role_capability_model.requirements = input.role_capability_model.requirements.slice(0, 1);
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find(t => t.requirement_id === "REQ-A")!;
+    assert.ok(tension);
+    assert.equal(tension.contextual_delta.scope, true);
+    assert.equal(tension.contextual_delta.seniority, true);
+    assert.equal(tension.canonical_status, "SUPPORTED");
+    assert.deepEqual(tension.evidence_ids, ["EV-A"]);
+    assert.equal(input.bridge.requirements[0].status, "SUPPORTED");
+  });
+
+  it("compresses an overloaded JD to three deterministic traceable tensions", () => {
+    const input = fixture();
+    const gap = input.bridge.requirements[2];
+    const capability = input.role_capability_model.requirements[2];
+    input.bridge.requirements = Array.from({ length: 12 }, (_, i) => ({
+      ...gap, requirement_id: `WISH-${i}`, normalized_requirement: `Wishlist capability ${i}`,
+    }));
+    input.canonical_requirements = input.bridge.requirements.map(r => ({ id: r.requirement_id, normalized_requirement: r.normalized_requirement }));
+    input.role_capability_model.requirements = input.bridge.requirements.map((r, i) => ({
+      ...capability, capability_id: `CAP-WISH-${i}`, canonical_requirement_id: r.requirement_id,
+      normalized_requirement: r.normalized_requirement,
+      baseline_criticality: i < 4 ? "CRITICAL" : "SUPPORTING",
+    }));
+    input.jd_present = true;
+    input.jd_fingerprint = "frozen-overloaded-jd-control";
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    assert.equal(strategy.tensions.length, 3);
+    assert.deepEqual(strategy, buildD16Strategy(input));
+    for (const tension of strategy.tensions) {
+      assert.equal(tension.canonical_status, "UNRESOLVED");
+      assert.equal(tension.role_criticality, "CRITICAL");
+      assert.deepEqual(tension.evidence_ids, []);
+      assert.ok(input.canonical_requirements.some(r => r.id === tension.requirement_id));
+    }
+    assert.equal(validateD16Strategy(strategy, input).valid, true);
+  });
   it("selects deterministically with canonical status precedence and caps output at three", () => {
     const strategy = buildD16Strategy(fixture());
     assert.equal(strategy.tensions.length, 3);
