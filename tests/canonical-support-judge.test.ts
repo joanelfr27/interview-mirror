@@ -446,7 +446,7 @@ test("lexicon-free clause guard does not penalize a single-group facet", () => {
   const l = ledger();
   l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Experience with SAP and prepared monthly reporting.", start_offset: 0, end_offset: 48, language: "en" };
   l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "experience", object: "SAP" } };
-  l.requirements[0].facets[0] = { id: "F-1", type: "TOOL", requirement: "Experience with SAP", source_span_id: "S-REQ" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Experience with SAP", source_span_id: "S-REQ" };
   const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
