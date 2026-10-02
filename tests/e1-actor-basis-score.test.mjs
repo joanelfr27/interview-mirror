@@ -95,3 +95,22 @@ test("qualification scorer counts explicit-candidate predictions on unspecified 
   assert.equal(result.report.primary_rates.false_implicit_candidate.rate, "3.00%");
   assert.equal(result.report.qualification_pass, false);
 });
+
+
+test("qualification scorer rejects malformed row shapes and nominal metadata", () => {
+  for (const mutate of [
+    data => { data[0] = null; },
+    data => { data[0].nominal = "true"; },
+    data => { data[0].nominal = true; },
+    data => {
+      const nominal = data.find(x => x.construction === "nominal");
+      nominal.nominal = false;
+    },
+  ]) {
+    const data = rows();
+    mutate(data);
+    const result = score(data);
+    assert.equal(result.status, 1);
+    assert.equal(result.report, null);
+  }
+});
