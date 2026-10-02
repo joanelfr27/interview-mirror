@@ -69,6 +69,7 @@ test("generic MBA does not directly satisfy Finance/Accounting-specific Master's
   const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("required Finance or Accounting specialization"));
 });
 
 test("judge sanitizer fills a missing facet with fail-closed abstained NONE", () => {
@@ -308,5 +309,28 @@ test("ambiguous chronology and habitual wording are not automatic relational lab
     l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
     const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
     assert.ok(!result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+  }
+});
+
+
+test("connector substring alone cannot license a relationship when facet sides are not bound in one clause", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts. Input to pipeline reviews was discussed.", start_offset: 0, end_offset: 57, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "forecasts" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "input to", licensing_spans: ["Prepared forecasts. Input to pipeline reviews was discussed."] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("bind content from both sides")));
+});
+
+test("French relational classifier normalizes decomposed Unicode and dépend des", () => {
+  for (const requirementText of [
+    "Le pipeline dépend des prévisions",
+    "Réviser le pipeline en re\u0301ponse à la prévision",
+  ]) {
+    const l = ledger();
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+    assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
   }
 });
