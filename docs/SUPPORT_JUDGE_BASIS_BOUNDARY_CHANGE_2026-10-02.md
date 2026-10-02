@@ -40,7 +40,7 @@ Authorized development run 37052068438 showed that structural basis isolation wa
 
 The correction therefore reuses the frozen D15 G relationship-grounding principles rather than adding case-specific exceptions:
 
-- Co-occurrence is not a relationship; chronology does not license causality, purpose, response or mechanism.
+- Co-occurrence is not a relationship; chronology does not license causality, purpose, response or mechanism. Independently of connector classification, DIRECT support may not compose atoms from different source spans; multiple DIRECT atoms are permitted only when they preserve the same source-span reference.
 - A facet is deterministically classified as relational when its wording asserts a connection such as input-to, based-on, used-to, response, purpose, causality, feeding, shaping, enabling, influence or dependency (including conservative French equivalents).
 - For relational DIRECT, the judge must return the asserted connector and exact licensing span(s). The connector must occur explicitly in the facet wording and in each exact licensing span; each licensing span must occur verbatim in the minimal supporting evidence. When multiple atoms are cited, the relationship itself must be licensed within one cited atom; independent activities cannot be composed into DIRECT.
 - supporting_evidence_ids is the minimal licensing subset. context_evidence_ids is optional non-licensing context and must be disjoint. Abstentions carry neither.
