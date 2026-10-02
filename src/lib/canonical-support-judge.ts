@@ -257,70 +257,84 @@ function clauseTokenSet(value: string): Set<string> {
 
 const PREPOSITIONAL_GROUP_JOINERS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
 
-function prepositionalFacetParts(facetRequirement: string): { words: string[]; prepIndex: number; preposition: string; left: string[]; right: string[] } | null {
+const PREPOSITIONAL_MODIFIERS = new Set([
+  "monthly","weekly","daily","annual","annually","financial","strong","regular","strategic","operational",
+  "mensuel","mensuelle","hebdomadaire","quotidien","quotidienne","annuel","annuelle","financier","financiere","fort","forte",
+]);
+const LOCAL_RIGHT_SKIP = new Set(["the","a","an","le","la","les","un","une","des","du","de","d","weekly","monthly","annual","strategic","operational","financial","hebdomadaire","mensuel","mensuelle","annuel","annuelle","financier","financiere"]);
+
+function prepositionalFacetParts(facetRequirement: string): { words: string[]; prepIndex: number; preposition: string; left: string[]; right: string[]; verbFamily: Set<string> | null } | null {
   const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
   const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
   if (prepIndex < 0) return null;
-  const left = facetContentTokens(words.slice(0, prepIndex).join(" "));
+
+  let verbFamily: Set<string> | null = null;
+  const first = words[0];
+  const known = relationBearingVerbFamily(first);
+  if (known) verbFamily = known;
+  else if (first && !PREPOSITIONAL_MODIFIERS.has(first) && !RELATION_STOPWORDS.has(first)) {
+    // Only treat the leading word as an unclassified relation verb when its family
+    // can actually be observed as a predicate in evidence. The caller enforces that.
+    const stem = stemContentToken(first);
+    const forms = new Set([first, stem, stem+"s", stem+"ed", stem+"ing", stem+"e", stem+"er", stem+"é", stem+"ée", stem+"és", stem+"ées"]);
+    if (first.endsWith("er") && first.length > 4) {
+      const fs = first.slice(0,-2);
+      for (const suffix of ["e","é","ée","és","ées","ait","ais","aient"]) forms.add(fs+suffix);
+    }
+    verbFamily = forms;
+  }
+
+  const leftWords = words.slice(verbFamily ? 1 : 0, prepIndex);
+  const left = facetContentTokens(leftWords.join(" "));
   const right = facetContentTokens(words.slice(prepIndex + 1).join(" "));
   if (!left.length || !right.length) return null;
-  return { words, prepIndex, preposition: words[prepIndex], left, right };
+  return { words, prepIndex, preposition: words[prepIndex], left, right, verbFamily };
 }
 
-function ownRelationVerbFamily(facetRequirement: string, prepIndex: number): Set<string> | null {
-  const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
-  for (const word of words.slice(0, prepIndex)) {
-    const knownFamily = relationBearingVerbFamily(word);
-    if (knownFamily) return knownFamily;
-  }
-
-  // Conservative fallback for unclassified imperative/infinitive relation verbs such
-  // as "leverage" / "exploiter". Noun-led facets are deliberately excluded.
-  const first = words[0];
-  const nounLed = new Set(["experience","reporting","forecasting","budgeting","management","gestion","report","reports","revue","revues"]);
-  if (!first || nounLed.has(first) || RELATION_STOPWORDS.has(first) || first.length < 4) return null;
-  const stem = stemContentToken(first);
-  const forms = new Set([first, stem, stem + "s", stem + "ed", stem + "ing", stem + "e", stem + "er", stem + "é", stem + "ée", stem + "és", stem + "ées"]);
-  if (first.endsWith("er") && first.length > 4) {
-    const frenchStem = first.slice(0, -2);
-    for (const suffix of ["e","é","ée","és","ées","ait","ais","aient"]) forms.add(frenchStem + suffix);
-  }
-  return forms;
-}
-
-function clausePreservesOrderedPreposition(
+function clausePreservesFacetRelation(
   clause: string,
-  left: string[],
-  preposition: string,
-  right: string[],
-  verbFamily?: Set<string> | null,
+  parts: { preposition: string; left: string[]; right: string[]; verbFamily: Set<string> | null },
 ): boolean {
   const words = normalizeEvidenceText(clause).split(/\s+/).filter(Boolean);
   const stems = words.map(stemContentToken);
-  for (let i = 0; i < words.length; i++) {
-    if (words[i] !== preposition) continue;
-    const leftIndexes = stems.map((token, index) => left.includes(token) ? index : -1).filter(index => index >= 0 && index < i);
-    const rightIndexes = stems.map((token, index) => right.includes(token) ? index : -1).filter(index => index > i);
-    if (!leftIndexes.length || !rightIndexes.length) continue;
-    if (!verbFamily) return true;
-    const verbIndexes = words.map((word, index) => verbFamily.has(word) ? index : -1).filter(index => index >= 0);
-    if (verbIndexes.some(verbIndex => verbIndex < Math.min(...leftIndexes))) return true;
+
+  // If the proposed leading verb is not actually present as a predicate, reinterpret
+  // it as part of a verb-less/modifier-led facet rather than manufacturing a verb.
+  let verbIndex = -1;
+  if (parts.verbFamily) verbIndex = words.findIndex(word => parts.verbFamily!.has(word));
+  const requireVerb = Boolean(parts.verbFamily && verbIndex >= 0);
+
+  for (let prepIndex = 0; prepIndex < words.length; prepIndex++) {
+    if (words[prepIndex] !== parts.preposition) continue;
+
+    const leftIndexes = stems.map((token,index) => parts.left.includes(token) ? index : -1)
+      .filter(index => index >= 0 && index < prepIndex);
+    if (!leftIndexes.length) continue;
+    const leftStart = Math.min(...leftIndexes);
+    if (requireVerb && verbIndex >= leftStart) continue;
+
+    // The right group must begin locally after the facet's own preposition. Permit
+    // at most two determiner/adjective tokens; another preposition breaks binding.
+    let cursor = prepIndex + 1;
+    let skipped = 0;
+    while (cursor < words.length && skipped < 2 && LOCAL_RIGHT_SKIP.has(words[cursor])) {
+      cursor++; skipped++;
+    }
+    if (cursor >= words.length || PREPOSITIONAL_GROUP_JOINERS.has(words[cursor])) continue;
+    if (!parts.right.includes(stems[cursor])) continue;
+    return true;
   }
   return false;
 }
 
 function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
-  // Additive fallback only. The frozen classifier/licensing path remains authoritative.
   if (isRelationalFacet(facetRequirement)) return false;
   const parts = prepositionalFacetParts(facetRequirement);
   if (!parts) return false;
-  const verbFamily = ownRelationVerbFamily(facetRequirement, parts.prepIndex);
 
   for (const source of citedSourceTexts) {
     for (const clause of semanticClauses(source)) {
-      const stemmedTokens = clauseTokenSet(clause);
-      if (!parts.left.some(token => stemmedTokens.has(token)) || !parts.right.some(token => stemmedTokens.has(token))) continue;
-      if (clausePreservesOrderedPreposition(clause, parts.left, parts.preposition, parts.right, verbFamily)) return false;
+      if (clausePreservesFacetRelation(clause, parts)) return false;
     }
   }
   return true;
