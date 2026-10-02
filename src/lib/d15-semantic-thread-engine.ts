@@ -1,4 +1,4 @@
-import { clarificationQuestion, judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
+import { openRelationshipQuestion, judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
@@ -398,7 +398,7 @@ Return only candidate evidence sets; do NOT write headlines, summaries, question
 A candidate set may contain one atom with an explicit meaningful relationship, or several atoms suggesting a meaningful relationship to confirm. Do not require cross-line synthesis. An unconfirmed relationship is a hypothesis for a question, never evidence.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
 Select the SMALLEST sufficient evidence set that captures the COMPLETE relationship. Do not add atoms merely because they share a topic and do not optimize coverage.
-Rank candidate relationships by professional information gain. Treat the dimensions as operational ranking rules, not labels:
+Rank candidate relationships by professional information gain. Inspect explicit source-local connectors first, including following, after, based on, during, après, à partir de, and suite à. Preserve the actual type of link: following licenses temporal sequence, never automatically purpose or causation. In a change/integration candidate, include the atom explicitly linking systems integration to business changes rather than dropping the change context. A single atom with an explicit meaningful connection is allowed. Treat the dimensions as operational ranking rules, not labels:
 - EXTERNAL_INTERNAL_BRIDGE: prefer direct evidence that customer/user/market observations are carried to internal or senior-management audiences over generic coordination.
 - DIAGNOSIS_CHANGE: prefer diagnosis/root-cause evidence paired with a procedure/process change or reorganisation over dashboards/reporting.
 - OPERATING_RHYTHM: prefer recurring planning/forecast evidence paired with a structured review cadence over general account/team activity.
@@ -431,7 +431,7 @@ async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15B
       { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
 Address the candidate directly. If source_language is "en", the headline MUST begin exactly with "You ". If source_language is "fr", it MUST begin exactly with "Vous ". Never output the other language.
 Write a precise relational hypothesis for assessment, preserving exact agency and scope. State how one activity feeds, informs, changes, structures, or is carried into another. A hypothesis may lack an evidence license: the judges will then ask about the link, never assert it as fact. A list joined by and/et is NOT a relationship and must not be proposed. Good hypothetical shape: You use your sales forecasts to structure the pipeline review. French: Vous utilisez votre analyse des retards pour modifier le processus de traitement des commandes. These are shapes, never assumed facts. Do not copy example wording unless its activities occur in the input. It can be stated in one atom or be an unconfirmed hypothesis connecting atoms. Do not concatenate activities or write category packaging. Never write "Documented connection between" or "Lien documenté". Unsupported hypotheses will become questions, never accepted facts.
-Use a concrete relationship, not a metaphor such as intersection or bridge. Preserve assisted/supported as assisted/supported; never upgrade them to facilitating or leading.
+If the supplied atoms state a source-local relationship with following, after or equivalent, preserve that exact relationship in a proposal before inventing a different cross-atom mechanism. Do not silently turn chronology into response or causation. Use a concrete relationship, not a metaphor such as intersection or bridge. Preserve assisted/supported as assisted/supported; never upgrade them to facilitating or leading.
 Do not explain why the pattern is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
@@ -648,7 +648,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
     }
     const gs = await judgeD15GS(ledger, workingProposal.evidence_ids, workingProposal.headline);
     if (!gs.accepted) {
-      const question=clarificationQuestion(gs,sourceLanguageForEvidence(ledger,workingProposal.evidence_ids));
+      const question=openRelationshipQuestion(ledger,workingProposal.evidence_ids,gs,sourceLanguageForEvidence(ledger,workingProposal.evidence_ids));
       if(question) clarification_questions.push({proposal_id:proposal.id,question,evidence_ids:workingProposal.evidence_ids,gs_decision:gs});
       rejected.push({ proposal_id: proposal.id, diagnostic_headline: workingProposal.headline, gs_decision: gs, reasons: [`G/S v1.1 rejected: G=${gs.G.supported}; S=${gs.S.supported}; vetoes=${gs.vetoes.join(",")}; G: ${gs.G.reason}; S: ${gs.S.reason}`] });
       continue;

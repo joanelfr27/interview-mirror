@@ -1,3 +1,4 @@
+import {canonicalizeRawCandidateAtom} from '@/lib/canonical-shadow-extractor';
 import { AI_MODEL, getOpenAI, normalizeLanguage } from "@/lib/openai";
 import type { SessionRecord } from "@/types";
 import {
@@ -105,19 +106,21 @@ export async function classifyCandidateElicitation(
   let span: SourceSpan | null = null;
 
   if (!quote || start < 0) {
-    throw new Error("Elicited classification rejected because atom_quote was not an exact answer substring.");
+    const retained:CandidateElicitation={...elicitation,answer,answer_assertion_type:'ELICITED',answer_source_span_id:undefined,classification:undefined,classification_rationale:undefined};
+    return {ledger:{...ledger,candidate_elicitations:[...ledger.candidate_elicitations.filter(e=>e.id!==elicitation.id),retained]},elicitation:retained,diagnostics:['Answer retained without evidence: atom_quote was not an exact answer substring.']};
   } else {
     span = {
       id: "SPAN-ELICIT-" + elicitation.id,
       document_id: "ELICIT-" + session.id,
       text: quote, start_offset: start, end_offset: start + quote.length, language,
     };
+    const canonical = canonicalizeRawCandidateAtom({id:'ELICIT-ATOM-'+elicitation.id,source_quote:quote,actor:parsed.actor,actor_basis:parsed.actor_basis,ownership:parsed.ownership,normalized_action:parsed.normalized_action,object:parsed.object,assertion_type:'STATED',polarity:parsed.polarity,has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1},quote);
     atom = {
       id: "ELICIT-ATOM-" + elicitation.id,
       source_span_id: span.id,
       provenance: { source_type: "CANDIDATE_ELICITED", language, extraction_method: "LLM" },
-      subject: { actor: parsed.actor, actor_basis: parsed.actor_basis, ownership: parsed.ownership },
-      action: { normalized_action: parsed.normalized_action, object: parsed.object },
+      subject: { actor: canonical.actor, actor_basis: canonical.actor_basis, ownership: canonical.ownership },
+      action: { normalized_action: canonical.normalized_action, object: canonical.object },
       context: {}, scale: {}, time: {}, outcome: null,
       assertion: { type: "ELICITED", polarity: parsed.polarity },
       verifiability: deriveDeterministicVerifiability(quote),
@@ -128,15 +131,16 @@ export async function classifyCandidateElicitation(
       ...validateAtomicEvidenceAgainstSource(atom, span),
     ];
     if (atomErrors.length) {
-      throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
+      diagnostics.push("Elicited evidence rejected; answer retained for clarification: " + atomErrors.join(" | "));
+      atom=null;
     }
   }
 
   const updatedElicitation: CandidateElicitation = {
     ...elicitation, answer, answer_assertion_type: "ELICITED",
     answer_source_span_id: span?.id,
-    classification: parsed.classification,
-    classification_rationale: parsed.rationale,
+    classification: atom?parsed.classification:undefined,
+    classification_rationale: atom?parsed.rationale:undefined,
   };
 
   const next: EvidenceLedger = {
@@ -149,6 +153,7 @@ export async function classifyCandidateElicitation(
       : ledger.evidence,
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
+  if(!atom) return {ledger:next,elicitation:updatedElicitation,diagnostics};
   const judged = await judgeCanonicalSupport(session, next);
   let rebuilt = judged.ledger;
   const objectives = attachDemonstrationObjectives(rebuilt);

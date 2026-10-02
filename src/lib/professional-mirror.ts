@@ -584,7 +584,8 @@ export function validateProfessionalMirror(mirror: ProfessionalMirror, ledger: E
     const span = spans.get(ref.source_span_id);
     if (!atom || !span) { errors.push(`D15 unknown evidence reference: ${ref.evidence_id}`); continue; }
     if (atom.assertion.polarity !== "AFFIRMATIVE") errors.push(`D15 mirror cannot use negated evidence: ${ref.evidence_id}`);
-    if (atom.provenance.source_type === "CANDIDATE_ELICITED") errors.push(`D15 mirror cannot use candidate-elicited evidence: ${ref.evidence_id}`);
+    if (atom.provenance.source_type === "CANDIDATE_ELICITED" && !d15EligibleIndependentAtoms(ledger).some(a=>a.id===atom.id)) errors.push(`D15 mirror cannot use unvalidated candidate-elicited evidence: ${ref.evidence_id}`);
+    if(ref.source_type!==atom.provenance.source_type) errors.push(`D15 evidence source type mismatch: ${ref.evidence_id}`);
     if (atom.source_span_id !== ref.source_span_id || span.text !== ref.source_quote) errors.push(`D15 provenance mismatch: ${ref.evidence_id}`);
   }
 

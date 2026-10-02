@@ -383,8 +383,15 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
 
   const deterministic = deriveDeterministicVerifiability(source);
 
+  const exactLexical = (value:string):string => {
+    const trimmed=value.trim();
+    const index=source.toLocaleLowerCase().indexOf(trimmed.toLocaleLowerCase());
+    return trimmed&&index>=0?source.slice(index,index+trimmed.length):trimmed;
+  };
   return {
     ...raw,
+    normalized_action:exactLexical(raw.normalized_action),
+    object:exactLexical(raw.object),
     actor: groundedActor,
     actor_basis: actorBasis,
     ownership,
@@ -460,7 +467,7 @@ function toAtomicEvidence(
   };
 }
 
-async function extractAtoms(
+export async function extractAtoms(
   cv: string,
 ): Promise<RawCandidateAtom[]> {
   const openai = getOpenAI();
@@ -816,4 +823,27 @@ export async function extractCanonicalShadow(
     source_spans: uniqueSourceSpans,
     diagnostics,
   };
+}
+
+/** Same E1 extractor, canonicalizer and validators, applied to candidate answers.
+ * The question is deliberately not part of the extraction input.
+ */
+export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAtoms:RawCandidateAtom[]) {
+ const sourceSpans:SourceSpan[]=[];const evidence:AtomicEvidence[]=[];const rejected:Array<{id:string;errors:string[]}>=[];
+ const used=new Set<string>();
+ for(const [index,raw] of rawAtoms.entries()){
+  const span=findExactSpan('ELICIT-'+responseId,answer,raw.source_quote,detectSourceLanguage(answer,''),used,'ATOM');
+  if(!span){rejected.push({id:raw.id,errors:['Answer quote is not exact']});continue;}
+  const canonical=canonicalizeRawCandidateAtom({...raw,id:'ELICIT-ATOM-'+responseId+'-'+index},span.text);
+  const extracted=toAtomicEvidence(canonical,span);
+  const atom:AtomicEvidence={...extracted,provenance:{...extracted.provenance,source_type:'CANDIDATE_ELICITED'},assertion:{...extracted.assertion,type:'ELICITED'}};
+  const errors=[...validateSourceSpan(span),...validateSpanBounds(span,answer),...validateAtomicEvidence(atom),...validateAtomicEvidenceAgainstSource(atom,span),...forbiddenInferenceViolations(atom)];
+  if(errors.length){rejected.push({id:raw.id,errors});continue;}
+  if(!sourceSpans.some(s=>s.id===span.id)) sourceSpans.push(span);evidence.push(atom);
+ }
+ return {source_spans:sourceSpans,evidence,rejected,answer};
+}
+export async function extractCanonicalElicitedAnswer(answer:string,responseId:string) {
+ if(!answer.trim()||/^(?:yes|no|oui|non)[.!\s]*$/iu.test(answer.trim())) return {source_spans:[] as SourceSpan[],evidence:[] as AtomicEvidence[],rejected:[{id:responseId,errors:['Bare confirmation is not relational evidence']}],answer};
+ return canonicalizeElicitedAtoms(answer,responseId,await extractAtoms(answer));
 }

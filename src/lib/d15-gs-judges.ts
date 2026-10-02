@@ -80,3 +80,16 @@ export function clarificationQuestion(decision:GSDecision,language:'en'|'fr'):st
     ? `Cette relation décrit-elle réellement votre expérience : « ${decision.semantic_reading?.relationship_assertion??decision.asserted_proposition} » ? Si oui, quel exemple concret la confirme, et quelle était votre contribution personnelle ?`
     : `Does this relationship actually describe your experience: “${decision.semantic_reading?.relationship_assertion??decision.asserted_proposition}”? If so, what concrete example confirms it, and what was your personal contribution?`;
 }
+
+export function openRelationshipQuestion(ledger:EvidenceLedger,ids:string[],decision:GSDecision,language:'en'|'fr'):string|null {
+ if(!clarificationQuestion(decision,language)) return null;
+ const quotes=[...new Set(ids.map(id=>{
+  const atom=ledger.evidence.find(a=>a.id===id);
+  return ledger.source_spans.find(s=>s.id===atom?.source_span_id)?.text;
+ }).filter((s):s is string=>Boolean(s)))];
+ if(!quotes.length) return null;
+ const anchors=quotes.slice(0,2).map(q=>`“${q}”`).join(language==='fr'?' et ':' and ');
+ return language==='fr'
+  ? `Vous mentionnez ${anchors}. Quel lien, s’il y en avait un, existait entre ces activités ? Décrivez ce que vous avez personnellement fait. S’il n’y avait pas de lien, indiquez-le.`
+  : `You mention ${anchors}. What connection, if any, was there between these activities? Describe what you personally did. If there was no connection, say so.`;
+}

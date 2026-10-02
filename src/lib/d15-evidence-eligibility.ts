@@ -1,4 +1,4 @@
-import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
+import {validateAtomicEvidence,validateAtomicEvidenceAgainstSource,type AtomicEvidence,type EvidenceLedger} from "@/lib/canonical-evidence-model";
 
 const GENERIC_TOKENS = new Set([
   "team","teams","process","processes","system","systems","data","work","business","project","projects",
@@ -77,7 +77,10 @@ export function d15EligibleIndependentAtoms(ledger: EvidenceLedger): AtomicEvide
   const affirmative=ledger.evidence
     .filter((atom)=>atom.assertion.polarity==="AFFIRMATIVE")
     .filter((atom)=>!contradictoryKeys.has(contradictionKey(atom)))
-    .filter((atom)=>atom.provenance.source_type!=="CANDIDATE_ELICITED")
+    .filter((atom)=>atom.provenance.source_type!=="CANDIDATE_ELICITED" || (
+      atom.assertion.type==='ELICITED' && validateAtomicEvidence(atom).length===0 &&
+      ledger.source_spans.some(span=>span.id===atom.source_span_id&&validateAtomicEvidenceAgainstSource(atom,span).length===0)
+    ))
     .filter((atom)=>ledger.source_spans.some((span)=>span.id===atom.source_span_id))
     .sort((a,b)=>a.id.localeCompare(b.id));
 

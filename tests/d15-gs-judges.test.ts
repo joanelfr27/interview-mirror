@@ -111,3 +111,33 @@ test('rate handling retries token rate limits but never quota errors',async()=>{
  assert.equal(retryableD15RateLimit({status:429,code:'rate_limit_exceeded'}),true);
  assert.equal(retryableD15RateLimit({status:429,code:'insufficient_quota'}),false);
 });
+
+test('elicited answers use E1 canonicalization and keep valid atoms when another atom fails',async()=>{
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const {d15ThreadEligibleAtoms}=await import('../src/lib/d15-evidence-eligibility.ts');
+ const answer='I used my monthly sales forecasts as an input to the structured pipeline review.';
+ const base={id:'raw',source_quote:answer,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE' as const,ownership:'TEAM' as const,normalized_action:' USED ',object:'MONTHLY SALES FORECASTS',assertion_type:'STATED' as const,polarity:'AFFIRMATIVE' as const,has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1};
+ const r=canonicalizeElicitedAtoms(answer,'response',[base,{...base,id:'bad',object:'imaginary revenue gain'}]);
+ assert.equal(r.evidence.length,1);assert.equal(r.rejected.length,1);assert.equal(r.answer,answer);
+ assert.equal(r.evidence[0].subject.ownership,'UNKNOWN'); // TEAM is not licensed by I.
+ assert.equal(r.evidence[0].action.object,'monthly sales forecasts');
+ assert.equal(r.evidence[0].provenance.source_type,'CANDIDATE_ELICITED');
+ assert.equal(r.evidence[0].assertion.type,'ELICITED');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ const next={...ledger,evidence:[...ledger.evidence,...r.evidence],source_spans:[...ledger.source_spans,...r.source_spans]};
+ assert.ok(d15ThreadEligibleAtoms(next).some(a=>a.id===r.evidence[0].id));
+ assert.ok(!d15ThreadEligibleAtoms({...next,evidence:[{...r.evidence[0],assertion:{type:'ELICITED',polarity:'NEGATED'}}]}).length);
+});
+test('bare yes cannot create relational evidence and does not call a model',async()=>{
+ const {extractCanonicalElicitedAnswer}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const r=await extractCanonicalElicitedAnswer('Yes.','bare');assert.equal(r.evidence.length,0);assert.equal(r.answer,'Yes.');
+});
+test('relationship questions do not hand the candidate an inferred conclusion',async()=>{
+ const {openRelationshipQuestion}=await import('../src/lib/d15-gs-judges.ts');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ const decision=combineGS('Your forecasts drive the review.',{...G,supported:false,licensing_spans:[]},S,[]);
+ const question=openRelationshipQuestion(ledger,['E2','E4'],decision,'en')!;
+ assert.ok(question.includes('What connection, if any'));
+ assert.ok(question.includes('If there was no connection'));
+ assert.ok(!question.includes('drive'));
+});
