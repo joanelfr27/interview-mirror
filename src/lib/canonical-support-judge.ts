@@ -214,18 +214,25 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
   return { judgments: valid, errors };
 }
 
+export function buildSupportJudgeEvidence(ledger: EvidenceLedger) {
+  return ledger.evidence.map(atom => ({
+    id: atom.id,
+    source_type: atom.provenance.source_type,
+    support_basis: atom.provenance.source_type === "CANDIDATE_ELICITED"
+      ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED",
+    source_quote: ledger.source_spans.find(s => s.id === atom.source_span_id)?.text ?? "",
+    ownership: atom.subject.ownership, action: atom.action, context: atom.context,
+    scale: atom.scale, time: atom.time, outcome: atom.outcome, assertion: atom.assertion,
+  }));
+}
+
 export async function judgeCanonicalSupport(
   session: SessionRecord,
   ledger: EvidenceLedger,
 ): Promise<{ ledger: EvidenceLedger; diagnostics: string[] }> {
   const openai = getOpenAI();
 
-  const compactEvidence = ledger.evidence.map(atom => ({
-    id: atom.id,
-    source_quote: ledger.source_spans.find(s => s.id === atom.source_span_id)?.text ?? "",
-    ownership: atom.subject.ownership, action: atom.action, context: atom.context,
-    scale: atom.scale, time: atom.time, outcome: atom.outcome, assertion: atom.assertion,
-  }));
+  const compactEvidence = buildSupportJudgeEvidence(ledger);
   const compactRequirements = ledger.requirements.map(req => ({
     id: req.id, requirement: req.normalized_requirement, salience: req.salience,
     facets: req.facets.map(f => ({
@@ -242,6 +249,9 @@ export async function judgeCanonicalSupport(
     "DIRECT = explicit atom(s) directly satisfy the facet. PARTIAL = explicit atom(s) address part but a material dimension remains unresolved. " +
     "ANALOGICAL_TRANSFER = explicit atom shows genuinely adjacent capability/context, not the same requirement. " +
     "CONTRADICTORY = explicit candidate evidence conflicts with the facet. NONE = supplied evidence does not support the facet; abstain when uncertain.\n\n" +
+    "Evidence basis rules: each supplied atom includes source_type and support_basis. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
+    "Use DOCUMENTED with documented atoms only. Use CANDIDATE_SELF_REPORTED with CANDIDATE_ELICITED atoms only; candidate self-report can never be DIRECT. " +
+    "When both bases address a facet, choose the single basis that supports the most defensible allowed judgment and explain its limits; do not combine the bases to manufacture stronger support. If neither basis alone supports a defensible judgment, abstain as NONE with no citations.\n" +
     "Hard rules: cite only supplied evidence IDs; one facet may cite multiple atoms and one atom may support multiple facets; " +
     "never infer missing tools, scope, ownership, outcomes, seniority, industry or qualifications; not mentioned is not contradictory; an explicitly NEGATED atom is evidence of contradiction when it conflicts with the facet; " +
     "CONTRADICTORY requires explicit conflict; if insufficient to distinguish positive statuses, abstain as NONE; " +
@@ -302,7 +312,7 @@ export async function judgeCanonicalSupport(
   // judgments still fail closed through sanitized.errors.
   const sanitized = sanitizeJudgments(rawJudgments, ledger);
   if (sanitized.errors.length) {
-    throw new Error("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "));
+    throw new CanonicalSupportJudgmentError("Canonical support judgment response failed validation: " + sanitized.errors.join(" | "), diagnostic);
   }
   const completenessErrors = assertCompleteFacetJudgments(sanitized.judgments, ledger.requirements.flatMap(r => r.facets));
   if (completenessErrors.length) {
