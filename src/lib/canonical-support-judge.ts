@@ -257,18 +257,25 @@ function clauseTokenSet(value: string): Set<string> {
 
 const PREPOSITIONAL_GROUP_JOINERS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
 
-function relationVerbFamilyFromFacet(facetRequirement: string): Set<string> | null {
+function prepositionalFacetParts(facetRequirement: string): { words: string[]; prepIndex: number; preposition: string; left: string[]; right: string[] } | null {
   const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
   const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
   if (prepIndex < 0) return null;
+  const left = facetContentTokens(words.slice(0, prepIndex).join(" "));
+  const right = facetContentTokens(words.slice(prepIndex + 1).join(" "));
+  if (!left.length || !right.length) return null;
+  return { words, prepIndex, preposition: words[prepIndex], left, right };
+}
 
+function ownRelationVerbFamily(facetRequirement: string, prepIndex: number): Set<string> | null {
+  const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
   for (const word of words.slice(0, prepIndex)) {
     const knownFamily = relationBearingVerbFamily(word);
     if (knownFamily) return knownFamily;
   }
 
-  // Fallback only for an imperative/infinitive-like leading relation verb. Do not
-  // infer a verb for noun-led facets such as "Experience with SAP" or "Reporting in SAP".
+  // Conservative fallback for unclassified imperative/infinitive relation verbs such
+  // as "leverage" / "exploiter". Noun-led facets are deliberately excluded.
   const first = words[0];
   const nounLed = new Set(["experience","reporting","forecasting","budgeting","management","gestion","report","reports","revue","revues"]);
   if (!first || nounLed.has(first) || RELATION_STOPWORDS.has(first) || first.length < 4) return null;
@@ -276,25 +283,40 @@ function relationVerbFamilyFromFacet(facetRequirement: string): Set<string> | nu
   return new Set([first, stem, stem + "s", stem + "ed", stem + "ing", stem + "e", stem + "er", stem + "é", stem + "ée", stem + "és", stem + "ées"]);
 }
 
-function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
-  // Recognized relational facets stay under the established connector/licensing-span validator.
-  if (isRelationalFacet(facetRequirement)) return false;
-  const verbFamily = relationVerbFamilyFromFacet(facetRequirement);
-  if (!verbFamily) return false;
+function clausePreservesOrderedPreposition(
+  clause: string,
+  left: string[],
+  preposition: string,
+  right: string[],
+): boolean {
+  const words = normalizeEvidenceText(clause).split(/\s+/).filter(Boolean);
+  const stems = words.map(stemContentToken);
+  for (let i = 0; i < words.length; i++) {
+    if (words[i] !== preposition) continue;
+    const before = new Set(stems.slice(0, i));
+    const after = new Set(stems.slice(i + 1));
+    if (left.some(token => before.has(token)) && right.some(token => after.has(token))) return true;
+  }
+  return false;
+}
 
-  const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
-  const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
-  if (prepIndex < 0) return false;
-  const left = facetContentTokens(words.slice(0, prepIndex).join(" "));
-  const right = facetContentTokens(words.slice(prepIndex + 1).join(" "));
-  if (!left.length || !right.length) return false;
+function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
+  // Additive fallback only. The frozen classifier/licensing path remains authoritative.
+  if (isRelationalFacet(facetRequirement)) return false;
+  const parts = prepositionalFacetParts(facetRequirement);
+  if (!parts) return false;
+  const verbFamily = ownRelationVerbFamily(facetRequirement, parts.prepIndex);
 
   for (const source of citedSourceTexts) {
     for (const clause of semanticClauses(source)) {
       const stemmedTokens = clauseTokenSet(clause);
-      const rawTokens = new Set(normalizeEvidenceText(clause).split(/\s+/).filter(Boolean));
-      if (!left.some(token => stemmedTokens.has(token)) || !right.some(token => stemmedTokens.has(token))) continue;
-      if ([...verbFamily].some(form => rawTokens.has(form))) return false;
+      if (!parts.left.some(token => stemmedTokens.has(token)) || !parts.right.some(token => stemmedTokens.has(token))) continue;
+      if (verbFamily) {
+        const rawTokens = new Set(normalizeEvidenceText(clause).split(/\s+/).filter(Boolean));
+        if ([...verbFamily].some(form => rawTokens.has(form))) return false;
+      } else if (clausePreservesOrderedPreposition(clause, parts.left, parts.preposition, parts.right)) {
+        return false;
+      }
     }
   }
   return true;
