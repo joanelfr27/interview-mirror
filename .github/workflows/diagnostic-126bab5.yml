@@ -1,0 +1,94 @@
+name: D15 D16 Actor Diagnostic 126bab5
+on:
+  push:
+    branches: [diagnostic-126bab5-one-run]
+    paths: [.github/workflows/diagnostic-126bab5.yml]
+permissions:
+  contents: read
+concurrency:
+  group: diagnostic-126bab5-one-run
+  cancel-in-progress: false
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: e1-runtime
+    env:
+      CANONICAL_STRATEGY_CUTOVER: "false"
+      D14_CANONICAL_CUTOVER: "false"
+      D15_RUNTIME_SESSION_COUNT: "5"
+      D15_RUNTIME_STATUS_FILTER: ""
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: definition
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          path: measured
+          ref: 126bab540d141e2d1dc9e999fba18b8353210b54
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assert and record preselected provenance
+        working-directory: measured
+        run: |
+          test "$(git rev-parse HEAD)" = "126bab540d141e2d1dc9e999fba18b8353210b54"
+          test "$(git hash-object src/lib/d15-gold-gate.ts)" = "2304f2f4b0bc443e1732a12471a4521c795f138f"
+          {
+            echo "extractor_commit=126bab540d141e2d1dc9e999fba18b8353210b54"
+            echo "scorer_blob=2304f2f4b0bc443e1732a12471a4521c795f138f"
+            echo "run_definition_commit=${{ github.sha }}"
+            echo "cutover=false; database_writes=false; sessions=5 latest distinct CVs"
+            echo "role_criticality=existing shadow runner positional model, development only"
+            echo "legacy_scorer_transitions=c5c7b78,1b78754"
+            sha256sum ../definition/scripts/one-run-*
+          } | tee provenance.txt
+          cp ../definition/scripts/one-run-* scripts/
+          git diff --exit-code -- src tests package.json package-lock.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: measured/package-lock.json
+      - run: npm ci
+        working-directory: measured
+      - run: npm run typecheck
+        working-directory: measured
+      - name: Combined real session measurement
+        id: combined
+        continue-on-error: true
+        working-directory: measured
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node --experimental-loader ./scripts/one-run-reporting-loader.mjs scripts/one-run-126bab5.ts
+      - name: Actor report including sessions stopped after extraction
+        if: always() && steps.combined.outcome != 'skipped'
+        working-directory: measured
+        run: node scripts/one-run-actor-report.mjs
+      - name: Unchanged five fixture Gold scorer
+        id: gold
+        continue-on-error: true
+        working-directory: measured
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/one-run-gold-126bab5.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diagnostic-126bab5-${{ github.run_id }}
+          retention-days: 3
+          path: |
+            measured/provenance.txt
+            measured/combined-report.json
+            measured/actor-basis-report.json
+            measured/actor-checkpoints/
+            measured/gold-report.json
+      - name: Record measurement failures
+        if: always()
+        run: |
+          test "${{ steps.combined.outcome }}" = "success"
+          test "${{ steps.gold.outcome }}" = "success"
