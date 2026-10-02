@@ -123,7 +123,7 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
 
 const RELATIONAL_CONNECTOR_PATTERNS = [
   /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|through|via|after|before|following|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with|aligns?\s+.+\s+with)\b/i,
-  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|après|avant|dépend\s+de|au\s+moyen\s+de|via|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+de|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
+  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|après|avant|dépend\s+de|au\s+moyen\s+de|via|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+(?:de|des|du)|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
 ] as const;
 
 function isRelationalFacet(requirement: string): boolean {
