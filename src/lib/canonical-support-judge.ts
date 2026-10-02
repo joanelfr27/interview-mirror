@@ -108,7 +108,9 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
       supporting_evidence_ids: ids.length
         ? { type: "array", minItems: 1, items: { type: "string", enum: ids } }
         : { type: "array", maxItems: 0, items: { type: "string" } },
-      context_evidence_ids: { type: "array", items: { type: "string", enum: [...documented, ...elicited] } },
+      context_evidence_ids: abstained
+        ? { type: "array", maxItems: 0, items: { type: "string" } }
+        : { type: "array", items: { type: "string", enum: [...documented, ...elicited] } },
     },
   });
   const documented = ledger.evidence.filter(a => a.provenance.source_type !== "CANDIDATE_ELICITED").map(a => a.id);
