@@ -332,6 +332,9 @@ export function validateAtomicEvidenceAgainstSource(
         !source.includes(value.subject.actor.trim())) {
       errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_OTHER requires an exact other-actor phrase grounded in the source quote.");
     }
+    if (value.subject.ownership !== "UNKNOWN") {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_OTHER requires ownership=UNKNOWN.");
+    }
   }
   if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.actor !== "unspecified") {
     errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires the canonical actor placeholder unspecified.");
