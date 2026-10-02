@@ -613,3 +613,44 @@ test("FR true synonym understatement is PARTIAL", () => {
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "PARTIAL");
 });
+
+
+test("A1 roles reversed cannot survive as DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Leveraged pipeline reviews in forecasts.", start_offset: 0, end_offset: 40, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("A2 preposition bound to different object cannot survive as DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Leveraged forecasts in budgeting for pipeline reviews.", start_offset: 0, end_offset: 53, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("FR own verb participle exploité licenses ordered relation", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Exploité les prévisions dans les revues du pipeline.", start_offset: 0, end_offset: 52, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("FR own verb imperfect exploitait licenses ordered relation", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Exploitait les prévisions dans les revues du pipeline.", start_offset: 0, end_offset: 54, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
