@@ -79,6 +79,8 @@ Two primary error rates:
 
 Hard safety override: a false candidate attribution on a case with an explicit different actor is **0 tolerated**, regardless of aggregate rates. An `UNSPECIFIED` atom must also carry `ownership = UNKNOWN`; validation must reject any contradictory non-UNKNOWN ownership.
 
+Explicit candidate-agency controls are part of the false-ambiguity safety gate: gold `EXPLICIT_CANDIDATE` predicted as a non-candidate basis counts against the aggregate candidate false-ambiguity rate. Qualification requires <=2.0% across candidate-attributed gold (`IMPLICIT_CANDIDATE` + `EXPLICIT_CANDIDATE`) and <=3.0% separately in EN and FR.
+
 ### 6.3 Minimum scored sample
 
 Before qualification may be claimed:
