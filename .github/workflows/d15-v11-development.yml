@@ -11,28 +11,28 @@ concurrency:
 jobs:
   diagnostic:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment: e1-runtime
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 58cf4887dd9ccd0bbccbe2c36a3727b9a8e81138
+          ref: 87eb84aa8206c1cd7d1570e823669201904e0b8d
           fetch-depth: 0
           persist-credentials: false
       - name: Assert pinned engine, codebook and development scorer
         run: |
-          test "$(git rev-parse HEAD)" = "58cf4887dd9ccd0bbccbe2c36a3727b9a8e81138"
+          test "$(git rev-parse HEAD)" = "87eb84aa8206c1cd7d1570e823669201904e0b8d"
           test "$(git hash-object docs/d15-semantic-significance-codebook-v1.1-candidate.md)" = "56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-          test "$(git hash-object src/lib/d15-v11-development-scorer.ts)" = "6ff4646db6194b0e338c132fc6657dc5edf94002"
+          test "$(git hash-object src/lib/d15-v11-development-scorer.ts)" = "6f28dbd07129ac4f6d1c7ab9f8b5b1343939d6cd"
           test "$(git hash-object docs/D15_V11_ERRATUM_2026-10-02.md)" = "5f888c661a5c4b9efa17724066b0785c3080be3d"
           {
-            echo "engine_commit=58cf4887dd9ccd0bbccbe2c36a3727b9a8e81138"
+            echo "engine_commit=87eb84aa8206c1cd7d1570e823669201904e0b8d"
             echo "workflow_definition_commit=${{ github.sha }}"
             echo "codebook_blob=56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-            echo "development_scorer_blob=6ff4646db6194b0e338c132fc6657dc5edf94002"
+            echo "development_scorer_blob=6f28dbd07129ac4f6d1c7ab9f8b5b1343939d6cd"
             echo "erratum_blob=5f888c661a5c4b9efa17724066b0785c3080be3d"
             echo "mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION"
-            echo "G_S=shared_semantic_reading; separate_independent_calls; paired_model_comparison; temperature=0"
+            echo "G_S=shared_semantic_reading; separate_independent_calls; stronger_judge_completion_diagnostic; temperature=0"
             echo "cutover=false; database_writes=false"
           } | tee provenance.txt
       - uses: actions/setup-node@v4
