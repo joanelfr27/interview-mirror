@@ -24,8 +24,20 @@ const requiredConstructions = [
 if (!Array.isArray(rows)) throw new Error("Qualification input must be a JSON array.");
 const seenIds = new Set();
 for (const row of rows) {
+  if (row === null || typeof row !== "object" || Array.isArray(row)) {
+    throw new Error("Invalid qualification row shape.");
+  }
   if (!row.id || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted) || !requiredConstructions.includes(row.construction)) {
     throw new Error("Invalid row: " + JSON.stringify({ id: row.id, language: row.language, gold: row.gold, predicted: row.predicted }));
+  }
+  if (row.nominal !== undefined && typeof row.nominal !== "boolean") {
+    throw new Error("Invalid nominal flag on row: " + row.id);
+  }
+  if (row.nominal === true && row.construction !== "nominal") {
+    throw new Error("Nominal flag requires construction=nominal on row: " + row.id);
+  }
+  if (row.construction === "nominal" && row.nominal !== true) {
+    throw new Error("Nominal construction requires nominal=true on row: " + row.id);
   }
   if (seenIds.has(row.id)) throw new Error("Duplicate qualification row id: " + row.id);
   seenIds.add(row.id);
@@ -39,8 +51,8 @@ const implicit = count(r => r.gold === "IMPLICIT_CANDIDATE");
 const unspecified = count(r => r.gold === "UNSPECIFIED");
 const explicitOther = count(r => r.gold === "EXPLICIT_OTHER");
 const explicitCandidate = count(r => r.gold === "EXPLICIT_CANDIDATE");
-const nominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.nominal === true);
-const frNominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.nominal === true && r.language === "fr");
+const nominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.construction === "nominal");
+const frNominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.construction === "nominal" && r.language === "fr");
 
 const fu = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.predicted === "UNSPECIFIED");
 const fi = count(r => r.gold === "UNSPECIFIED" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted));
