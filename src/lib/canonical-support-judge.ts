@@ -315,8 +315,7 @@ function clausePreservesFacetRelation(
     if (!leftIndexes.length) continue;
     const leftStart = Math.min(...leftIndexes);
     if (requireVerb && verbIndex >= leftStart) continue;
-    // For verb-less/modifier-led facets, do not let an unrelated evidence verb\n    // reverse the facet relation (e.g. "Configured SAP in the reporting team"\n    // cannot directly satisfy "Reporting in SAP"). The facet-left content must\n    // occur before the facet preposition in the source clause.\n    if (!requireVerb && leftStart === 0 && words.length > 1 && !parts.left.includes(stems[0])) continue;
-
+    // For verb-less/modifier-led facets, do not let an unrelated evidence verb\n    // reverse the facet relation (e.g. "Configured SAP in the reporting team"\n    // cannot directly satisfy "Reporting in SAP"). The facet-left content must\n    // occur before the facet preposition in the source clause.\n    if (!requireVerb && leftStart > 0) {\n      const prefix = stems.slice(0, leftStart);\n      const prefixIsOnlyFacetModifier = prefix.every((_, index) => PREPOSITIONAL_MODIFIERS.has(words[index]));\n      if (!prefixIsOnlyFacetModifier) continue;\n    }\n
     // The right group must begin locally after the facet's own preposition. Permit
     // at most two determiner/adjective tokens; another preposition breaks binding.
     let cursor = prepIndex + 1;
