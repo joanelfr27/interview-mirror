@@ -41,3 +41,18 @@ Prospective live validation must record whether the support judge emits DIRECT f
 - EN: "Prepared forecasts with the pipeline review team" vs the same facet.
 
 This is a pre-registered measurement of the known X3/X4 lexical limitation, not a pass/fail blocker by itself. Any observed candidate-facing false relationship remains a truth-boundary finding and must be reported; no resampling or post-hoc relabeling is allowed.
+
+
+## Known residual carried into prospective live validation — verb-less reversed binding
+
+Static final-harness record at validated SHA `c593666cd33a58052e283b011059ce29c9552382`:
+- Evidence: "Configured SAP in the reporting team."
+- Facet: "Reporting in SAP"
+- Observed: DIRECT
+- Expected truth-safe boundary: PARTIAL, because the facet order is reversed and "in" governs "the reporting team", not SAP.
+
+Disposition: known PR #69 residual carried forward as an explicit prospective live control. It does not authorize relabeling, resampling, or a pre-run code change. Preserve whether the live model produces the triggering judgment and whether the deterministic boundary permits it. The deterministic correction remains required after the prospective run and before production reliance.
+
+## Separate production integration dependency — actor attribution
+
+PR #69 does not establish candidate agency. PR #66 actor_basis must be enforced when the two boundaries are integrated: EXPLICIT_OTHER and genuinely UNSPECIFIED/agentless evidence must not become candidate DIRECT support. Candidate-authored prospective development controls may proceed, but production integration remains blocked until this dependency and the existing PR #66 qualification gates are closed.
