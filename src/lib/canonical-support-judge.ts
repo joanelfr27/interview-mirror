@@ -206,6 +206,45 @@ function connectorBindsFacetSides(facetRequirement: string, connector: string, l
   });
 }
 
+function semanticClauses(value: string): string[] {
+  return value.normalize("NFC")
+    .split(/[.!?;:,\n]+|\b(?:and|but|while|whereas|et|mais|tandis\s+que|alors\s+que)\b/iu)
+    .map(clause => normalizeEvidenceText(clause))
+    .filter(Boolean);
+}
+
+const FACET_CONTENT_STOPWORDS = new Set([
+  ...RELATION_STOPWORDS,
+  "experience","experienced","manage","managed","management","prepare","prepared","introduce","introduced",
+  "run","ran","role","responsible","responsibility","required","requirement",
+  "experience","gestion","gerer","gere","preparer","prepare","introduire","introduit","realiser","realise",
+]);
+
+function facetContentTokens(value: string): string[] {
+  return [...new Set(normalizeEvidenceText(value).split(/\s+/)
+    .filter(token => token.length >= 3 && !FACET_CONTENT_STOPWORDS.has(token)))];
+}
+
+function directEvidenceContentIsSplitAcrossClauses(
+  facetRequirement: string,
+  citedSourceTexts: string[],
+): boolean {
+  const facetTokens = facetContentTokens(facetRequirement);
+  if (facetTokens.length < 2) return false;
+
+  for (const source of citedSourceTexts) {
+    const clauses = semanticClauses(source);
+    const matched = facetTokens.filter(token => clauses.some(clause => clause.split(/\s+/).includes(token)));
+    if (matched.length < 2) continue;
+    if (clauses.some(clause => {
+      const tokens = new Set(clause.split(/\s+/));
+      return matched.every(token => tokens.has(token));
+    })) continue;
+    return true;
+  }
+  return false;
+}
+
 function buildCanonicalRationale(item: RawJudgment): string {
   if (item.status === "NONE" || item.abstained) return "No validated evidence subset supports a positive judgment for this facet.";
   const ids = item.supporting_evidence_ids.join(", ");
@@ -242,6 +281,13 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     .map(id => byId.get(id))
     .filter((atom): atom is EvidenceLedger["evidence"][number] => Boolean(atom))
     .map(atom => spans.get(atom.source_span_id) ?? "");
+
+  // Lexicon-free evidence-side anti-co-occurrence guard. Even when facet wording
+  // falls outside the deterministic relational vocabulary, DIRECT cannot be licensed
+  // by content terms that are distributed across independent clauses of one source span.
+  if (item.status === "DIRECT" && directEvidenceContentIsSplitAcrossClauses(facet.requirement, citedSourceTexts)) {
+    errors.push("DIRECT evidence content is distributed across independent clauses; co-location in one source span cannot establish the facet relationship.");
+  }
 
   if (relational && item.status === "DIRECT") {
     const connector = item.relationship_connector?.trim() ?? "";
