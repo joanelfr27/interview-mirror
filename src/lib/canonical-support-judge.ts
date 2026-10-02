@@ -157,6 +157,14 @@ function relationshipSideTokens(value: string): string[] {
   return normalizeEvidenceText(value).split(/\s+/).filter(token => token.length >= 3 && !RELATION_STOPWORDS.has(token));
 }
 
+const GENERIC_RELATION_PREPOSITIONS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
+
+function relationBearingVerb(facetRequirement: string): string | null {
+  const normalized = normalizeEvidenceText(facetRequirement);
+  const match = normalized.match(/\b(use|uses|using|used|apply|applies|applying|applied|integrate|integrates|integrating|integrated|translate|translates|translating|translated|utilise|utiliser|utilisant|applique|appliquer|integrer|integre|integrant|traduit|traduire|traduisant)\b/);
+  return match?.[1] ?? null;
+}
+
 function connectorBindsFacetSides(facetRequirement: string, connector: string, licensingSpan: string): boolean {
   const facet = normalizeEvidenceText(facetRequirement);
   const normalizedConnector = normalizeEvidenceText(connector);
@@ -178,7 +186,12 @@ function connectorBindsFacetSides(facetRequirement: string, connector: string, l
     if (connectorIndex < 0) return false;
     const before = sentence.slice(0, connectorIndex);
     const after = sentence.slice(connectorIndex + normalizedConnector.length);
-    return leftTokens.some(token => before.includes(token)) && rightTokens.some(token => after.includes(token));
+    if (!leftTokens.some(token => before.includes(token)) || !rightTokens.some(token => after.includes(token))) return false;
+    if (GENERIC_RELATION_PREPOSITIONS.has(normalizedConnector)) {
+      const verb = relationBearingVerb(facetRequirement);
+      if (!verb || !before.split(/\s+/).includes(verb)) return false;
+    }
+    return true;
   });
 }
 
