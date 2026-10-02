@@ -175,3 +175,22 @@ test("qualification scorer rejects duplicate source text under distinct IDs", ()
   assert.equal(result.report, null);
   assert.match(result.stderr, /Duplicate qualification source text/);
 });
+
+
+test("explicit candidate failures are gated separately by language", () => {
+  const data = rows();
+  for (const row of data.filter(x => x.language === "fr" && x.gold === "EXPLICIT_CANDIDATE")) row.predicted = "UNSPECIFIED";
+  const extras = [];
+  for (let i = 0; i < 1100; i++) {
+    const base = data.find(x => x.language === "en" && x.gold === "EXPLICIT_CANDIDATE");
+    extras.push({ ...base, id: "EN-EXPLICIT-" + i, source_text: "en explicit control " + i, predicted: "EXPLICIT_CANDIDATE" });
+  }
+  for (let i = 0; i < 700; i++) {
+    const base = data.find(x => x.language === "fr" && x.gold === "IMPLICIT_CANDIDATE");
+    extras.push({ ...base, id: "FR-IMPLICIT-" + i, source_text: "fr implicit control " + i, predicted: "IMPLICIT_CANDIDATE" });
+  }
+  const result = score([...data, ...extras]);
+  assert.equal(result.status, 1);
+  assert.equal(result.report.by_language.fr.explicit_candidate_false_ambiguity_rate, "100.00%");
+  assert.equal(result.report.qualification_pass, false);
+});
