@@ -228,3 +228,24 @@ test("postposed first-person passive agents are explicit candidate agency", () =
     assert.equal(out.actor, "candidate", source);
   }
 });
+
+
+test("explicit other actors force ownership unknown in EN and FR", () => {
+  for (const [source, actor] of [
+    ["My manager reconciled payroll.", "My manager"],
+    ["Ma responsable a validé la clôture.", "Ma responsable"],
+  ] as const) {
+    for (const ownership of ["INDIVIDUAL", "TEAM", "SUPERVISED"] as const) {
+      const input = raw(source, "EXPLICIT_OTHER", actor);
+      input.ownership = ownership;
+      const out = canonicalizeRawCandidateAtom(input, source);
+      assert.equal(out.actor_basis, "EXPLICIT_OTHER", source + " " + ownership);
+      assert.equal(out.ownership, "UNKNOWN", source + " " + ownership);
+
+      const value = atom(source, "EXPLICIT_OTHER", actor);
+      value.subject.ownership = ownership;
+      const span = { id: "S1", document_id: "CV", text: source, start_offset: 0, end_offset: source.length, language: source.startsWith("Ma ") ? "fr" : "en" };
+      assert.ok(validateAtomicEvidenceAgainstSource(value, span).some(e => e.includes("EXPLICIT_OTHER requires ownership=UNKNOWN")), source + " " + ownership);
+    }
+  }
+});
