@@ -298,11 +298,12 @@ function clausePreservesFacetRelation(
   const words = normalizeEvidenceText(clause).split(/\s+/).filter(Boolean);
   const stems = words.map(stemContentToken);
 
-  // If the proposed leading verb is not actually present as a predicate, reinterpret
-  // it as part of a verb-less/modifier-led facet rather than manufacturing a verb.
-  let verbIndex = -1;
-  if (parts.verbFamily) verbIndex = words.findIndex(word => parts.verbFamily!.has(word));
-  const requireVerb = Boolean(parts.verbFamily && verbIndex >= 0);
+  // Modifier-led facets were classified verb-less when the facet was parsed.
+  // For a genuinely verb-led facet, absence of its own verb family cannot be
+  // reinterpreted as verb-less: it is an understatement-safe PARTIAL condition.
+  const verbIndex = parts.verbFamily ? words.findIndex(word => parts.verbFamily!.has(word)) : -1;
+  if (parts.verbFamily && verbIndex < 0) return false;
+  const requireVerb = Boolean(parts.verbFamily);
 
   for (let prepIndex = 0; prepIndex < words.length; prepIndex++) {
     if (words[prepIndex] !== parts.preposition) continue;
