@@ -159,10 +159,20 @@ function relationshipSideTokens(value: string): string[] {
 
 const GENERIC_RELATION_PREPOSITIONS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
 
-function relationBearingVerb(facetRequirement: string): string | null {
+function relationBearingVerbFamily(facetRequirement: string): Set<string> | null {
   const normalized = normalizeEvidenceText(facetRequirement);
-  const match = normalized.match(/\b(use|uses|using|used|apply|applies|applying|applied|integrate|integrates|integrating|integrated|translate|translates|translating|translated|utilise|utiliser|utilisant|applique|appliquer|integrer|integre|integrant|traduit|traduire|traduisant)\b/);
-  return match?.[1] ?? null;
+  const families = [
+    ["use","uses","using","used"],
+    ["apply","applies","applying","applied"],
+    ["integrate","integrates","integrating","integrated"],
+    ["translate","translates","translating","translated"],
+    ["utilise","utiliser","utilisant"],
+    ["applique","appliquer","appliquant"],
+    ["integrer","integre","integrant"],
+    ["traduit","traduire","traduisant"],
+  ];
+  const family = families.find(forms => forms.some(form => normalized.split(/\s+/).includes(form)));
+  return family ? new Set(family) : null;
 }
 
 function connectorBindsFacetSides(facetRequirement: string, connector: string, licensingSpan: string): boolean {
@@ -188,8 +198,9 @@ function connectorBindsFacetSides(facetRequirement: string, connector: string, l
     const after = sentence.slice(connectorIndex + normalizedConnector.length);
     if (!leftTokens.some(token => before.includes(token)) || !rightTokens.some(token => after.includes(token))) return false;
     if (GENERIC_RELATION_PREPOSITIONS.has(normalizedConnector)) {
-      const verb = relationBearingVerb(facetRequirement);
-      if (!verb || !before.split(/\s+/).includes(verb)) return false;
+      const verbFamily = relationBearingVerbFamily(facetRequirement);
+      const beforeTokens = before.split(/\s+/);
+      if (!verbFamily || !beforeTokens.some(token => verbFamily.has(token))) return false;
     }
     return true;
   });
