@@ -16,7 +16,7 @@ export const DEVELOPMENT_EXPECTATIONS = {
   recall_policy:'Record all proposals, axes, licenses, vetoes and questions. Previous Nancy B, David rhythm and Marie diagnosis-change quotas are retired. Zero threads is not automatically a failure. No relabelling after output.',
 } as const;
 export function scoreDevelopmentControl(expected:{G:boolean;S:boolean},actual:GSDecision) {
-  return {G_matches:expected.G===actual.G.supported,S_matches:expected.S===actual.S.supported,expected_accept:expected.G&&expected.S,actual_accept:actual.accepted};
+  return {validation_failure:actual.G.connector==='INVALID'||actual.S.reason==='invalid S response',G_matches:actual.G.connector==='INVALID'?null:expected.G===actual.G.supported,S_matches:actual.S.reason==='invalid S response'?null:expected.S===actual.S.supported,expected_accept:expected.G&&expected.S,actual_accept:actual.accepted};
 }
 export function assessDevelopmentEngine(result:D15BVerificationResult) {
   return {mode:'DEVELOPMENT_ONLY',completion_state:result.completion_state,accepted_count:result.accepted.length,rejected_count:result.rejected.length,
@@ -26,6 +26,7 @@ export function assessDevelopmentEngine(result:D15BVerificationResult) {
 
 // Explicit synthetic relationships: development controls, never candidate evidence.
 export const POSITIVE_DEVELOPMENT_CONTROLS = [
+ {id:'SYNTHETIC_EN_FEEDBACK',language:'en' as const,lines:['Collected feedback from users during the portal rollout.','Used that user feedback to revise the portal training guide.'],headline:'You use feedback collected during the portal rollout to revise the training guide.',G:true,S:true},
  {id:'SYNTHETIC_EN_RESPONSE',language:'en' as const,lines:['Reviewed recurring invoice exceptions.','Based on that review, revised the invoice intake checklist.'],headline:'You use reviews of recurring invoice exceptions to revise the intake checklist.',G:true,S:true},
  {id:'SYNTHETIC_FR_RESPONSE',language:'fr' as const,lines:['Analysait les incidents récurrents de traitement des commandes.','À partir de cette analyse, modifiait la procédure de traitement des commandes.'],headline:'Vous utilisez l’analyse des incidents récurrents pour modifier la procédure de traitement des commandes.',G:true,S:true},
 ] as const;

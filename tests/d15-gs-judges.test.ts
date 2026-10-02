@@ -67,7 +67,7 @@ test('chronology alone cannot license a stronger cause even if G says YES',()=>{
 
 test('enumeration reading cannot invent a relationship or route a raw S YES into a question',async()=>{
  const {validateSemanticReading,readingVetoes}=await import('../src/lib/d15-semantic-reading.ts');
- const reading=validateSemanticReading({asserted_proposition:'The candidate prepares forecasts and conducts reviews; no interaction is asserted.',component_claims:['prepares forecasts','conducts reviews'],form:'ENUMERATION',relationship_assertion:null,reading_reason:'Two activities joined by and.'});
+ const reading=validateSemanticReading({language:'en',actor:'CANDIDATE',asserted_proposition:'The candidate prepares forecasts and conducts reviews; no interaction is asserted.',component_claims:['prepares forecasts','conducts reviews'],form:'ENUMERATION',relationship_assertion:null,reading_reason:'Two activities joined by and.'});
  assert.throws(()=>validateSemanticReading({...reading,relationship_assertion:'Forecasts feed reviews.'}));
  const decision=combineGS('claim',{...G,supported:false,licensing_spans:[]},S,readingVetoes(reading),reading.asserted_proposition);
  assert.equal(decision.S.supported,true); // Preserve the raw error, do not hide it.
@@ -75,10 +75,39 @@ test('enumeration reading cannot invent a relationship or route a raw S YES into
 });
 test('packaging remains insignificant despite a strong generic connection reading',async()=>{
  const {readingVetoes}=await import('../src/lib/d15-semantic-reading.ts');
- const veto=readingVetoes({asserted_proposition:'Two domains are connected.',component_claims:['financial systems','business change'],form:'PACKAGING',relationship_assertion:'Two domains are connected.',reading_reason:'No substantive flow is asserted.'});
+ const veto=readingVetoes({language:'en',actor:'CANDIDATE',asserted_proposition:'Two domains are connected.',component_claims:['financial systems','business change'],form:'PACKAGING',relationship_assertion:'Two domains are connected.',reading_reason:'No substantive flow is asserted.'});
  assert.equal(combineGS('claim',G,S,veto).accepted,false);
 });
 test('a substantive ungrounded relationship asks about the missing link rather than a list',()=>{
- const decision={...combineGS('headline',{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:{asserted_proposition:'Forecasts feed reviews.',component_claims:['prepares forecasts','conducts reviews'],form:'RELATIONSHIP' as const,relationship_assertion:'Your forecasts feed the pipeline review.',reading_reason:'Information flow is asserted.'}};
+ const decision={...combineGS('headline',{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:{language:'en' as const,actor:'CANDIDATE' as const,asserted_proposition:'Forecasts feed reviews.',component_claims:['prepares forecasts','conducts reviews'],form:'RELATIONSHIP' as const,relationship_assertion:'Your forecasts feed the pipeline review.',reading_reason:'Information flow is asserted.'}};
  assert.ok(clarificationQuestion(decision,'en')?.includes('Your forecasts feed the pipeline review.'));
+});
+
+test('reading validation preserves active candidate agency and source language',async()=>{
+ const {validateSemanticReading}=await import('../src/lib/d15-semantic-reading.ts');
+ const reading={language:'en',actor:'CANDIDATE',asserted_proposition:'You align forecasts with reviews to create a team rhythm.',component_claims:['You align forecasts with reviews.','You create a team rhythm through that alignment.'],form:'RELATIONSHIP',relationship_assertion:'You use that alignment to create a rhythm.',reading_reason:'Explicit candidate mechanism.'};
+ assert.doesNotThrow(()=>validateSemanticReading(reading,'You create a rhythm for the sales team by aligning forecasts with structured reviews.'));
+ assert.throws(()=>validateSemanticReading({...reading,asserted_proposition:'A rhythm is created through alignment.'},'You create a rhythm.'));
+ assert.throws(()=>validateSemanticReading(reading,'Vous créez un rythme.'));
+ const fr={...reading,language:'fr',asserted_proposition:'Vous reliez l’analyse des problèmes et la réorganisation.',component_claims:['Vous analysez les problèmes.','Vous participez à la réorganisation.'],form:'PACKAGING',relationship_assertion:'Vous reliez ces deux domaines.'};
+ assert.doesNotThrow(()=>validateSemanticReading(fr,'Vous travaillez à l’intersection de l’analyse et de la réorganisation.'));
+ assert.throws(()=>validateSemanticReading({...fr,relationship_assertion:'Vous work with the analysis.'},'Vous travaillez à l’intersection de l’analyse et de la réorganisation.'));
+});
+test('intersection reading retains an asserted connection without adding a mechanism',async()=>{
+ const {validateSemanticReading}=await import('../src/lib/d15-semantic-reading.ts');
+ const reading={language:'en',actor:'CANDIDATE',asserted_proposition:'You connect financial-systems work and business-change work.',component_claims:['You work in financial systems.','You work in business changes.'],form:'PACKAGING',relationship_assertion:'You connect these domains without a specified mechanism.',reading_reason:'Generic connection, not just dual membership.'};
+ assert.doesNotThrow(()=>validateSemanticReading(reading,'You work at the intersection of financial systems and business changes.'));
+ assert.throws(()=>validateSemanticReading({...reading,relationship_assertion:'You work in both domains; no interaction is asserted.'},'You work at the intersection of financial systems and business changes.'));
+});
+test('invalid judge shapes are retained as raw replies rather than scored as semantic NO',async()=>{
+ const {scoreDevelopmentControl}=await import('../src/lib/d15-v11-development-scorer.ts');
+ const bad={supported:true,connector:'',minimal_atom_subset:[],licensing_spans:[],reason:'enumerated activities'};
+ const result=await evaluateGSCalls('headline',atoms,async()=>bad,async()=>S,[]);
+ assert.deepEqual(result.raw_G,bad);
+ assert.equal(scoreDevelopmentControl({G:false,S:true},result).G_matches,null);
+});
+test('rate handling retries token rate limits but never quota errors',async()=>{
+ const {retryableD15RateLimit}=await import('../src/lib/d15-diagnostic-request.ts');
+ assert.equal(retryableD15RateLimit({status:429,code:'rate_limit_exceeded'}),true);
+ assert.equal(retryableD15RateLimit({status:429,code:'insufficient_quota'}),false);
 });
