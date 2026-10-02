@@ -382,6 +382,12 @@ function distinctivePhrases(value: string): string[] {
   return phrases;
 }
 
+function rationaleExplicitlyReferencesEvidenceId(rationale: string, evidenceId: string): boolean {
+  const escapedId = evidenceId.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp("(?:evidence|atom)(?:\\s+id)?\\s*(?:#|:)?\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])", "i");
+  return pattern.test(rationale);
+}
+
 function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: EvidenceLedger["requirements"][number]["facets"][number], ledger: EvidenceLedger): string[] {
   const errors: string[] = [];
   const relational = isRelationalFacet(facet.requirement);
@@ -432,7 +438,7 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
   const rationale = normalizeEvidenceText(item.rationale);
   for (const atom of ledger.evidence) {
     if (minimalIds.has(atom.id)) continue;
-    if (item.rationale.includes(atom.id)) errors.push("rationale explicitly relies on an evidence ID outside the minimal supporting subset.");
+    if (rationaleExplicitlyReferencesEvidenceId(item.rationale, atom.id)) errors.push("rationale explicitly relies on an evidence ID outside the minimal supporting subset.");
     const source = spans.get(atom.source_span_id) ?? "";
     const otherSources = ledger.evidence
       .filter(other => other.id !== atom.id)
