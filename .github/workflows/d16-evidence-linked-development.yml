@@ -1,0 +1,58 @@
+name: D16 Evidence Linked Development
+on:
+  push:
+    branches: [d16-evidence-linked-one-run]
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 42cf5ef6eb09501960159352f27d9b343bcbf085
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - name: Record pinned provenance
+        env:
+          ENGINE_COMMIT: 42cf5ef6eb09501960159352f27d9b343bcbf085
+          WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          paths=['src/lib/d16-personalized-interview-strategy.ts','scripts/d16-evidence-linked-development.ts','src/lib/d15-gold-gate.ts','docs/d15-semantic-significance-codebook-v1.1-candidate.md','docs/D15_V11_ERRATUM_2026-10-02.md']
+          with open('provenance.txt','w') as f:
+              f.write('mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION\nengine='+os.environ['ENGINE_COMMIT']+'\nworkflow='+os.environ['WORKFLOW_COMMIT']+'\nDB_reads=false\nDB_writes=false\ncutover=false\nD15_GS_rerun=false\n')
+              for path in paths:
+                  f.write(path+'='+subprocess.check_output(['git','rev-parse','HEAD:'+path],text=True).strip()+'\n')
+          PY
+      - name: Assemble Nancy and Thomas and dispatch D16 preparation
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_MODEL: gpt-4o-mini
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d16-evidence-linked-development.ts
+      - name: Hash saved result
+        if: always()
+        run: |
+          if test -s d16-evidence-linked-report.json; then
+            sha256sum d16-evidence-linked-report.json provenance.txt > SHA256SUMS
+            cat SHA256SUMS
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d16-evidence-linked-${{ github.run_id }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            d16-evidence-linked-report.json
+            provenance.txt
+            SHA256SUMS
