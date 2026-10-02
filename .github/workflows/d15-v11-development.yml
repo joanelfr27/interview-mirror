@@ -16,21 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 2bf6878b6ead26db3c4d7f3a7d52359cffa3bffa
+          ref: 21a614d88b0a489830708b390da5ee68f41cfad5
           fetch-depth: 0
           persist-credentials: false
       - name: Assert pinned engine, codebook and development scorer
         run: |
-          test "$(git rev-parse HEAD)" = "2bf6878b6ead26db3c4d7f3a7d52359cffa3bffa"
+          test "$(git rev-parse HEAD)" = "21a614d88b0a489830708b390da5ee68f41cfad5"
           test "$(git hash-object docs/d15-semantic-significance-codebook-v1.1-candidate.md)" = "56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-          test "$(git hash-object src/lib/d15-v11-development-scorer.ts)" = "c5ea8796c5a6a756ffc432767c01bd0038fb254a"
+          test "$(git hash-object src/lib/d15-v11-development-scorer.ts)" = "c0a52bd07629709225a37fe7fb090a40f98db134"
           {
-            echo "engine_commit=2bf6878b6ead26db3c4d7f3a7d52359cffa3bffa"
+            echo "engine_commit=21a614d88b0a489830708b390da5ee68f41cfad5"
             echo "workflow_definition_commit=${{ github.sha }}"
             echo "codebook_blob=56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-            echo "development_scorer_blob=c5ea8796c5a6a756ffc432767c01bd0038fb254a"
+            echo "development_scorer_blob=c0a52bd07629709225a37fe7fb090a40f98db134"
             echo "mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION"
-            echo "G_S=separate_independent_calls; model=existing_pinned_AI_MODEL; temperature=0"
+            echo "G_S=shared_asserted_proposition; separate_independent_verdict_calls; model=gpt-4o-mini; temperature=0"
             echo "cutover=false; database_writes=false"
           } | tee provenance.txt
       - uses: actions/setup-node@v4
