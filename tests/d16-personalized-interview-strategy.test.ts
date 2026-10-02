@@ -446,3 +446,27 @@ describe("D16 evidence-linked preparation development contract", () => {
     assert.doesNotMatch(action.instruction, /These are|You led/);
   });
 });
+
+it("does not consume an unconfirmed/denied relationship as a D16 anchor", () => {
+  const input = preparationFixture();
+  input.selections[0].relationship_ids = ["DENIED-OR-PARTIAL"];
+  refreshPreparation(input);
+  assert.throws(() => buildD16PreparationActions(input), /Missing accepted/);
+});
+it("zero eligible tensions produce zero v2 actions", () => {
+  const canonical = fixture();
+  canonical.bridge.requirements = [canonical.bridge.requirements[0]];
+  canonical.canonical_requirements = [canonical.canonical_requirements[0]];
+  canonical.role_capability_model.requirements = [canonical.role_capability_model.requirements[0]];
+  canonical.dependency_snapshot = buildD16DependencySnapshot(canonical);
+  const material = { canonical, accepted_relationships: [], selections: [], language: "en" as const };
+  assert.deepEqual(buildD16PreparationActions({ ...material, dependency_fingerprint: buildD16PreparationFingerprint(material) }), []);
+});
+it("v2 makes a contradiction explicit in the preparation task", () => {
+  const canonical = fixture();
+  const material = { canonical, accepted_relationships: [], selections: [], language: "en" as const };
+  const actions = buildD16PreparationActions({ ...material, dependency_fingerprint: buildD16PreparationFingerprint(material) });
+  const conflict = actions.find(a => a.canonical_status === "CONTRADICTED")!;
+  assert.match(conflict.instruction, /record contains a contradiction/);
+  assert.equal(conflict.evidence_reference_mode, "NO_CANDIDATE_EVIDENCE");
+});

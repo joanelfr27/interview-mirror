@@ -10,7 +10,7 @@ import {
 } from "@/lib/role-capability-model";
 import type { ProfessionalMirror } from "@/lib/professional-mirror";
 import type { D15BVerifiedThread } from "@/lib/d15-semantic-thread-engine";
-import { validateG, validateS } from "@/lib/d15-gs-judges";
+import { validateG, validateS, relationshipVetoes } from "@/lib/d15-gs-judges";
 import { D15_CODEBOOK_BLOB } from "@/lib/d15-gs-v11-rules";
 
 export const D16_VERSION = "d16-v1" as const;
@@ -166,7 +166,7 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
   for (const t of input.accepted_relationships) {
     const gs = t.gs_decision;
     const cited = t.evidence_ids.map(id => { const { span } = resolve(id); return { evidence_id: id, source_text: span.text }; });
-    if (!gs || !gs.accepted || gs.codebook_blob !== D15_CODEBOOK_BLOB || gs.headline !== t.headline || t.verification !== "SUPPORTED" || gs.vetoes.length || !validateG(gs.G, cited).supported || !validateS(gs.S).supported) throw new Error("Unvalidated D15 relationship: " + t.id);
+    if (!gs || !gs.accepted || gs.codebook_blob !== D15_CODEBOOK_BLOB || gs.headline !== t.headline || t.verification !== "SUPPORTED" || gs.vetoes.length || !validateG(gs.G, cited).supported || !validateS(gs.S).supported || relationshipVetoes(canonical.ledger, t.evidence_ids, t.headline + " " + gs.asserted_proposition).length) throw new Error("Unvalidated D15 relationship: " + t.id);
   }
   return strategy.tensions.flatMap(tension => {
     const selection = chosen.get(tension.requirement_id);
@@ -184,9 +184,10 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
     const fr = input.language === "fr";
     const source = anchors.map(({ span }) => `« ${span.text} »`).join("\n");
     const relationshipsText = threadIds.map(id => relationships.get(id)!.headline).join("; ");
-    const boundary = fr
+    const conflict = tension.contradiction_present ? (fr ? " Le dossier contient une contradiction : préparez à l'expliquer sans privilégier arbitrairement une version." : " The record contains a contradiction: prepare to explain it without arbitrarily choosing one version.") : "";
+    const boundary = (fr
       ? "Ces éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier."
-      : "These are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.";
+      : "These are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.") + conflict;
     const topic = `« ${tension.requirement} »`;
     const prep = anchors.length
       ? (fr ? `Pour ${topic}, choisissez un exemple parmi ces éléments documentés :\n${source}\nPréparez le problème précis, votre tâche, les responsabilités des autres et ce qui pourrait justifier l'application de la règle pertinente.` : `For ${topic}, choose one example from these documented anchors:\n${source}\nPrepare the specific issue, your task, others' responsibilities and what could substantiate application of the relevant rule.`)
