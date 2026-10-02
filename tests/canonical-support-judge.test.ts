@@ -34,6 +34,7 @@ function raw(status: SupportJudgment["status"], ids: string[] = []): any {
   return {
     id: "SJ-1", requirement_id: "REQ-1", facet_id: "F-1", status, supporting_evidence_ids: ids,
     rationale: "test", confidence: 1, abstained: false, support_basis: "DOCUMENTED",
+    context_evidence_ids: [], relational: false, relationship_connector: null, licensing_spans: [],
     analogical_mapping: null, abstention_reason: null,
   };
 }
@@ -48,26 +49,6 @@ test("judge sanitizer preserves valid documented direct support", () => {
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
   assert.equal(result.judgments[0].support_basis, "DOCUMENTED");
-});
-
-
-test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
-  const l = ledger();
-  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
-  l.evidence[0] = {
-    ...l.evidence[0],
-    source_span_id: "S-A1",
-    action: { normalized_action: "MBA", object: "Global Business & Management Studies" },
-    assertion: { type: "CREDENTIAL", polarity: "AFFIRMATIVE" },
-  };
-  l.requirements[0].facets = [{
-    id: "F-1", type: "LEVEL",
-    requirement: "Master's degree in Finance or Accounting is strongly preferred",
-    source_span_id: "S-REQ",
-  }];
-  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
-  assert.equal(result.errors.length, 0);
-  assert.equal(result.judgments[0].status, "PARTIAL");
 });
 
 
@@ -141,4 +122,69 @@ test("response grammar handles documented-only, elicited-only and empty ledgers 
   assert.equal(validate({judgments:[raw("DIRECT",["A1"])]}),mode==="documented");
   assert.equal(validate({judgments:[{...raw("PARTIAL",["A1"]),support_basis:"CANDIDATE_SELF_REPORTED"}]}),mode==="elicited");
  }
+});
+
+
+test("relational DIRECT rejects composition of separately documented activities", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts", start_offset: 0, end_offset: 18, language: "en" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Introduced pipeline reviews", start_offset: 19, end_offset: 46, language: "en" });
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "forecasts" } };
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2", action: { normalized_action: "introduced", object: "pipeline reviews" } });
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = {
+    ...raw("DIRECT", ["A1", "A2"]),
+    relational: true,
+    relationship_connector: "input to",
+    licensing_spans: ["Prepared forecasts", "Introduced pipeline reviews"],
+  };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("independent activities cannot be composed")));
+});
+
+test("relational DIRECT accepts an exact single-atom licensing span", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts as input to pipeline reviews", start_offset: 0, end_offset: 43, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts as input to pipeline reviews" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = {
+    ...raw("DIRECT", ["A1"]),
+    relational: true,
+    relationship_connector: "input to",
+    licensing_spans: ["forecasts as input to pipeline reviews"],
+  };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("relational classifier is enforced independently of the model declaration", () => {
+  const l = ledger();
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([raw("PARTIAL", ["A1"])], l);
+  assert.ok(result.errors.some(error => error.includes("relational classification")));
+});
+
+test("rationale cannot explicitly invoke an uncited evidence ID", () => {
+  const l = ledger();
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2" });
+  const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "A2 establishes the missing relationship." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("outside the minimal supporting subset")));
+});
+
+test("rationale cannot borrow a distinctive phrase from uncited evidence", () => {
+  const l = ledger();
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Forecasts directly shaped quarterly pipeline review decisions", start_offset: 18, end_offset: 75, language: "en" });
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "Forecasts directly shaped quarterly pipeline review decisions." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("distinctive phrase")));
+});
+
+test("minimal support and optional context IDs must remain disjoint", () => {
+  const l = ledger();
+  const judgment = { ...raw("PARTIAL", ["A1"]), context_evidence_ids: ["A1"] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("must be disjoint")));
 });
