@@ -45,7 +45,7 @@ jobs:
           import os,subprocess
           paths=['src/lib/canonical-support-judge.ts','tests/canonical-support-judge.test.ts','docs/SUPPORT_JUDGE_BASIS_BOUNDARY_CHANGE_2026-10-02.md','src/lib/d16-personalized-interview-strategy.ts','src/lib/d16-preparation-anchor-selector.ts','src/lib/d16-development-role-fixtures.ts','src/lib/d16-shadow-runtime-integration.ts','scripts/d16-automatic-development.ts','tests/fixtures/d16-assembled-gold-inputs.json','tests/fixtures/d16-d15-confirmed-loop.json','docs/D16_AUTOMATIC_DEVELOPMENT_PREREGISTRATION_2026-10-02.md','docs/D16_NANCY_ACTION_YARDSTICK_2026-10-02.md','docs/d15-semantic-significance-codebook-v1.1-candidate.md','docs/D15_V11_ERRATUM_2026-10-02.md']
           with open('provenance.txt','w') as f:
-              f.write('mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION\nengine='+os.environ['ENGINE_COMMIT']+'\nworkflow='+os.environ['WORKFLOW_COMMIT']+'\nDB_reads=false\nDB_writes=false\ncutover=false\nE1_rerun=false\nD15_GS_rerun=false\n')
+              f.write('mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION\nengine='+os.environ['ENGINE_COMMIT']+'\nworkflow='+os.environ['WORKFLOW_COMMIT']+'\nDB_reads=false\nDB_writes=false\ncutover=false\nlocked_boundary_dependency=PR69_UNMERGED_DEVELOPMENT_ONLY\nresult_selection=NEW_RUN_ALL_CASES_NO_CHERRY_PICKING\nprior_runs=37040330015,37048265878\nE1_rerun=false\nD15_GS_rerun=false\n')
               for path in paths:
                   f.write(path+'='+subprocess.check_output(['git','rev-parse','HEAD:'+path],text=True).strip()+'\n')
           PY
