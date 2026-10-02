@@ -81,6 +81,7 @@ const byLanguage = Object.fromEntries(languages.map(language => {
     false_unspecified: implicitFalse,
     explicit_candidate_false_ambiguity: explicitFalse,
     candidate_false_ambiguity: implicitFalse + explicitFalse,
+    explicit_candidate_false_ambiguity: explicitFalse,
     false_implicit_candidate: count(r => r.language === language && r.gold === "UNSPECIFIED" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted)),
   }];
 }));
@@ -110,6 +111,7 @@ const thresholdPass =
   rate(fi, unspecified) !== null && rate(fi, unspecified) <= 0.02 &&
   languages.every(l => rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) !== null && rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) <= 0.03) &&
   languages.every(l => rate(byLanguage[l].candidate_false_ambiguity, byLanguage[l].candidate_gold) !== null && rate(byLanguage[l].candidate_false_ambiguity, byLanguage[l].candidate_gold) <= 0.03) &&
+  languages.every(l => rate(byLanguage[l].explicit_candidate_false_ambiguity, byLanguage[l].explicit_candidate) !== null && rate(byLanguage[l].explicit_candidate_false_ambiguity, byLanguage[l].explicit_candidate) <= 0.03) &&
   languages.every(l => rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) !== null && rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified) <= 0.03) &&
   explicitOtherFalseCandidate === 0;
 
@@ -134,6 +136,7 @@ const report = {
     ...byLanguage[l],
     false_unspecified_rate: pct(rate(byLanguage[l].false_unspecified, byLanguage[l].implicit)),
     candidate_false_ambiguity_rate: pct(rate(byLanguage[l].candidate_false_ambiguity, byLanguage[l].candidate_gold)),
+    explicit_candidate_false_ambiguity_rate: pct(rate(byLanguage[l].explicit_candidate_false_ambiguity, byLanguage[l].explicit_candidate)),
     false_implicit_candidate_rate: pct(rate(byLanguage[l].false_implicit_candidate, byLanguage[l].unspecified)),
   }])),
   confusion,
