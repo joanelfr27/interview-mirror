@@ -52,6 +52,17 @@ export type ContextualDelta = {
   domain: boolean;
 };
 
+export type D16RoleKnowledge = {
+  interviewer_may_test: Array<{ text: string; source: "JD_GROUNDED" }>;
+  preparation_points: Array<{ text: string; source: "JD_GROUNDED" | "GENERAL_SECTOR_KNOWLEDGE" }>;
+};
+
+export type D16CandidatePosition = {
+  status: "DIRECT" | "PARTIAL" | "TRANSFER" | "NONE";
+  evidence_ids: string[];
+  elicited_evidence_ids: string[];
+};
+
 export type StrategicTension = {
   id: string;
   requirement_id: string;
@@ -75,6 +86,8 @@ export type StrategicTension = {
   };
   contextual_delta: ContextualDelta;
   contradiction_present: boolean;
+  role_knowledge: D16RoleKnowledge;
+  candidate_position: D16CandidatePosition;
 };
 
 export type D16Action = {
@@ -182,6 +195,31 @@ function contextualDelta(requirement: string, item: CanonicalStrategyBridgeRequi
     scale: delta([["large", "grand", "grande"], ["million"], ["multi-site", "multi-sites"], ["enterprise", "entreprise"]]),
     domain: delta([["industry", "industrie"], ["sector", "secteur"], ["domain", "domaine"], ["regulated", "réglementé", "réglementée"]]),
   };
+}
+
+function roleKnowledgeFor(requirement: string): D16RoleKnowledge {
+  return {
+    interviewer_may_test: [{ text: "Likely probe area from the JD: " + requirement, source: "JD_GROUNDED" }],
+    preparation_points: [{ text: "Preparation point from the JD: " + requirement, source: "JD_GROUNDED" }],
+  };
+}
+
+function candidatePositionFor(item: CanonicalStrategyBridgeRequirement, ledger: EvidenceLedger): D16CandidatePosition {
+  const status: D16CandidatePosition["status"] = item.route_mode === "TRANSFERABLE"
+    ? "TRANSFER"
+    : item.status === "SUPPORTED"
+      ? "DIRECT"
+      : item.status === "PARTIAL"
+        ? "PARTIAL"
+        : "NONE";
+  const ids = [...new Set(item.evidence.map((e) => e.evidence_id))].sort();
+  const elicited = new Set(ledger.evidence.filter((e) => e.provenance.source_type === "CANDIDATE_ELICITED").map((e) => e.id));
+  return { status, evidence_ids: ids, elicited_evidence_ids: ids.filter((id) => elicited.has(id)) };
+}
+
+function roleKnowledgeHasCandidateClaimLeakage(roleKnowledge: D16RoleKnowledge): boolean {
+  const text = [...roleKnowledge.interviewer_may_test, ...roleKnowledge.preparation_points].map((x) => x.text).join(" ");
+  return /\b(?:you|your|vous|votre|vos)\s+(?:managed|led|handled|worked|delivered|built|created|géré|gere|dirigé|dirige|piloté|pilote|travaillé|travaille|réalisé|realise)\b/i.test(text);
 }
 
 function evidenceStrength(tension: StrategicTension): number {
@@ -437,6 +475,8 @@ export function buildD16Strategy(input: D16Inputs): D16Strategy {
         truthfulness_boundary: boundariesFor(item),
         contextual_delta: delta,
         contradiction_present: item.status === "CONTRADICTED" || item.evidence.some((e) => e.support_status === "CONTRADICTORY"),
+        role_knowledge: roleKnowledgeFor(rcm.normalized_requirement),
+        candidate_position: candidatePositionFor(item, input.ledger),
       } satisfies StrategicTension;
     })
     .filter((x): x is StrategicTension => Boolean(x))
@@ -510,6 +550,17 @@ export function validateD16Strategy(strategy: D16Strategy, input: D16Inputs): { 
     if (seen.has(tension.requirement_id)) errors.push("D16 duplicate tension requirement: " + tension.requirement_id);
     seen.add(tension.requirement_id);
     if (!canonicalTensions.has(tension.requirement_id)) errors.push("D16 tension references unknown requirement: " + tension.requirement_id);
+    if (!isRecord(tension.role_knowledge) || !Array.isArray(tension.role_knowledge.interviewer_may_test) || !Array.isArray(tension.role_knowledge.preparation_points)) {
+      errors.push("D16 role knowledge is malformed: " + tension.requirement_id);
+    } else {
+      if (roleKnowledgeHasCandidateClaimLeakage(tension.role_knowledge)) errors.push("D16 role knowledge leaks a candidate-history claim: " + tension.requirement_id);
+      for (const item of [...tension.role_knowledge.interviewer_may_test, ...tension.role_knowledge.preparation_points]) {
+        if (!nonBlank(item.text) || !["JD_GROUNDED", "GENERAL_SECTOR_KNOWLEDGE"].includes(item.source)) errors.push("D16 role knowledge source is invalid: " + tension.requirement_id);
+      }
+    }
+    if (!isRecord(tension.candidate_position) || !["DIRECT", "PARTIAL", "TRANSFER", "NONE"].includes(tension.candidate_position.status)) {
+      errors.push("D16 candidate position is malformed: " + tension.requirement_id);
+    }
     if (!isRecord(tension.truthfulness_boundary) ||
         !Array.isArray(tension.truthfulness_boundary.permitted_claims) ||
         !Array.isArray(tension.truthfulness_boundary.prohibited_claims)) {
