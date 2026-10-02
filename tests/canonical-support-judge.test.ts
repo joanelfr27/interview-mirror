@@ -515,3 +515,30 @@ test("conjunctive payroll and accounts payable facet remains DIRECT FN3", () => 
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
 });
+
+
+test("deterministic validator caps English elicited-only DIRECT at PARTIAL", () => {
+  const l = ledger();
+  l.evidence[0] = {
+    ...l.evidence[0],
+    provenance: { ...l.evidence[0].provenance, source_type: "CANDIDATE_ELICITED", language: "en" },
+  };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]), support_basis: "CANDIDATE_SELF_REPORTED" }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.equal(result.judgments[0].support_basis, "CANDIDATE_SELF_REPORTED");
+  assert.ok(result.judgments[0].rationale.includes("self-reported evidence cannot establish DIRECT"));
+});
+
+test("deterministic validator caps French elicited-only DIRECT at PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { ...l.source_spans[0], text: "J'ai géré la finance", language: "fr" };
+  l.evidence[0] = {
+    ...l.evidence[0],
+    provenance: { ...l.evidence[0].provenance, source_type: "CANDIDATE_ELICITED", language: "fr" },
+  };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]), support_basis: "CANDIDATE_SELF_REPORTED" }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.equal(result.judgments[0].support_basis, "CANDIDATE_SELF_REPORTED");
+});
