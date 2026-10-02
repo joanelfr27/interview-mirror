@@ -18,7 +18,7 @@ type RawJudgment = {
   id: string; requirement_id: string; facet_id: string; status: SupportStatus;
   supporting_evidence_ids: string[]; context_evidence_ids: string[];
   rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
-  relational: boolean; relationship_connector?: string | null; licensing_spans: string[];
+  relationship_connector?: string | null; licensing_spans: string[];
   analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
 };
 
@@ -71,7 +71,6 @@ const SCHEMA = {
         context_evidence_ids: { type: "array", items: { type: "string" } },
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
-        relational: { type: "boolean" },
         relationship_connector: { anyOf: [{ type: "string" }, { type: "null" }] },
         licensing_spans: { type: "array", items: { type: "string" } },
         abstention_reason: { anyOf: [{ type: "string" }, { type: "null" }] },
@@ -88,7 +87,7 @@ const SCHEMA = {
           }, { type: "null" }]
         },
       },
-      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","context_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","relational","relationship_connector","licensing_spans","analogical_mapping"],
+      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","context_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","relationship_connector","licensing_spans","analogical_mapping"],
     }},
   },
   required: ["judgments"],
@@ -123,8 +122,8 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
 
 
 const RELATIONAL_CONNECTOR_PATTERNS = [
-  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to)\b/i,
-  /\b(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)\b/i,
+  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|through|via|after|before|following|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with)\b/i,
+  /\b(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|après|avant|dépend\s+de|au\s+moyen\s+de|via|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)\b/i,
 ] as const;
 
 function isRelationalFacet(requirement: string): boolean {
@@ -150,8 +149,6 @@ function distinctivePhrases(value: string): string[] {
 function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: EvidenceLedger["requirements"][number]["facets"][number], ledger: EvidenceLedger): string[] {
   const errors: string[] = [];
   const relational = isRelationalFacet(facet.requirement);
-  if (item.relational !== relational) errors.push("relational classification does not match the deterministic facet classifier.");
-
   const minimalIds = new Set(item.supporting_evidence_ids);
   const contextIds = new Set(item.context_evidence_ids);
   if ([...minimalIds].some(id => contextIds.has(id))) errors.push("minimal supporting evidence and optional context evidence must be disjoint.");
@@ -391,7 +388,7 @@ export async function judgeCanonicalSupport(
     "Evidence basis rules: each supplied atom includes source_type and support_basis. supporting_evidence_ids is the MINIMAL subset that licenses the returned status; optional non-licensing background belongs only in context_evidence_ids. The two lists must be disjoint. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
     "Use DOCUMENTED with documented atoms only. Use CANDIDATE_SELF_REPORTED with CANDIDATE_ELICITED atoms only; candidate self-report can never be DIRECT. " +
     "When both bases address a facet, choose the single basis that supports the most defensible allowed judgment and explain its limits; do not combine the bases to manufacture stronger support. If neither basis alone supports a defensible judgment, abstain as NONE with no citations.\n" +
-    "Relationship grounding: set relational to whether the FACET ITSELF asserts a connection such as input-to, based-on, used-to, drives, feeds, shapes, enables, response, purpose, causality, recurrence, interface or dependency. For a relational DIRECT judgment, relationship_connector is required and licensing_spans must quote the exact words in the minimal supporting evidence that license that connector. Co-occurrence is not a relationship; chronology is not causality or purpose. Two separately documented activities cannot be combined to manufacture a DIRECT relationship. If the relationship exists only in candidate elicitation, use CANDIDATE_SELF_REPORTED and remain below DIRECT. Never mention or paraphrase evidence outside supporting_evidence_ids in the rationale; context_evidence_ids is non-licensing context only.\n" +
+    "Relationship grounding is classified deterministically from the FACET wording; do not infer the classification yourself. For a relational DIRECT judgment, relationship_connector is required and licensing_spans must quote the exact words in the minimal supporting evidence that license that connector. Co-occurrence is not a relationship; chronology is not causality or purpose. Two separately documented activities cannot be combined to manufacture a DIRECT relationship. If the relationship exists only in candidate elicitation, use CANDIDATE_SELF_REPORTED and remain below DIRECT. Never mention or paraphrase evidence outside supporting_evidence_ids in the rationale; context_evidence_ids is non-licensing context only.\n" +
     "Hard rules: cite only supplied evidence IDs; one facet may cite multiple atoms and one atom may support multiple facets; " +
     "never infer missing tools, scope, ownership, outcomes, seniority, industry or qualifications; not mentioned is not contradictory; an explicitly NEGATED atom is evidence of contradiction when it conflicts with the facet; " +
     "CONTRADICTORY requires explicit conflict; if insufficient to distinguish positive statuses, abstain as NONE; " +
