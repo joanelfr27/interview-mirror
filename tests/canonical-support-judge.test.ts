@@ -158,7 +158,7 @@ test("relational DIRECT rejects composition of separately documented activities"
     licensing_spans: ["Prepared forecasts", "Introduced pipeline reviews"],
   };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
+  assert.ok(result.errors.some(error => error.includes("relational DIRECT cannot compose independent source spans")));
 });
 
 test("relational DIRECT accepts an exact single-atom licensing span", () => {
@@ -217,7 +217,7 @@ test("relational DIRECT rejects extra support IDs even when one atom licenses th
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = { ...raw("DIRECT", ["A1", "A2"]), relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
+  assert.ok(result.errors.some(error => error.includes("relational DIRECT cannot compose independent source spans")));
 });
 
 test("unknown context evidence fails closed", () => {
