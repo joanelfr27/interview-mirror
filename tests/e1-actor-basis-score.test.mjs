@@ -9,7 +9,7 @@ function rows() {
   const out = [];
   let n = 0;
   const add = (language, gold, count, construction, nominal = false) => {
-    for (let i = 0; i < count; i++) out.push({ id: "R" + (++n), language, construction, gold, predicted: gold, nominal });
+    for (let i = 0; i < count; i++) out.push({ id: "R" + (++n), source_text: language + " source " + n, language, construction, gold, predicted: gold, nominal });
   };
   for (const language of ["en", "fr"]) {
     add(language, "IMPLICIT_CANDIDATE", language === "fr" ? 20 : 25, "subjectless_verb");
@@ -162,4 +162,15 @@ test("explicit candidate failures cannot be diluted by implicit rows", () => {
   assert.equal(result.status, 1);
   assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.rate, "100.00%");
   assert.equal(result.report.qualification_pass, false);
+});
+
+
+test("qualification scorer rejects duplicate source text under distinct IDs", () => {
+  const data = rows();
+  data[1].source_text = data[0].source_text;
+  data[1].language = data[0].language;
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report, null);
+  assert.match(result.stderr, /Duplicate qualification source text/);
 });
