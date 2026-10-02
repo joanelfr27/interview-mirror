@@ -122,8 +122,8 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
 
 
 const RELATIONAL_CONNECTOR_PATTERNS = [
-  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|through|via|after|before|following|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with)\b/i,
-  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|après|avant|dépend\s+de|au\s+moyen\s+de|via|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
+  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|through|via|after|before|following|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with|aligns?\s+.+\s+with)\b/i,
+  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|après|avant|dépend\s+de|au\s+moyen\s+de|via|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+de|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
 ] as const;
 
 function isRelationalFacet(requirement: string): boolean {
@@ -192,18 +192,11 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
       }
     }
     if (item.supporting_evidence_ids.length > 1) {
-      const licensingAtomIds = new Set<string>();
-      for (const exact of item.licensing_spans.map(span => span.trim()).filter(Boolean)) {
-        for (const id of item.supporting_evidence_ids) {
-          const atom = byId.get(id);
-          const source = atom ? spans.get(atom.source_span_id) ?? "" : "";
-          if (source.includes(exact)) licensingAtomIds.add(id);
-        }
-      }
-      if (licensingAtomIds.size !== 1) {
-        errors.push("relational DIRECT must be licensed within one cited atom; independent activities cannot be composed into a DIRECT relationship.");
-      } else {
-        errors.push("relational DIRECT minimal support must contain only the single licensing atom; other atoms belong in context_evidence_ids.");
+      const sourceSpanIds = new Set(
+        item.supporting_evidence_ids.map(id => byId.get(id)?.source_span_id).filter((id): id is string => Boolean(id))
+      );
+      if (sourceSpanIds.size > 1) {
+        errors.push("relational DIRECT must be licensed within one preserved source reference; independent activities cannot be composed into a DIRECT relationship.");
       }
     }
   }
@@ -332,6 +325,17 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       continue;
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
+
+    // General anti-composition invariant: DIRECT support cannot be assembled from
+    // independent source spans. Multiple atoms are permitted only when they retain
+    // the same preserved source-span reference.
+    if (item.status === "DIRECT") {
+      const sourceSpanIds = new Set(citedAtoms.map(atom => atom.source_span_id));
+      if (sourceSpanIds.size > 1) {
+        errors.push("Rejected judgment " + item.id + ": DIRECT support cannot compose independent source spans; downgrade or use a single preserved source reference.");
+        continue;
+      }
+    }
 
     // Pre-existing locked credential-specificity guard retained unchanged.
     // It is not extended as part of the relational boundary correction.
