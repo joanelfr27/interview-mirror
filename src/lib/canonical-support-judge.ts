@@ -257,34 +257,36 @@ function clauseTokenSet(value: string): Set<string> {
 
 const PREPOSITIONAL_GROUP_JOINERS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
 
-function prepositionalFacetRelation(facetRequirement: string): { left: string[]; right: string[]; verbStem: string | null } | null {
+function relationVerbFamilyFromFacet(facetRequirement: string): Set<string> | null {
   const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
   const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
   if (prepIndex < 0) return null;
-  const leftRaw = words.slice(0, prepIndex);
-  const rightRaw = words.slice(prepIndex + 1);
-  const left = facetContentTokens(leftRaw.join(" "));
-  const right = facetContentTokens(rightRaw.join(" "));
-  if (!left.length || !right.length) return null;
-  const verbCandidate = leftRaw.find(word => !RELATION_STOPWORDS.has(word) && word.length >= 3) ?? null;
-  return { left, right, verbStem: verbCandidate ? stemContentToken(verbCandidate) : null };
+  for (const word of words.slice(0, prepIndex)) {
+    const family = relationBearingVerbFamily(word);
+    if (family) return family;
+  }
+  return null;
 }
 
 function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
-  // Recognized relational facets are governed by the stronger connector/licensing-span
-  // validator below. This conservative fallback only closes unclassified prepositional
-  // relationships such as "leverage X in Y".
+  // Recognized relational facets stay under the established connector/licensing-span validator.
   if (isRelationalFacet(facetRequirement)) return false;
-  const relation = prepositionalFacetRelation(facetRequirement);
-  if (!relation) return false;
+  const verbFamily = relationVerbFamilyFromFacet(facetRequirement);
+  if (!verbFamily) return false;
+
+  const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
+  const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
+  if (prepIndex < 0) return false;
+  const left = facetContentTokens(words.slice(0, prepIndex).join(" "));
+  const right = facetContentTokens(words.slice(prepIndex + 1).join(" "));
+  if (!left.length || !right.length) return false;
+
   for (const source of citedSourceTexts) {
     for (const clause of semanticClauses(source)) {
-      const tokens = clauseTokenSet(clause);
-      const hasLeft = relation.left.some(token => tokens.has(token));
-      const hasRight = relation.right.some(token => tokens.has(token));
-      if (!hasLeft || !hasRight) continue;
-      const hasFacetVerb = Boolean(relation.verbStem && tokens.has(relation.verbStem));
-      if (hasFacetVerb) return false;
+      const stemmedTokens = clauseTokenSet(clause);
+      const rawTokens = new Set(normalizeEvidenceText(clause).split(/\s+/).filter(Boolean));
+      if (!left.some(token => stemmedTokens.has(token)) || !right.some(token => stemmedTokens.has(token))) continue;
+      if ([...verbFamily].some(form => rawTokens.has(form))) return false;
     }
   }
   return true;
