@@ -654,3 +654,29 @@ test("FR own verb imperfect exploitait licenses ordered relation", () => {
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
 });
+
+
+test("exact positive Leveraged forecasts in pipeline reviews remains DIRECT", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Leveraged forecasts in pipeline reviews.",start_offset:0,end_offset:41,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Leverage forecasts in pipeline reviews",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"DIRECT");
+});
+test("exact FR A2 local-binding hole downgrades to PARTIAL", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Exploité les prévisions dans le budget pour les revues du pipeline.",start_offset:0,end_offset:68,language:"fr"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Exploiter les prévisions dans les revues du pipeline",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"PARTIAL");
+});
+test("monthly reporting in SAP remains verb-less DIRECT", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Prepared monthly reporting in SAP.",start_offset:0,end_offset:34,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Monthly reporting in SAP",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"DIRECT");
+});
+test("EN A2 budgeting interruption remains PARTIAL", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Leveraged forecasts in budgeting for pipeline reviews.",start_offset:0,end_offset:53,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Leverage forecasts in pipeline reviews",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"PARTIAL");
+});
+test("positive determiner and adjective local binding remains DIRECT", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Leveraged the forecasts in the weekly pipeline reviews.",start_offset:0,end_offset:55,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Leverage forecasts in pipeline reviews",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"DIRECT");
+});
+test("financial reporting in SAP remains modifier-led DIRECT", () => {
+  const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Prepared financial reporting in SAP.",start_offset:0,end_offset:36,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Financial reporting in SAP",source_span_id:"S-REQ"};
+  const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"DIRECT");
+});
