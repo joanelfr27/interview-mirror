@@ -197,3 +197,34 @@ test("source validator rejects unspecified actor basis with non-unknown ownershi
   const span = { id: "S1", document_id: "CV", text: source, start_offset: 0, end_offset: source.length, language: "en" };
   assert.ok(validateAtomicEvidenceAgainstSource(value, span).some(e => e.includes("ownership=UNKNOWN")));
 });
+
+
+test("explicit candidate attribution rejects pronoun, proper-name, and possessive subject switches", () => {
+  for (const source of [
+    "I prepared reports; she reconciled accounts.",
+    "I prepared reports; Payroll reconciled accounts.",
+    "I prepared reports; my manager reconciled accounts.",
+  ]) {
+    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", "reconciled accounts"), source);
+    assert.equal(out.actor_basis, "UNSPECIFIED", source);
+    assert.equal(out.actor, "unspecified", source);
+  }
+});
+
+test("repeated action text fails closed instead of binding to the first occurrence", () => {
+  const source = "I reconciled expenses; the payroll team reconciled accounts.";
+  const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", "reconciled"), source);
+  assert.equal(out.actor_basis, "UNSPECIFIED");
+  assert.equal(out.actor, "unspecified");
+});
+
+test("postposed first-person passive agents are explicit candidate agency", () => {
+  for (const [source, action] of [
+    ["Prepared by me.", "Prepared"],
+    ["Réalisé par moi.", "Réalisé"],
+  ] as const) {
+    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", action), source);
+    assert.equal(out.actor_basis, "EXPLICIT_CANDIDATE", source);
+    assert.equal(out.actor, "candidate", source);
+  }
+});
