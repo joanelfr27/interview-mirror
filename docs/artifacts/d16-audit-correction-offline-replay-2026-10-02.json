@@ -1,0 +1,871 @@
+{
+  "mode": "OFFLINE_DETERMINISTIC_REPLAY_NOT_NEW_RUNTIME",
+  "upstream_run": 37052068438,
+  "upstream_report_sha256": "d2335527f2816646ed34c683d0c9b6a734cb66011fb2b5f226c2c6e12191e7da",
+  "model_calls": 0,
+  "semantic_support_verdict": "HOLD_UPSTREAM_JUDGE_RELATIONSHIP_INFERENCE",
+  "cases": [
+    {
+      "id": "NANCY_AUTO_STANDARDS",
+      "actions": [
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "1",
+          "canonical_status": "UNRESOLVED",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; unresolved canonical status",
+          "prep_objective": "Prepare a precise answer that distinguishes what is documented from what is not established.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "3",
+              "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "1.1",
+            "1.2",
+            "1.3"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:a444840d64f8e3f9fed72f2c9d5f97506242b1380bd527774615b4a6c602b7d4",
+          "id": "D16-TENSION-1-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "For « Experience applying international accounting standards », prepare this documented example:\n« Managing statutory financial reporting and taxation requirements. »\nPrepare the specific issue, your task and others' responsibilities. Identify the rule, jurisdiction and period only if you can substantiate them. Assemble an anonymized source or a precise account of applying the rule. Using or implementing a system alone does not prove application of a standard.\nStill to establish: Experience applying international accounting standards.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.",
+          "expected_artifact": "An example sheet with contribution, substantiation and limits."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "1",
+          "canonical_status": "UNRESOLVED",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; unresolved canonical status",
+          "prep_objective": "Prepare a precise answer that distinguishes what is documented from what is not established.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "3",
+              "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "1.1",
+            "1.2",
+            "1.3"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:a444840d64f8e3f9fed72f2c9d5f97506242b1380bd527774615b4a6c602b7d4",
+          "id": "D16-TENSION-1-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Practise answering for « Experience applying international accounting standards » from your chosen example in PREP, using these anchors:\n« Managing statutory financial reporting and taxation requirements. »\n\"Which rule or standard did you apply, and what did you personally do?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" If the standard is not established, distinguish your documented work from the unverified requirement.\nStill to establish: Experience applying international accounting standards.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.",
+          "expected_artifact": "A practice response; evaluating it belongs to D21."
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": []
+      },
+      "coverage": {
+        "action_count": 2,
+        "actions_with_requirement_support_refs": 0,
+        "requirement_support_evaluation": "NOT_SEMANTICALLY_VERIFIED",
+        "actions_with_contextual_anchors": 2,
+        "actions_without_candidate_evidence": 0,
+        "linked_reference_count": 2,
+        "personalization_evaluation": "NOT_EVALUATED"
+      },
+      "content_review": {
+        "preparation_specificity": "MEETS_PRE_RUN_NANCY_YARDSTICK",
+        "review_mode": "ASSISTANT_OFFLINE_REVIEW_NOT_INDEPENDENT_AUDIT",
+        "language_scope": "ENGLISH"
+      }
+    },
+    {
+      "id": "THOMAS_AUTO_STANDARDS",
+      "actions": [
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "1",
+          "canonical_status": "UNRESOLVED",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; unresolved canonical status",
+          "prep_objective": "Prepare a precise answer that distinguishes what is documented from what is not established.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [],
+          "preparation_anchor_refs": [],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "1.1",
+            "1.2",
+            "1.3"
+          ],
+          "evidence_reference_mode": "NO_CANDIDATE_EVIDENCE",
+          "personalization": "NO_RELEVANT_ANCHOR",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:465536960c8154363319d7376d6e21518e5a404776f8ad1df18dff4285138599",
+          "id": "D16-TENSION-1-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "No relevant candidate anchor was selected for « Experience applying international accounting standards ». Prepare a three-part answer: what your documented experience establishes; the closest adjacent experience, if any, and its limits; one realistic learning and supervised-practice step to close the gap, with a way to demonstrate progress. If there is no adjacent experience, say so; do not invent an example.\nStill to establish: Experience applying international accounting standards.\nThe current record does not establish this requirement. Adjacent experience is not direct proof; describe learning steps as a plan, not as completed experience.",
+          "expected_artifact": "A three-part answer: documented background, adjacent experience if any and its limits, learning plan."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "1",
+          "canonical_status": "UNRESOLVED",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; unresolved canonical status",
+          "prep_objective": "Prepare a precise answer that distinguishes what is documented from what is not established.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [],
+          "preparation_anchor_refs": [],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "1.1",
+            "1.2",
+            "1.3"
+          ],
+          "evidence_reference_mode": "NO_CANDIDATE_EVIDENCE",
+          "personalization": "NO_RELEVANT_ANCHOR",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:465536960c8154363319d7376d6e21518e5a404776f8ad1df18dff4285138599",
+          "id": "D16-TENSION-1-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Practise handling a probe on « Experience applying international accounting standards »: \"What adjacent experience could you bring, and how would you become ready?\" State the boundary first, explain only documented adjacent experience if any, then describe your learning plan and how you would demonstrate progress. Do not present the plan as completed experience.\nStill to establish: Experience applying international accounting standards.\nThe current record does not establish this requirement. Adjacent experience is not direct proof; describe learning steps as a plan, not as completed experience.",
+          "expected_artifact": "A practice response; evaluating it belongs to D21."
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": []
+      },
+      "coverage": {
+        "action_count": 2,
+        "actions_with_requirement_support_refs": 0,
+        "requirement_support_evaluation": "NOT_SEMANTICALLY_VERIFIED",
+        "actions_with_contextual_anchors": 0,
+        "actions_without_candidate_evidence": 2,
+        "linked_reference_count": 0,
+        "personalization_evaluation": "NOT_EVALUATED"
+      },
+      "content_review": {
+        "preparation_specificity": "MEETS_GAP_DEFENSE_DESIGN",
+        "review_mode": "ASSISTANT_OFFLINE_REVIEW_NOT_INDEPENDENT_AUDIT",
+        "language_scope": "ENGLISH"
+      }
+    },
+    {
+      "id": "DAVID_EN_NO_JD_MULTI_ROLE",
+      "actions": [
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-FORECAST",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E1",
+              "source_span_id": "S1",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E6",
+              "source_span_id": "S6",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E8",
+              "source_span_id": "S8",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E3",
+              "source_span_id": "S3",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0",
+              "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-0-80",
+              "source_type": "CANDIDATE_ELICITED",
+              "actor": "candidate",
+              "ownership": "INDIVIDUAL"
+            }
+          ],
+          "d15_thread_refs": [
+            "DAVID-FORECAST-REVIEW"
+          ],
+          "missing_facet_ids": [
+            "ROLE-FORECAST-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Introduced a structured pipeline review for the sales team.",
+              "You may state only what is explicitly supported by: Managed a portfolio of business customers across the northern region.",
+              "You may state only what is explicitly supported by: Prepared monthly sales forecasts and reviewed variances with the sales team.",
+              "You may state only what is explicitly supported by: Presented customer and market observations to senior management.",
+              "You may state only what is explicitly supported by: Supported negotiations with several strategic customers.",
+              "You may state only what is explicitly supported by: Visited key accounts to understand customer priorities and coordinate follow-up.",
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:731f91e6c473ac291ca6a3da575ee5544ab2968cefd268772c8c52ed91b78455",
+          "id": "D16-TENSION-ROLE-FORECAST-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "For « Use monthly sales forecasts as input to structured pipeline reviews across a multi-country region. », choose one example from these documented anchors:\n« Prepared monthly sales forecasts and reviewed variances with the sales team. »\n« Introduced a structured pipeline review for the sales team. »\n« I used my monthly sales forecasts as an input to the structured pipeline review. »\nPrepare the specific situation, your contribution and others' responsibilities. Assemble an anonymized source or a precise account of your work. Distinguish what this example establishes from the unverified parts of the requirement.\nConfirmed relationship: You use your monthly sales forecasts as an input to the structured pipeline review..\nStill to establish: Across a multi-country region.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it. Candidate self-report; it does not establish recurrence or independent verification.",
+          "expected_artifact": "An example sheet with contribution, substantiation and limits."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-FORECAST",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E1",
+              "source_span_id": "S1",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E6",
+              "source_span_id": "S6",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E8",
+              "source_span_id": "S8",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E3",
+              "source_span_id": "S3",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0",
+              "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-0-80",
+              "source_type": "CANDIDATE_ELICITED",
+              "actor": "candidate",
+              "ownership": "INDIVIDUAL"
+            }
+          ],
+          "d15_thread_refs": [
+            "DAVID-FORECAST-REVIEW"
+          ],
+          "missing_facet_ids": [
+            "ROLE-FORECAST-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Introduced a structured pipeline review for the sales team.",
+              "You may state only what is explicitly supported by: Managed a portfolio of business customers across the northern region.",
+              "You may state only what is explicitly supported by: Prepared monthly sales forecasts and reviewed variances with the sales team.",
+              "You may state only what is explicitly supported by: Presented customer and market observations to senior management.",
+              "You may state only what is explicitly supported by: Supported negotiations with several strategic customers.",
+              "You may state only what is explicitly supported by: Visited key accounts to understand customer priorities and coordinate follow-up.",
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:731f91e6c473ac291ca6a3da575ee5544ab2968cefd268772c8c52ed91b78455",
+          "id": "D16-TENSION-ROLE-FORECAST-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Practise answering for « Use monthly sales forecasts as input to structured pipeline reviews across a multi-country region. » from your chosen example in PREP, using these anchors:\n« Prepared monthly sales forecasts and reviewed variances with the sales team. »\n« Introduced a structured pipeline review for the sales team. »\n« I used my monthly sales forecasts as an input to the structured pipeline review. »\n\"What did you personally do, and how does it address this requirement?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" Distinguish your documented contribution from the unverified parts.\nConfirmed relationship: You use your monthly sales forecasts as an input to the structured pipeline review..\nStill to establish: Across a multi-country region.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it. Candidate self-report; it does not establish recurrence or independent verification.",
+          "expected_artifact": "A practice response; evaluating it belongs to D21."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-LAUNCH",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 2,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "PARTIAL"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "ROLE-LAUNCH-F0",
+            "ROLE-LAUNCH-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:731f91e6c473ac291ca6a3da575ee5544ab2968cefd268772c8c52ed91b78455",
+          "id": "D16-TENSION-ROLE-LAUNCH-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "For « Lead product launches with full personal ownership. », prepare this documented example:\n« Worked with marketing colleagues to coordinate product launches. »\nPrepare the specific situation, your contribution and others' responsibilities. Assemble an anonymized source or a precise account of your work. Distinguish what this example establishes from the unverified parts of the requirement.\nPartly documented; further substantiation needed: Coordinate product launches.\nStill to establish: Full personal ownership of product launches.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.",
+          "expected_artifact": "An example sheet with contribution, substantiation and limits."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-LAUNCH",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 2,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "PARTIAL"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "ROLE-LAUNCH-F0",
+            "ROLE-LAUNCH-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "en",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:731f91e6c473ac291ca6a3da575ee5544ab2968cefd268772c8c52ed91b78455",
+          "id": "D16-TENSION-ROLE-LAUNCH-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Practise answering for « Lead product launches with full personal ownership. » from your chosen example in PREP, using these anchors:\n« Worked with marketing colleagues to coordinate product launches. »\n\"What did you personally do, and how does it address this requirement?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" Distinguish your documented contribution from the unverified parts.\nPartly documented; further substantiation needed: Coordinate product launches.\nStill to establish: Full personal ownership of product launches.\nThese are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.",
+          "expected_artifact": "A practice response; evaluating it belongs to D21."
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": []
+      },
+      "coverage": {
+        "action_count": 4,
+        "actions_with_requirement_support_refs": 4,
+        "requirement_support_evaluation": "NOT_SEMANTICALLY_VERIFIED",
+        "actions_with_contextual_anchors": 4,
+        "actions_without_candidate_evidence": 0,
+        "linked_reference_count": 24,
+        "personalization_evaluation": "NOT_EVALUATED"
+      },
+      "content_review": {
+        "preparation_specificity": "CONTEXTUAL_PREPARATION_WITH_UPSTREAM_SUPPORT_HOLD",
+        "review_mode": "ASSISTANT_OFFLINE_REVIEW_NOT_INDEPENDENT_AUDIT",
+        "language_scope": "ENGLISH"
+      }
+    },
+    {
+      "id": "DAVID_FR_NO_JD_MULTI_ROLE",
+      "actions": [
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-FORECAST",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E1",
+              "source_span_id": "S1",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E6",
+              "source_span_id": "S6",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E8",
+              "source_span_id": "S8",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E3",
+              "source_span_id": "S3",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E7",
+              "source_span_id": "S7",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0",
+              "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-0-121",
+              "source_type": "CANDIDATE_ELICITED",
+              "actor": "candidate",
+              "ownership": "INDIVIDUAL"
+            }
+          ],
+          "d15_thread_refs": [
+            "DAVID-FORECAST-REVIEW"
+          ],
+          "missing_facet_ids": [
+            "ROLE-FORECAST-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "fr",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Coached new account executives on customer planning and reporting routines.",
+              "You may state only what is explicitly supported by: Introduit une revue structurée du pipeline commercial pour l’équipe commerciale.",
+              "You may state only what is explicitly supported by: Managed a portfolio of business customers across the northern region.",
+              "You may state only what is explicitly supported by: Presented customer and market observations to senior management.",
+              "You may state only what is explicitly supported by: Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale.",
+              "You may state only what is explicitly supported by: Supported negotiations with several strategic customers.",
+              "You may state only what is explicitly supported by: Visited key accounts to understand customer priorities and coordinate follow-up.",
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:734151cb1a63dadca0d6042d5d99e0a2a2d4dd2582dc2b5a722443a0d03b72a3",
+          "id": "D16-TENSION-ROLE-FORECAST-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "Pour « Utiliser les prévisions de ventes mensuelles dans les revues structurées du pipeline commercial à l'échelle de plusieurs pays. », choisissez un exemple parmi ces éléments documentés :\n« Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale. »\n« Introduit une revue structurée du pipeline commercial pour l’équipe commerciale. »\n« J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial. »\nPréparez la situation précise, votre contribution et les responsabilités des autres. Assemblez un justificatif anonymisé ou un récit précis de votre travail. Distinguez ce que cet exemple établit des aspects encore non vérifiés de l'exigence.\nRelation confirmée : Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial..\nÀ justifier : À l’échelle de plusieurs pays.\nCes éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier. Déclaration du candidat; elle ne démontre pas une récurrence ou une vérification indépendante.",
+          "expected_artifact": "Une fiche d'exemple avec contribution, justificatifs et limites."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-FORECAST",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 1,
+          "strategic_significance": "critical role requirement; partial canonical status; 1 contextual delta(s)",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E1",
+              "source_span_id": "S1",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E6",
+              "source_span_id": "S6",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E8",
+              "source_span_id": "S8",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E3",
+              "source_span_id": "S3",
+              "support_status": "DIRECT"
+            },
+            {
+              "evidence_id": "E7",
+              "source_span_id": "S7",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E2",
+              "source_span_id": "S2",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "E4",
+              "source_span_id": "S4",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            {
+              "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0",
+              "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-0-121",
+              "source_type": "CANDIDATE_ELICITED",
+              "actor": "candidate",
+              "ownership": "INDIVIDUAL"
+            }
+          ],
+          "d15_thread_refs": [
+            "DAVID-FORECAST-REVIEW"
+          ],
+          "missing_facet_ids": [
+            "ROLE-FORECAST-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "fr",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Coached new account executives on customer planning and reporting routines.",
+              "You may state only what is explicitly supported by: Introduit une revue structurée du pipeline commercial pour l’équipe commerciale.",
+              "You may state only what is explicitly supported by: Managed a portfolio of business customers across the northern region.",
+              "You may state only what is explicitly supported by: Presented customer and market observations to senior management.",
+              "You may state only what is explicitly supported by: Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale.",
+              "You may state only what is explicitly supported by: Supported negotiations with several strategic customers.",
+              "You may state only what is explicitly supported by: Visited key accounts to understand customer priorities and coordinate follow-up.",
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:734151cb1a63dadca0d6042d5d99e0a2a2d4dd2582dc2b5a722443a0d03b72a3",
+          "id": "D16-TENSION-ROLE-FORECAST-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Entraînez-vous à répondre pour « Utiliser les prévisions de ventes mensuelles dans les revues structurées du pipeline commercial à l'échelle de plusieurs pays. » à partir de l’exemple que vous aurez choisi en PREP, parmi ces éléments :\n« Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale. »\n« Introduit une revue structurée du pipeline commercial pour l’équipe commerciale. »\n« J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial. »\n« Qu'avez-vous personnellement fait, et comment cela répond-il à cette exigence ? » Puis : « Quel jugement avez-vous exercé, et quelle preuve permettrait de le justifier ? » Distinguez votre contribution documentée des aspects encore non vérifiés.\nRelation confirmée : Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial..\nÀ justifier : À l’échelle de plusieurs pays.\nCes éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier. Déclaration du candidat; elle ne démontre pas une récurrence ou une vérification indépendante.",
+          "expected_artifact": "Une réponse de pratique; son évaluation appartient à D21."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-LAUNCH",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 2,
+          "strategic_significance": "critical role requirement; partial canonical status",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "ROLE-LAUNCH-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "fr",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:734151cb1a63dadca0d6042d5d99e0a2a2d4dd2582dc2b5a722443a0d03b72a3",
+          "id": "D16-TENSION-ROLE-LAUNCH-PREP-V2",
+          "dispatcher": "PREP",
+          "instruction": "Pour « Piloter les lancements de produits en assumant la pleine responsabilité personnelle. », préparez cet exemple documenté :\n« Worked with marketing colleagues to coordinate product launches. »\nPréparez la situation précise, votre contribution et les responsabilités des autres. Assemblez un justificatif anonymisé ou un récit précis de votre travail. Distinguez ce que cet exemple établit des aspects encore non vérifiés de l'exigence.\nÀ justifier : Pleine responsabilité personnelle des lancements de produits.\nCes éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier.",
+          "expected_artifact": "Une fiche d'exemple avec contribution, justificatifs et limites."
+        },
+        {
+          "version": "d16-preparation-v2-development",
+          "requirement_id": "ROLE-LAUNCH",
+          "canonical_status": "PARTIAL",
+          "role_criticality": "CRITICAL",
+          "assessment_relevance": "UNKNOWN",
+          "assessment_context": null,
+          "preparation_priority": 2,
+          "strategic_significance": "critical role requirement; partial canonical status",
+          "prep_objective": "Show the closest documented evidence, then explicitly explain the transferable and unproven dimensions.",
+          "practice_target": "Practise a precise boundary statement and clarification response.",
+          "requirement_proof_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "support_status": "DIRECT"
+            }
+          ],
+          "preparation_anchor_refs": [
+            {
+              "evidence_id": "E5",
+              "source_span_id": "S5",
+              "source_type": "CV",
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            }
+          ],
+          "d15_thread_refs": [],
+          "missing_facet_ids": [
+            "ROLE-LAUNCH-F1"
+          ],
+          "evidence_reference_mode": "SUPPORTED_EVIDENCE",
+          "personalization": "AUTOMATIC_CONTEXTUAL_ANCHORS",
+          "language": "fr",
+          "truthfulness_boundary": {
+            "permitted_claims": [
+              "You may state only what is explicitly supported by: Worked with marketing colleagues to coordinate product launches."
+            ],
+            "prohibited_claims": [
+              "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience.",
+              "Do not claim the unresolved facet is fully established."
+            ]
+          },
+          "dependency_fingerprint": "sha256:734151cb1a63dadca0d6042d5d99e0a2a2d4dd2582dc2b5a722443a0d03b72a3",
+          "id": "D16-TENSION-ROLE-LAUNCH-PRACTICE-V2",
+          "dispatcher": "PRACTICE",
+          "instruction": "Entraînez-vous à répondre pour « Piloter les lancements de produits en assumant la pleine responsabilité personnelle. » à partir de l’exemple que vous aurez choisi en PREP, parmi ces éléments :\n« Worked with marketing colleagues to coordinate product launches. »\n« Qu'avez-vous personnellement fait, et comment cela répond-il à cette exigence ? » Puis : « Quel jugement avez-vous exercé, et quelle preuve permettrait de le justifier ? » Distinguez votre contribution documentée des aspects encore non vérifiés.\nÀ justifier : Pleine responsabilité personnelle des lancements de produits.\nCes éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier.",
+          "expected_artifact": "Une réponse de pratique; son évaluation appartient à D21."
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "errors": []
+      },
+      "coverage": {
+        "action_count": 4,
+        "actions_with_requirement_support_refs": 4,
+        "requirement_support_evaluation": "NOT_SEMANTICALLY_VERIFIED",
+        "actions_with_contextual_anchors": 4,
+        "actions_without_candidate_evidence": 0,
+        "linked_reference_count": 26,
+        "personalization_evaluation": "NOT_EVALUATED"
+      },
+      "content_review": {
+        "preparation_specificity": "CONTEXTUAL_PREPARATION_WITH_UPSTREAM_SUPPORT_HOLD",
+        "review_mode": "ASSISTANT_OFFLINE_REVIEW_NOT_INDEPENDENT_AUDIT",
+        "language_scope": "FRENCH_INSTRUCTIONS_MIXED_LANGUAGE_SOURCES"
+      }
+    }
+  ]
+}

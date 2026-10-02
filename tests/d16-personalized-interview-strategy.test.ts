@@ -422,6 +422,29 @@ function refreshPreparation(input: D16PreparationInputs) {
 }
 
 describe("D16 evidence-linked preparation development contract", () => {
+  it("uses deduplicated positive judge citations rather than unrelated bridge candidates", () => {
+    const input = preparationFixture();
+    input.canonical.ledger.support_judgments = [{ id: "J-C", requirement_id: "REQ-C", facet_id: "F-C", status: "PARTIAL", supporting_evidence_ids: ["EV-A", "EV-A"], rationale: "Partial documented support", confidence: 0.7, abstained: false, support_basis: "DOCUMENTED" }];
+    refreshPreparation(input);
+    const actions = buildD16PreparationActions(input);
+    for (const action of actions) {
+      assert.deepEqual(action.requirement_proof_refs, [{ evidence_id: "EV-A", source_span_id: "SPAN-A", support_status: "PARTIAL" }]);
+    }
+    assert.match(actions[0].instruction, /prepare this documented example/);
+    actions[0].requirement_proof_refs.push({ evidence_id: "EV-B", source_span_id: "SPAN-B", support_status: "DIRECT" });
+    assert.equal(validateD16PreparationActions(actions, input).valid, false);
+  });
+  it("renders malformed source facets as the unresolved requirement without changing the source ledger", () => {
+    const input = preparationFixture();
+    input.canonical.ledger.requirements = [{ id: "REQ-C", source_span_id: "SPAN-A", normalized_requirement: "Experience with International Standards", category: "finance", salience: "CORE", facets: [{ id: "F-1", type: "FUNCTION", requirement: "Experience", source_span_id: "SPAN-A" }, { id: "F-2", type: "FUNCTION", requirement: "is required", source_span_id: "SPAN-A" }], extraction_confidence: 1 }];
+    refreshPreparation(input);
+    const before = JSON.stringify(input.canonical.ledger);
+    const action = buildD16PreparationActions(input)[0];
+    assert.match(action.instruction, /Still to establish: Experience with International Standards/);
+    assert.doesNotMatch(action.instruction, /Experience; is required/);
+    assert.deepEqual(action.missing_facet_ids, ["F-1", "F-2"]);
+    assert.equal(JSON.stringify(input.canonical.ledger), before);
+  });
   it("Nancy uses contextual accounting anchors without granting IFRS proof", () => {
     const input = preparationFixture();
     const actions = buildD16PreparationActions(input);

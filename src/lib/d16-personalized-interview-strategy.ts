@@ -209,7 +209,17 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
     })])].sort();
     const anchors = anchorIds.map(resolve);
     const requirement = canonical.bridge.requirements.find(r => r.requirement_id === tension.requirement_id)!;
-    const proof = requirement.evidence.filter(e => ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"].includes(e.support_status));
+    const positiveStatuses = ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER"];
+    const judgedProof = canonical.ledger.support_judgments
+      .filter(j => j.requirement_id === tension.requirement_id && !j.abstained && positiveStatuses.includes(j.status))
+      .flatMap(j => j.supporting_evidence_ids.map(id => {
+        const atom = atoms.get(id);
+        if (!atom) throw new Error("Unknown judged requirement evidence: " + id);
+        return { evidence_id: id, source_span_id: atom.source_span_id, support_status: j.status };
+      }));
+    const candidates = canonical.ledger.support_judgments.length
+      ? judgedProof : requirement.evidence.filter(e => positiveStatuses.includes(e.support_status));
+    const proof = [...new Map(candidates.map(e => [e.evidence_id, e])).values()];
     const facets = canonical.ledger.requirements.find(r => r.id === tension.requirement_id)?.facets ?? [];
     const missing = facets.filter(f => !canonical.ledger.support_judgments.some(j => j.requirement_id === tension.requirement_id && j.facet_id === f.id && j.status === "DIRECT" && !j.abstained)).map(f => f.id);
     const fr = input.language === "fr";
@@ -234,14 +244,21 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
       ? (fr ? "« Quelle règle ou norme avez-vous appliquée, et qu'avez-vous personnellement fait ? » Puis : « Quel jugement avez-vous exercé, et quelle preuve permettrait de le justifier ? » Si la norme n'est pas établie, distinguez votre travail documenté de l'exigence non vérifiée." : '\"Which rule or standard did you apply, and what did you personally do?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" If the standard is not established, distinguish your documented work from the unverified requirement.')
       : (fr ? "« Qu'avez-vous personnellement fait, et comment cela répond-il à cette exigence ? » Puis : « Quel jugement avez-vous exercé, et quelle preuve permettrait de le justifier ? » Distinguez votre contribution documentée des aspects encore non vérifiés." : '\"What did you personally do, and how does it address this requirement?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" Distinguish your documented contribution from the unverified parts.');
     const prep = anchors.length
-      ? (fr ? `Pour ${topic}, choisissez un exemple parmi ces éléments documentés :\n${source}\n${exampleDetail}` : `For ${topic}, choose one example from these documented anchors:\n${source}\n${exampleDetail}`)
+      ? (fr ? `Pour ${topic}, ${anchors.length === 1 ? "préparez cet exemple documenté" : "choisissez un exemple parmi ces éléments documentés"} :\n${source}\n${exampleDetail}` : `For ${topic}, ${anchors.length === 1 ? "prepare this documented example" : "choose one example from these documented anchors"}:\n${source}\n${exampleDetail}`)
       : proof.length ? (fr ? `Pour ${topic}, aucun exemple contextuel n'a été sélectionné. Examinez les preuves de l'exigence :\n${proofSource}\nPréparez votre contribution et ses limites, puis les aspects restant à justifier. N'inventez pas un écart d'expérience à partir d'un écart de preuve.` : `For ${topic}, no contextual example was selected. Review the requirement evidence:\n${proofSource}\nPrepare your contribution and its limits, then the dimensions still to establish. Do not turn an evidence gap into a claim that you lack experience.`)
       : (fr ? `Aucun élément pertinent n'a été sélectionné pour ${topic}. Préparez une réponse en trois parties : ce que votre expérience documentée établit; l'expérience adjacente la plus proche, si elle existe, et ses limites; une étape réaliste d'apprentissage et de pratique supervisée pour combler l'écart, avec un moyen de démontrer votre progression. À défaut d'expérience adjacente, dites-le; n'inventez pas d'exemple.` : `No relevant candidate anchor was selected for ${topic}. Prepare a three-part answer: what your documented experience establishes; the closest adjacent experience, if any, and its limits; one realistic learning and supervised-practice step to close the gap, with a way to demonstrate progress. If there is no adjacent experience, say so; do not invent an example.`);
     const practice = anchors.length
       ? (fr ? `Entraînez-vous à répondre pour ${topic} à partir de l’exemple que vous aurez choisi en PREP, parmi ces éléments :\n${source}\n${exampleProbe}` : `Practise answering for ${topic} from your chosen example in PREP, using these anchors:\n${source}\n${exampleProbe}`)
       : proof.length ? (fr ? `Entraînez-vous à expliquer votre contribution à ${topic} à partir des preuves citées :\n${proofSource}\nDistinguez ce qu'elles établissent du périmètre et des responsabilités restant à justifier.` : `Practise explaining your contribution to ${topic} using the cited requirement evidence:\n${proofSource}\nDistinguish what it establishes from additional scope and ownership still to demonstrate.`)
       : (fr ? `Entraînez-vous à répondre à une question d’entretien sur ${topic} : « Quelle expérience adjacente pouvez-vous apporter, et comment deviendriez-vous prêt ? » Annoncez d'abord la limite, décrivez uniquement une expérience adjacente documentée si elle existe, puis expliquez votre projet d'apprentissage et comment vous démontreriez votre progression. Ne présentez pas le projet comme une expérience acquise.` : `Practise handling a probe on ${topic}: "What adjacent experience could you bring, and how would you become ready?" State the boundary first, explain only documented adjacent experience if any, then describe your learning plan and how you would demonstrate progress. Do not present the plan as completed experience.`);
-    const missingNote = missing.length ? (fr ? "\nÀ justifier : " : "\nStill to establish: ") + facets.filter(f => missing.includes(f.id)).map(f => f.requirement).join("; ") + "." : "";
+    const incomplete = facets.filter(f => missing.includes(f.id));
+    const fragment = incomplete.some(f => /^(?:experience|expérience|is required\.?|required\.?|is mandatory\.?|est requis(?:e)?\.?)$/i.test(f.requirement.trim()));
+    const partial = incomplete.filter(f => canonical.ledger.support_judgments.some(j => j.requirement_id === tension.requirement_id && j.facet_id === f.id && !j.abstained && ["PARTIAL", "ANALOGICAL_TRANSFER"].includes(j.status)));
+    const absent = incomplete.filter(f => !partial.includes(f));
+    const missingNote = fragment
+      ? (fr ? "\nÀ justifier : " : "\nStill to establish: ") + tension.requirement + "."
+      : (partial.length ? (fr ? "\nPartiellement documenté, à préciser : " : "\nPartly documented; further substantiation needed: ") + partial.map(f => f.requirement).join("; ") + "." : "")
+        + (absent.length ? (fr ? "\nÀ justifier : " : "\nStill to establish: ") + absent.map(f => f.requirement).join("; ") + "." : "");
     const selfReport = anchors.some(a => a.atom.provenance.source_type === "CANDIDATE_ELICITED");
     const allConfirmed = threadIds.every(id => relationships.get(id)!.maturity === "CONFIRMED_RELATIONSHIP");
     const note = relationshipsText ? (fr ? `\nRelation ${allConfirmed ? "confirmée" : "acceptée"} : ${relationshipsText}.` : `\n${allConfirmed ? "Confirmed" : "Accepted"} relationship: ${relationshipsText}.`) : "";
@@ -279,7 +296,8 @@ export function validateD16PreparationActions(actions: D16PreparationAction[], i
 export function reportD16PreparationCoverage(actions: D16PreparationAction[]) {
   return {
     action_count: actions.length,
-    actions_with_requirement_proof: actions.filter(a => a.requirement_proof_refs.length > 0).length,
+    actions_with_requirement_support_refs: actions.filter(a => a.requirement_proof_refs.length > 0).length,
+    requirement_support_evaluation: "NOT_SEMANTICALLY_VERIFIED" as const,
     actions_with_contextual_anchors: actions.filter(a => a.preparation_anchor_refs.length > 0).length,
     actions_without_candidate_evidence: actions.filter(a => a.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE").length,
     linked_reference_count: actions.reduce((n, a) => n + a.requirement_proof_refs.length + a.preparation_anchor_refs.length, 0),
