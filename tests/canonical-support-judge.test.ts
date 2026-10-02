@@ -216,7 +216,7 @@ test("relational DIRECT rejects extra support IDs even when one atom licenses th
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = { ...raw("DIRECT", ["A1", "A2"]), relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("minimal support must contain only")));
+  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
 });
 
 test("unknown context evidence fails closed", () => {
@@ -238,6 +238,8 @@ test("relational classifier covers sequence, dependency, recurrence and French r
     "Use a recurring forecast-to-review cadence",
     "Réviser le pipeline en réponse à la prévision",
     "Réviser le pipeline après la prévision",
+    "Align forecasts with pipeline reviews",
+    "Mettre les prévisions au service des revues du pipeline",
   ]) {
     const l = ledger();
     l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
@@ -274,4 +276,24 @@ test("accepted model rationale is replaced by a canonical minimal-subset rationa
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].rationale, "PARTIAL support from minimal evidence [A1].");
   assert.ok(!result.judgments[0].rationale.includes("Model-written"));
+});
+
+
+test("DIRECT cannot compose independent source spans even when relational wording is unfamiliar", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts", start_offset: 0, end_offset: 18, language: "en" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Introduced pipeline reviews", start_offset: 19, end_offset: 46, language: "en" });
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Synchronize forecasting alongside pipeline governance", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1", "A2"]) }], l);
+  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
+});
+
+test("DIRECT may use multiple atoms only when they preserve the same source-span reference", () => {
+  const l = ledger();
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", action: { normalized_action: "managed", object: "finance operations" } });
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1", "A2"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
 });
