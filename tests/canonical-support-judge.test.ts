@@ -72,6 +72,48 @@ test("generic MBA does not directly satisfy Finance/Accounting-specific Master's
   assert.ok(result.judgments[0].rationale.includes("required Finance or Accounting specialization"));
 });
 
+
+test("specificity freeze: EDF domain-specific tenure is not DIRECT from generic finance tenure", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Finance leader with over 13 years of multinational experience.", start_offset: 0, end_offset: 62, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "worked", object: "finance for over 13 years" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "7 to 10 years of experience in Asset Management, Project Finance, Private Equity or M&A", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.notEqual(result.judgments[0].status, "DIRECT");
+  assert.notEqual(result.judgments[0].status, "NONE");
+});
+
+test("specificity freeze: genuine M&A tenure remains DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "8 years in M&A advisory.", start_offset: 0, end_offset: 24, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "worked", object: "M&A advisory for 8 years" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "7 to 10 years of experience in Asset Management, Project Finance, Private Equity or M&A", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("specificity freeze: English PE synonym remains DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "8 years in private equity.", start_offset: 0, end_offset: 26, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "worked", object: "private equity for 8 years" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "7 to 10 years of experience in PE", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("specificity freeze: French project-finance synonym remains DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "8 ans en financement de projet.", start_offset: 0, end_offset: 31, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", provenance: { ...l.evidence[0].provenance, language: "fr" }, action: { normalized_action: "worked", object: "financement de projet pendant 8 ans" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "7 to 10 years of experience in Project Finance", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
 test("judge sanitizer fills a missing facet with fail-closed abstained NONE", () => {
   const l = ledger();
   l.requirements[0].facets.push({
