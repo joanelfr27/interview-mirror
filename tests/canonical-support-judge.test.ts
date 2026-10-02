@@ -157,7 +157,7 @@ test("relational DIRECT rejects composition of separately documented activities"
     licensing_spans: ["Prepared forecasts", "Introduced pipeline reviews"],
   };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("independent activities cannot be composed")));
+  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
 });
 
 test("relational DIRECT accepts an exact single-atom licensing span", () => {
