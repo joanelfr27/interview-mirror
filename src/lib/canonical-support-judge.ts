@@ -16,7 +16,9 @@ import {
 
 type RawJudgment = {
   id: string; requirement_id: string; facet_id: string; status: SupportStatus;
-  supporting_evidence_ids: string[]; rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
+  supporting_evidence_ids: string[]; context_evidence_ids: string[];
+  rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
+  relational: boolean; relationship_connector?: string | null; licensing_spans: string[];
   analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
 };
 
@@ -66,8 +68,12 @@ const SCHEMA = {
         id: { type: "string" }, requirement_id: { type: "string" }, facet_id: { type: "string" },
         status: { type: "string", enum: [...STATUS_VALUES] },
         supporting_evidence_ids: { type: "array", items: { type: "string" } },
+        context_evidence_ids: { type: "array", items: { type: "string" } },
         rationale: { type: "string" }, confidence: { type: "number", minimum: 0, maximum: 1 },
         abstained: { type: "boolean" },
+        relational: { type: "boolean" },
+        relationship_connector: { anyOf: [{ type: "string" }, { type: "null" }] },
+        licensing_spans: { type: "array", items: { type: "string" } },
         abstention_reason: { anyOf: [{ type: "string" }, { type: "null" }] },
         support_basis: { type: "string", enum: ["DOCUMENTED", "CANDIDATE_SELF_REPORTED"] },
         analogical_mapping: {
@@ -82,7 +88,7 @@ const SCHEMA = {
           }, { type: "null" }]
         },
       },
-      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","analogical_mapping"],
+      required: ["id","requirement_id","facet_id","status","supporting_evidence_ids","context_evidence_ids","rationale","confidence","abstained","abstention_reason","support_basis","relational","relationship_connector","licensing_spans","analogical_mapping"],
     }},
   },
   required: ["judgments"],
@@ -102,6 +108,7 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
       supporting_evidence_ids: ids.length
         ? { type: "array", minItems: 1, items: { type: "string", enum: ids } }
         : { type: "array", maxItems: 0, items: { type: "string" } },
+      context_evidence_ids: { type: "array", items: { type: "string", enum: [...documented, ...elicited] } },
     },
   });
   const documented = ledger.evidence.filter(a => a.provenance.source_type !== "CANDIDATE_ELICITED").map(a => a.id);
@@ -110,6 +117,96 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
   if (documented.length) anyOf.push(branch(["DOCUMENTED"], ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY"], documented, false));
   if (elicited.length) anyOf.push(branch(["CANDIDATE_SELF_REPORTED"], ["PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY"], elicited, false));
   return { ...SCHEMA, properties: { judgments: { type: "array", items: { anyOf } } } };
+}
+
+
+const RELATIONAL_CONNECTOR_PATTERNS = [
+  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|used\s+to|uses?\s+.+\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to)\b/i,
+  /\b(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|suite\s+à|sert\s+à|utilis[ée]e?\s+pour|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)\b/i,
+] as const;
+
+function isRelationalFacet(requirement: string): boolean {
+  return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(requirement));
+}
+
+function normalizeEvidenceText(value: string): string {
+  return value.toLocaleLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function distinctivePhrases(value: string): string[] {
+  const words = normalizeEvidenceText(value).split(/\s+/).filter(Boolean);
+  const phrases: string[] = [];
+  for (let size = Math.min(6, words.length); size >= 4; size--) {
+    for (let i = 0; i + size <= words.length; i++) {
+      const phrase = words.slice(i, i + size).join(" ");
+      if (phrase.length >= 20) phrases.push(phrase);
+    }
+  }
+  return phrases;
+}
+
+function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: EvidenceLedger["requirements"][number]["facets"][number], ledger: EvidenceLedger): string[] {
+  const errors: string[] = [];
+  const relational = isRelationalFacet(facet.requirement);
+  if (item.relational !== relational) errors.push("relational classification does not match the deterministic facet classifier.");
+
+  const minimalIds = new Set(item.supporting_evidence_ids);
+  const contextIds = new Set(item.context_evidence_ids);
+  if ([...minimalIds].some(id => contextIds.has(id))) errors.push("minimal supporting evidence and optional context evidence must be disjoint.");
+
+  const byId = new Map(ledger.evidence.map(atom => [atom.id, atom]));
+  const spans = new Map(ledger.source_spans.map(span => [span.id, span.text]));
+  const citedSourceTexts = item.supporting_evidence_ids
+    .map(id => byId.get(id))
+    .filter((atom): atom is EvidenceLedger["evidence"][number] => Boolean(atom))
+    .map(atom => spans.get(atom.source_span_id) ?? "");
+
+  if (relational && item.status === "DIRECT") {
+    if (!item.relationship_connector?.trim()) errors.push("relational DIRECT requires an explicit relationship_connector.");
+    if (!item.licensing_spans.length) errors.push("relational DIRECT requires at least one exact licensing span.");
+    for (const licensingSpan of item.licensing_spans) {
+      const exact = licensingSpan.trim();
+      if (!exact || !citedSourceTexts.some(source => source.includes(exact))) {
+        errors.push("relational DIRECT licensing span must be an exact quote from the minimal supporting evidence subset.");
+      }
+    }
+    if (item.supporting_evidence_ids.length > 1) {
+      const licensingAtomIds = new Set<string>();
+      for (const exact of item.licensing_spans.map(span => span.trim()).filter(Boolean)) {
+        for (const id of item.supporting_evidence_ids) {
+          const atom = byId.get(id);
+          const source = atom ? spans.get(atom.source_span_id) ?? "" : "";
+          if (source.includes(exact)) licensingAtomIds.add(id);
+        }
+      }
+      if (licensingAtomIds.size !== 1) {
+        errors.push("relational DIRECT must be licensed within one cited atom; independent activities cannot be composed into a DIRECT relationship.");
+      }
+    }
+  }
+  if ((!relational || item.status !== "DIRECT") && item.licensing_spans.length > 0) {
+    for (const licensingSpan of item.licensing_spans) {
+      const exact = licensingSpan.trim();
+      if (!exact || !citedSourceTexts.some(source => source.includes(exact))) errors.push("licensing span must be an exact quote from minimal supporting evidence.");
+    }
+  }
+
+  const rationale = normalizeEvidenceText(item.rationale);
+  for (const atom of ledger.evidence) {
+    if (minimalIds.has(atom.id)) continue;
+    if (item.rationale.includes(atom.id)) errors.push("rationale explicitly relies on an evidence ID outside the minimal supporting subset.");
+    const source = spans.get(atom.source_span_id) ?? "";
+    const otherSources = ledger.evidence
+      .filter(other => other.id !== atom.id)
+      .map(other => spans.get(other.source_span_id) ?? "");
+    const uniquePhrases = distinctivePhrases(source).filter(phrase =>
+      !otherSources.some(other => normalizeEvidenceText(other).includes(phrase))
+    );
+    if (uniquePhrases.some(phrase => rationale.includes(phrase))) {
+      errors.push("rationale contains a distinctive phrase from evidence outside the minimal supporting subset.");
+    }
+  }
+  return errors;
 }
 
 function responseFormat(name: string, schema: unknown) {
@@ -185,6 +282,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     seenFacetKeys.add(facetKey);
 
     const cited = [...new Set(item.supporting_evidence_ids)].filter(id => evidenceIds.has(id));
+    item.context_evidence_ids = [...new Set(item.context_evidence_ids ?? [])].filter(id => evidenceIds.has(id));
     if (item.status === "NONE" || item.abstained) {
       item.status = "NONE"; item.abstained = true; item.supporting_evidence_ids = []; item.abstention_reason = item.abstention_reason || "Insufficient explicit evidence to make a positive support judgment.";
     } else {
@@ -206,20 +304,10 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
-    // Deterministic credential-specificity guard: a generic Master's/MBA credential
-    // cannot DIRECTLY satisfy a Finance/Accounting-specific Master's requirement
-    // unless the cited credential explicitly names Finance or Accounting.
-    if (item.status === "DIRECT" && facet.type === "LEVEL" &&
-        /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
-      const citedCredentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
-      const hasSpecificField = citedCredentials.some(atom =>
-        /\b(?:finance|accounting)\b/i.test(atom.action.object)
-      );
-      if (citedCredentials.length > 0 && !hasSpecificField) {
-        item.status = "PARTIAL";
-        item.rationale = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
-        item.confidence = Math.min(item.confidence, 0.8);
-      }
+    const semanticBoundaryErrors = validateRelationalAndRationaleBoundary(item, facet, ledger);
+    if (semanticBoundaryErrors.length) {
+      errors.push(...semanticBoundaryErrors.map(error => "[" + item.id + "] " + error));
+      continue;
     }
 
     const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
@@ -275,9 +363,10 @@ export async function judgeCanonicalSupport(
     "DIRECT = explicit atom(s) directly satisfy the facet. PARTIAL = explicit atom(s) address part but a material dimension remains unresolved. " +
     "ANALOGICAL_TRANSFER = explicit atom shows genuinely adjacent capability/context, not the same requirement. " +
     "CONTRADICTORY = explicit candidate evidence conflicts with the facet. NONE = supplied evidence does not support the facet; abstain when uncertain.\n\n" +
-    "Evidence basis rules: each supplied atom includes source_type and support_basis. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
+    "Evidence basis rules: each supplied atom includes source_type and support_basis. supporting_evidence_ids is the MINIMAL subset that licenses the returned status; optional non-licensing background belongs only in context_evidence_ids. The two lists must be disjoint. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
     "Use DOCUMENTED with documented atoms only. Use CANDIDATE_SELF_REPORTED with CANDIDATE_ELICITED atoms only; candidate self-report can never be DIRECT. " +
     "When both bases address a facet, choose the single basis that supports the most defensible allowed judgment and explain its limits; do not combine the bases to manufacture stronger support. If neither basis alone supports a defensible judgment, abstain as NONE with no citations.\n" +
+    "Relationship grounding: set relational to whether the FACET ITSELF asserts a connection such as input-to, based-on, used-to, drives, feeds, shapes, enables, response, purpose, causality, recurrence, interface or dependency. For a relational DIRECT judgment, relationship_connector is required and licensing_spans must quote the exact words in the minimal supporting evidence that license that connector. Co-occurrence is not a relationship; chronology is not causality or purpose. Two separately documented activities cannot be combined to manufacture a DIRECT relationship. If the relationship exists only in candidate elicitation, use CANDIDATE_SELF_REPORTED and remain below DIRECT. Never mention or paraphrase evidence outside supporting_evidence_ids in the rationale; context_evidence_ids is non-licensing context only.\n" +
     "Hard rules: cite only supplied evidence IDs; one facet may cite multiple atoms and one atom may support multiple facets; " +
     "never infer missing tools, scope, ownership, outcomes, seniority, industry or qualifications; not mentioned is not contradictory; an explicitly NEGATED atom is evidence of contradiction when it conflicts with the facet; " +
     "CONTRADICTORY requires explicit conflict; if insufficient to distinguish positive statuses, abstain as NONE; " +
