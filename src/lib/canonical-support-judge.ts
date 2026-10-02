@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { SessionRecord } from "@/types";
 import {
   type EvidenceLedger,
+  type AtomicEvidence,
   type SupportJudgment,
   type SupportStatus,
   validateSupportJudgmentAgainstEvidence,
@@ -47,6 +48,7 @@ export type SupportJudgeDiagnostic = Readonly<{
   supporting_evidence_ids: Readonly<Record<string, readonly string[]>>;
   rationale_lengths: Readonly<Record<string, number>>;
   analogical_mapping_lengths: Readonly<Record<string, { shared_dimensions: number; unshared_dimensions: number }>>;
+  transfer_probe_presence: Readonly<{ investment_decision: boolean; restricted_funds_reporting: boolean; multi_country_finance: boolean }>;
 }>;
 
 export class CanonicalSupportJudgmentError extends Error {
@@ -519,6 +521,14 @@ function buildSupportJudgeDiagnostic(args: {
         unshared_dimensions: judgment.analogical_mapping?.unshared_dimensions.length ?? 0,
       },
     ])),
+    transfer_probe_presence: (() => {
+      const corpus = args.compactEvidence.map((atom) => JSON.stringify(atom)).join(" ").toLowerCase();
+      return {
+        investment_decision: /investment/.test(corpus) && /decision/.test(corpus),
+        restricted_funds_reporting: /restricted/.test(corpus) && /fund/.test(corpus) && /report/.test(corpus),
+        multi_country_finance: /(?:multi[- ]country|countries|pays)/.test(corpus) && /financ/.test(corpus),
+      };
+    })(),
   };
 }
 
