@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildD16DependencySnapshot, buildD16Strategy, validateD16Inputs, validateD16Strategy, type D16Inputs, type D16Strategy } from "@/lib/d16-personalized-interview-strategy";
+import { buildD16PreparationActions, buildD16PreparationFingerprint, validateD16PreparationActions, type D16PreparationInputs } from "@/lib/d16-personalized-interview-strategy";
+import { combineGS } from "@/lib/d15-gs-judges";
 
 function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
   const canonical = [
@@ -347,4 +349,200 @@ describe("D16 personalized interview strategy", () => {
     assert.equal(strategy.jd_present, false);
     assert.equal(strategy.d6_version, "d6-v1");
   });
+});
+
+function preparationFixture(quote = "Supporting acquisition accounting and financial integration activities.", language: "en" | "fr" = "en"): D16PreparationInputs {
+  const canonical = fixture();
+  const req = canonical.bridge.requirements[2];
+  req.normalized_requirement = "Experience with International Standards";
+  canonical.bridge.requirements = [req];
+  canonical.canonical_requirements = [{ id: req.requirement_id, normalized_requirement: req.normalized_requirement }];
+  canonical.role_capability_model.requirements = [{ ...canonical.role_capability_model.requirements[2], normalized_requirement: req.normalized_requirement }];
+  canonical.ledger.source_spans[0].text = quote;
+  canonical.ledger.source_spans[0].end_offset = quote.length;
+  canonical.ledger.source_spans[0].language = language;
+  canonical.mirror.evidence[0].source_quote = quote;
+  canonical.ledger.evidence[0].subject.ownership = "UNKNOWN";
+  canonical.ledger.evidence[0].subject.actor_basis = "IMPLICIT_CANDIDATE";
+  canonical.dependency_snapshot = buildD16DependencySnapshot(canonical);
+  const material = { canonical, language, accepted_relationships: [], selections: [{ requirement_id: req.requirement_id, preparation_evidence_ids: ["EV-A"], relationship_ids: [] }] };
+  return { ...material, dependency_fingerprint: buildD16PreparationFingerprint(material) };
+}
+function refreshPreparation(input: D16PreparationInputs) {
+  input.canonical.dependency_snapshot = buildD16DependencySnapshot(input.canonical);
+  const { dependency_fingerprint: _, ...material } = input;
+  input.dependency_fingerprint = buildD16PreparationFingerprint(material);
+}
+
+describe("D16 evidence-linked preparation development contract", () => {
+  it("Nancy uses contextual accounting anchors without granting IFRS proof", () => {
+    const input = preparationFixture();
+    const actions = buildD16PreparationActions(input);
+    assert.equal(actions.length, 2);
+    for (const action of actions) {
+      assert.equal(action.canonical_status, "UNRESOLVED");
+      assert.deepEqual(action.requirement_proof_refs, []);
+      assert.equal(action.preparation_anchor_refs[0].source_span_id, "SPAN-A");
+      assert.match(action.instruction, /Supporting acquisition accounting/);
+      assert.match(action.instruction, /not proof/);
+      assert.doesNotMatch(action.instruction, /applied IFRS|led acquisition/);
+    }
+    assert.equal(validateD16PreparationActions(actions, input).valid, true);
+  });
+  it("Thomas does not inherit Nancy's finance anchors for the same requirement", () => {
+    const input = preparationFixture("Supported the rollout of a customer portal.");
+    input.selections[0].preparation_evidence_ids = [];
+    refreshPreparation(input);
+    const action = buildD16PreparationActions(input)[0];
+    assert.equal(action.personalization, "NO_RELEVANT_ANCHOR");
+    assert.deepEqual(action.preparation_anchor_refs, []);
+    assert.match(action.instruction, /No relevant candidate anchor/);
+    assert.doesNotMatch(action.instruction, /acquisition|IFRS/);
+  });
+  it("fails closed on forged selections, changed evidence, and tampered claims", () => {
+    const input = preparationFixture();
+    const actions = buildD16PreparationActions(input);
+    actions[0].instruction = "You led acquisitions under IFRS.";
+    assert.equal(validateD16PreparationActions(actions, input).valid, false);
+    input.canonical.ledger.source_spans[0].text += " changed";
+    assert.throws(() => buildD16PreparationActions(input), /Stale/);
+    const forged = preparationFixture();
+    forged.selections[0].preparation_evidence_ids = ["FORGED"];
+    refreshPreparation(forged);
+    assert.throws(() => buildD16PreparationActions(forged), /Forged/);
+  });
+  it("keeps an explicitly different actor visible instead of claiming their work", () => {
+    const input = preparationFixture("My manager used the forecasts in the pipeline review.");
+    input.canonical.ledger.evidence[0].subject = { actor: "My manager", actor_basis: "EXPLICIT_OTHER", ownership: "UNKNOWN" };
+    refreshPreparation(input);
+    const action = buildD16PreparationActions(input)[0];
+    assert.equal(action.preparation_anchor_refs[0].actor, "My manager");
+    assert.match(action.instruction, /Separate your contribution from other actors/);
+    assert.equal(action.canonical_status, "UNRESOLVED");
+    assert.match(action.instruction, /work of: My manager/);
+  });
+  it("accepts a licensed single-answer D15 relationship only as a self-report anchor", () => {
+    const quote = "I used my forecasts as input to the pipeline review.";
+    const input = preparationFixture(quote);
+    input.canonical.ledger.evidence[0].provenance.source_type = "CANDIDATE_ELICITED";
+    input.canonical.ledger.evidence[0].assertion.type = "ELICITED";
+    input.canonical.ledger.evidence[0].subject = { actor: "candidate", actor_basis: "EXPLICIT_CANDIDATE", ownership: "INDIVIDUAL" };
+    input.canonical.ledger.evidence[0].action = { normalized_action: "used", object: "forecasts" };
+    input.canonical.mirror.evidence[0].source_type = "CANDIDATE_ELICITED";
+    const headline = "You use your forecasts as input to the pipeline review.";
+    const gs = combineGS(headline, { supported: true, connector: "input", minimal_atom_subset: ["EV-A"], licensing_spans: [{ evidence_id: "EV-A", text: quote }], reason: "Explicit use" }, { supported: true, relationship_type: "MECHANISM", reason: "Input relationship" }, []);
+    input.accepted_relationships = [{ id: "T-1", headline, evidence_ids: ["EV-A"], question_back: null, verification: "SUPPORTED", maturity: "CONFIRMED_RELATIONSHIP", relationship_support_unit_count: 1, gs_decision: gs }];
+    input.selections[0].relationship_ids = ["T-1"];
+    refreshPreparation(input);
+    const action = buildD16PreparationActions(input)[0];
+    assert.deepEqual(action.d15_thread_refs, ["T-1"]);
+    assert.deepEqual(action.requirement_proof_refs, []);
+    assert.match(action.instruction, /Candidate self-report/);
+    input.accepted_relationships[0].gs_decision!.accepted = false;
+    refreshPreparation(input);
+    assert.throws(() => buildD16PreparationActions(input), /Unvalidated/);
+  });
+  it("French instructions preserve source language and ownership boundaries", () => {
+    const input = preparationFixture("Soutien à l'intégration comptable après une acquisition.", "fr");
+    const action = buildD16PreparationActions(input)[0];
+    assert.match(action.instruction, /Soutien à l'intégration/);
+    assert.match(action.instruction, /ne transformez pas une assistance en direction/);
+    assert.doesNotMatch(action.instruction, /These are|You led/);
+  });
+});
+
+it("does not consume an unconfirmed/denied relationship as a D16 anchor", () => {
+  const input = preparationFixture();
+  input.selections[0].relationship_ids = ["DENIED-OR-PARTIAL"];
+  refreshPreparation(input);
+  assert.throws(() => buildD16PreparationActions(input), /Missing accepted/);
+});
+it("zero eligible tensions produce zero v2 actions", () => {
+  const canonical = fixture();
+  canonical.bridge.requirements = [canonical.bridge.requirements[0]];
+  canonical.canonical_requirements = [canonical.canonical_requirements[0]];
+  canonical.role_capability_model.requirements = [canonical.role_capability_model.requirements[0]];
+  canonical.dependency_snapshot = buildD16DependencySnapshot(canonical);
+  const material = { canonical, accepted_relationships: [], selections: [], language: "en" as const };
+  assert.deepEqual(buildD16PreparationActions({ ...material, dependency_fingerprint: buildD16PreparationFingerprint(material) }), []);
+});
+it("v2 makes a contradiction explicit in the preparation task", () => {
+  const canonical = fixture();
+  const material = { canonical, accepted_relationships: [], selections: [], language: "en" as const };
+  const actions = buildD16PreparationActions({ ...material, dependency_fingerprint: buildD16PreparationFingerprint(material) });
+  const conflict = actions.find(a => a.canonical_status === "CONTRADICTED")!;
+  assert.match(conflict.instruction, /record contains a contradiction/);
+  assert.equal(conflict.evidence_reference_mode, "NO_CANDIDATE_EVIDENCE");
+});
+
+it("does not imply an example was already selected for Nancy", () => {
+  const actions = buildD16PreparationActions(preparationFixture());
+  assert.match(actions[1].instruction, /your chosen example in PREP/);
+  assert.doesNotMatch(actions[1].instruction, /the selected example/);
+  assert.match(actions[0].instruction, /jurisdiction and period/);
+  assert.match(actions[0].instruction, /anonymized source/);
+  assert.match(actions[1].instruction, /What judgment did you make/);
+});
+it("Thomas gets a truthful gap-defense task without anchor-template leakage", () => {
+  const input = preparationFixture("Supported the rollout of a customer portal.");
+  input.selections[0].preparation_evidence_ids = [];
+  refreshPreparation(input);
+  const actions = buildD16PreparationActions(input);
+  assert.match(actions[0].instruction, /three-part answer/);
+  assert.match(actions[1].instruction, /how would you become ready/);
+  for (const a of actions) {
+    assert.doesNotMatch(a.instruction, /These are preparation anchors|Separate your contribution from other actors/);
+    assert.match(a.instruction, /not.*completed experience|not as completed experience/);
+  }
+});
+
+it("D16 preparation fingerprints survive JSON persistence of optional undefined fields", () => {
+  const input = preparationFixture();
+  input.canonical.ledger.evidence[0].context.domain = undefined;
+  refreshPreparation(input);
+  const loaded = JSON.parse(JSON.stringify(input));
+  assert.deepEqual(buildD16PreparationActions(loaded), buildD16PreparationActions(input));
+  loaded.canonical.ledger.evidence[0].context.domain = "changed";
+  assert.throws(() => buildD16PreparationActions(loaded), /Stale/);
+});
+
+it("non-standard requirements get a contribution probe rather than an accounting-standard probe", () => {
+  const input = preparationFixture();
+  input.canonical.bridge.requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  input.canonical.canonical_requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  input.canonical.role_capability_model.requirements[0].normalized_requirement = "Experience coordinating project delivery";
+  refreshPreparation(input);
+  const actions = buildD16PreparationActions(input);
+  assert.match(actions[1].instruction, /how does it address this requirement/);
+  assert.doesNotMatch(actions[0].instruction, /jurisdiction|application of a standard/);
+  assert.doesNotMatch(actions[1].instruction, /Which rule or standard/);
+});
+
+it("no-anchor PREP does not demand an invented example artifact", () => {
+ const input=preparationFixture();input.selections[0].preparation_evidence_ids=[];refreshPreparation(input);
+ assert.match(buildD16PreparationActions(input)[0].expected_artifact,/three-part answer/);
+});
+it("proof-only preparation does not falsely state that documented support is absent", () => {
+ const canonical=fixture();const material={canonical,accepted_relationships:[],selections:[],language:"en" as const};
+ const actions=buildD16PreparationActions({...material,dependency_fingerprint:buildD16PreparationFingerprint(material)});
+ const partial=actions.find(a=>a.requirement_id==="REQ-B"&&a.dispatcher==="PREP")!;
+ assert.equal(partial.requirement_proof_refs.length,1);
+ assert.match(partial.instruction,/Review the requirement evidence/);
+ assert.doesNotMatch(partial.instruction,/current record does not establish|No relevant candidate anchor/);
+});
+
+it("contextual anchors resolve to the same Mirror span, quote and source type", () => {
+ const input=preparationFixture();input.canonical.ledger.evidence[0].source_span_id="SPAN-B";refreshPreparation(input);
+ assert.throws(()=>buildD16PreparationActions(input),/Mirror provenance mismatch/);
+});
+it("recorded denials cannot become positive preparation examples", () => {
+ const input=preparationFixture();input.canonical.ledger.evidence[0].assertion.polarity="NEGATED";refreshPreparation(input);
+ assert.throws(()=>buildD16PreparationActions(input),/Non-affirmative/);
+});
+it("named IFRS requirements keep the standards-specific truth boundary", () => {
+ const input=preparationFixture();
+ for(const r of input.canonical.bridge.requirements)r.normalized_requirement="Experience applying IFRS";
+ for(const r of input.canonical.canonical_requirements)r.normalized_requirement="Experience applying IFRS";
+ for(const r of input.canonical.role_capability_model.requirements)r.normalized_requirement="Experience applying IFRS";
+ refreshPreparation(input);assert.match(buildD16PreparationActions(input)[0].instruction,/jurisdiction and period/);
 });

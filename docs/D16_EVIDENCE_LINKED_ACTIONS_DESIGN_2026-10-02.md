@@ -74,3 +74,35 @@ Report raw denominators separately: actions using requirement-proof references, 
 ## Exit and next step
 
 Review this amendment and the Nancy/Thomas expected behavior before modifying the D16 payload and validator. Then implement one controlled PREP/PRACTICE slice, run pre-spend tests and one pinned development comparison. Keep qualification, production cutover, database writes, live persistence and the Pre-D17 Live Validation Gate separate. The current five-case D15 artifact is development evidence, not a D16 release authorization.
+
+## Implemented first development slice — 2 October
+
+`buildD16PreparationActions` and its validator now provide `d16-preparation-v2-development` in the existing D16 module. The legacy D16 builder, validator and production routing remain unchanged. Tensions still come from the existing deterministic builder; the slice emits PREP/PRACTICE only, without inventing evaluation results.
+
+Preparation selections are explicit curated requirement-to-evidence mappings. This first slice does **not** automatically establish contextual relevance. Nancy/Thomas tests are controlled fixture comparisons using real source wording, not new assembled-CV/model runs. No personalization qualification follows from their passing. Coverage reports keep personalization NOT_EVALUATED until a separate content review.
+
+The payload separates D6 requirement-support references from contextual source references and accepted D15 relationship IDs. Canonical requirement status is copied without upgrades. A full dependency fingerprint includes ledger, D6, D15 result, selected anchors, RCM, JD, context and language. Tampering or stale material fails closed. Accepted D15 results must retain both positive validated axes, a matching headline, current codebook, exact licensing spans and no vetoes; D16 does not create or re-judge a relationship. This validates the supplied existing D15 result contract, not the semantic correctness of the judge itself.
+
+Instructions quote canonical sources, keep others' work distinct, mark self-reported relationships as self-report, and forbid turning support into leadership or unestablished standards into facts. Missing relevant anchors yield an explicit fallback. EN/FR wording is supplied; source text remains in its original language. No free-form action writer is enabled, which makes the v2 validator able to reject an altered instruction exactly.
+
+Pre-spend validation: typecheck and 338 tests (337 canonical plus the D14 runtime gate) passed. Six new checks cover Nancy's contextual accounting/non-IFRS boundary, Thomas's fallback against the same standards requirement, tampered claims/forged IDs/stale source, other-actor ownership, single-answer accepted D15 self-report, and French instructions.
+
+Remaining: independent review of this versioned amendment/implementation; an actual assembled Nancy/Thomas comparison; broader contradictory, facet, denial/partial and no-JD cases; candidate-relevant anchor selection beyond curation; and a pinned paid development run only when its outputs answer a new question. Production cutover, qualification, persistence and D17 remain closed. A matching source reference alone is not a semantic-relevance pass.
+
+### Review corrections and assembled runtime comparison
+
+Internal review added a second application of existing D15 deterministic vetoes at the D16 boundary (a positive supplied G/S flag cannot bypass current attribution vetoes) and an explicit candidate-facing contradiction warning. Further regressions preserve zero-action states and reject unresolved/denied relationship references. Typecheck and 341 tests pass after these changes (340 canonical plus D14 runtime).
+
+The controlled runner `scripts/d16-evidence-linked-development.ts` assembles E1 through D6 from every responsibility line in the familiar Nancy and Thomas fixtures against one identical standards JD. It does not read sessions or write a database, rerun the D15 judges, introduce a new model, or claim these are full uploaded CV documents. RCM criticality and the contextual Nancy anchor selection are explicitly curated development inputs. Requirement extraction is separate per candidate and must be inspected for comparison equivalence. The complete ledger, D6 bridge, Mirror, model capability provenance, dependency fingerprint and dispatched actions are saved before/after dispatch so the expensive upstream calls need not be repeated for offline D16 changes. Content review remains NOT_EVALUATED until the actual outputs are read; no structural pass is a personalization claim.
+
+## Automatic context selection development extension
+
+The next slice adds a constrained semantic selector over canonical source atoms and already accepted D15 relationships. Its only output authority is contextual preparation relevance. Deterministic D16 code continues to select/rank/cap tensions and derive criticality, states and truthfulness boundaries. The selector cannot produce requirements, proof judgments, headlines, actions or candidate answers. Guidance remains a deterministic projection of canonical sources and missing facets.
+
+The selector first rebuilds and validates the existing D1–D6 and D15 projections from the saved ledger, then checks supplied D15 licenses, source eligibility, closure and current deterministic vetoes. Known IDs, bounded selection counts and rationale shape are enforced. Model relevance explanations stay internal and are explicitly pending content review. An empty relevant-anchor choice is valid, and zero eligible tensions costs no model call. Async dependency mutation is rejected; outputs retain a full JSON-stable dependency fingerprint.
+
+D16PreparationInputs optionally records selection_source=AUTOMATIC_CONTEXT_SELECTOR; actions distinguish automatic context from curated context and no relevant anchor. No selector result can change requirement_proof_refs or canonical status. Guidance now also carries the selected tension's priority, criticality, assessment context, objectives and traceable missing facets. D21 evaluation remains the existing deterministic criteria handoff, not an invented performance result.
+
+The one-run input/expectation freeze is docs/D16_AUTOMATIC_DEVELOPMENT_PREREGISTRATION_2026-10-02.md. Tests use saved canonical inputs and genuine EN/FR accepted CONFIRMED_RELATIONSHIP objects from the earlier simulated loop; conservative synthetic support controls are disclosed and are not represented as model output. The runtime comparison uses the existing canonical support judge only for the explicit new five-requirement role and never reruns E1 or D15 judgments. Both Nancy and Thomas discard curated anchor mappings before the selector sees their inputs.
+
+Copilot and CodeRabbit findings at 85bab330 are recorded in D16_REVIEW_DISPOSITIONS_2026-10-02.md. The old content replay remains an immutable historical artifact; a new run gets a separate report. Qualification, production cutover, database writes, locked-line merges, real pathway/WOW validation and D17 remain closed.

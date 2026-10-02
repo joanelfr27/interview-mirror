@@ -1,0 +1,16 @@
+import type { EvidenceLedger, Requirement, SourceSpan } from "@/lib/canonical-evidence-model";
+
+/** Explicit curated development role, never generated from the candidate or inferred from a missing JD. */
+export const D16_SALES_ROLE_BASELINE = [
+ {id:"ROLE-FORECAST",criticality:"CRITICAL",en:"Use monthly sales forecasts as input to structured pipeline reviews across a multi-country region.",fr:"Utiliser les prévisions de ventes mensuelles dans les revues structurées du pipeline commercial à l'échelle de plusieurs pays.",facets:[{type:"FUNCTION",en:"Use monthly sales forecasts as input to structured pipeline reviews",fr:"Utiliser les prévisions de ventes mensuelles comme donnée d’entrée des revues structurées du pipeline commercial"},{type:"SCOPE",en:"Across a multi-country region",fr:"À l’échelle de plusieurs pays"}]},
+ {id:"ROLE-ACCOUNTS",criticality:"IMPORTANT",en:"Manage a portfolio of business customers.",fr:"Gérer un portefeuille de clients professionnels.",facets:[{type:"FUNCTION",en:"Manage a portfolio of business customers",fr:"Gérer un portefeuille de clients professionnels"}]},
+ {id:"ROLE-OBSERVATIONS",criticality:"IMPORTANT",en:"Present customer and market observations to senior management.",fr:"Présenter les observations clients et marché à la direction.",facets:[{type:"FUNCTION",en:"Present customer and market observations to senior management",fr:"Présenter les observations clients et marché à la direction"}]},
+ {id:"ROLE-COACHING",criticality:"SUPPORTING",en:"Coach account executives on customer planning and reporting routines.",fr:"Accompagner les chargés de clientèle sur la planification client et les routines de reporting.",facets:[{type:"FUNCTION",en:"Coach account executives on customer planning and reporting routines",fr:"Accompagner les chargés de clientèle sur la planification client et les routines de reporting"}]},
+ {id:"ROLE-LAUNCH",criticality:"CRITICAL",en:"Lead product launches with full personal ownership.",fr:"Piloter les lancements de produits en assumant la pleine responsabilité personnelle.",facets:[{type:"FUNCTION",en:"Coordinate product launches",fr:"Coordonner les lancements de produits"},{type:"OWNERSHIP",en:"Full personal ownership of product launches",fr:"Pleine responsabilité personnelle des lancements de produits"}]}
+] as const;
+export function attachD16DevelopmentRole(ledger:EvidenceLedger,language:"en"|"fr"):EvidenceLedger {
+ const spans:SourceSpan[]=[];let offset=0;
+ for(const r of D16_SALES_ROLE_BASELINE){spans.push({id:"SPAN-"+r.id,document_id:"D16-CURATED-SALES-ROLE-V1",text:r[language],start_offset:offset,end_offset:offset+r[language].length,language});offset+=r[language].length+1;}
+ const requirements:Requirement[]=D16_SALES_ROLE_BASELINE.map((r,i)=>({id:r.id,source_span_id:spans[i].id,normalized_requirement:r[language],category:"sales",salience:r.criticality==="CRITICAL"?"CORE":r.criticality==="IMPORTANT"?"IMPORTANT":"SUPPORTING",facets:r.facets.map((f,j)=>({id:r.id+"-F"+j,type:f.type,requirement:f[language],source_span_id:spans[i].id})),extraction_confidence:1}));
+ return {...structuredClone(ledger),source_spans:[...structuredClone(ledger.source_spans),...spans],requirements,support_judgments:[],requirement_statuses:[],unresolved_items:[],candidate_elicitations:[],demonstration_objectives:[]};
+}

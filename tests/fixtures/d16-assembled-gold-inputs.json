@@ -1,0 +1,1886 @@
+{
+  "mode": "DEVELOPMENT_ASSEMBLED_GOLD_RESPONSIBILITY_TEXT_NOT_QUALIFICATION",
+  "upstream_report_sha256": "64d1953da7db576dfa1994bccfe9e89e3015fda73bb4faaa2ff0e0290390a802",
+  "upstream_run": 37032538646,
+  "upstream_engine": "42cf5ef6eb09501960159352f27d9b343bcbf085",
+  "case_inputs": [
+    {
+      "candidate": "NANCY",
+      "input": {
+        "canonical": {
+          "mirror": {
+            "version": "d15-v1",
+            "evidence": [
+              {
+                "evidence_id": "1",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                "source_quote": "Managing accounting systems and financial procedures.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "10",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-569-630",
+                "source_quote": "Communicating financial information to internal stakeholders.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "2",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                "source_quote": "Preparing and analysing actual, forecast and budget financial information.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "3",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                "source_quote": "Managing statutory financial reporting and taxation requirements.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "4",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                "source_quote": "Supporting acquisition accounting and financial integration activities.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "5",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                "source_quote": "Supporting systems integration following business changes.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "6",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-326-386",
+                "source_quote": "Implementing and improving accounting systems and processes.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "7",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-387-425",
+                "source_quote": "Training and developing finance staff.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "8",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                "source_quote": "Providing financial information to management to support business decisions.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "9",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-503-568",
+                "source_quote": "Maintaining effective financial controls and reporting processes.",
+                "source_type": "CV"
+              }
+            ],
+            "threads": [
+              {
+                "id": "THREAD-1-4-5-6",
+                "label": "Implementing and improving accounting systems and processes",
+                "evidence_ids": [
+                  "1",
+                  "4",
+                  "5",
+                  "6"
+                ],
+                "connection_reason": "SHARED_OBJECT",
+                "maturity": "EMERGING_PATTERN",
+                "maturity_basis": {
+                  "proven_context_count": 1,
+                  "context_status": "CANONICAL_ROLE_CONTEXT_UNAVAILABLE",
+                  "evidence_ids": [
+                    "1",
+                    "4",
+                    "5",
+                    "6"
+                  ],
+                  "source_span_ids": [
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-326-386"
+                  ]
+                },
+                "not_said_yet": [
+                  {
+                    "dimension": "OUTCOME",
+                    "evidence_ids": [
+                      "1",
+                      "4",
+                      "5",
+                      "6"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-326-386"
+                    ]
+                  },
+                  {
+                    "dimension": "SCALE",
+                    "evidence_ids": [
+                      "1",
+                      "4",
+                      "5",
+                      "6"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-326-386"
+                    ]
+                  },
+                  {
+                    "dimension": "TIMING",
+                    "evidence_ids": [
+                      "1",
+                      "4",
+                      "5",
+                      "6"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-326-386"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "THREAD-10-2-8",
+                "label": "Communicating financial information to internal stakeholders",
+                "evidence_ids": [
+                  "10",
+                  "2",
+                  "8"
+                ],
+                "connection_reason": "SHARED_OBJECT",
+                "maturity": "EMERGING_PATTERN",
+                "maturity_basis": {
+                  "proven_context_count": 1,
+                  "context_status": "CANONICAL_ROLE_CONTEXT_UNAVAILABLE",
+                  "evidence_ids": [
+                    "10",
+                    "2",
+                    "8"
+                  ],
+                  "source_span_ids": [
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-569-630"
+                  ]
+                },
+                "not_said_yet": [
+                  {
+                    "dimension": "OUTCOME",
+                    "evidence_ids": [
+                      "10",
+                      "2",
+                      "8"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-569-630"
+                    ]
+                  },
+                  {
+                    "dimension": "SCALE",
+                    "evidence_ids": [
+                      "10",
+                      "2",
+                      "8"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-569-630"
+                    ]
+                  },
+                  {
+                    "dimension": "TIMING",
+                    "evidence_ids": [
+                      "10",
+                      "2",
+                      "8"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-569-630"
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "THREAD-3-9",
+                "label": "Maintaining effective financial controls and reporting processes",
+                "evidence_ids": [
+                  "3",
+                  "9"
+                ],
+                "connection_reason": "SHARED_OBJECT",
+                "maturity": "EMERGING_PATTERN",
+                "maturity_basis": {
+                  "proven_context_count": 1,
+                  "context_status": "CANONICAL_ROLE_CONTEXT_UNAVAILABLE",
+                  "evidence_ids": [
+                    "3",
+                    "9"
+                  ],
+                  "source_span_ids": [
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                    "SPAN-CV-d16-comparison-shared-role-ATOM-503-568"
+                  ]
+                },
+                "not_said_yet": [
+                  {
+                    "dimension": "OUTCOME",
+                    "evidence_ids": [
+                      "3",
+                      "9"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-503-568"
+                    ]
+                  },
+                  {
+                    "dimension": "SCALE",
+                    "evidence_ids": [
+                      "3",
+                      "9"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-503-568"
+                    ]
+                  },
+                  {
+                    "dimension": "TIMING",
+                    "evidence_ids": [
+                      "3",
+                      "9"
+                    ],
+                    "source_span_ids": [
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                      "SPAN-CV-d16-comparison-shared-role-ATOM-503-568"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "statements": [
+              {
+                "id": "FACT-1",
+                "kind": "FACT",
+                "text": "Managing accounting systems and financial procedures.",
+                "evidence_ids": [
+                  "1"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-10",
+                "kind": "FACT",
+                "text": "Communicating financial information to internal stakeholders.",
+                "evidence_ids": [
+                  "10"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-2",
+                "kind": "FACT",
+                "text": "Preparing and analysing actual, forecast and budget financial information.",
+                "evidence_ids": [
+                  "2"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-3",
+                "kind": "FACT",
+                "text": "Managing statutory financial reporting and taxation requirements.",
+                "evidence_ids": [
+                  "3"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-4",
+                "kind": "FACT",
+                "text": "Supporting acquisition accounting and financial integration activities.",
+                "evidence_ids": [
+                  "4"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-5",
+                "kind": "FACT",
+                "text": "Supporting systems integration following business changes.",
+                "evidence_ids": [
+                  "5"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-6",
+                "kind": "FACT",
+                "text": "Implementing and improving accounting systems and processes.",
+                "evidence_ids": [
+                  "6"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-7",
+                "kind": "FACT",
+                "text": "Training and developing finance staff.",
+                "evidence_ids": [
+                  "7"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-8",
+                "kind": "FACT",
+                "text": "Providing financial information to management to support business decisions.",
+                "evidence_ids": [
+                  "8"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-9",
+                "kind": "FACT",
+                "text": "Maintaining effective financial controls and reporting processes.",
+                "evidence_ids": [
+                  "9"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "PATTERN-THREAD-1-4-5-6",
+                "kind": "PATTERN",
+                "text": "Repeated professional thread: Implementing and improving accounting systems and processes.",
+                "evidence_ids": [
+                  "1",
+                  "4",
+                  "5",
+                  "6"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "PATTERN-THREAD-10-2-8",
+                "kind": "PATTERN",
+                "text": "Repeated professional thread: Communicating financial information to internal stakeholders.",
+                "evidence_ids": [
+                  "10",
+                  "2",
+                  "8"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "PATTERN-THREAD-3-9",
+                "kind": "PATTERN",
+                "text": "Repeated professional thread: Maintaining effective financial controls and reporting processes.",
+                "evidence_ids": [
+                  "3",
+                  "9"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              }
+            ],
+            "story": {
+              "opening": "Repeated professional thread: Implementing and improving accounting systems and processes.",
+              "opening_statement_id": "PATTERN-THREAD-1-4-5-6",
+              "threads": [
+                {
+                  "thread_id": "THREAD-1-4-5-6",
+                  "title": "Implementing and improving accounting systems and processes",
+                  "statement_ids": [
+                    "FACT-1",
+                    "FACT-4",
+                    "FACT-5",
+                    "FACT-6",
+                    "PATTERN-THREAD-1-4-5-6"
+                  ]
+                },
+                {
+                  "thread_id": "THREAD-10-2-8",
+                  "title": "Communicating financial information to internal stakeholders",
+                  "statement_ids": [
+                    "FACT-10",
+                    "FACT-2",
+                    "FACT-8",
+                    "PATTERN-THREAD-10-2-8"
+                  ]
+                },
+                {
+                  "thread_id": "THREAD-3-9",
+                  "title": "Maintaining effective financial controls and reporting processes",
+                  "statement_ids": [
+                    "FACT-3",
+                    "FACT-9",
+                    "PATTERN-THREAD-3-9"
+                  ]
+                }
+              ]
+            }
+          },
+          "bridge": {
+            "version": "d6-v1",
+            "requirements": [
+              {
+                "requirement_id": "1",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "status": "UNRESOLVED",
+                "route_mode": "VERIFY_GAP",
+                "fit_state": "UNRESOLVED",
+                "gap_classification": null,
+                "preparation_state": "ELICIT_AND_CLARIFY",
+                "strategy_action": "ELICIT_AND_CLARIFY",
+                "evidence": [],
+                "unresolved_item_ids": [
+                  "UNRESOLVED-1"
+                ],
+                "demonstration_objective_ids": [
+                  "DEMO-UNRESOLVED-1"
+                ],
+                "boundaries": [
+                  {
+                    "permitted_claims": [],
+                    "prohibited_claims": [
+                      "Do not claim the unresolved facet is fully established.",
+                      "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience."
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "ledger": {
+            "source_spans": [
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Managing accounting systems and financial procedures.",
+                "start_offset": 0,
+                "end_offset": 53,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Preparing and analysing actual, forecast and budget financial information.",
+                "start_offset": 54,
+                "end_offset": 128,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Managing statutory financial reporting and taxation requirements.",
+                "start_offset": 129,
+                "end_offset": 194,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Supporting acquisition accounting and financial integration activities.",
+                "start_offset": 195,
+                "end_offset": 266,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Supporting systems integration following business changes.",
+                "start_offset": 267,
+                "end_offset": 325,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-326-386",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Implementing and improving accounting systems and processes.",
+                "start_offset": 326,
+                "end_offset": 386,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-387-425",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Training and developing finance staff.",
+                "start_offset": 387,
+                "end_offset": 425,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Providing financial information to management to support business decisions.",
+                "start_offset": 426,
+                "end_offset": 502,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-503-568",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Maintaining effective financial controls and reporting processes.",
+                "start_offset": 503,
+                "end_offset": 568,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-569-630",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Communicating financial information to internal stakeholders.",
+                "start_offset": 569,
+                "end_offset": 630,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-11-54",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "applying international accounting standards",
+                "start_offset": 11,
+                "end_offset": 54,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-0-10",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "Experience",
+                "start_offset": 0,
+                "end_offset": 10,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-55-66",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "is required",
+                "start_offset": 55,
+                "end_offset": 66,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-REQUIREMENT-0-67",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "Experience applying international accounting standards is required.",
+                "start_offset": 0,
+                "end_offset": 67,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              }
+            ],
+            "evidence": [
+              {
+                "id": "1",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-53",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Managing",
+                  "object": "accounting systems and financial procedures"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "2",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-54-128",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Preparing and analysing",
+                  "object": "actual, forecast and budget financial information"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "3",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-129-194",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Managing",
+                  "object": "statutory financial reporting and taxation requirements"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "4",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-195-266",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Supporting",
+                  "object": "acquisition accounting and financial integration activities"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "5",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-267-325",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Supporting",
+                  "object": "systems integration following business changes"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "6",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-326-386",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Implementing and improving",
+                  "object": "accounting systems and processes"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "7",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-387-425",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Training and developing",
+                  "object": "finance staff"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "8",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-426-502",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Providing",
+                  "object": "financial information to management to support business decisions"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "9",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-503-568",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Maintaining",
+                  "object": "effective financial controls and reporting processes"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "10",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-569-630",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Communicating",
+                  "object": "financial information to internal stakeholders"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              }
+            ],
+            "requirements": [
+              {
+                "id": "1",
+                "source_span_id": "SPAN-JD-d16-comparison-shared-role-REQUIREMENT-0-67",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "category": "CORE",
+                "salience": "CORE",
+                "facets": [
+                  {
+                    "id": "1.1",
+                    "type": "FUNCTION",
+                    "requirement": "applying international accounting standards",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-11-54"
+                  },
+                  {
+                    "id": "1.2",
+                    "type": "LEVEL",
+                    "requirement": "Experience",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-0-10"
+                  },
+                  {
+                    "id": "1.3",
+                    "type": "OUTCOME",
+                    "requirement": "is required",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-55-66"
+                  }
+                ],
+                "extraction_confidence": 1
+              }
+            ],
+            "support_judgments": [
+              {
+                "id": "1",
+                "requirement_id": "1",
+                "facet_id": "1.1",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not provide any evidence of experience applying international accounting standards. All provided evidence relates to managing accounting systems, financial reporting, and other responsibilities but does not mention international accounting standards specifically.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              },
+              {
+                "id": "2",
+                "requirement_id": "1",
+                "facet_id": "1.2",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not indicate the level of experience the candidate has. While they describe various responsibilities, there is no explicit mention of the duration or depth of experience required for the role.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              },
+              {
+                "id": "3",
+                "requirement_id": "1",
+                "facet_id": "1.3",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not address whether the experience applying international accounting standards is required or not. There is no evidence provided that confirms or denies the candidate's ability to meet this requirement.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              }
+            ],
+            "requirement_statuses": [
+              {
+                "requirement_id": "1",
+                "status": "UNRESOLVED"
+              }
+            ],
+            "unresolved_items": [
+              {
+                "id": "UNRESOLVED-1",
+                "requirement_id": "1",
+                "facet_ids": [
+                  "1.1",
+                  "1.2",
+                  "1.3"
+                ],
+                "type": "ABSENT",
+                "supporting_evidence_ids": [],
+                "contradiction_evidence_ids": [],
+                "absence_basis": "UNMENTIONED",
+                "negation_evidence_ids": []
+              }
+            ],
+            "candidate_elicitations": [
+              {
+                "id": "ELICIT-UNRESOLVED-1",
+                "unresolved_item_id": "UNRESOLVED-1",
+                "question": "To clarify this point, describe any relevant experience you have actually had, your personal role, context, scope and outcome. If you do not have direct experience, say so and, if relevant, describe the closest experience you could transfer."
+              }
+            ],
+            "demonstration_objectives": [
+              {
+                "id": "DEMO-UNRESOLVED-1",
+                "target_unresolved_item_id": "UNRESOLVED-1",
+                "observable_cue": "Make explicit the candidate's own evidence for: applying international accounting standards; Experience; is required. If it cannot be honestly demonstrated, state the boundary rather than inventing evidence.",
+                "supporting_true_atom_ids": [],
+                "truthfulness_boundary": {
+                  "permitted_claims": [],
+                  "prohibited_claims": [
+                    "Do not claim the unresolved facet is fully established.",
+                    "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience."
+                  ]
+                },
+                "probe_family": "FUNCTION+LEVEL+OUTCOME"
+              }
+            ]
+          },
+          "canonical_requirements": [
+            {
+              "id": "1",
+              "normalized_requirement": "Experience applying international accounting standards"
+            }
+          ],
+          "role_capability_model": {
+            "version": "rcm-v1",
+            "model_id": "d16-standards-development-role",
+            "role_family": "accounting",
+            "role_title": "Accounting role — controlled standards comparison",
+            "requirements": [
+              {
+                "capability_id": "DEV-CAP-0",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "baseline_criticality": "CRITICAL",
+                "source": {
+                  "source_type": "ADMIN_CURATED",
+                  "source_id": "d16-development-standards-design",
+                  "source_version": "1"
+                },
+                "canonical_requirement_id": "1"
+              }
+            ]
+          },
+          "jd_present": true,
+          "jd_fingerprint": "sha256:472152b18883f04b0e4714ddea5d886b98c8a2ee436e1d191ec80b6499f0e0e7",
+          "dependency_snapshot": {
+            "version": "d16-dependency-snapshot-v1",
+            "d15_fingerprint": "sha256:33f0de9b1c85a427de8048f2ac71f66f2cc71c8c210115fefb8c05ede597502c",
+            "rcm_fingerprint": "sha256:5481036ad9a71868f8fe8078f9a8df79fb8322bb0b22a5adbb61e175be0478c0",
+            "jd_fingerprint": "sha256:472152b18883f04b0e4714ddea5d886b98c8a2ee436e1d191ec80b6499f0e0e7",
+            "assessment_context_fingerprint": null
+          }
+        },
+        "language": "en",
+        "accepted_relationships": [],
+        "selections": [
+          {
+            "requirement_id": "1",
+            "preparation_evidence_ids": [
+              "3",
+              "4",
+              "6"
+            ],
+            "relationship_ids": []
+          }
+        ],
+        "dependency_fingerprint": "sha256:7ced966deb58493f009241097348363eae6b0b8bc96cf0ea57f4fe49329c637b"
+      },
+      "upstream_dependency_fingerprint": "sha256:e148b505a20d438aff3321b613014b89793540b6f4ec390daa00389a9b5b5b2b"
+    },
+    {
+      "candidate": "THOMAS",
+      "input": {
+        "canonical": {
+          "mirror": {
+            "version": "d15-v1",
+            "evidence": [
+              {
+                "evidence_id": "1",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-56",
+                "source_quote": "Coordinated project meetings and maintained action logs.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "10",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-374-435",
+                "source_quote": "Helped project managers prepare steering-committee materials.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "2",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-56",
+                "source_quote": "Coordinated project meetings and maintained action logs.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "3",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-57-106",
+                "source_quote": "Prepared status updates for project stakeholders.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "4",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-107-160",
+                "source_quote": "Worked with technical teams to track delivery issues.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "5",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-161-208",
+                "source_quote": "Supported the rollout of a new customer portal.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "6",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-209-259",
+                "source_quote": "Collected user feedback during the portal rollout.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "7",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-260-312",
+                "source_quote": "Maintained project documentation and risk registers.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "8",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-260-312",
+                "source_quote": "Maintained project documentation and risk registers.",
+                "source_type": "CV"
+              },
+              {
+                "evidence_id": "9",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-313-373",
+                "source_quote": "Assisted with training sessions for users of the new portal.",
+                "source_type": "CV"
+              }
+            ],
+            "threads": [],
+            "statements": [
+              {
+                "id": "FACT-1",
+                "kind": "FACT",
+                "text": "Coordinated project meetings and maintained action logs.",
+                "evidence_ids": [
+                  "1"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-10",
+                "kind": "FACT",
+                "text": "Helped project managers prepare steering-committee materials.",
+                "evidence_ids": [
+                  "10"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-2",
+                "kind": "FACT",
+                "text": "Coordinated project meetings and maintained action logs.",
+                "evidence_ids": [
+                  "2"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-3",
+                "kind": "FACT",
+                "text": "Prepared status updates for project stakeholders.",
+                "evidence_ids": [
+                  "3"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-4",
+                "kind": "FACT",
+                "text": "Worked with technical teams to track delivery issues.",
+                "evidence_ids": [
+                  "4"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-5",
+                "kind": "FACT",
+                "text": "Supported the rollout of a new customer portal.",
+                "evidence_ids": [
+                  "5"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-6",
+                "kind": "FACT",
+                "text": "Collected user feedback during the portal rollout.",
+                "evidence_ids": [
+                  "6"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-7",
+                "kind": "FACT",
+                "text": "Maintained project documentation and risk registers.",
+                "evidence_ids": [
+                  "7"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-8",
+                "kind": "FACT",
+                "text": "Maintained project documentation and risk registers.",
+                "evidence_ids": [
+                  "8"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              },
+              {
+                "id": "FACT-9",
+                "kind": "FACT",
+                "text": "Assisted with training sessions for users of the new portal.",
+                "evidence_ids": [
+                  "9"
+                ],
+                "maturity": "EMERGING_PATTERN"
+              }
+            ],
+            "story": {
+              "opening": "Your professional story is still gathering evidence.",
+              "opening_statement_id": null,
+              "threads": []
+            }
+          },
+          "bridge": {
+            "version": "d6-v1",
+            "requirements": [
+              {
+                "requirement_id": "1",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "status": "UNRESOLVED",
+                "route_mode": "VERIFY_GAP",
+                "fit_state": "UNRESOLVED",
+                "gap_classification": null,
+                "preparation_state": "ELICIT_AND_CLARIFY",
+                "strategy_action": "ELICIT_AND_CLARIFY",
+                "evidence": [],
+                "unresolved_item_ids": [
+                  "UNRESOLVED-1"
+                ],
+                "demonstration_objective_ids": [
+                  "DEMO-UNRESOLVED-1"
+                ],
+                "boundaries": [
+                  {
+                    "permitted_claims": [],
+                    "prohibited_claims": [
+                      "Do not claim the unresolved facet is fully established.",
+                      "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience."
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "ledger": {
+            "source_spans": [
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-56",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Coordinated project meetings and maintained action logs.",
+                "start_offset": 0,
+                "end_offset": 56,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-57-106",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Prepared status updates for project stakeholders.",
+                "start_offset": 57,
+                "end_offset": 106,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-107-160",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Worked with technical teams to track delivery issues.",
+                "start_offset": 107,
+                "end_offset": 160,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-161-208",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Supported the rollout of a new customer portal.",
+                "start_offset": 161,
+                "end_offset": 208,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-209-259",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Collected user feedback during the portal rollout.",
+                "start_offset": 209,
+                "end_offset": 259,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-260-312",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Maintained project documentation and risk registers.",
+                "start_offset": 260,
+                "end_offset": 312,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-313-373",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Assisted with training sessions for users of the new portal.",
+                "start_offset": 313,
+                "end_offset": 373,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-CV-d16-comparison-shared-role-ATOM-374-435",
+                "document_id": "CV-d16-comparison-shared-role",
+                "text": "Helped project managers prepare steering-committee materials.",
+                "start_offset": 374,
+                "end_offset": 435,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-11-54",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "applying international accounting standards",
+                "start_offset": 11,
+                "end_offset": 54,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-0-10",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "Experience",
+                "start_offset": 0,
+                "end_offset": 10,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-FACET-55-66",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "is required",
+                "start_offset": 55,
+                "end_offset": 66,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              },
+              {
+                "id": "SPAN-JD-d16-comparison-shared-role-REQUIREMENT-0-67",
+                "document_id": "JD-d16-comparison-shared-role",
+                "text": "Experience applying international accounting standards is required.",
+                "start_offset": 0,
+                "end_offset": 67,
+                "language": "en",
+                "source_section": "UNKNOWN_SECTION"
+              }
+            ],
+            "evidence": [
+              {
+                "id": "1",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-56",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Coordinated",
+                  "object": "project meetings"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "2",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-0-56",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "maintained",
+                  "object": "action logs"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "3",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-57-106",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Prepared",
+                  "object": "status updates"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "4",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-107-160",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Worked",
+                  "object": "technical teams"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "5",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-161-208",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Supported",
+                  "object": "the rollout of a new customer portal"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "6",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-209-259",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Collected",
+                  "object": "user feedback"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "7",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-260-312",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Maintained",
+                  "object": "project documentation"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "8",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-260-312",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Maintained",
+                  "object": "risk registers"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "9",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-313-373",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Assisted",
+                  "object": "training sessions"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              },
+              {
+                "id": "10",
+                "source_span_id": "SPAN-CV-d16-comparison-shared-role-ATOM-374-435",
+                "provenance": {
+                  "source_type": "CV",
+                  "language": "en",
+                  "extraction_method": "LLM"
+                },
+                "subject": {
+                  "actor": "candidate",
+                  "actor_basis": "IMPLICIT_CANDIDATE",
+                  "ownership": "UNKNOWN"
+                },
+                "action": {
+                  "normalized_action": "Helped",
+                  "object": "project managers"
+                },
+                "context": {},
+                "scale": {},
+                "time": {},
+                "outcome": null,
+                "assertion": {
+                  "type": "RESPONSIBILITY",
+                  "polarity": "AFFIRMATIVE"
+                },
+                "verifiability": {
+                  "has_quantifiable_metric": false,
+                  "has_third_party_entity": false,
+                  "has_time_anchor": false
+                },
+                "extraction_confidence": 1
+              }
+            ],
+            "requirements": [
+              {
+                "id": "1",
+                "source_span_id": "SPAN-JD-d16-comparison-shared-role-REQUIREMENT-0-67",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "category": "CORE",
+                "salience": "CORE",
+                "facets": [
+                  {
+                    "id": "1.1",
+                    "type": "FUNCTION",
+                    "requirement": "applying international accounting standards",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-11-54"
+                  },
+                  {
+                    "id": "1.2",
+                    "type": "LEVEL",
+                    "requirement": "Experience",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-0-10"
+                  },
+                  {
+                    "id": "1.3",
+                    "type": "OUTCOME",
+                    "requirement": "is required",
+                    "source_span_id": "SPAN-JD-d16-comparison-shared-role-FACET-55-66"
+                  }
+                ],
+                "extraction_confidence": 1
+              }
+            ],
+            "support_judgments": [
+              {
+                "id": "1",
+                "requirement_id": "1",
+                "facet_id": "1.1",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not provide any evidence related to applying international accounting standards, which is a specific requirement of the role.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              },
+              {
+                "id": "2",
+                "requirement_id": "1",
+                "facet_id": "1.2",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not indicate any level of experience related to international accounting standards, as none of the evidence pertains to this area.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              },
+              {
+                "id": "3",
+                "requirement_id": "1",
+                "facet_id": "1.3",
+                "status": "NONE",
+                "supporting_evidence_ids": [],
+                "rationale": "The candidate atoms do not demonstrate any outcomes related to the application of international accounting standards, which is a requirement for the role.",
+                "confidence": 0,
+                "abstained": true,
+                "abstention_reason": "Insufficient explicit evidence to make a positive support judgment.",
+                "support_basis": "DOCUMENTED",
+                "analogical_mapping": null
+              }
+            ],
+            "requirement_statuses": [
+              {
+                "requirement_id": "1",
+                "status": "UNRESOLVED"
+              }
+            ],
+            "unresolved_items": [
+              {
+                "id": "UNRESOLVED-1",
+                "requirement_id": "1",
+                "facet_ids": [
+                  "1.1",
+                  "1.2",
+                  "1.3"
+                ],
+                "type": "ABSENT",
+                "supporting_evidence_ids": [],
+                "contradiction_evidence_ids": [],
+                "absence_basis": "UNMENTIONED",
+                "negation_evidence_ids": []
+              }
+            ],
+            "candidate_elicitations": [
+              {
+                "id": "ELICIT-UNRESOLVED-1",
+                "unresolved_item_id": "UNRESOLVED-1",
+                "question": "To clarify this point, describe any relevant experience you have actually had, your personal role, context, scope and outcome. If you do not have direct experience, say so and, if relevant, describe the closest experience you could transfer."
+              }
+            ],
+            "demonstration_objectives": [
+              {
+                "id": "DEMO-UNRESOLVED-1",
+                "target_unresolved_item_id": "UNRESOLVED-1",
+                "observable_cue": "Make explicit the candidate's own evidence for: applying international accounting standards; Experience; is required. If it cannot be honestly demonstrated, state the boundary rather than inventing evidence.",
+                "supporting_true_atom_ids": [],
+                "truthfulness_boundary": {
+                  "permitted_claims": [],
+                  "prohibited_claims": [
+                    "Do not claim the unresolved facet is fully established.",
+                    "Do not add an unrecorded tool, scope, ownership, metric, outcome, seniority or sector experience."
+                  ]
+                },
+                "probe_family": "FUNCTION+LEVEL+OUTCOME"
+              }
+            ]
+          },
+          "canonical_requirements": [
+            {
+              "id": "1",
+              "normalized_requirement": "Experience applying international accounting standards"
+            }
+          ],
+          "role_capability_model": {
+            "version": "rcm-v1",
+            "model_id": "d16-standards-development-role",
+            "role_family": "accounting",
+            "role_title": "Accounting role — controlled standards comparison",
+            "requirements": [
+              {
+                "capability_id": "DEV-CAP-0",
+                "normalized_requirement": "Experience applying international accounting standards",
+                "baseline_criticality": "CRITICAL",
+                "source": {
+                  "source_type": "ADMIN_CURATED",
+                  "source_id": "d16-development-standards-design",
+                  "source_version": "1"
+                },
+                "canonical_requirement_id": "1"
+              }
+            ]
+          },
+          "jd_present": true,
+          "jd_fingerprint": "sha256:472152b18883f04b0e4714ddea5d886b98c8a2ee436e1d191ec80b6499f0e0e7",
+          "dependency_snapshot": {
+            "version": "d16-dependency-snapshot-v1",
+            "d15_fingerprint": "sha256:359a1822b90877b4f88b9a0340997158ebcc6e206a51e59d89653023f781d389",
+            "rcm_fingerprint": "sha256:5481036ad9a71868f8fe8078f9a8df79fb8322bb0b22a5adbb61e175be0478c0",
+            "jd_fingerprint": "sha256:472152b18883f04b0e4714ddea5d886b98c8a2ee436e1d191ec80b6499f0e0e7",
+            "assessment_context_fingerprint": null
+          }
+        },
+        "language": "en",
+        "accepted_relationships": [],
+        "selections": [
+          {
+            "requirement_id": "1",
+            "preparation_evidence_ids": [],
+            "relationship_ids": []
+          }
+        ],
+        "dependency_fingerprint": "sha256:03a9705d6e801a7c7211c69ba5b8531127545dc351475bfcfbc6ee0c6fc48a26"
+      },
+      "upstream_dependency_fingerprint": "sha256:a6e4a5cae3d5cd151690e02bcebb5219ad0dfdb1b3aac6b7b0abbb2e7574c0b5"
+    }
+  ],
+  "replay_conversion": "Original development fingerprints preserved; re-encoded against JSON-canonical material. No evidence or support judgment changed."
+}
