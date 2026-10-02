@@ -321,7 +321,8 @@ test("connector substring alone cannot license a relationship when facet sides a
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "input to", licensing_spans: ["Prepared forecasts. Input to pipeline reviews was discussed."] };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("bind content from both sides")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
 });
 
 test("French relational classifier normalizes decomposed Unicode and dépend des", () => {
@@ -343,7 +344,8 @@ test("same-span co-occurrence cannot satisfy use-X-in-Y relationship as DIRECT",
   l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "monthly sales forecasts and introduced a structured pipeline review" } };
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts in pipeline reviews", source_span_id: "S-REQ" };
   const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
-  assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
 });
 
 test("comma-joined independent relation cannot license DIRECT", () => {
@@ -353,7 +355,8 @@ test("comma-joined independent relation cannot license DIRECT", () => {
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "input to", licensing_spans: ["Used forecasts as input to budgeting, and separately ran pipeline reviews."] };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("bind content from both sides")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
 });
 
 test("French plural and feminine based-on forms remain relational after normalization", () => {
