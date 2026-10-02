@@ -16,24 +16,26 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: 28f78f0eb2711f66fdff582171ef605b7f87e5e8
+          ref: cfdc42911204517d7b081201b9ca3605290db686
           fetch-depth: 0
           persist-credentials: false
       - name: Assert pinned loop and evidence definition
         run: |
-          test "$(git rev-parse HEAD)" = "28f78f0eb2711f66fdff582171ef605b7f87e5e8"
+          test "$(git rev-parse HEAD)" = "cfdc42911204517d7b081201b9ca3605290db686"
           test "$(git hash-object docs/d15-semantic-significance-codebook-v1.1-candidate.md)" = "56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-          test "$(git hash-object scripts/d15-conversation-loop.ts)" = "3d5d5576fe9804424b00fb6edcee6a3e9c1918d0"
-          test "$(git hash-object src/lib/canonical-shadow-extractor.ts)" = "e58484c0a0f3dec3d87000cc3b0da5856151585b"
+          test "$(git hash-object scripts/d15-conversation-loop.ts)" = "2c956423ac0502280d8507b9a42095e623dbbbbb"
+          test "$(git hash-object src/lib/canonical-shadow-extractor.ts)" = "22ebb0bda8a2360f3173fdfd3cbdc1a668747d95"
+          test "$(git hash-object src/lib/d15-conversational-mirror.ts)" = "354b641adfc34711cdc4ab3491127cbc472f0566"
           {
-            echo "engine_commit=28f78f0eb2711f66fdff582171ef605b7f87e5e8"
+            echo "engine_commit=cfdc42911204517d7b081201b9ca3605290db686"
             echo "workflow_definition_commit=${{ github.sha }}"
             echo "codebook_blob=56f753c50e50aeb8532d7e7a70eeea04f0e69255"
             echo "erratum_blob=5f888c661a5c4b9efa17724066b0785c3080be3d"
-            echo "loop_definition_blob=3d5d5576fe9804424b00fb6edcee6a3e9c1918d0"
-            echo "E1_extractor_blob=e58484c0a0f3dec3d87000cc3b0da5856151585b"
-            echo "product_decision_blob=9fcf31a039e9609617a1189b213318ed17f327c4"
-            echo "mode=DEVELOPMENT_ONLY_SIMULATED_ANSWER_NOT_QUALIFICATION"
+            echo "loop_definition_blob=2c956423ac0502280d8507b9a42095e623dbbbbb"
+            echo "E1_extractor_blob=22ebb0bda8a2360f3173fdfd3cbdc1a668747d95"
+            echo "answer_loop_blob=354b641adfc34711cdc4ab3491127cbc472f0566"
+            echo "product_decision_blob=cae8f90b33a2f68339f2c36e479007f843602e30"
+            echo "mode=DEVELOPMENT_ONLY_SIMULATED_ANSWERS_NOT_QUALIFICATION"
             echo "cutover=false; database_writes=false"
           } | tee provenance.txt
       - uses: actions/setup-node@v4
@@ -44,7 +46,7 @@ jobs:
       - run: npm run typecheck
       - name: Pre-spend canonical checks
         run: npm run test:canonical
-      - name: Run one simulated conversational loop
+      - name: Run three simulated answers against one frozen proposition
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-conversation-loop.ts
