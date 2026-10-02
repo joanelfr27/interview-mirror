@@ -245,3 +245,33 @@ test("relational classifier covers sequence, dependency, recurrence and French r
     assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
   }
 });
+
+
+test("relational DIRECT rejects a licensing quote that does not contain the asserted connector", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts for the sales team", start_offset: 0, end_offset: 36, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "forecasts" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "input to", licensing_spans: ["Prepared forecasts for the sales team"] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("must explicitly contain the asserted relationship connector")));
+});
+
+test("relational DIRECT rejects a connector absent from the facet", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts because of pipeline reviews", start_offset: 0, end_offset: 40, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts because of pipeline reviews" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "because of", licensing_spans: ["forecasts because of pipeline reviews"] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("connector must be explicitly present in the facet")));
+});
+
+test("accepted model rationale is replaced by a canonical minimal-subset rationale", () => {
+  const l = ledger();
+  const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "Model-written interpretation that should not propagate." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].rationale, "PARTIAL support from minimal evidence [A1].");
+  assert.ok(!result.judgments[0].rationale.includes("Model-written"));
+});
