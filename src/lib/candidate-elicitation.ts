@@ -4,7 +4,7 @@ import {
   type AtomicEvidence, type CandidateElicitation, type CandidateGapClassification,
   type EvidenceLedger, type UnresolvedItem, type SourceSpan,
   type EvidenceOwnership, type ActorBasis, type AssertionType,
-  validateAtomicEvidence, validateRequirementGraph,
+  validateAtomicEvidence, validateAtomicEvidenceAgainstSource, validateRequirementGraph,
 } from "@/lib/canonical-evidence-model";
 import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
 import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
@@ -125,7 +125,10 @@ export async function classifyCandidateElicitation(
       },
       extraction_confidence: 1,
     };
-    const atomErrors = validateAtomicEvidence(atom);
+    const atomErrors = [
+      ...validateAtomicEvidence(atom),
+      ...validateAtomicEvidenceAgainstSource(atom, span),
+    ];
     if (atomErrors.length) {
       throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
     }
@@ -141,7 +144,11 @@ export async function classifyCandidateElicitation(
   const next: EvidenceLedger = {
     ...ledger,
     source_spans: span ? [...ledger.source_spans, span] : ledger.source_spans,
-    evidence: atom && !validateAtomicEvidence(atom).length ? [...ledger.evidence, atom] : ledger.evidence,
+    evidence: atom && span &&
+      !validateAtomicEvidence(atom).length &&
+      !validateAtomicEvidenceAgainstSource(atom, span).length
+      ? [...ledger.evidence, atom]
+      : ledger.evidence,
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
   const judged = await judgeCanonicalSupport(session, next);
