@@ -188,3 +188,12 @@ test("explicit candidate attribution rejects later clause subject switches", () 
     assert.equal(out.actor, "unspecified", source);
   }
 });
+
+
+test("source validator rejects unspecified actor basis with non-unknown ownership", () => {
+  const source = "I supported the payroll team that reconciled accounts.";
+  const value = atom(source, "UNSPECIFIED", "unspecified", "reconciled accounts");
+  value.subject.ownership = "INDIVIDUAL";
+  const span = { id: "S1", document_id: "CV", text: source, start_offset: 0, end_offset: source.length, language: "en" };
+  assert.ok(validateAtomicEvidenceAgainstSource(value, span).some(e => e.includes("ownership=UNKNOWN")));
+});
