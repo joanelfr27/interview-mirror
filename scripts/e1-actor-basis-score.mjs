@@ -55,10 +55,11 @@ const nominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.construction ===
 const frNominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.construction === "nominal" && r.language === "fr");
 
 const candidatePredictions = ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"];
-const fu = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.predicted === "UNSPECIFIED");
+const fu = count(r => r.gold === "IMPLICIT_CANDIDATE" && !candidatePredictions.includes(r.predicted));
 const explicitCandidateFalseAmbiguity = count(r => r.gold === "EXPLICIT_CANDIDATE" && !candidatePredictions.includes(r.predicted));
 const candidateGold = implicit + explicitCandidate;
 const candidateFalseAmbiguity = fu + explicitCandidateFalseAmbiguity;
+const explicitCandidateFalseAmbiguityRate = rate(explicitCandidateFalseAmbiguity, explicitCandidate);
 const fi = count(r => r.gold === "UNSPECIFIED" && candidatePredictions.includes(r.predicted));
 const explicitOtherFalseCandidate = count(r => r.gold === "EXPLICIT_OTHER" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted));
 
@@ -66,7 +67,7 @@ const byLanguage = Object.fromEntries(languages.map(language => {
   const implicitN = count(r => r.language === language && r.gold === "IMPLICIT_CANDIDATE");
   const explicitCandidateN = count(r => r.language === language && r.gold === "EXPLICIT_CANDIDATE");
   const unspecifiedN = count(r => r.language === language && r.gold === "UNSPECIFIED");
-  const implicitFalse = count(r => r.language === language && r.gold === "IMPLICIT_CANDIDATE" && r.predicted === "UNSPECIFIED");
+  const implicitFalse = count(r => r.language === language && r.gold === "IMPLICIT_CANDIDATE" && !candidatePredictions.includes(r.predicted));
   const explicitFalse = count(r => r.language === language && r.gold === "EXPLICIT_CANDIDATE" && !candidatePredictions.includes(r.predicted));
   return [language, {
     implicit: implicitN,
@@ -101,6 +102,7 @@ const samplePass =
 const thresholdPass =
   rate(fu, implicit) !== null && rate(fu, implicit) <= 0.02 &&
   rate(candidateFalseAmbiguity, candidateGold) !== null && rate(candidateFalseAmbiguity, candidateGold) <= 0.02 &&
+  explicitCandidateFalseAmbiguityRate !== null && explicitCandidateFalseAmbiguityRate <= 0.02 &&
   rate(fi, unspecified) !== null && rate(fi, unspecified) <= 0.02 &&
   languages.every(l => rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) !== null && rate(byLanguage[l].false_unspecified, byLanguage[l].implicit) <= 0.03) &&
   languages.every(l => rate(byLanguage[l].candidate_false_ambiguity, byLanguage[l].candidate_gold) !== null && rate(byLanguage[l].candidate_false_ambiguity, byLanguage[l].candidate_gold) <= 0.03) &&
@@ -120,7 +122,7 @@ const report = {
   primary_rates: {
     false_unspecified: { count: fu, denominator: implicit, rate: pct(rate(fu, implicit)) },
     candidate_false_ambiguity: { count: candidateFalseAmbiguity, denominator: candidateGold, rate: pct(rate(candidateFalseAmbiguity, candidateGold)) },
-    explicit_candidate_false_ambiguity: explicitCandidateFalseAmbiguity,
+    explicit_candidate_false_ambiguity: { count: explicitCandidateFalseAmbiguity, denominator: explicitCandidate, rate: pct(explicitCandidateFalseAmbiguityRate) },
     false_implicit_candidate: { count: fi, denominator: unspecified, rate: pct(rate(fi, unspecified)) },
     explicit_other_false_candidate: explicitOtherFalseCandidate,
   },
