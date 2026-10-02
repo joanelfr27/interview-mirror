@@ -1,0 +1,73 @@
+name: D16 David Evidence Basis Rerun
+on:
+  push:
+    branches: [d16-david-basis-rerun]
+permissions:
+  contents: read
+jobs:
+  pre-spend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fe41bbc35b22ff97d06ed9b59792cdc93eff2b3c
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - run: npm run build
+  diagnostic:
+    needs: pre-spend
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fe41bbc35b22ff97d06ed9b59792cdc93eff2b3c
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Record pinned provenance
+        env:
+          ENGINE_COMMIT: fe41bbc35b22ff97d06ed9b59792cdc93eff2b3c
+          WORKFLOW_COMMIT: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import os,subprocess
+          paths=['src/lib/canonical-support-judge.ts','docs/D16_DAVID_BASIS_CORRECTION_2026-10-02.md','src/lib/d16-personalized-interview-strategy.ts','src/lib/d16-preparation-anchor-selector.ts','src/lib/d16-development-role-fixtures.ts','src/lib/d16-shadow-runtime-integration.ts','scripts/d16-automatic-development.ts','tests/fixtures/d16-assembled-gold-inputs.json','tests/fixtures/d16-d15-confirmed-loop.json','docs/D16_AUTOMATIC_DEVELOPMENT_PREREGISTRATION_2026-10-02.md','docs/D16_NANCY_ACTION_YARDSTICK_2026-10-02.md','docs/d15-semantic-significance-codebook-v1.1-candidate.md','docs/D15_V11_ERRATUM_2026-10-02.md']
+          with open('provenance.txt','w') as f:
+              f.write('mode=DEVELOPMENT_ONLY_NOT_QUALIFICATION\nengine='+os.environ['ENGINE_COMMIT']+'\nworkflow='+os.environ['WORKFLOW_COMMIT']+'\nDB_reads=false\nDB_writes=false\ncutover=false\nE1_rerun=false\nD15_GS_rerun=false\n')
+              for path in paths:
+                  f.write(path+'='+subprocess.check_output(['git','rev-parse','HEAD:'+path],text=True).strip()+'\n')
+          PY
+      - name: Retry only the two failed David cases once
+        env:
+          D16_DAVID_ONLY: "1"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d16-automatic-development.ts
+      - name: Hash saved results
+        if: always()
+        run: |
+          if test -s d16-automatic-development-report.json; then
+            sha256sum d16-automatic-development-report.json provenance.txt > SHA256SUMS
+            cat SHA256SUMS
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d16-david-basis-rerun-${{ github.run_id }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            d16-automatic-development-report.json
+            provenance.txt
+            SHA256SUMS
