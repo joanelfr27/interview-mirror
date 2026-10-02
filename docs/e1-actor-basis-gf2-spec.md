@@ -150,3 +150,14 @@ Before any merge/cutover to the locked E1 boundary:
 Until all seven pass, status is:
 
 **E1 Actor Basis — IMPLEMENTED IN ISOLATION / NOT QUALIFIED / NO CUTOVER.**
+
+
+## Development diagnostic provenance
+
+Before sealed qualification, any real-CV development diagnostic must record the exact extractor commit and a cryptographic hash of the immutable diagnostic corpus. Rows must carry the source text used for scoring and duplicate source text must not inflate sample counts. Development diagnostics are not qualification evidence.
+
+Report both observed directions separately:
+- ordinary subjectless/nominal candidate bullets classified to a non-candidate basis;
+- true agentless passive/impersonal cases classified to a candidate basis.
+
+A poor false-ambiguity result is an architectural finding, not a reason to keep adding language-specific exceptions.
