@@ -161,3 +161,10 @@ Report both observed directions separately:
 - true agentless passive/impersonal cases classified to a candidate basis.
 
 A poor false-ambiguity result is an architectural finding, not a reason to keep adding language-specific exceptions.
+
+
+## IMPLICIT_CANDIDATE implementation decision
+
+The canonicalizer intentionally does not add a deterministic passive/impersonal regex guard to the `IMPLICIT_CANDIDATE` branch before the real-CV development diagnostic. This is a measured-risk decision, not an assumption that model classification is sufficient. The development diagnostic must quantify both false candidate attribution on true passive/impersonal material and false ambiguity on ordinary subjectless/nominal candidate bullets. If either direction is materially poor, reconsider the classification approach rather than accumulating further language-specific exceptions.
+
+Repeated/ambiguous action-string fail-closed behavior is likewise retained for measurement as a known false-ambiguity risk.
