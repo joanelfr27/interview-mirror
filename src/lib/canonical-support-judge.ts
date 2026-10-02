@@ -255,6 +255,42 @@ function clauseTokenSet(value: string): Set<string> {
   return new Set(normalizeEvidenceText(value).split(/\s+/).filter(Boolean).map(stemContentToken));
 }
 
+const PREPOSITIONAL_GROUP_JOINERS = new Set(["in","into","to","for","with","dans","en","a","pour","avec"]);
+
+function prepositionalFacetRelation(facetRequirement: string): { left: string[]; right: string[]; verbStem: string | null } | null {
+  const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
+  const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
+  if (prepIndex < 0) return null;
+  const leftRaw = words.slice(0, prepIndex);
+  const rightRaw = words.slice(prepIndex + 1);
+  const left = facetContentTokens(leftRaw.join(" "));
+  const right = facetContentTokens(rightRaw.join(" "));
+  if (!left.length || !right.length) return null;
+  const verbCandidate = leftRaw.find(word => !RELATION_STOPWORDS.has(word) && word.length >= 3) ?? null;
+  return { left, right, verbStem: verbCandidate ? stemContentToken(verbCandidate) : null };
+}
+
+function clauseContainsRecognizedRelationalConnector(clause: string): boolean {
+  const canonical = normalizeEvidenceText(clause);
+  return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(canonical));
+}
+
+function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
+  const relation = prepositionalFacetRelation(facetRequirement);
+  if (!relation) return false;
+  for (const source of citedSourceTexts) {
+    for (const clause of semanticClauses(source)) {
+      const tokens = clauseTokenSet(clause);
+      const hasLeft = relation.left.some(token => tokens.has(token));
+      const hasRight = relation.right.some(token => tokens.has(token));
+      if (!hasLeft || !hasRight) continue;
+      const hasFacetVerb = Boolean(relation.verbStem && tokens.has(relation.verbStem));
+      if (hasFacetVerb || clauseContainsRecognizedRelationalConnector(clause)) return false;
+    }
+  }
+  return true;
+}
+
 function directEvidenceContentIsSplitAcrossClauses(
   facetRequirement: string,
   citedSourceTexts: string[],
@@ -501,6 +537,17 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         item.rationale = deterministicRationaleOverride;
         item.confidence = Math.min(item.confidence, 0.8);
       }
+    }
+
+    const prepositionalUnlicensedDirect = item.status === "DIRECT" && prepositionalDirectLacksRelationLicense(
+      facet.requirement,
+      citedAtoms.map(atom => ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? ""),
+    );
+    if (prepositionalUnlicensedDirect) {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "The cited evidence contains both content groups but does not explicitly license the facet's prepositional relationship; conservatively downgraded to PARTIAL.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
     }
 
     const clauseSplitDirect = item.status === "DIRECT" && directEvidenceContentIsSplitAcrossClauses(
