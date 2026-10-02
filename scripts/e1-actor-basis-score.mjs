@@ -43,7 +43,7 @@ const nominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.nominal === true
 const frNominal = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.nominal === true && r.language === "fr");
 
 const fu = count(r => r.gold === "IMPLICIT_CANDIDATE" && r.predicted === "UNSPECIFIED");
-const fi = count(r => r.gold === "UNSPECIFIED" && r.predicted === "IMPLICIT_CANDIDATE");
+const fi = count(r => r.gold === "UNSPECIFIED" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted));
 const explicitOtherFalseCandidate = count(r => r.gold === "EXPLICIT_OTHER" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted));
 
 const byLanguage = Object.fromEntries(languages.map(language => {
@@ -53,7 +53,7 @@ const byLanguage = Object.fromEntries(languages.map(language => {
     implicit: implicitN,
     unspecified: unspecifiedN,
     false_unspecified: count(r => r.language === language && r.gold === "IMPLICIT_CANDIDATE" && r.predicted === "UNSPECIFIED"),
-    false_implicit_candidate: count(r => r.language === language && r.gold === "UNSPECIFIED" && r.predicted === "IMPLICIT_CANDIDATE"),
+    false_implicit_candidate: count(r => r.language === language && r.gold === "UNSPECIFIED" && ["IMPLICIT_CANDIDATE","EXPLICIT_CANDIDATE"].includes(r.predicted)),
   }];
 }));
 
