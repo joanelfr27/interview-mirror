@@ -317,6 +317,9 @@ export function validateAtomicEvidenceAgainstSource(
   if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.actor !== "unspecified") {
     errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires the canonical actor placeholder unspecified.");
   }
+  if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.ownership !== "UNKNOWN") {
+    errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires ownership=UNKNOWN.");
+  }
 
   // Free-text semantic fields are deliberately fail-closed: normalization may
   // change casing/spacing, but it may not introduce facts absent from the quote.
