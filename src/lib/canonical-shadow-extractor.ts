@@ -370,7 +370,7 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
     SHARED: /\b(?:shared|co-owned|partagé|partagée|partagés|partagées)\b/i,
     SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
   };
-  const ownership = actorBasis === "UNSPECIFIED"
+  const ownership = actorBasis === "UNSPECIFIED" || actorBasis === "EXPLICIT_OTHER"
     ? "UNKNOWN"
     : raw.ownership === "UNKNOWN"
       ? "UNKNOWN"
