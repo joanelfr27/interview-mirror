@@ -280,7 +280,12 @@ function ownRelationVerbFamily(facetRequirement: string, prepIndex: number): Set
   const nounLed = new Set(["experience","reporting","forecasting","budgeting","management","gestion","report","reports","revue","revues"]);
   if (!first || nounLed.has(first) || RELATION_STOPWORDS.has(first) || first.length < 4) return null;
   const stem = stemContentToken(first);
-  return new Set([first, stem, stem + "s", stem + "ed", stem + "ing", stem + "e", stem + "er", stem + "é", stem + "ée", stem + "és", stem + "ées"]);
+  const forms = new Set([first, stem, stem + "s", stem + "ed", stem + "ing", stem + "e", stem + "er", stem + "é", stem + "ée", stem + "és", stem + "ées"]);
+  if (first.endsWith("er") && first.length > 4) {
+    const frenchStem = first.slice(0, -2);
+    for (const suffix of ["e","é","ée","és","ées","ait","ais","aient"]) forms.add(frenchStem + suffix);
+  }
+  return forms;
 }
 
 function clausePreservesOrderedPreposition(
@@ -288,14 +293,18 @@ function clausePreservesOrderedPreposition(
   left: string[],
   preposition: string,
   right: string[],
+  verbFamily?: Set<string> | null,
 ): boolean {
   const words = normalizeEvidenceText(clause).split(/\s+/).filter(Boolean);
   const stems = words.map(stemContentToken);
   for (let i = 0; i < words.length; i++) {
     if (words[i] !== preposition) continue;
-    const before = new Set(stems.slice(0, i));
-    const after = new Set(stems.slice(i + 1));
-    if (left.some(token => before.has(token)) && right.some(token => after.has(token))) return true;
+    const leftIndexes = stems.map((token, index) => left.includes(token) ? index : -1).filter(index => index >= 0 && index < i);
+    const rightIndexes = stems.map((token, index) => right.includes(token) ? index : -1).filter(index => index > i);
+    if (!leftIndexes.length || !rightIndexes.length) continue;
+    if (!verbFamily) return true;
+    const verbIndexes = words.map((word, index) => verbFamily.has(word) ? index : -1).filter(index => index >= 0);
+    if (verbIndexes.some(verbIndex => verbIndex < Math.min(...leftIndexes))) return true;
   }
   return false;
 }
@@ -311,12 +320,7 @@ function prepositionalDirectLacksRelationLicense(facetRequirement: string, cited
     for (const clause of semanticClauses(source)) {
       const stemmedTokens = clauseTokenSet(clause);
       if (!parts.left.some(token => stemmedTokens.has(token)) || !parts.right.some(token => stemmedTokens.has(token))) continue;
-      if (verbFamily) {
-        const rawTokens = new Set(normalizeEvidenceText(clause).split(/\s+/).filter(Boolean));
-        if ([...verbFamily].some(form => rawTokens.has(form))) return false;
-      } else if (clausePreservesOrderedPreposition(clause, parts.left, parts.preposition, parts.right)) {
-        return false;
-      }
+      if (clausePreservesOrderedPreposition(clause, parts.left, parts.preposition, parts.right, verbFamily)) return false;
     }
   }
   return true;
