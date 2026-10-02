@@ -278,15 +278,16 @@ test("accepted model rationale is replaced by a canonical minimal-subset rationa
 });
 
 
-test("DIRECT cannot compose independent source spans even when relational wording is unfamiliar", () => {
+test("multi-span non-relational DIRECT is conservatively downgraded to PARTIAL", () => {
   const l = ledger();
-  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts", start_offset: 0, end_offset: 18, language: "en" };
-  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Introduced pipeline reviews", start_offset: 19, end_offset: 46, language: "en" });
-  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Managed the annual budget", start_offset: 0, end_offset: 25, language: "en" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed the annual budget for the region", start_offset: 26, end_offset: 66, language: "en" });
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "managed", object: "annual budget" } };
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
-  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Synchronize forecasting alongside pipeline governance", source_span_id: "S-REQ" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Manage the annual budget", source_span_id: "S-REQ" };
   const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1", "A2"]) }], l);
-  assert.ok(result.errors.some(error => error.includes("DIRECT support cannot compose independent source spans")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
 });
 
 test("DIRECT may use multiple atoms only when they preserve the same source-span reference", () => {
@@ -327,6 +328,53 @@ test("French relational classifier normalizes decomposed Unicode and dépend des
   for (const requirementText of [
     "Le pipeline dépend des prévisions",
     "Réviser le pipeline en re\u0301ponse à la prévision",
+  ]) {
+    const l = ledger();
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+    assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+  }
+});
+
+
+test("same-span co-occurrence cannot satisfy use-X-in-Y relationship as DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared monthly sales forecasts and introduced a structured pipeline review.", start_offset: 0, end_offset: 75, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "monthly sales forecasts and introduced a structured pipeline review" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")));
+});
+
+test("comma-joined independent relation cannot license DIRECT", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts as input to budgeting, and separately ran pipeline reviews.", start_offset: 0, end_offset: 70, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts as input to budgeting and separately ran pipeline reviews" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "input to", licensing_spans: ["Used forecasts as input to budgeting, and separately ran pipeline reviews."] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("bind content from both sides")));
+});
+
+test("French plural and feminine based-on forms remain relational after normalization", () => {
+  for (const requirementText of [
+    "Revues du pipeline basées sur les prévisions",
+    "Décisions fondées sur les prévisions",
+    "Contrôles basés sur les prévisions",
+  ]) {
+    const l = ledger();
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+    assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+  }
+});
+
+test("apply integrate and translate relation-bearing constructions require licensing", () => {
+  for (const requirementText of [
+    "Apply forecasts to pipeline reviews",
+    "Integrate forecasts into pipeline reviews",
+    "Translate forecasts into pipeline actions",
+    "Intégrer les prévisions dans les revues du pipeline",
   ]) {
     const l = ledger();
     l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
