@@ -183,6 +183,8 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
       }
       if (licensingAtomIds.size !== 1) {
         errors.push("relational DIRECT must be licensed within one cited atom; independent activities cannot be composed into a DIRECT relationship.");
+      } else {
+        errors.push("relational DIRECT minimal support must contain only the single licensing atom; other atoms belong in context_evidence_ids.");
       }
     }
   }
@@ -283,8 +285,14 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
     seenFacetKeys.add(facetKey);
 
-    const cited = [...new Set(item.supporting_evidence_ids)].filter(id => evidenceIds.has(id));
-    item.context_evidence_ids = [...new Set(item.context_evidence_ids ?? [])].filter(id => evidenceIds.has(id));
+    const unknownSupportingIds = [...new Set(item.supporting_evidence_ids)].filter(id => !evidenceIds.has(id));
+    const unknownContextIds = [...new Set(item.context_evidence_ids ?? [])].filter(id => !evidenceIds.has(id));
+    if (unknownSupportingIds.length || unknownContextIds.length) {
+      errors.push("Rejected judgment " + item.id + ": unknown evidence ID in support/context citations.");
+      continue;
+    }
+    const cited = [...new Set(item.supporting_evidence_ids)];
+    item.context_evidence_ids = [...new Set(item.context_evidence_ids ?? [])];
     if (item.status === "NONE" || item.abstained) {
       item.status = "NONE"; item.abstained = true; item.supporting_evidence_ids = []; item.abstention_reason = item.abstention_reason || "Insufficient explicit evidence to make a positive support judgment.";
     } else {
@@ -305,6 +313,21 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       continue;
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
+
+    // Pre-existing locked credential-specificity guard retained unchanged.
+    // It is not extended as part of the relational boundary correction.
+    if (item.status === "DIRECT" && facet.type === "LEVEL" &&
+        /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
+      const citedCredentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
+      const hasSpecificField = citedCredentials.some(atom =>
+        /\b(?:finance|accounting)\b/i.test(atom.action.object)
+      );
+      if (citedCredentials.length > 0 && !hasSpecificField) {
+        item.status = "PARTIAL";
+        item.rationale = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
+        item.confidence = Math.min(item.confidence, 0.8);
+      }
+    }
 
     const semanticBoundaryErrors = validateRelationalAndRationaleBoundary(item, facet, ledger);
     if (semanticBoundaryErrors.length) {
