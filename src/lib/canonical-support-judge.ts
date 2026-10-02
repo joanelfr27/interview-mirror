@@ -327,7 +327,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     const hasElicited = citedAtoms.some(atom => atom.provenance.source_type === "CANDIDATE_ELICITED");
     const hasDocumented = citedAtoms.some(atom => atom.provenance.source_type !== "CANDIDATE_ELICITED");
     if (hasElicited && hasDocumented) {
-      errors.push("Rejected judgment " + item.id + ": mixed documented and elicited evidence requires an explicit mixed basis.");
+      errors.push("Rejected judgment " + item.id + ": mixed documented and elicited evidence is not permitted in one support judgment.");
       continue;
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
