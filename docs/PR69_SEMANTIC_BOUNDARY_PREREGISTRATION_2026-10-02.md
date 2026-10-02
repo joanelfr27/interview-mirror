@@ -34,3 +34,10 @@ F. Minimal-subset control: a relational DIRECT with one licensing atom plus extr
 ## After this validation
 
 A passing development validation still does not close release. PR #69 full-rigor review remains required, followed by the five real D12 pathways and observed WOW under the Pre-D17 Live Validation Gate. No merge, cutover, database write or D17 is authorized by this preregistration.
+
+## Residual single-clause association control (non-blocking measurement)
+Prospective live validation must record whether the support judge emits DIRECT for an unclassified relational synonym when the cited atom contains only a single-clause association, e.g.:
+- EN: "Prepared forecasts in June for pipeline reviews" vs "Leverage forecasts in pipeline reviews".
+- EN: "Prepared forecasts with the pipeline review team" vs the same facet.
+
+This is a pre-registered measurement of the known X3/X4 lexical limitation, not a pass/fail blocker by itself. Any observed candidate-facing false relationship remains a truth-boundary finding and must be reported; no resampling or post-hoc relabeling is allowed.
