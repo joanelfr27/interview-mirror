@@ -141,3 +141,49 @@ test('relationship questions do not hand the candidate an inferred conclusion',a
  assert.ok(question.includes('If there was no connection'));
  assert.ok(!question.includes('drive'));
 });
+
+test('attribution veto reports its exact atom and field, including elicited evidence',async()=>{
+ const {attributionVetoDetails}=await import('../src/lib/d15-gs-judges.ts');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ ledger.evidence[0].subject.actor_basis='UNSPECIFIED';
+ assert.deepEqual(attributionVetoDetails(ledger,['E1']),[{code:'CANDIDATE_ATTRIBUTION_NOT_LICENSED',evidence_id:'E1',field:'subject.actor_basis',value:'UNSPECIFIED'}]);
+});
+test('elicited coordinated verbs inherit a proven candidate subject, not another actor or a later sentence',async()=>{
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const base={id:'a',source_quote:'I presented assumptions and discussed variances.',actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE' as const,ownership:'INDIVIDUAL' as const,normalized_action:'presented',object:'assumptions',assertion_type:'STATED' as const,polarity:'AFFIRMATIVE' as const,has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1};
+ const second={...base,id:'b',actor:'unspecified',actor_basis:'UNSPECIFIED' as const,ownership:'UNKNOWN' as const,normalized_action:'discussed',object:'variances'};
+ const r=canonicalizeElicitedAtoms(base.source_quote,'coord',[base,second]);
+ assert.equal(r.evidence[1].subject.actor_basis,'EXPLICIT_CANDIDATE');
+ for(const quote of ['I presented assumptions and John discussed variances.','I presented assumptions. They discussed variances.','I presented assumptions that John discussed variances.']){
+  const result=canonicalizeElicitedAtoms(quote,'other',[{...base,source_quote:quote},{...second,source_quote:quote}]);
+  assert.equal(result.evidence[1].subject.actor_basis,'UNSPECIFIED');
+ }
+});
+test('answer references retain their exact source and a unique earlier antecedent',async()=>{
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const answer='I used forecasts as an input to the structured pipeline review. I presented assumptions in that review.';
+ const quote='I presented assumptions in that review.';
+ const r=canonicalizeElicitedAtoms(answer,'refs',[{id:'a',source_quote:quote,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE',ownership:'INDIVIDUAL',normalized_action:'presented',object:'assumptions',situation:'that review',assertion_type:'STATED',polarity:'AFFIRMATIVE',has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1}]);
+ assert.equal(r.evidence[0].context.situation,'that review');
+ assert.equal(r.resolved_references[0].antecedent,'the structured pipeline review');
+ const ref=r.resolved_references[0];assert.equal(answer.slice(ref.antecedent_start,ref.antecedent_end),ref.antecedent);
+});
+test('answer loop freezes proposition, accepts only anchored evidence, and closes denial without a repeat',async()=>{
+ const {applyD15ClarificationAnswer}=await import('../src/lib/d15-conversational-mirror.ts');
+ const {canonicalizeElicitedAtoms}=await import('../src/lib/canonical-shadow-extractor.ts');
+ const ledger=buildD15BGoldLedger(d15BGoldFixtures().find(f=>f.id==='DAVID')!);
+ const headline='You use your monthly sales forecasts as an input to the structured pipeline review.';
+ const reading={language:'en' as const,actor:'CANDIDATE' as const,asserted_proposition:headline,component_claims:[headline],form:'RELATIONSHIP' as const,relationship_assertion:headline,reading_reason:'Explicit input relationship.'};
+ const before={...combineGS(headline,{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:reading};
+ const target={proposal_id:'forecast',question:'What connection, if any?',evidence_ids:['E2','E4'],gs_decision:before};
+ const answer='I used my monthly sales forecasts as an input to the structured pipeline review.';
+ let extracts=0,judges=0;
+ const services={extract:async(text:string,id:string)=>{extracts++;assert.equal(text,answer);return canonicalizeElicitedAtoms(text,id,[{id:'a',source_quote:text,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE',ownership:'INDIVIDUAL',normalized_action:'used',object:'monthly sales forecasts',assertion_type:'STATED',polarity:'AFFIRMATIVE',has_quantifiable_metric:false,has_third_party_entity:false,has_time_anchor:false,extraction_confidence:1}]);},judge:async(next:typeof ledger,ids:string[],claim:string,options?:Parameters<typeof import('../src/lib/d15-gs-judges.ts').judgeD15GS>[3])=>{judges++;assert.equal(claim,headline);assert.deepEqual(options?.reading,reading);const atom=next.evidence.find(a=>a.provenance.source_type==='CANDIDATE_ELICITED')!;assert.ok(ids.includes(atom.id));return combineGS(claim,{...G,minimal_atom_subset:[atom.id],licensing_spans:[{evidence_id:atom.id,text:answer}]},S,[],headline);}};
+ const result=await applyD15ClarificationAnswer(ledger,{id:'coop',answer,target},services);
+ assert.equal(result.mirror.accepted.length,1);assert.equal(result.mirror.accepted[0].headline,headline);assert.equal(extracts,1);assert.equal(judges,1);
+ for(const [answer,status] of [["No, they weren't connected",'DENIED'],['Sometimes, informally','NEEDS_MORE_DETAIL']]){
+  const other=await applyD15ClarificationAnswer(ledger,{id:status,answer,target},services);
+  assert.equal(other.status,status);assert.equal(other.mirror.accepted.length,0);assert.equal(other.repeat_question,false);assert.equal(other.response.answer,answer);
+ }
+ assert.equal(extracts,1);assert.equal(judges,1);
+});

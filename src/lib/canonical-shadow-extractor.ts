@@ -834,14 +834,41 @@ export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAto
  for(const [index,raw] of rawAtoms.entries()){
   const span=findExactSpan('ELICIT-'+responseId,answer,raw.source_quote,detectSourceLanguage(answer,''),used,'ATOM');
   if(!span){rejected.push({id:raw.id,errors:['Answer quote is not exact']});continue;}
-  const canonical=canonicalizeRawCandidateAtom({...raw,id:'ELICIT-ATOM-'+responseId+'-'+index},span.text);
+  // Carry a proven first-person subject only across a direct coordinated verb,
+  // using another explicitly attributed atom in the SAME source quote.
+  // Never overwrite EXPLICIT_OTHER or cross a sentence/relative-clause boundary.
+  let attributed=raw;
+  if(raw.actor_basis==='UNSPECIFIED' && /^(?:candidate|unspecified)$/iu.test(raw.actor)) {
+   const target=span.text.toLocaleLowerCase().indexOf(raw.normalized_action.trim().toLocaleLowerCase());
+   const sibling=rawAtoms.find(a=>a!==raw&&a.source_quote===raw.source_quote&&a.actor_basis==='EXPLICIT_CANDIDATE'&&
+    canonicalizeRawCandidateAtom(a,span.text).actor_basis==='EXPLICIT_CANDIDATE'&&(()=>{
+     const start=span.text.toLocaleLowerCase().indexOf(a.normalized_action.trim().toLocaleLowerCase());
+     if(start<0||target<=start) return false;
+     const between=span.text.slice(start+a.normalized_action.trim().length,target);
+     return /\s(?:and|et)\s*$/iu.test(between)&&!/[;.!?«»"“”]/u.test(between)&&
+      !/\b(?:and|et|that|who|which|que|qui|dont|said|reported|disait|dit)\b/iu.test(between.replace(/\s(?:and|et)\s*$/iu,''));
+    })());
+   if(sibling) attributed={...raw,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE'};
+  }
+  const canonical=canonicalizeRawCandidateAtom({...attributed,id:'ELICIT-ATOM-'+responseId+'-'+index},span.text);
   const extracted=toAtomicEvidence(canonical,span);
   const atom:AtomicEvidence={...extracted,provenance:{...extracted.provenance,source_type:'CANDIDATE_ELICITED'},assertion:{...extracted.assertion,type:'ELICITED'}};
   const errors=[...validateSourceSpan(span),...validateSpanBounds(span,answer),...validateAtomicEvidence(atom),...validateAtomicEvidenceAgainstSource(atom,span),...forbiddenInferenceViolations(atom)];
   if(errors.length){rejected.push({id:raw.id,errors});continue;}
   if(!sourceSpans.some(s=>s.id===span.id)) sourceSpans.push(span);evidence.push(atom);
  }
- return {source_spans:sourceSpans,evidence,rejected,answer};
+ // Resolve only a unique, earlier, exact review noun phrase in this answer.
+ // Keep the original deictic source text; offsets make the association auditable.
+ const resolved_references=evidence.flatMap(atom=>{
+  if(!/^(?:that review|cette revue)$/iu.test(atom.context.situation??'')) return [];
+  const span=sourceSpans.find(s=>s.id===atom.source_span_id)!;
+  const earlier=answer.slice(0,span.start_offset);
+  const matches=[...earlier.matchAll(/\b(?:the|a)\s+(?:[\p{L}-]+\s+){0,3}review\b/giu)];
+  if(matches.length!==1) return [];
+  const match=matches[0];
+  return [{evidence_id:atom.id,field:'context.situation',source_text:atom.context.situation!,antecedent:match[0],antecedent_start:match.index!,antecedent_end:match.index!+match[0].length,document_id:span.document_id}];
+ });
+ return {source_spans:sourceSpans,evidence,rejected,answer,resolved_references};
 }
 export async function extractCanonicalElicitedAnswer(answer:string,responseId:string) {
  if(!answer.trim()||/^(?:yes|no|oui|non)[.!\s]*$/iu.test(answer.trim())) return {source_spans:[] as SourceSpan[],evidence:[] as AtomicEvidence[],rejected:[{id:responseId,errors:['Bare confirmation is not relational evidence']}],answer};
