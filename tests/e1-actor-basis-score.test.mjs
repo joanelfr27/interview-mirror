@@ -128,6 +128,7 @@ test("qualification scorer rejects structured qualification IDs", () => {
 test("qualification scorer gates explicit candidate false ambiguity", () => {
   const data = rows();
   const explicit = data.filter(x => x.gold === "EXPLICIT_CANDIDATE" && x.language === "en").slice(0, 3);
+  assert.equal(data.filter(x => x.gold === "EXPLICIT_CANDIDATE").length, 42);
   assert.equal(explicit.length, 3);
   for (const row of explicit) row.predicted = "UNSPECIFIED";
   const result = score(data);
