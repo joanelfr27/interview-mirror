@@ -149,3 +149,29 @@ test("pre-change atoms retain today's candidate interpretation through compatibi
   delete unspecified.subject.actor_basis;
   assert.equal(effectiveActorBasis(unspecified), "UNSPECIFIED");
 });
+
+
+test("French elided first-person subjects remain action-local explicit candidate", () => {
+  for (const [source, action] of [
+    ["J’assure le suivi des clôtures.", "assure"],
+    ["J'ai rapproché les dates de paie.", "ai rapproché"],
+  ] as const) {
+    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", action), source);
+    assert.equal(out.actor, "candidate", source);
+    assert.equal(out.actor_basis, "EXPLICIT_CANDIDATE", source);
+  }
+});
+
+test("ownership fails closed when actor attribution becomes unspecified", () => {
+  const mixed = raw(
+    "I supported the payroll team that reconciled accounts.",
+    "EXPLICIT_CANDIDATE",
+    "candidate",
+    "reconciled accounts",
+  );
+  mixed.ownership = "INDIVIDUAL";
+  const out = canonicalizeRawCandidateAtom(mixed, mixed.source_quote);
+  assert.equal(out.actor_basis, "UNSPECIFIED");
+  assert.equal(out.actor, "unspecified");
+  assert.equal(out.ownership, "UNKNOWN");
+});
