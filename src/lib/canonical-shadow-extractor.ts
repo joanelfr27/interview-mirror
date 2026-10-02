@@ -358,6 +358,9 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
       actorBasis = "UNSPECIFIED";
     }
   } else if (actorBasis === "IMPLICIT_CANDIDATE") {
+    // Deliberately model-classified for the development diagnostic. Do not add
+    // passive/impersonal regex exceptions here before measuring both error
+    // directions on real CV text; see e1-actor-basis-gf2-spec.md.
     groundedActor = "candidate";
   } else {
     groundedActor = "unspecified";
