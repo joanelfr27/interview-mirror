@@ -249,3 +249,12 @@ test("explicit other actors force ownership unknown in EN and FR", () => {
     }
   }
 });
+
+
+test("French équipe marker preserves explicit team ownership", () => {
+  const source = "Travail avec l'équipe paie sur les clôtures.";
+  const input = raw(source, "IMPLICIT_CANDIDATE", "candidate", "Travail");
+  input.ownership = "TEAM";
+  const out = canonicalizeRawCandidateAtom(input, source);
+  assert.equal(out.ownership, "TEAM");
+});
