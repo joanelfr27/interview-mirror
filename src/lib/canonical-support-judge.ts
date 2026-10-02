@@ -478,7 +478,7 @@ function buildSupportJudgeDiagnostic(args: {
   parsedSuccessfully: boolean;
   rawJudgments: RawJudgment[];
   compactRequirements: Array<{ id: string; facets: Array<{ id: string }> }>;
-  compactEvidence: Array<{ id: string }>;
+  compactEvidence: Array<{ id: string; source_quote?: string; action?: { normalized_action?: string; object?: string }; context?: Record<string, unknown>; scale?: Record<string, unknown> }>;
   requestCharacterCount: number;
 }): SupportJudgeDiagnostic {
   const expectedFacetIds = args.compactRequirements.flatMap((req) => req.facets.map((facet) => facet.id));
