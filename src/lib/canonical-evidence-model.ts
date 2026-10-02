@@ -277,7 +277,7 @@ export function hasActionLocalCandidateMarker(source: string, normalizedAction: 
   // subject means the candidate marker belongs to a neighboring action.
   if (/\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/i.test(between)) return false;
   const lastClause = between.split(/[;.!?]|(?:,\s+(?:and|but|while|whereas|et|mais|tandis\s+que)\s+)/i).at(-1) ?? "";
-  if (/^\s*(?:the|a|an|le|la|les|un|une|des|l['’])\s+[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}\s+/u.test(lastClause)) return false;
+  if (/^\s*(?:(?:the|a|an|le|la|les|un|une|des)\s+[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}|l['’][\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4})\s+/u.test(lastClause)) return false;
   return true;
 }
 
