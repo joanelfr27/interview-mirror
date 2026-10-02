@@ -175,3 +175,16 @@ test("ownership fails closed when actor attribution becomes unspecified", () => 
   assert.equal(out.actor, "unspecified");
   assert.equal(out.ownership, "UNKNOWN");
 });
+
+
+test("explicit candidate attribution rejects later clause subject switches", () => {
+  for (const [source, action] of [
+    ["I prepared reports; the payroll team reconciled accounts.", "reconciled accounts"],
+    ["I prepared reports, and the payroll team reconciled accounts.", "reconciled accounts"],
+    ["J'ai préparé les rapports ; l'équipe paie a rapproché les comptes.", "a rapproché les comptes"],
+  ] as const) {
+    const out = canonicalizeRawCandidateAtom(raw(source, "EXPLICIT_CANDIDATE", "candidate", action), source);
+    assert.equal(out.actor_basis, "UNSPECIFIED", source);
+    assert.equal(out.actor, "unspecified", source);
+  }
+});
