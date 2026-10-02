@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - d16-integration
+      - e1-support-basis-contract
   pull_request:
     branches:
       - audit-version
