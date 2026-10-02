@@ -204,6 +204,13 @@ function buildOwnershipStratification(
   };
 }
 
+function redactProtectedCvInput(value: string): string {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, "[REDACTED_PHONE]")
+    .replace(/(Member\s+No\s*:\s*)\d+/gi, "$1[REDACTED_MEMBER_NUMBER]");
+}
+
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
@@ -300,7 +307,7 @@ for (const row of chosen) {
     id: row.id,
     user_id: row.user_id,
     title: row.title,
-    cv_text: row.cv_text,
+    cv_text: redactProtectedCvInput(row.cv_text),
     job_description: row.job_description,
     cv_analysis: row.cv_analysis,
     interview_strategy: row.interview_strategy,
@@ -319,6 +326,7 @@ for (const row of chosen) {
     cv: fingerprint(row.cv_text),
     jd: fingerprint(row.job_description),
     cv_chars: row.cv_text.length,
+    protected_cv_input_redacted: true,
     jd_chars: row.job_description.length,
   };
 
