@@ -233,11 +233,9 @@ test("abstention schema rejects context citations", () => {
 
 test("relational classifier covers sequence, dependency, recurrence and French response connectors", () => {
   for (const requirementText of [
-    "Review pipeline after forecast updates",
     "Pipeline review depends on forecast quality",
     "Use a recurring forecast-to-review cadence",
     "Réviser le pipeline en réponse à la prévision",
-    "Réviser le pipeline après la prévision",
     "Align forecasts with pipeline reviews",
     "Mettre les prévisions au service des revues du pipeline",
   ]) {
@@ -296,4 +294,19 @@ test("DIRECT may use multiple atoms only when they preserve the same source-span
   const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1", "A2"]) }], l);
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+
+test("ambiguous chronology and habitual wording are not automatic relational labels", () => {
+  for (const requirementText of [
+    "Review pipeline after forecast updates",
+    "Réviser le pipeline après la prévision",
+    "Used to manage budgets",
+    "Analyses pour le directeur financier",
+  ]) {
+    const l = ledger();
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+    assert.ok(!result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+  }
 });
