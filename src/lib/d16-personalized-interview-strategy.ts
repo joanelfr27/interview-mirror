@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { EvidenceLedger } from "@/lib/canonical-evidence-model";
+import { effectiveActorBasis, type EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { CanonicalStrategyBridgeProjection, CanonicalStrategyBridgeRequirement } from "@/lib/canonical-strategy-bridge";
 import { validateCanonicalStrategyBridgeProjection } from "@/lib/canonical-strategy-bridge";
 import {
@@ -10,8 +10,11 @@ import {
 } from "@/lib/role-capability-model";
 import type { ProfessionalMirror } from "@/lib/professional-mirror";
 import type { D15BVerifiedThread } from "@/lib/d15-semantic-thread-engine";
-import { validateG, validateS, relationshipVetoes } from "@/lib/d15-gs-judges";
+import { validateG, validateS, relationshipVetoes, licensingVetoes } from "@/lib/d15-gs-judges";
 import { D15_CODEBOOK_BLOB } from "@/lib/d15-gs-v11-rules";
+import { d15ThreadEligibleAtoms } from "@/lib/d15-evidence-eligibility";
+import { closedClarification } from "@/lib/d15-clarification-state";
+import { validateSemanticReading, readingVetoes } from "@/lib/d15-semantic-reading";
 
 export const D16_VERSION = "d16-v1" as const;
 
@@ -118,6 +121,7 @@ export type D16PreparationInputs = {
   accepted_relationships: D15BVerifiedThread[];
   selections: D16PreparationSelection[];
   language: "en" | "fr";
+  selection_source?: "CURATED" | "AUTOMATIC_CONTEXT_SELECTOR";
   dependency_fingerprint: string;
 };
 export type D16PreparationAction = {
@@ -131,7 +135,14 @@ export type D16PreparationAction = {
   d15_thread_refs: string[];
   missing_facet_ids: string[];
   evidence_reference_mode: D16EvidenceReferenceMode;
-  personalization: "CURATED_CONTEXTUAL_ANCHORS" | "NO_RELEVANT_ANCHOR";
+  personalization: "CURATED_CONTEXTUAL_ANCHORS" | "AUTOMATIC_CONTEXTUAL_ANCHORS" | "NO_RELEVANT_ANCHOR";
+  role_criticality: RoleCapabilityCriticality;
+  assessment_relevance: StrategicTension["assessment_relevance"];
+  assessment_context: AssessmentContext | null;
+  preparation_priority: number;
+  strategic_significance: string;
+  prep_objective: string;
+  practice_target: string;
   instruction: string;
   expected_artifact: string;
   language: "en" | "fr";
@@ -150,11 +161,14 @@ export function buildD16PreparationFingerprint(input: Omit<D16PreparationInputs,
 export function buildD16PreparationActions(input: D16PreparationInputs): D16PreparationAction[] {
   const { dependency_fingerprint, ...material } = input;
   if (dependency_fingerprint !== buildD16PreparationFingerprint(material)) throw new Error("Stale D16 preparation dependencies.");
+  if (input.selection_source !== undefined && !["CURATED", "AUTOMATIC_CONTEXT_SELECTOR"].includes(input.selection_source)) throw new Error("Invalid D16 selection source.");
   if (!["en", "fr"].includes(input.language)) throw new Error("Invalid D16 preparation language.");
   const canonical = input.canonical;
   const strategy = buildD16Strategy(canonical);
   const atoms = new Map(canonical.ledger.evidence.map(a => [a.id, a]));
   const spans = new Map(canonical.ledger.source_spans.map(s => [s.id, s]));
+  const mirrorRefs = new Map(canonical.mirror.evidence.map(e => [e.evidence_id, e]));
+  const threadEligible = new Set(d15ThreadEligibleAtoms(canonical.ledger).map(a => a.id));
   const relationships = new Map(input.accepted_relationships.map(t => [t.id, t]));
   if (relationships.size !== input.accepted_relationships.length) throw new Error("Duplicate D15 relationship IDs.");
   const chosen = new Map(input.selections.map(s => [s.requirement_id, s]));
@@ -162,13 +176,28 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
   function resolve(id: string) {
     const atom = atoms.get(id), span = atom && spans.get(atom.source_span_id);
     if (!atom || !span || !span.text.trim()) throw new Error("Forged or missing D16 preparation reference: " + id);
+    const mirrorRef = mirrorRefs.get(id);
+    if (!mirrorRef || mirrorRef.source_span_id !== span.id || mirrorRef.source_quote !== span.text || mirrorRef.source_type !== atom.provenance.source_type) throw new Error("D16 preparation Mirror provenance mismatch: " + id);
+    if (atom.assertion.polarity !== "AFFIRMATIVE") throw new Error("Non-affirmative D16 preparation anchor: " + id);
+    if (effectiveActorBasis(atom) === "UNSPECIFIED") throw new Error("Unspecified D16 preparation attribution: " + id);
     return { atom, span };
   }
   // Check the existing D15 result contract; never re-judge or infer a relationship in D16.
   for (const t of input.accepted_relationships) {
     const gs = t.gs_decision;
     const cited = t.evidence_ids.map(id => { const { span } = resolve(id); return { evidence_id: id, source_text: span.text }; });
-    if (!gs || !gs.accepted || gs.codebook_blob !== D15_CODEBOOK_BLOB || gs.headline !== t.headline || t.verification !== "SUPPORTED" || gs.vetoes.length || !validateG(gs.G, cited).supported || !validateS(gs.S).supported || relationshipVetoes(canonical.ledger, t.evidence_ids, t.headline + " " + gs.asserted_proposition).length) throw new Error("Unvalidated D15 relationship: " + t.id);
+    const language = gs?.semantic_reading?.language ?? (t.headline.startsWith("Vous ") ? "fr" : "en");
+    const closed = closedClarification(canonical.ledger, t.evidence_ids, t.headline, language)
+      || (gs && closedClarification(canonical.ledger, t.evidence_ids, gs.asserted_proposition, language));
+    const readingInvalid = gs?.semantic_reading && readingVetoes(validateSemanticReading(gs.semantic_reading, t.headline)).length;
+    if (!gs || !gs.accepted || gs.codebook_blob !== D15_CODEBOOK_BLOB
+      || gs.headline !== t.headline || t.verification !== "SUPPORTED" || gs.vetoes.length
+      || licensingVetoes(gs.G).length || closed || readingInvalid
+      || t.evidence_ids.some(id => !threadEligible.has(id) || effectiveActorBasis(atoms.get(id)!) === "EXPLICIT_OTHER")
+      || !validateG(gs.G, cited).supported || !validateS(gs.S).supported
+      || relationshipVetoes(canonical.ledger, t.evidence_ids, t.headline + " " + gs.asserted_proposition).length) {
+      throw new Error("Unvalidated D15 relationship: " + t.id);
+    }
   }
   return strategy.tensions.flatMap(tension => {
     const selection = chosen.get(tension.requirement_id);
@@ -184,14 +213,20 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
     const facets = canonical.ledger.requirements.find(r => r.id === tension.requirement_id)?.facets ?? [];
     const missing = facets.filter(f => !canonical.ledger.support_judgments.some(j => j.requirement_id === tension.requirement_id && j.facet_id === f.id && j.status === "DIRECT" && !j.abstained)).map(f => f.id);
     const fr = input.language === "fr";
-    const source = anchors.map(({ span }) => `« ${span.text} »`).join("\n");
+    const attributedQuote = (id: string) => {
+      const { atom, span } = resolve(id);
+      const tag = effectiveActorBasis(atom) === "EXPLICIT_OTHER" ? (fr ? ` (travail de : ${atom.subject.actor})` : ` (work of: ${atom.subject.actor})`) : "";
+      return `« ${span.text} »${tag}`;
+    };
+    const source = anchors.map(({ atom }) => attributedQuote(atom.id)).join("\n");
+    const proofSource = proof.map(e => attributedQuote(e.evidence_id)).join("\n");
     const relationshipsText = threadIds.map(id => relationships.get(id)!.headline).join("; ");
     const conflict = tension.contradiction_present ? (fr ? " Le dossier contient une contradiction : préparez à l'expliquer sans privilégier arbitrairement une version." : " The record contains a contradiction: prepare to explain it without arbitrarily choosing one version.") : "";
     const boundary = (anchors.length ? (fr
       ? "Ces éléments servent de contexte de préparation, sans établir à eux seuls cette exigence. Distinguez votre contribution de celle des autres; ne transformez pas une assistance en direction. Ne nommez une norme, un résultat ou une ampleur que si vous pouvez les justifier."
-      : "These are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.") : (fr ? "Le dossier actuel ne justifie pas cette exigence. Une expérience adjacente ne vaut pas une preuve directe; présentez les étapes d'apprentissage comme un projet, pas comme une expérience acquise." : "The current record does not establish this requirement. Adjacent experience is not direct proof; describe learning steps as a plan, not as completed experience.")) + conflict;
+      : "These are preparation anchors, not proof of this requirement. Separate your contribution from other actors; do not turn support into leadership. Name a standard, outcome or scale only if you can substantiate it.") : proof.length ? (fr ? "Utilisez les preuves citées dans les limites de leur statut canonique. Tout périmètre ou niveau de responsabilité supplémentaire reste à justifier." : "Use the cited requirement evidence within its canonical support state. Any additional scope or ownership remains to be established.") : (fr ? "Le dossier actuel ne justifie pas cette exigence. Une expérience adjacente ne vaut pas une preuve directe; présentez les étapes d'apprentissage comme un projet, pas comme une expérience acquise." : "The current record does not establish this requirement. Adjacent experience is not direct proof; describe learning steps as a plan, not as completed experience.")) + conflict;
     const topic = `« ${tension.requirement} »`;
-    const standards = /\bstandards?\b|\bnormes?\b/i.test(tension.requirement);
+    const standards = /\bstandards?\b|\bnormes?\b|\b(?:IFRS|IAS|US GAAP|SYSCOHADA)\b/i.test(tension.requirement);
     const exampleDetail = standards
       ? (fr ? "Préparez le problème précis, votre tâche et les responsabilités des autres. Identifiez la règle, le pays et la période uniquement si vous pouvez les justifier. Assemblez un justificatif anonymisé ou un récit précis de l'application de la règle. L'utilisation ou la mise en œuvre d'un système ne prouve pas à elle seule l'application d'une norme." : "Prepare the specific issue, your task and others' responsibilities. Identify the rule, jurisdiction and period only if you can substantiate them. Assemble an anonymized source or a precise account of applying the rule. Using or implementing a system alone does not prove application of a standard.")
       : (fr ? "Préparez la situation précise, votre contribution et les responsabilités des autres. Assemblez un justificatif anonymisé ou un récit précis de votre travail. Distinguez ce que cet exemple établit des aspects encore non vérifiés de l'exigence." : "Prepare the specific situation, your contribution and others' responsibilities. Assemble an anonymized source or a precise account of your work. Distinguish what this example establishes from the unverified parts of the requirement.");
@@ -200,26 +235,36 @@ export function buildD16PreparationActions(input: D16PreparationInputs): D16Prep
       : (fr ? "« Qu'avez-vous personnellement fait, et comment cela répond-il à cette exigence ? » Puis : « Quel jugement avez-vous exercé, et quelle preuve permettrait de le justifier ? » Distinguez votre contribution documentée des aspects encore non vérifiés." : '\"What did you personally do, and how does it address this requirement?\" Then: \"What judgment did you make, and what evidence could substantiate it?\" Distinguish your documented contribution from the unverified parts.');
     const prep = anchors.length
       ? (fr ? `Pour ${topic}, choisissez un exemple parmi ces éléments documentés :\n${source}\n${exampleDetail}` : `For ${topic}, choose one example from these documented anchors:\n${source}\n${exampleDetail}`)
+      : proof.length ? (fr ? `Pour ${topic}, aucun exemple contextuel n'a été sélectionné. Examinez les preuves de l'exigence :\n${proofSource}\nPréparez votre contribution et ses limites, puis les aspects restant à justifier. N'inventez pas un écart d'expérience à partir d'un écart de preuve.` : `For ${topic}, no contextual example was selected. Review the requirement evidence:\n${proofSource}\nPrepare your contribution and its limits, then the dimensions still to establish. Do not turn an evidence gap into a claim that you lack experience.`)
       : (fr ? `Aucun élément pertinent n'a été sélectionné pour ${topic}. Préparez une réponse en trois parties : ce que votre expérience documentée établit; l'expérience adjacente la plus proche, si elle existe, et ses limites; une étape réaliste d'apprentissage et de pratique supervisée pour combler l'écart, avec un moyen de démontrer votre progression. À défaut d'expérience adjacente, dites-le; n'inventez pas d'exemple.` : `No relevant candidate anchor was selected for ${topic}. Prepare a three-part answer: what your documented experience establishes; the closest adjacent experience, if any, and its limits; one realistic learning and supervised-practice step to close the gap, with a way to demonstrate progress. If there is no adjacent experience, say so; do not invent an example.`);
     const practice = anchors.length
       ? (fr ? `Entraînez-vous à répondre pour ${topic} à partir de l’exemple que vous aurez choisi en PREP, parmi ces éléments :\n${source}\n${exampleProbe}` : `Practise answering for ${topic} from your chosen example in PREP, using these anchors:\n${source}\n${exampleProbe}`)
+      : proof.length ? (fr ? `Entraînez-vous à expliquer votre contribution à ${topic} à partir des preuves citées :\n${proofSource}\nDistinguez ce qu'elles établissent du périmètre et des responsabilités restant à justifier.` : `Practise explaining your contribution to ${topic} using the cited requirement evidence:\n${proofSource}\nDistinguish what it establishes from additional scope and ownership still to demonstrate.`)
       : (fr ? `Entraînez-vous à répondre à une question d’entretien sur ${topic} : « Quelle expérience adjacente pouvez-vous apporter, et comment deviendriez-vous prêt ? » Annoncez d'abord la limite, décrivez uniquement une expérience adjacente documentée si elle existe, puis expliquez votre projet d'apprentissage et comment vous démontreriez votre progression. Ne présentez pas le projet comme une expérience acquise.` : `Practise handling a probe on ${topic}: "What adjacent experience could you bring, and how would you become ready?" State the boundary first, explain only documented adjacent experience if any, then describe your learning plan and how you would demonstrate progress. Do not present the plan as completed experience.`);
+    const missingNote = missing.length ? (fr ? "\nÀ justifier : " : "\nStill to establish: ") + facets.filter(f => missing.includes(f.id)).map(f => f.requirement).join("; ") + "." : "";
     const selfReport = anchors.some(a => a.atom.provenance.source_type === "CANDIDATE_ELICITED");
-    const note = relationshipsText ? (fr ? `\nRelation D15 confirmée : ${relationshipsText}.` : `\nConfirmed D15 relationship: ${relationshipsText}.`) : "";
+    const allConfirmed = threadIds.every(id => relationships.get(id)!.maturity === "CONFIRMED_RELATIONSHIP");
+    const note = relationshipsText ? (fr ? `\nRelation ${allConfirmed ? "confirmée" : "acceptée"} : ${relationshipsText}.` : `\n${allConfirmed ? "Confirmed" : "Accepted"} relationship: ${relationshipsText}.`) : "";
     const selfNote = selfReport ? (fr ? " Déclaration du candidat; elle ne démontre pas une récurrence ou une vérification indépendante." : " Candidate self-report; it does not establish recurrence or independent verification.") : "";
     const common = {
       version: "d16-preparation-v2-development" as const, requirement_id: tension.requirement_id,
       canonical_status: tension.canonical_status,
+      role_criticality: tension.role_criticality, assessment_relevance: tension.assessment_relevance,
+      assessment_context: canonical.assessment_context ?? null,
+      preparation_priority: tension.preparation_priority, strategic_significance: tension.strategic_significance,
+      prep_objective: tension.prep_objective, practice_target: tension.practice_target,
       requirement_proof_refs: proof.map(e => ({ evidence_id: e.evidence_id, source_span_id: e.source_span_id, support_status: e.support_status })),
       preparation_anchor_refs: anchors.map(({ atom }) => ({ evidence_id: atom.id, source_span_id: atom.source_span_id, source_type: atom.provenance.source_type, actor: atom.subject.actor, ownership: atom.subject.ownership })),
       d15_thread_refs: threadIds, missing_facet_ids: missing,
       evidence_reference_mode: (tension.contradiction_present && (proof.length || anchors.length) ? "MIXED_EVIDENCE" : proof.length || anchors.length ? "SUPPORTED_EVIDENCE" : "NO_CANDIDATE_EVIDENCE") as D16EvidenceReferenceMode,
-      personalization: anchors.length ? "CURATED_CONTEXTUAL_ANCHORS" as const : "NO_RELEVANT_ANCHOR" as const,
+      personalization: anchors.length ? (input.selection_source === "AUTOMATIC_CONTEXT_SELECTOR" ? "AUTOMATIC_CONTEXTUAL_ANCHORS" as const : "CURATED_CONTEXTUAL_ANCHORS" as const) : "NO_RELEVANT_ANCHOR" as const,
       language: input.language, truthfulness_boundary: tension.truthfulness_boundary, dependency_fingerprint,
     };
     return [
-      { ...common, id: tension.id + "-PREP-V2", dispatcher: "PREP" as const, instruction: prep + note + "\n" + boundary + selfNote, expected_artifact: fr ? "Une fiche d'exemple avec contribution, justificatifs et limites." : "An example sheet with contribution, substantiation and limits." },
-      { ...common, id: tension.id + "-PRACTICE-V2", dispatcher: "PRACTICE" as const, instruction: practice + note + "\n" + boundary + selfNote, expected_artifact: fr ? "Une réponse de pratique; son évaluation appartient à D21." : "A practice response; evaluating it belongs to D21." },
+      { ...common, id: tension.id + "-PREP-V2", dispatcher: "PREP" as const, instruction: prep + note + missingNote + "\n" + boundary + selfNote, expected_artifact: anchors.length || proof.length
+        ? (fr ? "Une fiche d'exemple avec contribution, justificatifs et limites." : "An example sheet with contribution, substantiation and limits.")
+        : (fr ? "Une réponse en trois parties : acquis documentés, expérience adjacente éventuelle et ses limites, plan d'apprentissage." : "A three-part answer: documented background, adjacent experience if any and its limits, learning plan.") },
+      { ...common, id: tension.id + "-PRACTICE-V2", dispatcher: "PRACTICE" as const, instruction: practice + note + missingNote + "\n" + boundary + selfNote, expected_artifact: fr ? "Une réponse de pratique; son évaluation appartient à D21." : "A practice response; evaluating it belongs to D21." },
     ];
   });
 }

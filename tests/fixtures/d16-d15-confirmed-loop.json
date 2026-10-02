@@ -1,0 +1,1103 @@
+{
+  "mode": "SAVED_SIMULATED_D15_LOOP_NOT_QUALIFICATION",
+  "upstream_run": 37025234473,
+  "upstream_engine": "4ba6918be053bd847ea39cef1b8dcc0e5da29aab",
+  "upstream_zip_sha256": "43d37645617b8c43c24db57a7d38947649da56bb59ab31fef1ed231f49cc5ac0",
+  "upstream_report_sha256": "5596e4d876e3e5202b88926b1ef000472bd1376401f0b5271918850170c6e2d1",
+  "cases": [
+    {
+      "id": "COOPERATIVE",
+      "language": "en",
+      "answer": "I used my monthly sales forecasts as an input to the structured pipeline review. I presented the forecast assumptions in that review and discussed the variances with the sales team.",
+      "ledger": {
+        "source_spans": [
+          {
+            "id": "S1",
+            "document_id": "GOLD-DAVID",
+            "text": "Managed a portfolio of business customers across the northern region.",
+            "start_offset": 0,
+            "end_offset": 69,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S2",
+            "document_id": "GOLD-DAVID",
+            "text": "Prepared monthly sales forecasts and reviewed variances with the sales team.",
+            "start_offset": 100,
+            "end_offset": 176,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S3",
+            "document_id": "GOLD-DAVID",
+            "text": "Visited key accounts to understand customer priorities and coordinate follow-up.",
+            "start_offset": 200,
+            "end_offset": 280,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S4",
+            "document_id": "GOLD-DAVID",
+            "text": "Introduced a structured pipeline review for the sales team.",
+            "start_offset": 300,
+            "end_offset": 359,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S5",
+            "document_id": "GOLD-DAVID",
+            "text": "Worked with marketing colleagues to coordinate product launches.",
+            "start_offset": 400,
+            "end_offset": 464,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S6",
+            "document_id": "GOLD-DAVID",
+            "text": "Presented customer and market observations to senior management.",
+            "start_offset": 500,
+            "end_offset": 564,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S7",
+            "document_id": "GOLD-DAVID",
+            "text": "Coached new account executives on customer planning and reporting routines.",
+            "start_offset": 600,
+            "end_offset": 675,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S8",
+            "document_id": "GOLD-DAVID",
+            "text": "Supported negotiations with several strategic customers.",
+            "start_offset": 700,
+            "end_offset": 756,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-0-80",
+            "document_id": "ELICIT-SIMULATED-DAVID-COOPERATIVE",
+            "text": "I used my monthly sales forecasts as an input to the structured pipeline review.",
+            "start_offset": 0,
+            "end_offset": 80,
+            "language": "en",
+            "source_section": "UNKNOWN_SECTION"
+          },
+          {
+            "id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-81-181",
+            "document_id": "ELICIT-SIMULATED-DAVID-COOPERATIVE",
+            "text": "I presented the forecast assumptions in that review and discussed the variances with the sales team.",
+            "start_offset": 81,
+            "end_offset": 181,
+            "language": "en",
+            "source_section": "UNKNOWN_SECTION"
+          }
+        ],
+        "evidence": [
+          {
+            "id": "E1",
+            "source_span_id": "S1",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Managed",
+              "object": "a portfolio of business customers across the northern region"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E2",
+            "source_span_id": "S2",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Prepared",
+              "object": "monthly sales forecasts and reviewed variances with the sales team"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E3",
+            "source_span_id": "S3",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Visited",
+              "object": "key accounts to understand customer priorities and coordinate follow-up"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E4",
+            "source_span_id": "S4",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Introduced",
+              "object": "a structured pipeline review for the sales team"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E5",
+            "source_span_id": "S5",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Worked",
+              "object": "with marketing colleagues to coordinate product launches"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E6",
+            "source_span_id": "S6",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Presented",
+              "object": "customer and market observations to senior management"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E7",
+            "source_span_id": "S7",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Coached",
+              "object": "new account executives on customer planning and reporting routines"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E8",
+            "source_span_id": "S8",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Supported",
+              "object": "negotiations with several strategic customers"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-0-80",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "used",
+              "object": "monthly sales forecasts"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-1",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-81-181",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "presented",
+              "object": "the forecast assumptions"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-2",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-COOPERATIVE-ATOM-81-181",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "discussed",
+              "object": "the variances"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          }
+        ],
+        "requirements": [],
+        "support_judgments": [],
+        "requirement_statuses": [],
+        "unresolved_items": [],
+        "candidate_elicitations": [],
+        "demonstration_objectives": [],
+        "mirror_clarifications": [
+          {
+            "key": "[\"en\",[\"introduced a structured pipeline review for the sales team\",\"prepared monthly sales forecasts and reviewed variances with the sales team\"],\"you use your monthly sales forecasts as an input to the structured pipeline review\"]",
+            "headline": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+            "asserted_proposition": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+            "language": "en",
+            "source_quotes": [
+              "Introduced a structured pipeline review for the sales team.",
+              "Prepared monthly sales forecasts and reviewed variances with the sales team."
+            ],
+            "status": "CONFIRMED",
+            "responses": [
+              {
+                "id": "SIMULATED-DAVID-COOPERATIVE",
+                "answer": "I used my monthly sales forecasts as an input to the structured pipeline review. I presented the forecast assumptions in that review and discussed the variances with the sales team."
+              }
+            ],
+            "follow_up_issued": false
+          }
+        ]
+      },
+      "accepted_relationships": [
+        {
+          "id": "DAVID-FORECAST-REVIEW",
+          "headline": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+          "evidence_ids": [
+            "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0"
+          ],
+          "question_back": null,
+          "maturity": "CONFIRMED_RELATIONSHIP",
+          "verification": "SUPPORTED",
+          "gs_decision": {
+            "codebook_blob": "56f753c50e50aeb8532d7e7a70eeea04f0e69255",
+            "headline": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+            "asserted_proposition": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+            "G": {
+              "supported": true,
+              "connector": "use monthly sales forecasts as an input to the structured pipeline review",
+              "minimal_atom_subset": [
+                "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0"
+              ],
+              "licensing_spans": [
+                {
+                  "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0",
+                  "text": "I used my monthly sales forecasts as an input to the structured pipeline review."
+                }
+              ],
+              "reason": "The explicit statement in ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0 directly licenses the asserted relationship: the candidate uses monthly sales forecasts as an input to the structured pipeline review. No additional inference or unstated mechanism is required, and the connector is fully supported by the cited evidence."
+            },
+            "S": {
+              "supported": true,
+              "relationship_type": "MECHANISM",
+              "reason": "The asserted proposition describes a substantive relationship in which the output of one professional activity (monthly sales forecasts) is used as an input to another (structured pipeline review). This expresses a meaningful mechanism: the forecasts inform or structure the review process, going beyond a simple list of duties or a generic connection."
+            },
+            "vetoes": [],
+            "accepted": true,
+            "raw_G": {
+              "supported": true,
+              "connector": "use monthly sales forecasts as an input to the structured pipeline review",
+              "minimal_atom_subset": [
+                "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0"
+              ],
+              "licensing_spans": [
+                {
+                  "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0",
+                  "text": "I used my monthly sales forecasts as an input to the structured pipeline review."
+                }
+              ],
+              "reason": "The explicit statement in ELICIT-ATOM-SIMULATED-DAVID-COOPERATIVE-0 directly licenses the asserted relationship: the candidate uses monthly sales forecasts as an input to the structured pipeline review. No additional inference or unstated mechanism is required, and the connector is fully supported by the cited evidence."
+            },
+            "raw_S": {
+              "supported": true,
+              "relationship_type": "MECHANISM",
+              "reason": "The asserted proposition describes a substantive relationship in which the output of one professional activity (monthly sales forecasts) is used as an input to another (structured pipeline review). This expresses a meaningful mechanism: the forecasts inform or structure the review process, going beyond a simple list of duties or a generic connection."
+            },
+            "veto_details": [],
+            "semantic_reading": {
+              "language": "en",
+              "actor": "CANDIDATE",
+              "asserted_proposition": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+              "component_claims": [
+                "You create monthly sales forecasts.",
+                "You conduct a structured pipeline review.",
+                "You use your monthly sales forecasts as an input to the structured pipeline review."
+              ],
+              "form": "RELATIONSHIP",
+              "relationship_assertion": "You use your monthly sales forecasts as an input to the structured pipeline review.",
+              "reading_reason": "The headline explicitly states that the candidate's monthly sales forecasts are used as an input to the structured pipeline review, establishing a substantive relationship where information from one activity informs the other."
+            },
+            "judge_model": "gpt-4.1-2025-04-14"
+          },
+          "relationship_support_unit_count": 1
+        }
+      ]
+    },
+    {
+      "id": "FRENCH",
+      "language": "fr",
+      "answer": "J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial. J’ai présenté les hypothèses dans cette revue et discuté des écarts avec l’équipe commerciale.",
+      "ledger": {
+        "source_spans": [
+          {
+            "id": "S1",
+            "document_id": "GOLD-DAVID",
+            "text": "Managed a portfolio of business customers across the northern region.",
+            "start_offset": 0,
+            "end_offset": 69,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S2",
+            "document_id": "GOLD-DAVID",
+            "text": "Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale.",
+            "start_offset": 100,
+            "end_offset": 192,
+            "language": "fr",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S3",
+            "document_id": "GOLD-DAVID",
+            "text": "Visited key accounts to understand customer priorities and coordinate follow-up.",
+            "start_offset": 200,
+            "end_offset": 280,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S4",
+            "document_id": "GOLD-DAVID",
+            "text": "Introduit une revue structurée du pipeline commercial pour l’équipe commerciale.",
+            "start_offset": 300,
+            "end_offset": 380,
+            "language": "fr",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S5",
+            "document_id": "GOLD-DAVID",
+            "text": "Worked with marketing colleagues to coordinate product launches.",
+            "start_offset": 400,
+            "end_offset": 464,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S6",
+            "document_id": "GOLD-DAVID",
+            "text": "Presented customer and market observations to senior management.",
+            "start_offset": 500,
+            "end_offset": 564,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S7",
+            "document_id": "GOLD-DAVID",
+            "text": "Coached new account executives on customer planning and reporting routines.",
+            "start_offset": 600,
+            "end_offset": 675,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "S8",
+            "document_id": "GOLD-DAVID",
+            "text": "Supported negotiations with several strategic customers.",
+            "start_offset": 700,
+            "end_offset": 756,
+            "language": "en",
+            "source_section": "BULLET"
+          },
+          {
+            "id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-0-121",
+            "document_id": "ELICIT-SIMULATED-DAVID-FRENCH",
+            "text": "J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+            "start_offset": 0,
+            "end_offset": 121,
+            "language": "fr",
+            "source_section": "UNKNOWN_SECTION"
+          },
+          {
+            "id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-122-216",
+            "document_id": "ELICIT-SIMULATED-DAVID-FRENCH",
+            "text": "J’ai présenté les hypothèses dans cette revue et discuté des écarts avec l’équipe commerciale.",
+            "start_offset": 122,
+            "end_offset": 216,
+            "language": "fr",
+            "source_section": "UNKNOWN_SECTION"
+          }
+        ],
+        "evidence": [
+          {
+            "id": "E1",
+            "source_span_id": "S1",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Managed",
+              "object": "a portfolio of business customers across the northern region"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E2",
+            "source_span_id": "S2",
+            "provenance": {
+              "source_type": "CV",
+              "language": "fr",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Préparé",
+              "object": "les prévisions de ventes mensuelles"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E3",
+            "source_span_id": "S3",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Visited",
+              "object": "key accounts to understand customer priorities and coordinate follow-up"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E4",
+            "source_span_id": "S4",
+            "provenance": {
+              "source_type": "CV",
+              "language": "fr",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Introduit",
+              "object": "une revue structurée du pipeline commercial"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E5",
+            "source_span_id": "S5",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Worked",
+              "object": "with marketing colleagues to coordinate product launches"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E6",
+            "source_span_id": "S6",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Presented",
+              "object": "customer and market observations to senior management"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E7",
+            "source_span_id": "S7",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Coached",
+              "object": "new account executives on customer planning and reporting routines"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "E8",
+            "source_span_id": "S8",
+            "provenance": {
+              "source_type": "CV",
+              "language": "en",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "ownership": "UNKNOWN"
+            },
+            "action": {
+              "normalized_action": "Supported",
+              "object": "negotiations with several strategic customers"
+            },
+            "context": {},
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "RESPONSIBILITY",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-0-121",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "fr",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "utilisé",
+              "object": "mes prévisions de ventes mensuelles"
+            },
+            "context": {
+              "situation": "revue structurée du pipeline commercial"
+            },
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-1",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-122-216",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "fr",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "présenté",
+              "object": "les hypothèses"
+            },
+            "context": {
+              "situation": "cette revue"
+            },
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          },
+          {
+            "id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-2",
+            "source_span_id": "SPAN-ELICIT-SIMULATED-DAVID-FRENCH-ATOM-122-216",
+            "provenance": {
+              "source_type": "CANDIDATE_ELICITED",
+              "language": "fr",
+              "extraction_method": "LLM"
+            },
+            "subject": {
+              "actor": "candidate",
+              "actor_basis": "EXPLICIT_CANDIDATE",
+              "ownership": "INDIVIDUAL"
+            },
+            "action": {
+              "normalized_action": "discuté",
+              "object": "des écarts"
+            },
+            "context": {
+              "situation": "avec l’équipe commerciale"
+            },
+            "scale": {},
+            "time": {},
+            "outcome": null,
+            "assertion": {
+              "type": "ELICITED",
+              "polarity": "AFFIRMATIVE"
+            },
+            "verifiability": {
+              "has_quantifiable_metric": false,
+              "has_third_party_entity": false,
+              "has_time_anchor": false
+            },
+            "extraction_confidence": 1
+          }
+        ],
+        "requirements": [],
+        "support_judgments": [],
+        "requirement_statuses": [],
+        "unresolved_items": [],
+        "candidate_elicitations": [],
+        "demonstration_objectives": [],
+        "mirror_clarifications": [
+          {
+            "key": "[\"fr\",[\"introduit une revue structurée du pipeline commercial pour l’équipe commerciale\",\"préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale\"],\"vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial\"]",
+            "headline": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+            "asserted_proposition": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+            "language": "fr",
+            "source_quotes": [
+              "Introduit une revue structurée du pipeline commercial pour l’équipe commerciale.",
+              "Préparé les prévisions de ventes mensuelles et examiné les écarts avec l’équipe commerciale."
+            ],
+            "status": "CONFIRMED",
+            "responses": [
+              {
+                "id": "SIMULATED-DAVID-FRENCH",
+                "answer": "J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial. J’ai présenté les hypothèses dans cette revue et discuté des écarts avec l’équipe commerciale."
+              }
+            ],
+            "follow_up_issued": false
+          }
+        ]
+      },
+      "accepted_relationships": [
+        {
+          "id": "DAVID-FORECAST-REVIEW",
+          "headline": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+          "evidence_ids": [
+            "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0"
+          ],
+          "question_back": null,
+          "maturity": "CONFIRMED_RELATIONSHIP",
+          "verification": "SUPPORTED",
+          "gs_decision": {
+            "codebook_blob": "56f753c50e50aeb8532d7e7a70eeea04f0e69255",
+            "headline": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+            "asserted_proposition": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+            "G": {
+              "supported": true,
+              "connector": "utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial",
+              "minimal_atom_subset": [
+                "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0"
+              ],
+              "licensing_spans": [
+                {
+                  "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0",
+                  "text": "J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial."
+                }
+              ],
+              "reason": "L’assertion selon laquelle les prévisions de ventes mensuelles sont utilisées comme donnée d’entrée de la revue structurée du pipeline commercial est explicitement et directement énoncée dans l’atome ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0. Cette phrase établit sans ambiguïté le lien d’utilisation entre les deux activités, sans introduire de mécanisme, de causalité ou de relation non supportée. Les autres atomes ne sont pas nécessaires pour licencier ce lien, qui est déjà explicitement formulé."
+            },
+            "S": {
+              "supported": true,
+              "relationship_type": "MECHANISM",
+              "reason": "L’assertion décrit explicitement comment une activité (la réalisation des prévisions de ventes mensuelles) informe et structure une autre activité (la revue structurée du pipeline commercial) en précisant que les prévisions servent de donnée d’entrée à la revue. Cela va au-delà d’une simple co-occurrence ou d’une énumération d’activités : il s’agit d’un mécanisme professionnel où le résultat d’une activité est utilisé pour en alimenter une autre, ce qui constitue une relation significative de type MECHANISM."
+            },
+            "vetoes": [],
+            "accepted": true,
+            "raw_G": {
+              "supported": true,
+              "connector": "utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial",
+              "minimal_atom_subset": [
+                "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0"
+              ],
+              "licensing_spans": [
+                {
+                  "evidence_id": "ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0",
+                  "text": "J’ai utilisé mes prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial."
+                }
+              ],
+              "reason": "L’assertion selon laquelle les prévisions de ventes mensuelles sont utilisées comme donnée d’entrée de la revue structurée du pipeline commercial est explicitement et directement énoncée dans l’atome ELICIT-ATOM-SIMULATED-DAVID-FRENCH-0. Cette phrase établit sans ambiguïté le lien d’utilisation entre les deux activités, sans introduire de mécanisme, de causalité ou de relation non supportée. Les autres atomes ne sont pas nécessaires pour licencier ce lien, qui est déjà explicitement formulé."
+            },
+            "raw_S": {
+              "supported": true,
+              "relationship_type": "MECHANISM",
+              "reason": "L’assertion décrit explicitement comment une activité (la réalisation des prévisions de ventes mensuelles) informe et structure une autre activité (la revue structurée du pipeline commercial) en précisant que les prévisions servent de donnée d’entrée à la revue. Cela va au-delà d’une simple co-occurrence ou d’une énumération d’activités : il s’agit d’un mécanisme professionnel où le résultat d’une activité est utilisé pour en alimenter une autre, ce qui constitue une relation significative de type MECHANISM."
+            },
+            "veto_details": [],
+            "semantic_reading": {
+              "language": "fr",
+              "actor": "CANDIDATE",
+              "asserted_proposition": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée de la revue structurée du pipeline commercial.",
+              "component_claims": [
+                "Vous réalisez des prévisions de ventes mensuelles.",
+                "Vous effectuez une revue structurée du pipeline commercial.",
+                "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée pour la revue structurée du pipeline commercial."
+              ],
+              "form": "RELATIONSHIP",
+              "relationship_assertion": "Vous utilisez vos prévisions de ventes mensuelles comme une donnée d’entrée pour la revue structurée du pipeline commercial.",
+              "reading_reason": "L’énoncé affirme explicitement que les prévisions de ventes mensuelles sont utilisées comme donnée d’entrée dans la revue structurée du pipeline commercial, ce qui établit une relation de flux d’information entre les deux activités. Les deux activités sont donc reliées par l’utilisation des prévisions dans la revue."
+            },
+            "judge_model": "gpt-4.1-2025-04-14"
+          },
+          "relationship_support_unit_count": 1
+        }
+      ]
+    }
+  ]
+}

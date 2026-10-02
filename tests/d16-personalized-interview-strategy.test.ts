@@ -419,11 +419,15 @@ describe("D16 evidence-linked preparation development contract", () => {
     assert.equal(action.preparation_anchor_refs[0].actor, "My manager");
     assert.match(action.instruction, /Separate your contribution from other actors/);
     assert.equal(action.canonical_status, "UNRESOLVED");
+    assert.match(action.instruction, /work of: My manager/);
   });
   it("accepts a licensed single-answer D15 relationship only as a self-report anchor", () => {
     const quote = "I used my forecasts as input to the pipeline review.";
     const input = preparationFixture(quote);
     input.canonical.ledger.evidence[0].provenance.source_type = "CANDIDATE_ELICITED";
+    input.canonical.ledger.evidence[0].assertion.type = "ELICITED";
+    input.canonical.ledger.evidence[0].subject = { actor: "candidate", actor_basis: "EXPLICIT_CANDIDATE", ownership: "INDIVIDUAL" };
+    input.canonical.ledger.evidence[0].action = { normalized_action: "used", object: "forecasts" };
     input.canonical.mirror.evidence[0].source_type = "CANDIDATE_ELICITED";
     const headline = "You use your forecasts as input to the pipeline review.";
     const gs = combineGS(headline, { supported: true, connector: "input", minimal_atom_subset: ["EV-A"], licensing_spans: [{ evidence_id: "EV-A", text: quote }], reason: "Explicit use" }, { supported: true, relationship_type: "MECHANISM", reason: "Input relationship" }, []);
@@ -512,4 +516,33 @@ it("non-standard requirements get a contribution probe rather than an accounting
   assert.match(actions[1].instruction, /how does it address this requirement/);
   assert.doesNotMatch(actions[0].instruction, /jurisdiction|application of a standard/);
   assert.doesNotMatch(actions[1].instruction, /Which rule or standard/);
+});
+
+it("no-anchor PREP does not demand an invented example artifact", () => {
+ const input=preparationFixture();input.selections[0].preparation_evidence_ids=[];refreshPreparation(input);
+ assert.match(buildD16PreparationActions(input)[0].expected_artifact,/three-part answer/);
+});
+it("proof-only preparation does not falsely state that documented support is absent", () => {
+ const canonical=fixture();const material={canonical,accepted_relationships:[],selections:[],language:"en" as const};
+ const actions=buildD16PreparationActions({...material,dependency_fingerprint:buildD16PreparationFingerprint(material)});
+ const partial=actions.find(a=>a.requirement_id==="REQ-B"&&a.dispatcher==="PREP")!;
+ assert.equal(partial.requirement_proof_refs.length,1);
+ assert.match(partial.instruction,/Review the requirement evidence/);
+ assert.doesNotMatch(partial.instruction,/current record does not establish|No relevant candidate anchor/);
+});
+
+it("contextual anchors resolve to the same Mirror span, quote and source type", () => {
+ const input=preparationFixture();input.canonical.ledger.evidence[0].source_span_id="SPAN-B";refreshPreparation(input);
+ assert.throws(()=>buildD16PreparationActions(input),/Mirror provenance mismatch/);
+});
+it("recorded denials cannot become positive preparation examples", () => {
+ const input=preparationFixture();input.canonical.ledger.evidence[0].assertion.polarity="NEGATED";refreshPreparation(input);
+ assert.throws(()=>buildD16PreparationActions(input),/Non-affirmative/);
+});
+it("named IFRS requirements keep the standards-specific truth boundary", () => {
+ const input=preparationFixture();
+ for(const r of input.canonical.bridge.requirements)r.normalized_requirement="Experience applying IFRS";
+ for(const r of input.canonical.canonical_requirements)r.normalized_requirement="Experience applying IFRS";
+ for(const r of input.canonical.role_capability_model.requirements)r.normalized_requirement="Experience applying IFRS";
+ refreshPreparation(input);assert.match(buildD16PreparationActions(input)[0].instruction,/jurisdiction and period/);
 });
