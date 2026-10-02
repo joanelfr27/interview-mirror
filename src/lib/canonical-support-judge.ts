@@ -206,9 +206,21 @@ function connectorBindsFacetSides(facetRequirement: string, connector: string, l
   });
 }
 
+function stemContentToken(token: string): string {
+  let t = normalizeEvidenceText(token);
+  // Conservative inflection folding only; this is not a semantic synonym map.
+  if (t.length > 5 && t.endsWith("ing")) t = t.slice(0, -3);
+  else if (t.length > 4 && t.endsWith("ed")) t = t.slice(0, -2);
+  else if (t.length > 4 && t.endsWith("es")) t = t.slice(0, -2);
+  else if (t.length > 3 && t.endsWith("s")) t = t.slice(0, -1);
+  if (t.length > 4 && t.endsWith("x")) t = t.slice(0, -1);
+  if (t.length > 4 && t.endsWith("e")) t = t.slice(0, -1);
+  return t;
+}
+
 function semanticClauses(value: string): string[] {
   return value.normalize("NFC")
-    .split(/[.!?;:,\n]+|\b(?:and|but|while|whereas|et|mais|tandis\s+que|alors\s+que)\b/iu)
+    .split(/[.!?;:,\n]+|\b(?:and|but|while|whereas|then|after|before|followed\s+by|et|mais|tandis\s+que|alors\s+que|puis|ensuite|avant|après)\b/iu)
     .map(clause => normalizeEvidenceText(clause))
     .filter(Boolean);
 }
@@ -222,25 +234,38 @@ const FACET_CONTENT_STOPWORDS = new Set([
 
 function facetContentTokens(value: string): string[] {
   return [...new Set(normalizeEvidenceText(value).split(/\s+/)
-    .filter(token => token.length >= 3 && !FACET_CONTENT_STOPWORDS.has(token)))];
+    .filter(token => token.length >= 3 && !FACET_CONTENT_STOPWORDS.has(token))
+    .map(stemContentToken)
+    .filter(token => token.length >= 3))];
+}
+
+function facetContentGroups(value: string): string[][] {
+  // Requirement coordination ("budgeting and forecasting") is one asserted group.
+  // Only punctuation/adversative/chronology boundaries split independent facet groups.
+  return value.normalize("NFC")
+    .split(/[.!?;:,\n]+|\b(?:but|while|whereas|then|after|before|followed\s+by|mais|tandis\s+que|alors\s+que|puis|ensuite|avant|après)\b/iu)
+    .map(facetContentTokens)
+    .filter(group => group.length > 0);
+}
+
+function clauseTokenSet(value: string): Set<string> {
+  return new Set(normalizeEvidenceText(value).split(/\s+/).filter(Boolean).map(stemContentToken));
 }
 
 function directEvidenceContentIsSplitAcrossClauses(
   facetRequirement: string,
   citedSourceTexts: string[],
 ): boolean {
-  const facetTokens = facetContentTokens(facetRequirement);
-  if (facetTokens.length < 2) return false;
+  const groups = facetContentGroups(facetRequirement);
+  if (!groups.some(group => group.length >= 2)) return false;
 
   for (const source of citedSourceTexts) {
-    const clauses = semanticClauses(source);
-    const matched = facetTokens.filter(token => clauses.some(clause => clause.split(/\s+/).includes(token)));
-    if (matched.length < 2) continue;
-    if (clauses.some(clause => {
-      const tokens = new Set(clause.split(/\s+/));
-      return matched.every(token => tokens.has(token));
-    })) continue;
-    return true;
+    const clauseTokens = semanticClauses(source).map(clauseTokenSet);
+    for (const group of groups) {
+      const matched = group.filter(token => clauseTokens.some(tokens => tokens.has(token)));
+      if (matched.length < 2) continue;
+      if (!clauseTokens.some(tokens => matched.every(token => tokens.has(token)))) return true;
+    }
   }
   return false;
 }
@@ -281,13 +306,6 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     .map(id => byId.get(id))
     .filter((atom): atom is EvidenceLedger["evidence"][number] => Boolean(atom))
     .map(atom => spans.get(atom.source_span_id) ?? "");
-
-  // Lexicon-free evidence-side anti-co-occurrence guard. Even when facet wording
-  // falls outside the deterministic relational vocabulary, DIRECT cannot be licensed
-  // by content terms that are distributed across independent clauses of one source span.
-  if (item.status === "DIRECT" && directEvidenceContentIsSplitAcrossClauses(facet.requirement, citedSourceTexts)) {
-    errors.push("DIRECT evidence content is distributed across independent clauses; co-location in one source span cannot establish the facet relationship.");
-  }
 
   if (relational && item.status === "DIRECT") {
     const connector = item.relationship_connector?.trim() ?? "";
@@ -474,6 +492,17 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         item.rationale = deterministicRationaleOverride;
         item.confidence = Math.min(item.confidence, 0.8);
       }
+    }
+
+    const clauseSplitDirect = item.status === "DIRECT" && directEvidenceContentIsSplitAcrossClauses(
+      facet.requirement,
+      citedAtoms.map(atom => ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? ""),
+    );
+    if (clauseSplitDirect) {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "Facet content is distributed across independent evidence clauses, so co-occurrence cannot establish DIRECT support; conservatively downgraded to PARTIAL.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
     }
 
     const semanticBoundaryErrors = validateRelationalAndRationaleBoundary(item, facet, ledger);
