@@ -134,6 +134,22 @@ function normalizeEvidenceText(value: string): string {
   return value.toLocaleLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
+function containsNormalizedPhrase(haystack: string, needle: string): boolean {
+  const normalizedNeedle = normalizeEvidenceText(needle);
+  return normalizedNeedle.length > 0 && normalizeEvidenceText(haystack).includes(normalizedNeedle);
+}
+
+function buildCanonicalRationale(item: RawJudgment): string {
+  if (item.status === "NONE" || item.abstained) return "No validated evidence subset supports a positive judgment for this facet.";
+  const ids = item.supporting_evidence_ids.join(", ");
+  if (item.relationship_connector?.trim() && item.licensing_spans.length) {
+    return item.status + " support from minimal evidence [" + ids + "]; relationship connector \"" +
+      item.relationship_connector.trim() + "\" is licensed by exact source span(s): " +
+      item.licensing_spans.map(span => "\"" + span.trim() + "\"").join("; ") + ".";
+  }
+  return item.status + " support from minimal evidence [" + ids + "].";
+}
+
 function distinctivePhrases(value: string): string[] {
   const words = normalizeEvidenceText(value).split(/\s+/).filter(Boolean);
   const phrases: string[] = [];
@@ -161,12 +177,18 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     .map(atom => spans.get(atom.source_span_id) ?? "");
 
   if (relational && item.status === "DIRECT") {
-    if (!item.relationship_connector?.trim()) errors.push("relational DIRECT requires an explicit relationship_connector.");
+    const connector = item.relationship_connector?.trim() ?? "";
+    if (!connector) errors.push("relational DIRECT requires an explicit relationship_connector.");
+    if (connector && !containsNormalizedPhrase(facet.requirement, connector)) {
+      errors.push("relational DIRECT connector must be explicitly present in the facet wording.");
+    }
     if (!item.licensing_spans.length) errors.push("relational DIRECT requires at least one exact licensing span.");
     for (const licensingSpan of item.licensing_spans) {
       const exact = licensingSpan.trim();
       if (!exact || !citedSourceTexts.some(source => source.includes(exact))) {
         errors.push("relational DIRECT licensing span must be an exact quote from the minimal supporting evidence subset.");
+      } else if (connector && !containsNormalizedPhrase(exact, connector)) {
+        errors.push("relational DIRECT licensing span must explicitly contain the asserted relationship connector.");
       }
     }
     if (item.supporting_evidence_ids.length > 1) {
@@ -334,6 +356,9 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
 
     const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
+    // Candidate-facing/downstream rationale is deterministic and derived only from the
+    // validated minimal subset. The raw model rationale remains available in diagnostics.
+    item.rationale = buildCanonicalRationale(item);
     valid.push(item);
   }
 
