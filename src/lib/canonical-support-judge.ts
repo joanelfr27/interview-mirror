@@ -462,6 +462,12 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       continue;
     }
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
+    if (hasElicited && item.status === "DIRECT") {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "Candidate self-reported evidence cannot establish DIRECT support; conservatively downgraded to PARTIAL.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
+    }
 
     // General anti-composition invariant: DIRECT support cannot be assembled from
     // independent source spans. For relational facets this is a hard rejection because
