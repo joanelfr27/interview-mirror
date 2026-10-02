@@ -724,6 +724,17 @@ test("financial reporting in SAP remains modifier-led DIRECT", () => {
 });
 
 
+
+test("verb-less reversed-order residual stays PARTIAL", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Configured SAP in the reporting team.", start_offset: 0, end_offset: 37, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "configured", object: "SAP in the reporting team" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "TOOL_METHOD", requirement: "Reporting in SAP", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
 test("numeric prose does not masquerade as an out-of-subset evidence ID", () => {
   const l = ledger();
   l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed statutory audits.", start_offset: 0, end_offset: 25, language: "en" });
