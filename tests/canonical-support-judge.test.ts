@@ -680,3 +680,22 @@ test("financial reporting in SAP remains modifier-led DIRECT", () => {
   const l=ledger(); l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Prepared financial reporting in SAP.",start_offset:0,end_offset:36,language:"en"}; l.evidence[0]={...l.evidence[0],source_span_id:"S-A1"}; l.requirements[0].facets[0]={id:"F-1",type:"FUNCTION",requirement:"Financial reporting in SAP",source_span_id:"S-REQ"};
   const r=sanitizeJudgments([{...raw("DIRECT",["A1"])}],l); assert.equal(r.errors.length,0); assert.equal(r.judgments[0].status,"DIRECT");
 });
+
+
+test("numeric prose does not masquerade as an out-of-subset evidence ID", () => {
+  const l = ledger();
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed statutory audits.", start_offset: 0, end_offset: 25, language: "en" });
+  l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
+  const judgment = { ...raw("DIRECT", ["A1"]), rationale: "The candidate has over 13 years of finance experience." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.some(error => error.includes("evidence ID outside")), false);
+});
+
+test("explicit out-of-subset evidence ID reference remains rejected", () => {
+  const l = ledger();
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed statutory audits.", start_offset: 0, end_offset: 25, language: "en" });
+  l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
+  const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID 2 also supports this judgment." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.some(error => error.includes("evidence ID outside")), true);
+});
