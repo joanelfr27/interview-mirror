@@ -566,6 +566,23 @@ function directLacksNamedDomainSpecificity(
   return !requiredGroups.some(group => evidencedGroups.has(group));
 }
 
+function directLacksEducationFieldSpecificity(
+  facet: EvidenceLedger["requirements"][number]["facets"][number],
+  citedAtoms: AtomicEvidence[],
+): boolean {
+  if (facet.type !== "LEVEL") return false;
+  const requirement = normalizedSpecificityText(facet.requirement);
+  const asksSpecificMastersField = /\b(?:master|masters|master s|degree|diplome)\b/.test(requirement) &&
+    /\b(?:finance|accounting|comptabilite)\b/.test(requirement);
+  if (!asksSpecificMastersField) return false;
+  const credentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
+  if (!credentials.length) return false;
+  return !credentials.some(atom => {
+    const field = normalizedSpecificityText(atom.action.object);
+    return /\b(?:finance|accounting|comptabilite)\b/.test(field);
+  });
+}
+
 
 export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgments: SupportJudgment[]; errors: string[] } {
   const errors: string[] = [];
@@ -651,20 +668,12 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.confidence = Math.min(item.confidence, 0.8);
     }
 
-// Pre-existing locked credential-specificity guard retained unchanged.
-    // It is not extended as part of the relational boundary correction.
-    if (item.status === "DIRECT" && facet.type === "LEVEL" &&
-        /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
-      const citedCredentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
-      const hasSpecificField = citedCredentials.some(atom =>
-        /\b(?:finance|accounting)\b/i.test(atom.action.object)
-      );
-      if (citedCredentials.length > 0 && !hasSpecificField) {
-        item.status = "PARTIAL";
-        deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
-        item.rationale = deterministicRationaleOverride;
-        item.confidence = Math.min(item.confidence, 0.8);
-      }
+// Education-field specificity uses the same downgrade-only boundary rather than a credential-specific exception.
+    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms)) {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
     }
 
     const prepositionalUnlicensedDirect = item.status === "DIRECT" && prepositionalDirectLacksRelationLicense(
