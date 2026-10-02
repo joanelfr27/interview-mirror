@@ -1,0 +1,58 @@
+name: D15 Conversational Mirror Loop
+on:
+  push:
+    branches: [d15-v11-development-run]
+    paths: [.github/workflows/d15-conversation-loop.yml]
+permissions:
+  contents: read
+concurrency:
+  group: d15-conversation-loop-once
+  cancel-in-progress: false
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: 28f78f0eb2711f66fdff582171ef605b7f87e5e8
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assert pinned loop and evidence definition
+        run: |
+          test "$(git rev-parse HEAD)" = "28f78f0eb2711f66fdff582171ef605b7f87e5e8"
+          test "$(git hash-object docs/d15-semantic-significance-codebook-v1.1-candidate.md)" = "56f753c50e50aeb8532d7e7a70eeea04f0e69255"
+          test "$(git hash-object scripts/d15-conversation-loop.ts)" = "3d5d5576fe9804424b00fb6edcee6a3e9c1918d0"
+          test "$(git hash-object src/lib/canonical-shadow-extractor.ts)" = "e58484c0a0f3dec3d87000cc3b0da5856151585b"
+          {
+            echo "engine_commit=28f78f0eb2711f66fdff582171ef605b7f87e5e8"
+            echo "workflow_definition_commit=${{ github.sha }}"
+            echo "codebook_blob=56f753c50e50aeb8532d7e7a70eeea04f0e69255"
+            echo "erratum_blob=5f888c661a5c4b9efa17724066b0785c3080be3d"
+            echo "loop_definition_blob=3d5d5576fe9804424b00fb6edcee6a3e9c1918d0"
+            echo "E1_extractor_blob=e58484c0a0f3dec3d87000cc3b0da5856151585b"
+            echo "product_decision_blob=9fcf31a039e9609617a1189b213318ed17f327c4"
+            echo "mode=DEVELOPMENT_ONLY_SIMULATED_ANSWER_NOT_QUALIFICATION"
+            echo "cutover=false; database_writes=false"
+          } | tee provenance.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Pre-spend canonical checks
+        run: npm run test:canonical
+      - name: Run one simulated conversational loop
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-conversation-loop.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d15-conversation-loop-${{ github.run_id }}
+          retention-days: 3
+          path: |
+            provenance.txt
+            d15-conversation-loop-report.json
