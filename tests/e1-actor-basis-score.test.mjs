@@ -84,13 +84,14 @@ test("qualification scorer rejects missing required construction coverage", () =
 });
 
 
-test("qualification scorer counts explicit-candidate prediction on unspecified gold as false candidate attribution", () => {
+test("qualification scorer counts explicit-candidate predictions on unspecified gold against the frozen threshold", () => {
   const data = rows();
-  const row = data.find(x => x.gold === "UNSPECIFIED" && x.language === "en");
-  assert.ok(row);
-  row.predicted = "EXPLICIT_CANDIDATE";
+  const rowsToFlip = data.filter(x => x.gold === "UNSPECIFIED" && x.language === "en").slice(0, 3);
+  assert.equal(rowsToFlip.length, 3);
+  for (const row of rowsToFlip) row.predicted = "EXPLICIT_CANDIDATE";
   const result = score(data);
   assert.equal(result.status, 1);
-  assert.equal(result.report.primary_rates.false_implicit_candidate.count, 1);
+  assert.equal(result.report.primary_rates.false_implicit_candidate.count, 3);
+  assert.equal(result.report.primary_rates.false_implicit_candidate.rate, "3.00%");
   assert.equal(result.report.qualification_pass, false);
 });
