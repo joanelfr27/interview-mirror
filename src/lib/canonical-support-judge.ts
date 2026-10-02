@@ -595,7 +595,52 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       }
     }
 
-    // Pre-existing locked credential-specificity guard retained unchanged.
+    
+const SPECIFICITY_DOMAIN_GROUPS = [
+  ["m&a", "mergers and acquisitions", "fusions acquisitions", "fusion acquisition"],
+  ["private equity", "pe", "capital investissement"],
+  ["project finance", "financement de projet"],
+  ["asset management", "gestion d actifs", "gestion d actifs"],
+] as const;
+
+function normalizedSpecificityText(value: string): string {
+  return normalizeEvidenceText(value)
+    .replace(/[’']/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function specificityGroupsNamed(value: string): number[] {
+  const normalized = normalizedSpecificityText(value);
+  return SPECIFICITY_DOMAIN_GROUPS.flatMap((aliases, index) =>
+    aliases.some(alias => {
+      const token = normalizedSpecificityText(alias);
+      if (token === "pe") return new RegExp("(?:^|\\s)pe(?:$|\\s)", "i").test(normalized);
+      if (token === "m and a") return /(?:^|\s)m\s+and\s+a(?:$|\s)/i.test(normalized);
+      return normalized.includes(token);
+    }) ? [index] : []
+  );
+}
+
+function directLacksNamedDomainSpecificity(
+  facet: EvidenceLedger["requirements"][number]["facets"][number],
+  citedAtoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
+): boolean {
+  if (facet.type !== "LEVEL") return false;
+  const requiredGroups = specificityGroupsNamed(facet.requirement);
+  if (requiredGroups.length === 0) return false;
+  const citedText = citedAtoms.map(atom => {
+    const source = ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? "";
+    return [source, atom.action.object, atom.context.domain ?? "", atom.context.situation ?? ""].join(" ");
+  }).join(" ");
+  const evidencedGroups = new Set(specificityGroupsNamed(citedText));
+  return !requiredGroups.some(group => evidencedGroups.has(group));
+}
+
+// Pre-existing locked credential-specificity guard retained unchanged.
     // It is not extended as part of the relational boundary correction.
     if (item.status === "DIRECT" && facet.type === "LEVEL" &&
         /master(?:'s|’s)?\s+degree.*\b(?:finance|accounting)\b/i.test(facet.requirement)) {
@@ -783,4 +828,14 @@ export async function judgeCanonicalSupport(
     throw new Error("Canonical support graph failed validation: " + graphErrors.join(" | "));
   }
   return { ledger: next, diagnostics: sanitized.errors };
-}
+}    // General downgrade-only specificity boundary: a LEVEL requirement that names
+    // a specific professional field cannot be DIRECT from generic tenure alone.
+    // This guard never creates NONE and intentionally uses only the frozen alias set.
+    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger)) {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "The cited evidence establishes relevant experience, but does not explicitly document experience in one of the specific professional fields named by the requirement.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
+    }
+
+
