@@ -261,11 +261,19 @@ function relationVerbFamilyFromFacet(facetRequirement: string): Set<string> | nu
   const words = normalizeEvidenceText(facetRequirement).split(/\s+/).filter(Boolean);
   const prepIndex = words.findIndex((word, index) => index > 0 && index < words.length - 1 && PREPOSITIONAL_GROUP_JOINERS.has(word));
   if (prepIndex < 0) return null;
+
   for (const word of words.slice(0, prepIndex)) {
-    const family = relationBearingVerbFamily(word);
-    if (family) return family;
+    const knownFamily = relationBearingVerbFamily(word);
+    if (knownFamily) return knownFamily;
   }
-  return null;
+
+  // Fallback only for an imperative/infinitive-like leading relation verb. Do not
+  // infer a verb for noun-led facets such as "Experience with SAP" or "Reporting in SAP".
+  const first = words[0];
+  const nounLed = new Set(["experience","reporting","forecasting","budgeting","management","gestion","report","reports","revue","revues"]);
+  if (!first || nounLed.has(first) || RELATION_STOPWORDS.has(first) || first.length < 4) return null;
+  const stem = stemContentToken(first);
+  return new Set([first, stem, stem + "s", stem + "ed", stem + "ing", stem + "e", stem + "er", stem + "é", stem + "ée", stem + "és", stem + "ées"]);
 }
 
 function prepositionalDirectLacksRelationLicense(facetRequirement: string, citedSourceTexts: string[]): boolean {
