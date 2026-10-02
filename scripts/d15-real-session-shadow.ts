@@ -1,3 +1,4 @@
+import { d16EvidenceCoverage } from "@/lib/d16-evidence-coverage";
 // Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
@@ -374,6 +375,7 @@ for (const row of chosen) {
       d16_role_capability_model_version: d16.role_capability_model_version,
       d16_tensions: d16.tensions.length,
       d16_actions: d16.actions.length,
+      d16_evidence_coverage: d16EvidenceCoverage(d16.actions),
       d16_tension_requirement_ids: d16.tensions.map((tension) => tension.requirement_id),
       d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
       d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
@@ -473,6 +475,9 @@ for (const row of chosen) {
         thread_depths: result.d15.threads.map((thread) => new Set(thread.evidence_ids.map((id) => result.ledger.evidence.find((atom) => atom.id === id)?.source_span_id).filter((id): id is string => Boolean(id))).size),
         contextual_delta_tension_count: d16.tensions.filter((tension) => Object.values(tension.contextual_delta).some(Boolean)).length,
         d16_action_count: d16.actions.length,
+        d16_evidence_required_count: d16EvidenceCoverage(d16.actions).evidence_required_actions,
+        d16_evidence_linked_required_count: d16EvidenceCoverage(d16.actions).evidence_linked_required_actions,
+        d16_evidence_exempt_count: d16EvidenceCoverage(d16.actions).evidence_exempt_actions,
         d16_actions_with_truth_boundaries: d16.actions.filter((action) => action.truthfulness_boundary.permitted_claims.length > 0 || action.truthfulness_boundary.prohibited_claims.length > 0).length,
         d16_actions_with_evidence_when_available: d16.actions.filter((action) => action.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE" || action.evidence_ids.length > 0).length,
         cv_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("CV-")).map((span) => span.language))],
@@ -516,14 +521,20 @@ const wow = passedSessions.map((item) => item.wow as Record<string, unknown>).fi
 const countAtLeast = (key: string, minimum: number) =>
   wow.filter((item) => Number(item[key] ?? 0) >= minimum).length;
 
+const evidenceRequired = wow.reduce((sum, item) => sum + Number(item.d16_evidence_required_count ?? 0), 0);
+const evidenceLinked = wow.reduce((sum, item) => sum + Number(item.d16_evidence_linked_required_count ?? 0), 0);
 const wowGate = {
+  evidence_required_denominator: evidenceRequired,
+  evidence_linked_numerator: evidenceLinked,
+  evidence_exempt_count: wow.reduce((sum, item) => sum + Number(item.d16_evidence_exempt_count ?? 0), 0),
+  evidence_coverage_status: evidenceRequired === 0 ? "NOT_EVALUATED" : evidenceLinked === evidenceRequired ? "PASS" : "FAIL",
   all_sessions_pass: failures.length === 0 && passedSessions.length === chosen.length,
   sessions_with_two_or_more_threads: countAtLeast("thread_count", 2),
   sessions_with_non_fact_story: countAtLeast("non_fact_statement_count", 1),
   sessions_with_contextual_delta: countAtLeast("contextual_delta_tension_count", 1),
   sessions_with_d16_action: countAtLeast("d16_action_count", 1),
   truth_boundary_coverage_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_truth_boundaries ?? 0)),
-  evidence_linkage_when_available_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_evidence_when_available ?? 0)),
+  evidence_linkage_when_available_100_percent: evidenceRequired === 0 ? null : evidenceLinked === evidenceRequired,
 };
 
 (report as typeof report & { wow_kpis?: unknown }).wow_kpis = {

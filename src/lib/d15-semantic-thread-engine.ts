@@ -1,3 +1,4 @@
+import { judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
@@ -13,11 +14,12 @@ export type D15BSemanticThreadProposal = {
 export type D15BVerifiedThread = D15BSemanticThreadProposal & {
   maturity: MirrorMaturity;
   verification: "SUPPORTED";
+  gs_decision?: GSDecision;
 };
 
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
-  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string }>;
+  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; gs_decision?: GSDecision }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
@@ -465,6 +467,10 @@ export async function verifyD15BClaimIndependently(
   claim: string,
   claimType: "HEADLINE" | "SIGNIFICANCE" | "QUESTION_BACK",
 ): Promise<D15BClaimVerification> {
+  if (claimType === "SIGNIFICANCE") {
+    const decision = await judgeD15GS(ledger, evidenceIds, claim);
+    return { supported: decision.S.supported, reason: decision.S.reason };
+  }
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
   if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
   const response = await getOpenAI().chat.completions.create({
@@ -478,20 +484,6 @@ export async function verifyD15BClaimIndependently(
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, purpose links, or causal claims. Be strict about semantic upgrades even when they are linguistically subtle: support/assist wording does not entail providing/owning the activity; coordination/organisation does not entail managing it; and two separately documented activities do not entail that one was done to solve, improve, enable, or cause the other.
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
-For SIGNIFICANCE, the relationship is EXPECTED not to be stated in any single cited line; discovering that cross-line relationship is the point of a semantic thread. Truth, factual entailment, invented facts, ownership, outcomes and causality are checked separately by deterministic guards and the HEADLINE verifier. DO NOT reject because the lines fail to say that they are connected, fail to say that one leads to/supports/influences another, or merely appear as separate CV bullets.
-
-Apply these THREE tests:
-(a) RELATIONAL MEANING: Is the proposed connection more than naming, listing, paraphrasing, or assigning a general category to the activities?
-(b) REASONABLE SYNTHESIS: Would a reasonable reader, seeing these cited lines together, accept this connection as a fair synthesis of how the activities relate?
-(c) ROLE-TITLE SPECIFICITY: Reject if the headline would be equally true of most people holding the candidate's ordinary job title or function. A generic duty-summary such as "You provide administrative support" or "You keep a manager's day running" is not a Mirror insight. Accept only when the cited lines together reveal a more specific recurring relationship, interface, pattern, or way of working than the role title itself implies.
-Return supported=true if and only if (a) and (b) are yes AND the proposal passes (c).
-
-Worked examples (illustrative only; these are not benchmark cases):
-1. REJECT / generic receptionist duties. Lines: "Greeted clients at reception." + "Managed the main phone line." + "Ordered office stationery." Headline: "You keep front-desk administration running." => supported=false. This is a generic duty summary that would be equally true of many receptionists.
-2. ACCEPT / warehouse tool-to-user interface. Lines: "Introduced a new stock-tracking tool in the warehouse." + "Trained warehouse staff to use the tool." + "Collected staff feedback after go-live." Headline: "You work where a new operational tool meets the people who have to use it." => supported=true. The lines reveal a specific implementation-to-user relationship beyond a generic warehouse-supervision title.
-3. ACCEPT / accountant recurring around audit change. Lines: "Prepared account reconciliations for the annual audit." + "Mapped ledger balances during a finance-system migration." + "Reconciled migrated balances for auditor review." Headline: "Your accounting work repeatedly connects financial-system change with audit-ready evidence." => supported=true. The recurring relationship between system change, reconciliation and audit evidence is more specific than generic accounting work.
-
-The lines themselves do NOT need to contain an explicit linking sentence, causal statement, or explanation of interconnection. Do not ask for one. Do not re-run factual entailment here.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Reject the claim when its language differs from expected_language. Return supported=false whenever uncertain. Return JSON only.`,
       },
@@ -675,9 +667,9 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       workingProposal=floorProposal;
       headline={supported:true,reason:"reviewed deterministic headline floor"};
     }
-    const significance = await verifyD15BSignificanceByMajority(ledger, workingProposal.evidence_ids, workingProposal.headline);
-    if (!significance.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`significance majority rejected: ${significance.reason}`] });
+    const gs = await judgeD15GS(ledger, workingProposal.evidence_ids, workingProposal.headline);
+    if (!gs.accepted) {
+      rejected.push({ proposal_id: proposal.id, diagnostic_headline: workingProposal.headline, gs_decision: gs, reasons: [`G/S v1.1 rejected: G=${gs.G.supported}; S=${gs.S.supported}; vetoes=${gs.vetoes.join(",")}; G: ${gs.G.reason}; S: ${gs.S.reason}`] });
       continue;
     }
     if (workingProposal.question_back) {
@@ -707,7 +699,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question repair failed: ${questionCheck.reason}`] });
       continue;
     }
-    accepted.push({ ...workingProposal, question_back: generatedQuestion });
+    accepted.push({ ...workingProposal, question_back: generatedQuestion, gs_decision: gs });
   }
   const cvLanguage=(()=>{
     const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
