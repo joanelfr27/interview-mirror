@@ -384,9 +384,22 @@ function distinctivePhrases(value: string): string[] {
 
 function rationaleExplicitlyReferencesEvidenceId(rationale: string, evidenceId: string): boolean {
   const escapedId = evidenceId.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
-  const explicitLabel = new RegExp("(?:evidence|atom)(?:\\s+id)?\\s*(?:#|:)?\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])", "i");
+  // Symbolic IDs (for example A2/E13) remain valid as standalone references.
+  // Bare numeric IDs are intentionally NOT matched as standalone numbers because
+  // real rationales legitimately contain quantities such as 13+ years, 14
+  // countries, or USD 50,000. Numeric IDs require an explicit evidence/atom label.
+  if (!/[A-Za-z_-]/.test(evidenceId)) {
+    const numericLabel = new RegExp(
+      "(?:evidence|atom)\\s*(?:id\\s*)?(?:#|:)\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])",
+      "i",
+    );
+    return numericLabel.test(rationale);
+  }
+  const explicitLabel = new RegExp(
+    "(?:evidence|atom)(?:\\s+id)?\\s*(?:#|:)?\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])",
+    "i",
+  );
   if (explicitLabel.test(rationale)) return true;
-  if (!/[A-Za-z_-]/.test(evidenceId)) return false;
   const standaloneId = new RegExp("(^|[^\\w.-])" + escapedId + "(?![\\w.-])", "i");
   return standaloneId.test(rationale);
 }
