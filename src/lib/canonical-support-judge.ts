@@ -240,12 +240,15 @@ function facetContentTokens(value: string): string[] {
 }
 
 function facetContentGroups(value: string): string[][] {
-  // Requirement coordination ("budgeting and forecasting") is one asserted group.
-  // Only punctuation/adversative/chronology boundaries split independent facet groups.
-  return value.normalize("NFC")
-    .split(/[.!?;:,\n]+|\b(?:but|while|whereas|then|after|before|followed\s+by|mais|tandis\s+que|alors\s+que|puis|ensuite|avant|après)\b/iu)
-    .map(facetContentTokens)
-    .filter(group => group.length > 0);
+  const normalized = normalizeEvidenceText(value);
+  const relational = isRelationalFacet(value);
+  // A plain conjunctive requirement lists independently required content ("budgeting
+  // and forecasting"). A relational proposition keeps coordination inside the asserted
+  // relationship and must be licensed within one evidence clause.
+  const splitter = relational
+    ? /[.!?;:,\n]+|\b(?:but|while|whereas|then|after|before|followed\s+by|mais|tandis\s+que|alors\s+que|puis|ensuite|avant|après)\b/iu
+    : /[.!?;:,\n]+|\b(?:and|or|but|while|whereas|then|after|before|followed\s+by|et|ou|mais|tandis\s+que|alors\s+que|puis|ensuite|avant|après)\b/iu;
+  return normalized.split(splitter).map(facetContentTokens).filter(group => group.length > 0);
 }
 
 function clauseTokenSet(value: string): Set<string> {
