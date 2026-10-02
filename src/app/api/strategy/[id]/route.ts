@@ -93,7 +93,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!D16_PRODUCTION_CUTOVER_ENABLED) {
     return NextResponse.json({
       code: "D16_PRODUCTION_CUTOVER_REQUIRED",
-      error: "The legacy strategy engine is disabled. D16 production integration must be enabled before an interview strategy can be generated.",
+      error: normalizeLanguage(record.preparation_language) === "fr"\n        ? "Votre stratégie d’entretien n’est pas encore disponible pour cette analyse. La nouvelle version est en cours de validation."\n        : "Your interview strategy is not yet available for this analysis. The new version is still being validated.",
     }, { status: 503 });
   }
   if (!record.cv_analysis) return NextResponse.json({ error: "CV analysis is required before generating an interview strategy." }, { status: 400 });
