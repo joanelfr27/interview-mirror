@@ -640,6 +640,16 @@ function directLacksNamedDomainSpecificity(
   return !requiredGroups.some(group => evidencedGroups.has(group));
 }
 
+    // General downgrade-only specificity boundary: a LEVEL requirement that names
+    // a specific professional field cannot be DIRECT from generic tenure alone.
+    // This guard never creates NONE and intentionally uses only the frozen alias set.
+    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger)) {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "The cited evidence establishes relevant experience, but does not explicitly document experience in one of the specific professional fields named by the requirement.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
+    }
+
 // Pre-existing locked credential-specificity guard retained unchanged.
     // It is not extended as part of the relational boundary correction.
     if (item.status === "DIRECT" && facet.type === "LEVEL" &&
@@ -828,14 +838,4 @@ export async function judgeCanonicalSupport(
     throw new Error("Canonical support graph failed validation: " + graphErrors.join(" | "));
   }
   return { ledger: next, diagnostics: sanitized.errors };
-}    // General downgrade-only specificity boundary: a LEVEL requirement that names
-    // a specific professional field cannot be DIRECT from generic tenure alone.
-    // This guard never creates NONE and intentionally uses only the frozen alias set.
-    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger)) {
-      item.status = "PARTIAL";
-      deterministicRationaleOverride = "The cited evidence establishes relevant experience, but does not explicitly document experience in one of the specific professional fields named by the requirement.";
-      item.rationale = deterministicRationaleOverride;
-      item.confidence = Math.min(item.confidence, 0.8);
-    }
-
-
+}
