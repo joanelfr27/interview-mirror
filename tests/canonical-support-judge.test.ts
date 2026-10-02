@@ -106,7 +106,7 @@ test("mixed-basis support still fails closed rather than gaining documented supp
     ...l.evidence[0].provenance, source_type: "CANDIDATE_ELICITED",
   } });
   const result = sanitizeJudgments([raw("PARTIAL", ["A1", "A2"])], l);
-  assert.ok(result.errors.some(error => error.includes("mixed documented and elicited")));
+  assert.ok(result.errors.some(error => error.includes("mixed documented and elicited evidence is not permitted")));
   assert.equal(result.judgments[0].status, "NONE");
   assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
 });
