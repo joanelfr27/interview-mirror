@@ -522,6 +522,51 @@ function buildSupportJudgeDiagnostic(args: {
   };
 }
 
+const SPECIFICITY_DOMAIN_GROUPS = [
+  ["m&a", "mergers and acquisitions", "fusions acquisitions", "fusion acquisition"],
+  ["private equity", "pe", "capital investissement"],
+  ["project finance", "financement de projet"],
+  ["asset management", "gestion d actifs", "gestion d actifs"],
+] as const;
+
+function normalizedSpecificityText(value: string): string {
+  return normalizeEvidenceText(value)
+    .replace(/[’']/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function specificityGroupsNamed(value: string): number[] {
+  const normalized = normalizedSpecificityText(value);
+  return SPECIFICITY_DOMAIN_GROUPS.flatMap((aliases, index) =>
+    aliases.some(alias => {
+      const token = normalizedSpecificityText(alias);
+      if (token === "pe") return new RegExp("(?:^|\\s)pe(?:$|\\s)", "i").test(normalized);
+      if (token === "m and a") return /(?:^|\s)m\s+and\s+a(?:$|\s)/i.test(normalized);
+      return normalized.includes(token);
+    }) ? [index] : []
+  );
+}
+
+function directLacksNamedDomainSpecificity(
+  facet: EvidenceLedger["requirements"][number]["facets"][number],
+  citedAtoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
+): boolean {
+  if (facet.type !== "LEVEL") return false;
+  const requiredGroups = specificityGroupsNamed(facet.requirement);
+  if (requiredGroups.length === 0) return false;
+  const citedText = citedAtoms.map(atom => {
+    const source = ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? "";
+    return [source, atom.action.object, atom.context.domain ?? "", atom.context.situation ?? ""].join(" ");
+  }).join(" ");
+  const evidencedGroups = new Set(specificityGroupsNamed(citedText));
+  return !requiredGroups.some(group => evidencedGroups.has(group));
+}
+
+
 export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): { judgments: SupportJudgment[]; errors: string[] } {
   const errors: string[] = [];
   const evidenceIds = new Set(ledger.evidence.map(x => x.id));
@@ -596,50 +641,6 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
 
     
-const SPECIFICITY_DOMAIN_GROUPS = [
-  ["m&a", "mergers and acquisitions", "fusions acquisitions", "fusion acquisition"],
-  ["private equity", "pe", "capital investissement"],
-  ["project finance", "financement de projet"],
-  ["asset management", "gestion d actifs", "gestion d actifs"],
-] as const;
-
-function normalizedSpecificityText(value: string): string {
-  return normalizeEvidenceText(value)
-    .replace(/[’']/g, " ")
-    .replace(/&/g, " and ")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function specificityGroupsNamed(value: string): number[] {
-  const normalized = normalizedSpecificityText(value);
-  return SPECIFICITY_DOMAIN_GROUPS.flatMap((aliases, index) =>
-    aliases.some(alias => {
-      const token = normalizedSpecificityText(alias);
-      if (token === "pe") return new RegExp("(?:^|\\s)pe(?:$|\\s)", "i").test(normalized);
-      if (token === "m and a") return /(?:^|\s)m\s+and\s+a(?:$|\s)/i.test(normalized);
-      return normalized.includes(token);
-    }) ? [index] : []
-  );
-}
-
-function directLacksNamedDomainSpecificity(
-  facet: EvidenceLedger["requirements"][number]["facets"][number],
-  citedAtoms: AtomicEvidence[],
-  ledger: EvidenceLedger,
-): boolean {
-  if (facet.type !== "LEVEL") return false;
-  const requiredGroups = specificityGroupsNamed(facet.requirement);
-  if (requiredGroups.length === 0) return false;
-  const citedText = citedAtoms.map(atom => {
-    const source = ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? "";
-    return [source, atom.action.object, atom.context.domain ?? "", atom.context.situation ?? ""].join(" ");
-  }).join(" ");
-  const evidencedGroups = new Set(specificityGroupsNamed(citedText));
-  return !requiredGroups.some(group => evidencedGroups.has(group));
-}
-
     // General downgrade-only specificity boundary: a LEVEL requirement that names
     // a specific professional field cannot be DIRECT from generic tenure alone.
     // This guard never creates NONE and intentionally uses only the frozen alias set.
