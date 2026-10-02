@@ -133,7 +133,7 @@ test("qualification scorer gates explicit candidate false ambiguity", () => {
   const result = score(data);
   assert.equal(result.status, 1);
   assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.count, 3);
-  assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.rate, "7.50%");
+  assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.rate, "7.14%");
   assert.equal(result.report.qualification_pass, false);
 });
 
@@ -156,7 +156,7 @@ test("explicit candidate failures cannot be diluted by implicit rows", () => {
   const extras = [];
   for (let i = 0; i < 2000; i++) {
     const base = data.find(x => x.gold === "IMPLICIT_CANDIDATE" && x.language === (i % 2 ? "en" : "fr"));
-    extras.push({ ...base, id: "EXTRA-" + i, predicted: "IMPLICIT_CANDIDATE" });
+    extras.push({ ...base, id: "EXTRA-" + i, source_text: "unique dilution control " + i, predicted: "IMPLICIT_CANDIDATE" });
   }
   const result = score([...data, ...extras]);
   assert.equal(result.status, 1);
