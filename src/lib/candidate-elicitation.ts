@@ -5,6 +5,7 @@ import {
   type EvidenceLedger, type UnresolvedItem, type SourceSpan,
   type EvidenceOwnership, type ActorBasis, type AssertionType,
   validateAtomicEvidence, validateAtomicEvidenceAgainstSource, validateRequirementGraph,
+  deriveDeterministicVerifiability,
 } from "@/lib/canonical-evidence-model";
 import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
 import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
@@ -80,7 +81,8 @@ export async function classifyCandidateElicitation(
           "EXPERIENCE_GAP means the answer establishes that the candidate has not actually done the required thing. " +
           "TRANSFERABLE means the answer establishes a genuinely adjacent experience that could transfer but is not the same requirement. " +
           "Do not classify from plausibility. The atom_quote must be an exact substring of the supplied answer. Never invent an outcome, scope or ownership. " +
-          "actor_basis is action-local: EXPLICIT_CANDIDATE only when the answer explicitly makes the candidate or candidate-including group the actor of this action; EXPLICIT_OTHER when another actor is explicit; UNSPECIFIED for genuine agentless passives or unresolved impersonal agency. Do not infer candidate agency from context.",
+          "actor_basis is action-local: EXPLICIT_CANDIDATE only when the answer explicitly makes the candidate or candidate-including group the actor of this action; EXPLICIT_OTHER when another actor is explicit; UNSPECIFIED for genuine agentless passives or unresolved impersonal agency. Do not infer candidate agency from context. " +
+          "normalized_action and object must be exact source-language substrings of atom_quote; do not translate or paraphrase them.",
       },
       {
         role: "user",
@@ -118,11 +120,7 @@ export async function classifyCandidateElicitation(
       action: { normalized_action: parsed.normalized_action, object: parsed.object },
       context: {}, scale: {}, time: {}, outcome: null,
       assertion: { type: "ELICITED", polarity: parsed.polarity },
-      verifiability: {
-        has_quantifiable_metric: /[%€$£]|\b\d+(?:\.\d+)?\b/.test(quote),
-        has_third_party_entity: false,
-        has_time_anchor: /\b(?:19|20)\d{2}\b/.test(quote),
-      },
+      verifiability: deriveDeterministicVerifiability(quote),
       extraction_confidence: 1,
     };
     const atomErrors = [
