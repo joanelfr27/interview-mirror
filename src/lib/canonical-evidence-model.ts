@@ -263,24 +263,43 @@ export function deriveDeterministicVerifiability(source: string): VerifiabilityS
 export function hasActionLocalCandidateMarker(source: string, normalizedAction: string): boolean {
   const action = normalizedAction.trim();
   if (!action) return false;
-  const actionIndex = source.toLocaleLowerCase().indexOf(action.toLocaleLowerCase());
-  if (actionIndex < 0) return false;
+  const lowerSource = source.toLocaleLowerCase();
+  const lowerAction = action.toLocaleLowerCase();
+  const firstActionIndex = lowerSource.indexOf(lowerAction);
+  if (firstActionIndex < 0) return false;
+  // A short/repeated action string cannot safely identify which proposition
+  // this atom represents. Fail closed rather than binding to the first match.
+  if (lowerSource.indexOf(lowerAction, firstActionIndex + lowerAction.length) >= 0) return false;
 
-  const prefix = source.slice(0, actionIndex);
+  const prefix = source.slice(0, firstActionIndex);
   const markerPattern = /(?:\b(?:i|we|our\s+(?:team|teams)|je|nous|notre\s+équipe|nos\s+équipes)\b|\bj(?=['’]))/gi;
   const matches = [...prefix.matchAll(markerPattern)];
   const marker = matches.at(-1);
-  if (!marker || marker.index === undefined) return false;
+  if (!marker || marker.index === undefined) {
+    // Passive postposed first-person agents are explicit candidate agency.
+    const suffix = source.slice(firstActionIndex + action.length);
+    return /^\s*(?:[^;.!?]{0,80}\s)?\b(?:by\s+me|par\s+moi)\b/i.test(suffix);
+  }
 
   const between = prefix.slice(marker.index + marker[0].length);
-  // A relative-clause boundary or a new clause with an explicit non-candidate
-  // subject means the candidate marker belongs to a neighboring action.
   if (/\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/i.test(between)) return false;
-  const lastClause = between.split(/[;.!?]|(?:,\s+(?:and|but|while|whereas|et|mais|tandis\s+que)\s+)/i).at(-1) ?? "";
-  if (/^\s*(?:(?:the|a|an|le|la|les|un|une|des)\s+[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4}|l['’][\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,4})\s+/u.test(lastClause)) return false;
+
+  // Only the clause containing the asserted action can inherit the candidate
+  // marker. If a hard/coordinating boundary follows the marker, any explicit
+  // non-candidate subject at the start of that final clause blocks attribution.
+  const clauses = between.split(/[;.!?]|(?:,\s+(?:and|but|while|whereas|et|mais|tandis\s+que)\s+)/i);
+  const lastClause = clauses.at(-1) ?? "";
+  if (clauses.length > 1) {
+    const trimmed = lastClause.trim();
+    const candidateSubject = /^(?:i|we|our\s+(?:team|teams)|je|j['’]|nous|notre\s+équipe|nos\s+équipes)\b/i.test(trimmed);
+    // A non-empty clause beginning after the boundary is a fresh grammatical
+    // clause. Unless it explicitly restates candidate agency, do not carry the
+    // earlier candidate subject across the boundary.
+    if (trimmed && !candidateSubject) return false;
+  }
+
   return true;
 }
-
 export function validateAtomicEvidenceAgainstSource(
   value: AtomicEvidence,
   sourceSpan: SourceSpan,
