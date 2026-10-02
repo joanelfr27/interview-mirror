@@ -52,6 +52,25 @@ test("judge sanitizer preserves valid documented direct support", () => {
 });
 
 
+test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
+  l.evidence[0] = {
+    ...l.evidence[0],
+    source_span_id: "S-A1",
+    action: { normalized_action: "MBA", object: "Global Business & Management Studies" },
+    assertion: { type: "CREDENTIAL", polarity: "AFFIRMATIVE" },
+  };
+  l.requirements[0].facets = [{
+    id: "F-1", type: "LEVEL",
+    requirement: "Master's degree in Finance or Accounting is strongly preferred",
+    source_span_id: "S-REQ",
+  }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
 test("judge sanitizer fills a missing facet with fail-closed abstained NONE", () => {
   const l = ledger();
   l.requirements[0].facets.push({
@@ -187,4 +206,28 @@ test("minimal support and optional context IDs must remain disjoint", () => {
   const judgment = { ...raw("PARTIAL", ["A1"]), context_evidence_ids: ["A1"] };
   const result = sanitizeJudgments([judgment], l);
   assert.ok(result.errors.some(error => error.includes("must be disjoint")));
+});
+
+
+test("relational DIRECT rejects extra support IDs even when one atom licenses the relationship", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts as input to pipeline reviews", start_offset: 0, end_offset: 43, language: "en" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Prepared monthly reports", start_offset: 44, end_offset: 68, language: "en" });
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts as input to pipeline reviews" } };
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2", action: { normalized_action: "prepared", object: "monthly reports" } });
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1", "A2"]), relational: true, relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("minimal support must contain only")));
+});
+
+test("unknown context evidence fails closed", () => {
+  const result = sanitizeJudgments([{ ...raw("PARTIAL", ["A1"]), context_evidence_ids: ["FORGED"] }], ledger());
+  assert.ok(result.errors.some(error => error.includes("unknown evidence ID")));
+});
+
+test("abstention schema rejects context citations", () => {
+  const l = ledger();
+  const validate = new Ajv().compile(buildSupportJudgeSchema(l));
+  assert.equal(validate({ judgments: [{ ...raw("NONE"), abstained: true, context_evidence_ids: ["A1"] }] }), false);
 });
