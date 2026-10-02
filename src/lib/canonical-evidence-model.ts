@@ -267,7 +267,7 @@ export function hasActionLocalCandidateMarker(source: string, normalizedAction: 
   if (actionIndex < 0) return false;
 
   const prefix = source.slice(0, actionIndex);
-  const markerPattern = /\b(?:i|i['’]m|i['’]ve|we|we['’]ve|our\s+(?:team|teams)|je|j['’][a-zà-öø-ÿ]+|nous|notre\s+équipe|nos\s+équipes)\b/gi;
+  const markerPattern = /(?:\b(?:i|we|our\s+(?:team|teams)|je|nous|notre\s+équipe|nos\s+équipes)\b|\bj(?=['’]))/gi;
   const matches = [...prefix.matchAll(markerPattern)];
   const marker = matches.at(-1);
   if (!marker || marker.index === undefined) return false;
