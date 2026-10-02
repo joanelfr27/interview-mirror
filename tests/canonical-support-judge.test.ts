@@ -404,3 +404,50 @@ test("generic preposition licenses a relation when the facet relation verb is pr
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
 });
+
+
+test("lexicon-free clause guard rejects relational synonym co-occurrence in English", () => {
+  for (const requirementText of [
+    "Incorporate forecasts into pipeline reviews",
+    "Leverage forecasts in pipeline reviews",
+    "Forecasts inform pipeline reviews",
+    "Rely on forecasts for pipeline reviews",
+    "Embed forecasts in pipeline reviews",
+    "Pipeline reviews draw on forecasts",
+    "Run pipeline reviews from forecasts",
+  ]) {
+    const l = ledger();
+    l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared monthly sales forecasts and introduced a structured pipeline review.", start_offset: 0, end_offset: 75, language: "en" };
+    l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "monthly sales forecasts and introduced a structured pipeline review" } };
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+    assert.ok(result.errors.some(error => error.includes("distributed across independent clauses")), requirementText);
+    assert.notEqual(result.judgments[0]?.status, "DIRECT", requirementText);
+  }
+});
+
+test("lexicon-free clause guard rejects relational synonym co-occurrence in French", () => {
+  for (const requirementText of [
+    "S'appuyer sur les prévisions pour les revues du pipeline",
+    "Exploiter les prévisions dans les revues du pipeline",
+    "Intégrer les prévisions dans les revues du pipeline",
+  ]) {
+    const l = ledger();
+    l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Préparé les prévisions mensuelles et introduit une revue structurée du pipeline.", start_offset: 0, end_offset: 78, language: "fr" };
+    l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepare", object: "prévisions mensuelles et revue structurée du pipeline" } };
+    l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
+    const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+    assert.ok(result.errors.some(error => error.includes("distributed across independent clauses")) || result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
+    assert.notEqual(result.judgments[0]?.status, "DIRECT", requirementText);
+  }
+});
+
+test("lexicon-free clause guard does not penalize a single-group facet", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Experience with SAP and prepared monthly reporting.", start_offset: 0, end_offset: 48, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "experience", object: "SAP" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "TOOL", requirement: "Experience with SAP", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
