@@ -114,3 +114,24 @@ test("qualification scorer rejects malformed row shapes and nominal metadata", (
     assert.equal(result.report, null);
   }
 });
+
+
+test("qualification scorer rejects structured qualification IDs", () => {
+  const data = rows();
+  data[0].id = { sample: "R1" };
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report, null);
+  assert.match(result.stderr, /Invalid row/);
+});
+
+test("qualification scorer gates explicit candidate false ambiguity", () => {
+  const data = rows();
+  const explicit = data.filter(x => x.gold === "EXPLICIT_CANDIDATE" && x.language === "en").slice(0, 3);
+  assert.equal(explicit.length, 3);
+  for (const row of explicit) row.predicted = "UNSPECIFIED";
+  const result = score(data);
+  assert.equal(result.status, 1);
+  assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity, 3);
+  assert.equal(result.report.qualification_pass, false);
+});
