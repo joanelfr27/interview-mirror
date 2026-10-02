@@ -41,7 +41,7 @@ Authorized development run 37052068438 showed that structural basis isolation wa
 The correction therefore reuses the frozen D15 G relationship-grounding principles rather than adding case-specific exceptions:
 
 - Co-occurrence is not a relationship; chronology does not license causality, purpose, response or mechanism. Independently of connector classification, DIRECT support may not compose atoms from different source spans; multiple DIRECT atoms are permitted only when they preserve the same source-span reference.
-- A facet is deterministically classified as relational when its wording asserts a connection such as input-to, based-on, used-to, response, purpose, causality, feeding, shaping, enabling, influence or dependency (including conservative French equivalents).
+- A conservative deterministic classifier identifies unambiguous relational wording such as input-to, based-on, response, causality, feeding, shaping, enabling, influence or dependency. Ambiguous lexical tokens are not automatic semantic labels: chronology licenses sequence only, and habitual/purpose/recipient forms such as English “used to” or French « pour » require semantic interpretation. The general DIRECT anti-composition invariant remains the fail-closed backstop when the classifier does not fire.
 - For relational DIRECT, the judge must return the asserted connector and exact licensing span(s). The connector must occur explicitly in the facet wording and in each exact licensing span; each licensing span must occur verbatim in the minimal supporting evidence. When multiple atoms are cited, the relationship itself must be licensed within one cited atom; independent activities cannot be composed into DIRECT.
 - supporting_evidence_ids is the minimal licensing subset. context_evidence_ids is optional non-licensing context and must be disjoint. Abstentions carry neither.
 - Rationale consistency is checked independently: an uncited evidence ID, or a distinctive exact phrase uniquely traceable to an atom outside the minimal subset, rejects the judgment. Because lexical checks cannot prove the absence of paraphrased/translated hidden reliance, an accepted model-written rationale is never propagated: the canonical rationale is regenerated deterministically from the validated minimal IDs, status, connector and exact licensing spans. The raw model response remains in diagnostics for audit.
@@ -50,3 +50,15 @@ The correction therefore reuses the frozen D15 G relationship-grounding principl
 - The support judge remains on the existing gpt-4o-mini configuration for this correction. Changing the model at the same time would confound whether the deterministic boundary itself fixed the defect. Model adequacy remains a qualification question after the boundary passes static/adversarial review.
 
 No new live/model validation is authorized by this record. Before any such run, the independent EPA Sales Manager role baseline, prospective expectations, exact correction commit, tests and provenance must be frozen. PR #69 remains HOLD until full-rigor review is complete.
+
+
+## Independent assistant audit before Claude — 2 October 2026
+
+The full PR #69 boundary was re-audited against the frozen D15 G/S codebook in the master research record before any new live run. Two confirmed issues were corrected:
+
+1. The relational regex was broader than the frozen G semantics: chronology and ambiguous habitual/purpose wording were being treated as automatic relational labels. The classifier is now conservative; chronology and ambiguous “used to”/« pour » forms are not automatic labels, while the general DIRECT anti-composition invariant remains authoritative.
+2. The sanitizer error text incorrectly said mixed documented/elicited support “requires an explicit mixed basis” even though no MIXED support basis exists. The message now correctly states that mixed bases are not permitted in one support judgment.
+
+Concurrent Copilot hardening additionally requires a relational DIRECT licensing quote to bind content from both sides of the facet relationship in the same clause, and adds Unicode/French regression coverage. These changes are included in the exact Claude audit target and must be independently reviewed rather than assumed correct.
+
+No live/model validation was performed during this audit. The next gate is an independent Claude audit of the exact pinned commit after static CI is green.
