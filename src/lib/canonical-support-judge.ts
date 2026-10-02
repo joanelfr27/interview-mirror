@@ -34,6 +34,7 @@ export type SupportJudgeDiagnostic = Readonly<{
   response_present: boolean;
   response_character_count: number;
   response_sha256: string | null;
+  raw_response: string | null;
   parsed_successfully: boolean;
   returned_judgment_count: number;
   returned_facet_ids: readonly string[];
@@ -87,6 +88,30 @@ const SCHEMA = {
   required: ["judgments"],
 } as const;
 
+// Preserve the canonical two-basis contract in the generated response grammar.
+// This changes the judge request, so it is an isolated boundary-change candidate.
+export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
+  const template = SCHEMA.properties.judgments.items;
+  const branch = (basis: string[], statuses: string[], ids: string[], abstained: boolean) => ({
+    ...template,
+    properties: {
+      ...template.properties,
+      support_basis: { type: "string", enum: basis },
+      status: { type: "string", enum: statuses },
+      abstained: { type: "boolean", enum: [abstained] },
+      supporting_evidence_ids: ids.length
+        ? { type: "array", minItems: 1, items: { type: "string", enum: ids } }
+        : { type: "array", maxItems: 0, items: { type: "string" } },
+    },
+  });
+  const documented = ledger.evidence.filter(a => a.provenance.source_type !== "CANDIDATE_ELICITED").map(a => a.id);
+  const elicited = ledger.evidence.filter(a => a.provenance.source_type === "CANDIDATE_ELICITED").map(a => a.id);
+  const anyOf = [branch(["DOCUMENTED", "CANDIDATE_SELF_REPORTED"], ["NONE"], [], true)];
+  if (documented.length) anyOf.push(branch(["DOCUMENTED"], ["DIRECT", "PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY"], documented, false));
+  if (elicited.length) anyOf.push(branch(["CANDIDATE_SELF_REPORTED"], ["PARTIAL", "ANALOGICAL_TRANSFER", "CONTRADICTORY"], elicited, false));
+  return { ...SCHEMA, properties: { judgments: { type: "array", items: { anyOf } } } };
+}
+
 function responseFormat(name: string, schema: unknown) {
   return { type: "json_schema" as const, json_schema: { name, strict: true, schema: schema as Record<string, unknown> } };
 }
@@ -119,6 +144,7 @@ function buildSupportJudgeDiagnostic(args: {
     request_character_count: args.requestCharacterCount,
     response_present: args.raw !== null,
     response_character_count: args.raw?.length ?? 0,
+    raw_response: args.raw,
     response_sha256: args.raw === null ? null : createHash("sha256").update(args.raw, "utf8").digest("hex"),
     parsed_successfully: args.parsedSuccessfully,
     returned_judgment_count: args.rawJudgments.length,
@@ -259,7 +285,7 @@ export async function judgeCanonicalSupport(
 
   const userContent = "CANDIDATE ATOMS:\n" + JSON.stringify(compactEvidence) + "\n\nROLE REQUIREMENTS AND FACETS:\n" + JSON.stringify(compactRequirements);
   const response = await openai.chat.completions.create({
-    model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments", SCHEMA),
+    model: AI_MODEL, temperature: 0, response_format: responseFormat("canonical_support_judgments", buildSupportJudgeSchema(ledger)),
     messages: [
       { role: "system", content: system },
       { role: "user", content: userContent },
