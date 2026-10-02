@@ -16,25 +16,27 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: cfdc42911204517d7b081201b9ca3605290db686
+          ref: 4ba6918be053bd847ea39cef1b8dcc0e5da29aab
           fetch-depth: 0
           persist-credentials: false
       - name: Assert pinned loop and evidence definition
         run: |
-          test "$(git rev-parse HEAD)" = "cfdc42911204517d7b081201b9ca3605290db686"
+          test "$(git rev-parse HEAD)" = "4ba6918be053bd847ea39cef1b8dcc0e5da29aab"
           test "$(git hash-object docs/d15-semantic-significance-codebook-v1.1-candidate.md)" = "56f753c50e50aeb8532d7e7a70eeea04f0e69255"
-          test "$(git hash-object scripts/d15-conversation-loop.ts)" = "2c956423ac0502280d8507b9a42095e623dbbbbb"
-          test "$(git hash-object src/lib/canonical-shadow-extractor.ts)" = "22ebb0bda8a2360f3173fdfd3cbdc1a668747d95"
-          test "$(git hash-object src/lib/d15-conversational-mirror.ts)" = "354b641adfc34711cdc4ab3491127cbc472f0566"
+          test "$(git hash-object scripts/d15-conversation-loop.ts)" = "e2c6b82ff4ad87f50dec3b14d65df05dc1dfc4c7"
+          test "$(git hash-object src/lib/canonical-shadow-extractor.ts)" = "4d2ba2ffcc9cad8cba4c68b7c55bedb7a3225a4c"
+          test "$(git hash-object src/lib/d15-conversational-mirror.ts)" = "330e396b4ad5ef21e517f085afc90ef3e2d2ec52"
+          test "$(git hash-object src/lib/d15-clarification-state.ts)" = "1713dbd2513efbd8effe6c941025bcc00d21a089"
           {
-            echo "engine_commit=cfdc42911204517d7b081201b9ca3605290db686"
+            echo "engine_commit=4ba6918be053bd847ea39cef1b8dcc0e5da29aab"
             echo "workflow_definition_commit=${{ github.sha }}"
             echo "codebook_blob=56f753c50e50aeb8532d7e7a70eeea04f0e69255"
             echo "erratum_blob=5f888c661a5c4b9efa17724066b0785c3080be3d"
-            echo "loop_definition_blob=2c956423ac0502280d8507b9a42095e623dbbbbb"
-            echo "E1_extractor_blob=22ebb0bda8a2360f3173fdfd3cbdc1a668747d95"
-            echo "answer_loop_blob=354b641adfc34711cdc4ab3491127cbc472f0566"
-            echo "product_decision_blob=cae8f90b33a2f68339f2c36e479007f843602e30"
+            echo "loop_definition_blob=e2c6b82ff4ad87f50dec3b14d65df05dc1dfc4c7"
+            echo "E1_extractor_blob=4d2ba2ffcc9cad8cba4c68b7c55bedb7a3225a4c"
+            echo "conversation_state_blob=1713dbd2513efbd8effe6c941025bcc00d21a089"
+            echo "answer_loop_blob=330e396b4ad5ef21e517f085afc90ef3e2d2ec52"
+            echo "product_decision_blob=858455d1e05920c621317b1b5d3886718a99db38"
             echo "mode=DEVELOPMENT_ONLY_SIMULATED_ANSWERS_NOT_QUALIFICATION"
             echo "cutover=false; database_writes=false"
           } | tee provenance.txt
@@ -46,7 +48,7 @@ jobs:
       - run: npm run typecheck
       - name: Pre-spend canonical checks
         run: npm run test:canonical
-      - name: Run three simulated answers against one frozen proposition
+      - name: Run five simulated answers with subject and lifecycle coverage
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-conversation-loop.ts
