@@ -366,7 +366,7 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
 
   const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
     INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
-    TEAM: /\b(?:we|our|team|teams|nous|notre|nos|équipe|équipes)\b/i,
+    TEAM: /(?:\b(?:we|our|team|teams|nous|notre|nos)\b|(?:^|[^\p{L}])(?:équipe|équipes)(?=$|[^\p{L}]))/iu,
     SHARED: /\b(?:shared|co-owned|partagé|partagée|partagés|partagées)\b/i,
     SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
   };
