@@ -45,7 +45,7 @@ The correction therefore reuses the frozen D15 G relationship-grounding principl
 - For relational DIRECT, the judge must return the asserted connector and exact licensing span(s). Each licensing span must occur verbatim in the minimal supporting evidence. When multiple atoms are cited, the relationship itself must be licensed within one cited atom; independent activities cannot be composed into DIRECT.
 - supporting_evidence_ids is the minimal licensing subset. context_evidence_ids is optional non-licensing context and must be disjoint. Abstentions carry neither.
 - Rationale consistency is checked independently: an uncited evidence ID, or a distinctive exact phrase uniquely traceable to an atom outside the minimal subset, rejects the judgment.
-- The prior MBA/Finance sanitizer rewrite is removed. This patch does not add another credential-specific or candidate-specific rewrite.
+- The pre-existing MBA/Finance sanitizer guard is retained unchanged to avoid an unrelated regression. The relational correction adds no new credential-specific or candidate-specific rewrite.
 - No MIXED support basis is introduced. A relationship supported only by elicitation remains CANDIDATE_SELF_REPORTED and cannot be DIRECT.
 - The support judge remains on the existing gpt-4o-mini configuration for this correction. Changing the model at the same time would confound whether the deterministic boundary itself fixed the defect. Model adequacy remains a qualification question after the boundary passes static/adversarial review.
 
