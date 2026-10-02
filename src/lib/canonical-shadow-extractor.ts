@@ -370,11 +370,13 @@ export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: stri
     SHARED: /\b(?:shared|co-owned|partagé|partagée|partagés|partagées)\b/i,
     SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
   };
-  const ownership = raw.ownership === "UNKNOWN"
+  const ownership = actorBasis === "UNSPECIFIED"
     ? "UNKNOWN"
-    : ownershipMarkers[raw.ownership]?.test(source)
-      ? raw.ownership
-      : "UNKNOWN";
+    : raw.ownership === "UNKNOWN"
+      ? "UNKNOWN"
+      : ownershipMarkers[raw.ownership]?.test(source)
+        ? raw.ownership
+        : "UNKNOWN";
 
   const deterministic = deriveDeterministicVerifiability(source);
 
