@@ -384,8 +384,11 @@ function distinctivePhrases(value: string): string[] {
 
 function rationaleExplicitlyReferencesEvidenceId(rationale: string, evidenceId: string): boolean {
   const escapedId = evidenceId.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp("(?:evidence|atom)(?:\\s+id)?\\s*(?:#|:)?\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])", "i");
-  return pattern.test(rationale);
+  const explicitLabel = new RegExp("(?:evidence|atom)(?:\\s+id)?\\s*(?:#|:)?\\s*[\\\"'\\[]?" + escapedId + "(?![\\w.-])", "i");
+  if (explicitLabel.test(rationale)) return true;
+  if (!/[A-Za-z_-]/.test(evidenceId)) return false;
+  const standaloneId = new RegExp("(^|[^\\w.-])" + escapedId + "(?![\\w.-])", "i");
+  return standaloneId.test(rationale);
 }
 
 function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: EvidenceLedger["requirements"][number]["facets"][number], ledger: EvidenceLedger): string[] {
