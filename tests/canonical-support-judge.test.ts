@@ -695,7 +695,7 @@ test("explicit out-of-subset evidence ID reference remains rejected", () => {
   const l = ledger();
   l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Managed statutory audits.", start_offset: 0, end_offset: 25, language: "en" });
   l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
-  const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID 2 also supports this judgment." };
+  const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID: 2 also supports this judgment." };
   const result = sanitizeJudgments([judgment], l);
   assert.equal(result.errors.some(error => error.includes("evidence ID outside")), true);
 });
