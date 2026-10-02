@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { selectD16PreparationAnchors, validateD16AnchorChoices, D16_SELECTOR_MODEL, type D16AnchorSelectorInput } from "@/lib/d16-preparation-anchor-selector";
+import { selectD16PreparationAnchors, validateD16AnchorChoices, D16_SELECTOR_MODEL, type D16AnchorSelectorInput, usableD16Context } from "@/lib/d16-preparation-anchor-selector";
 import { buildD16PreparationActions, buildD16DependencySnapshot, type D16PreparationInputs } from "@/lib/d16-personalized-interview-strategy";
 const saved=JSON.parse(readFileSync("tests/fixtures/d16-assembled-gold-inputs.json","utf8")) as {case_inputs:Array<{input:D16PreparationInputs}>};
 function fixture():D16AnchorSelectorInput {const f=structuredClone(saved.case_inputs[0].input);return {canonical:f.canonical,accepted_relationships:[],language:"en"};}
@@ -164,4 +164,26 @@ it("an elicited source marked as a responsibility cannot bypass D15 eligibility"
  input.canonical.ledger.evidence.find(a=>a.id===id)!.assertion.type="RESPONSIBILITY";
  const p=projectD16CanonicalLedger(input.canonical.ledger);input.canonical.mirror=p.d15;input.canonical.bridge=p.d6;input.canonical.dependency_snapshot=buildD16DependencySnapshot(input.canonical);
  let calls=0;await assert.rejects(()=>selectD16PreparationAnchors(input,async()=>{calls++;throw Error("Unexpected call");}),/Mirror provenance mismatch/);assert.equal(calls,0);
+});
+
+it("excludes Mirror-omitted atoms from both the request and selector allowlist", async () => {
+ const input=fixture();
+ const original=input.canonical.ledger.evidence[0];
+ const omitted={...structuredClone(original),id:"OMITTED-DUPLICATE"};
+ input.canonical.ledger.evidence.push(omitted);
+ const p=projectD16CanonicalLedger(input.canonical.ledger);
+ input.canonical.mirror=p.d15;input.canonical.bridge=p.d6;
+ input.canonical.dependency_snapshot=buildD16DependencySnapshot(input.canonical);
+ assert.equal(usableD16Context(omitted,input),false);
+ await selectD16PreparationAnchors(input,async request=>{
+  assert.ok(!JSON.parse(request.input).atoms.some((a:any)=>a.id===omitted.id));
+  return {model:D16_SELECTOR_MODEL,content:JSON.stringify(choice(input))};
+ });
+ assert.throws(()=>validateD16AnchorChoices(choice(input,[omitted.id]),input),/Forged\/ineligible/);
+});
+it("preserves the successful raw reply when dependencies mutate after completion",async()=>{
+ const input=fixture();const content=JSON.stringify(choice(input));
+ await assert.rejects(()=>selectD16PreparationAnchors(input,async()=>{
+  input.language="fr";return {model:D16_SELECTOR_MODEL,content};
+ }), (error:any)=>error.message.includes("changed during selection") && error.diagnostic.raw_response===content);
 });

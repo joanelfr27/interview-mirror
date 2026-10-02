@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sanitizeJudgments } from "../src/lib/canonical-support-judge.ts";
+import { sanitizeJudgments, buildSupportJudgeEvidence, buildSupportJudgeSchema } from "../src/lib/canonical-support-judge.ts";
 import type { EvidenceLedger, Requirement, SupportJudgment } from "../src/lib/canonical-evidence-model.ts";
 
 const requirement: Requirement = {
@@ -84,4 +84,61 @@ test("judge sanitizer fills a missing facet with fail-closed abstained NONE", ()
   assert.equal(missing.abstained, true);
   assert.deepEqual(missing.supporting_evidence_ids, []);
   assert.equal(missing.confidence, 0);
+});
+
+
+test("support judge input labels documented and elicited atoms without rewriting quotes", () => {
+  const l = ledger();
+  l.evidence.push({ ...l.evidence[0], id: "A2", provenance: {
+    ...l.evidence[0].provenance, source_type: "CANDIDATE_ELICITED",
+  } });
+  const atoms = buildSupportJudgeEvidence(l);
+  assert.equal(atoms[0].source_type, "CV");
+  assert.equal(atoms[0].support_basis, "DOCUMENTED");
+  assert.equal(atoms[1].source_type, "CANDIDATE_ELICITED");
+  assert.equal(atoms[1].support_basis, "CANDIDATE_SELF_REPORTED");
+  assert.equal(atoms[1].source_quote, l.source_spans[0].text);
+});
+
+test("mixed-basis support still fails closed rather than gaining documented support", () => {
+  const l = ledger();
+  l.evidence.push({ ...l.evidence[0], id: "A2", provenance: {
+    ...l.evidence[0].provenance, source_type: "CANDIDATE_ELICITED",
+  } });
+  const result = sanitizeJudgments([raw("PARTIAL", ["A1", "A2"])], l);
+  assert.ok(result.errors.some(error => error.includes("mixed documented and elicited")));
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.deepEqual(result.judgments[0].supporting_evidence_ids, []);
+});
+
+
+import Ajv from "ajv";
+
+test("support response grammar admits single-basis support and abstention, rejects mixed and forged citations", () => {
+  const l=ledger();
+  l.evidence.push({...structuredClone(l.evidence[0]),id:"A2",provenance:{...l.evidence[0].provenance,source_type:"CANDIDATE_ELICITED"}});
+  const validate=new Ajv().compile(buildSupportJudgeSchema(l));
+  const check=(j:any)=>validate({judgments:[j]});
+  assert.equal(check(raw("DIRECT",["A1"])),true);
+  assert.equal(check({...raw("PARTIAL",["A2"]),support_basis:"CANDIDATE_SELF_REPORTED"}),true);
+  assert.equal(check({...raw("NONE"),abstained:true}),true);
+  for(const basis of ["DOCUMENTED","CANDIDATE_SELF_REPORTED"]){
+    assert.equal(check({...raw("PARTIAL",["A1","A2"]),support_basis:basis}),false);
+  }
+  assert.equal(check({...raw("DIRECT",["A2"]),support_basis:"CANDIDATE_SELF_REPORTED"}),false);
+  assert.equal(check(raw("PARTIAL",["FORGED"])),false);
+  assert.equal(check(raw("PARTIAL",[])),false);
+  assert.equal(check({...raw("NONE",["A1"]),abstained:true}),false);
+});
+
+test("response grammar handles documented-only, elicited-only and empty ledgers without invented IDs",()=>{
+ for(const mode of ["documented","elicited","empty"]){
+  const l=ledger();
+  if(mode==="elicited")l.evidence[0].provenance.source_type="CANDIDATE_ELICITED";
+  if(mode==="empty")l.evidence=[];
+  const validate=new Ajv().compile(buildSupportJudgeSchema(l));
+  assert.equal(validate({judgments:[{...raw("NONE"),abstained:true}]}),true);
+  assert.equal(validate({judgments:[raw("DIRECT",["A1"])]}),mode==="documented");
+  assert.equal(validate({judgments:[{...raw("PARTIAL",["A1"]),support_basis:"CANDIDATE_SELF_REPORTED"}]}),mode==="elicited");
+ }
 });

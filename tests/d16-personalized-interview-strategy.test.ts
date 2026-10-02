@@ -45,6 +45,53 @@ function fixture(overrides: Partial<D16Inputs> = {}): D16Inputs {
 }
 
 describe("D16 personalized interview strategy", () => {
+  it("exposes seniority and global scope mismatch without changing documented support", () => {
+    const input = fixture();
+    const requirement = "Senior director of global financial reporting";
+    input.canonical_requirements[0].normalized_requirement = requirement;
+    input.bridge.requirements[0].normalized_requirement = requirement;
+    input.role_capability_model.requirements[0].normalized_requirement = requirement;
+    input.canonical_requirements = input.canonical_requirements.slice(0, 1);
+    input.bridge.requirements = input.bridge.requirements.slice(0, 1);
+    input.role_capability_model.requirements = input.role_capability_model.requirements.slice(0, 1);
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find(t => t.requirement_id === "REQ-A")!;
+    assert.ok(tension);
+    assert.equal(tension.contextual_delta.scope, true);
+    assert.equal(tension.contextual_delta.seniority, true);
+    assert.equal(tension.canonical_status, "SUPPORTED");
+    assert.deepEqual(tension.evidence_ids, ["EV-A"]);
+    assert.equal(input.bridge.requirements[0].status, "SUPPORTED");
+  });
+
+  it("compresses an overloaded JD to three deterministic traceable tensions", () => {
+    const input = fixture();
+    const gap = input.bridge.requirements[2];
+    const capability = input.role_capability_model.requirements[2];
+    input.bridge.requirements = Array.from({ length: 12 }, (_, i) => ({
+      ...gap, requirement_id: `WISH-${i}`, normalized_requirement: `Wishlist capability ${i}`,
+    }));
+    input.canonical_requirements = input.bridge.requirements.map(r => ({ id: r.requirement_id, normalized_requirement: r.normalized_requirement }));
+    input.role_capability_model.requirements = input.bridge.requirements.map((r, i) => ({
+      ...capability, capability_id: `CAP-WISH-${i}`, canonical_requirement_id: r.requirement_id,
+      normalized_requirement: r.normalized_requirement,
+      baseline_criticality: i < 4 ? "CRITICAL" : "SUPPORTING",
+    }));
+    input.jd_present = true;
+    input.jd_fingerprint = "frozen-overloaded-jd-control";
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    assert.equal(strategy.tensions.length, 3);
+    assert.deepEqual(strategy, buildD16Strategy(input));
+    for (const tension of strategy.tensions) {
+      assert.equal(tension.canonical_status, "UNRESOLVED");
+      assert.equal(tension.role_criticality, "CRITICAL");
+      assert.deepEqual(tension.evidence_ids, []);
+      assert.ok(input.canonical_requirements.some(r => r.id === tension.requirement_id));
+    }
+    assert.equal(validateD16Strategy(strategy, input).valid, true);
+  });
   it("selects deterministically with canonical status precedence and caps output at three", () => {
     const strategy = buildD16Strategy(fixture());
     assert.equal(strategy.tensions.length, 3);
@@ -375,6 +422,29 @@ function refreshPreparation(input: D16PreparationInputs) {
 }
 
 describe("D16 evidence-linked preparation development contract", () => {
+  it("uses deduplicated positive judge citations rather than unrelated bridge candidates", () => {
+    const input = preparationFixture();
+    input.canonical.ledger.support_judgments = [{ id: "J-C", requirement_id: "REQ-C", facet_id: "F-C", status: "PARTIAL", supporting_evidence_ids: ["EV-A", "EV-A"], rationale: "Partial documented support", confidence: 0.7, abstained: false, support_basis: "DOCUMENTED" }];
+    refreshPreparation(input);
+    const actions = buildD16PreparationActions(input);
+    for (const action of actions) {
+      assert.deepEqual(action.requirement_proof_refs, [{ evidence_id: "EV-A", source_span_id: "SPAN-A", support_status: "PARTIAL" }]);
+    }
+    assert.match(actions[0].instruction, /prepare this documented example/);
+    actions[0].requirement_proof_refs.push({ evidence_id: "EV-B", source_span_id: "SPAN-B", support_status: "DIRECT" });
+    assert.equal(validateD16PreparationActions(actions, input).valid, false);
+  });
+  it("renders malformed source facets as the unresolved requirement without changing the source ledger", () => {
+    const input = preparationFixture();
+    input.canonical.ledger.requirements = [{ id: "REQ-C", source_span_id: "SPAN-A", normalized_requirement: "Experience with International Standards", category: "finance", salience: "CORE", facets: [{ id: "F-1", type: "FUNCTION", requirement: "Experience", source_span_id: "SPAN-A" }, { id: "F-2", type: "FUNCTION", requirement: "is required", source_span_id: "SPAN-A" }], extraction_confidence: 1 }];
+    refreshPreparation(input);
+    const before = JSON.stringify(input.canonical.ledger);
+    const action = buildD16PreparationActions(input)[0];
+    assert.match(action.instruction, /Still to establish: Experience with International Standards/);
+    assert.doesNotMatch(action.instruction, /Experience; is required/);
+    assert.deepEqual(action.missing_facet_ids, ["F-1", "F-2"]);
+    assert.equal(JSON.stringify(input.canonical.ledger), before);
+  });
   it("Nancy uses contextual accounting anchors without granting IFRS proof", () => {
     const input = preparationFixture();
     const actions = buildD16PreparationActions(input);

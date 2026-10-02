@@ -34,8 +34,12 @@ function assertCurrentCanonical(input: D16AnchorSelectorInput) {
   // Also validates accepted D15 references and current deterministic vetoes before spending.
   buildD16PreparationActions({...material,dependency_fingerprint:buildD16PreparationFingerprint(material)});
 }
-function usableContext(atom: AtomicEvidence) {
-  return atom.assertion.polarity === "AFFIRMATIVE" && effectiveActorBasis(atom) !== "UNSPECIFIED";
+export function usableD16Context(atom: AtomicEvidence, input: D16AnchorSelectorInput) {
+  const span = input.canonical.ledger.source_spans.find(s => s.id === atom.source_span_id);
+  const ref = input.canonical.mirror.evidence.find(e => e.evidence_id === atom.id);
+  return atom.assertion.polarity === "AFFIRMATIVE" && effectiveActorBasis(atom) !== "UNSPECIFIED"
+    && !!span && !!ref && ref.source_span_id === span.id
+    && ref.source_quote === span.text && ref.source_type === atom.provenance.source_type;
 }
 export function validateD16AnchorChoices(raw: unknown, input: D16AnchorSelectorInput): D16AnchorChoice[] {
   assertCurrentCanonical(input);
@@ -43,7 +47,7 @@ export function validateD16AnchorChoices(raw: unknown, input: D16AnchorSelectorI
   if (!keys(raw,["decisions"]) || !Array.isArray((raw as {decisions?:unknown}).decisions)) throw new Error("Malformed D16 selection response.");
   const decisions = (raw as {decisions:D16AnchorChoice[]}).decisions;
   if (decisions.length !== tensions.length || new Set(decisions.map(d=>d?.requirement_id)).size !== decisions.length) throw new Error("Missing or duplicate D16 selected tension.");
-  const allowedAtoms = new Set(input.canonical.ledger.evidence.filter(usableContext).map(a=>a.id));
+  const allowedAtoms = new Set(input.canonical.ledger.evidence.filter(a => usableD16Context(a, input)).map(a=>a.id));
   const threads = new Set(input.accepted_relationships.map(t=>t.id));
   for (const d of decisions) {
     if (!keys(d,["requirement_id","evidence","relationships","reason"]) || !tensions.some(t=>t.requirement_id===d.requirement_id) || !nonBlank(d.reason)) throw new Error("Unknown D16 tension or missing selection reason.");
@@ -63,8 +67,8 @@ export async function selectD16PreparationAnchors(input: D16AnchorSelectorInput,
   if (tensions.length) {
     const request = {
       system:D16_ANCHOR_SELECTOR_PROMPT,
-      input:JSON.stringify({tensions:tensions.map(t=>({requirement_id:t.requirement_id,requirement:t.requirement,canonical_status:t.canonical_status,missing_facets:input.canonical.ledger.requirements.find(r=>r.id===t.requirement_id)?.facets ?? [],truthfulness_boundary:t.truthfulness_boundary})),
-        atoms:input.canonical.ledger.evidence.filter(usableContext).map(a=>({id:a.id,source_text:input.canonical.ledger.source_spans.find(s=>s.id===a.source_span_id)!.text,actor:a.subject.actor,actor_basis:effectiveActorBasis(a),ownership:a.subject.ownership,source_type:a.provenance.source_type})),
+      input:JSON.stringify({tensions:tensions.map(t=>({requirement_id:t.requirement_id,requirement:t.requirement,canonical_status:t.canonical_status,missing_facets:input.canonical.ledger.requirements.find(r=>r.id===t.requirement_id)?.facets.filter(f => !input.canonical.ledger.support_judgments.some(j => j.requirement_id === t.requirement_id && j.facet_id === f.id && j.status === "DIRECT" && !j.abstained)) ?? [],truthfulness_boundary:t.truthfulness_boundary})),
+        atoms:input.canonical.ledger.evidence.filter(a => usableD16Context(a, input)).map(a=>({id:a.id,source_text:input.canonical.ledger.source_spans.find(s=>s.id===a.source_span_id)!.text,actor:a.subject.actor,actor_basis:effectiveActorBasis(a),ownership:a.subject.ownership,source_type:a.provenance.source_type})),
         accepted_relationships:input.accepted_relationships.map(t=>({id:t.id,headline:t.headline,evidence_ids:t.evidence_ids,maturity:t.maturity,relationship_support_unit_count:t.relationship_support_unit_count})),language:input.language})
     };
     const result = complete ? await complete(request) : await (async()=>{
@@ -79,6 +83,7 @@ export async function selectD16PreparationAnchors(input: D16AnchorSelectorInput,
       throw Object.assign(error instanceof Error ? error : new Error(String(error)), {diagnostic:{input_sha256,requested_model:D16_SELECTOR_MODEL,resolved_model,raw_response}});
     }
   }
+  try {
   // A completion callback or async caller cannot silently replace inputs while awaiting a response.
   if (digest(input)!==input_sha256) throw new Error("D16 selector dependencies changed during selection.");
   const selections:D16PreparationSelection[]=decisions.map(d=>({requirement_id:d.requirement_id,preparation_evidence_ids:d.evidence.map(r=>r.id),relationship_ids:d.relationships.map(r=>r.id)}));
@@ -86,4 +91,7 @@ export async function selectD16PreparationAnchors(input: D16AnchorSelectorInput,
   const preparation={...material,dependency_fingerprint:buildD16PreparationFingerprint(material)};
   buildD16PreparationActions(preparation);
   return {preparation,record:{version:D16_SELECTOR_VERSION,input_sha256,requested_model:D16_SELECTOR_MODEL,resolved_model,decisions,raw_response,semantic_relevance:tensions.length?"PENDING_CONTENT_REVIEW":"NOT_EVALUATED_ZERO_TENSIONS"}};
+  } catch(error) {
+    throw Object.assign(error instanceof Error ? error : new Error(String(error)), {diagnostic:{input_sha256,requested_model:D16_SELECTOR_MODEL,resolved_model,raw_response}});
+  }
 }
