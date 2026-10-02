@@ -23,11 +23,12 @@ const requiredConstructions = [
 
 if (!Array.isArray(rows)) throw new Error("Qualification input must be a JSON array.");
 const seenIds = new Set();
+const seenSources = new Set();
 for (const row of rows) {
   if (row === null || typeof row !== "object" || Array.isArray(row)) {
     throw new Error("Invalid qualification row shape.");
   }
-  if (typeof row.id !== "string" || !row.id.trim() || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted) || !requiredConstructions.includes(row.construction)) {
+  if (typeof row.id !== "string" || !row.id.trim() || typeof row.source_text !== "string" || !row.source_text.trim() || !languages.includes(row.language) || !bases.includes(row.gold) || !bases.includes(row.predicted) || !requiredConstructions.includes(row.construction)) {
     throw new Error("Invalid row: " + JSON.stringify({ id: row.id, language: row.language, gold: row.gold, predicted: row.predicted }));
   }
   if (row.nominal !== undefined && typeof row.nominal !== "boolean") {
@@ -41,6 +42,9 @@ for (const row of rows) {
   }
   if (seenIds.has(row.id)) throw new Error("Duplicate qualification row id: " + row.id);
   seenIds.add(row.id);
+  const sourceKey = row.language + "\u0000" + row.source_text.trim().toLocaleLowerCase();
+  if (seenSources.has(sourceKey)) throw new Error("Duplicate qualification source text: " + row.id);
+  seenSources.add(sourceKey);
 }
 
 const count = (predicate) => rows.filter(predicate).length;
