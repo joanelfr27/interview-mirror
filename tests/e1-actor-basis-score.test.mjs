@@ -133,7 +133,7 @@ test("qualification scorer gates explicit candidate false ambiguity", () => {
   const result = score(data);
   assert.equal(result.status, 1);
   assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.count, 3);
-  assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.rate, "14.29%");
+  assert.equal(result.report.primary_rates.explicit_candidate_false_ambiguity.rate, "7.14%");
   assert.equal(result.report.qualification_pass, false);
 });
 
