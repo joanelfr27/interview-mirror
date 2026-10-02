@@ -421,8 +421,8 @@ test("lexicon-free clause guard rejects relational synonym co-occurrence in Engl
     l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "monthly sales forecasts and introduced a structured pipeline review" } };
     l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
     const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
-    assert.ok(result.errors.some(error => error.includes("distributed across independent clauses")), requirementText);
-    assert.notEqual(result.judgments[0]?.status, "DIRECT", requirementText);
+    assert.equal(result.errors.length, 0, requirementText);
+    assert.equal(result.judgments[0]?.status, "PARTIAL", requirementText);
   }
 });
 
@@ -437,8 +437,8 @@ test("lexicon-free clause guard rejects relational synonym co-occurrence in Fren
     l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepare", object: "prévisions mensuelles et revue structurée du pipeline" } };
     l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: requirementText, source_span_id: "S-REQ" };
     const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
-    assert.ok(result.errors.some(error => error.includes("distributed across independent clauses")) || result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
-    assert.notEqual(result.judgments[0]?.status, "DIRECT", requirementText);
+    assert.equal(result.errors.length, 0, requirementText);
+    assert.equal(result.judgments[0]?.status, "PARTIAL", requirementText);
   }
 });
 
@@ -447,6 +447,67 @@ test("lexicon-free clause guard does not penalize a single-group facet", () => {
   l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Experience with SAP and prepared monthly reporting.", start_offset: 0, end_offset: 48, language: "en" };
   l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "experience", object: "SAP" } };
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Experience with SAP", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+
+test("clause guard folds EN inflections for R1 X1", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts and introduced a structured pipeline review.", start_offset: 0, end_offset: 61, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasting in reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("clause guard folds FR number inflections for R1 X2", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Préparé les prévisions et introduit les revues du pipeline.", start_offset: 0, end_offset: 57, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter la prévision dans la revue du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("chronology then is an evidence clause boundary for R1 X5", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared monthly forecasts then introduced pipeline reviews.", start_offset: 0, end_offset: 57, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Leverage forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("chronology puis is an evidence clause boundary for R1 X6", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Préparé les prévisions puis introduit les revues du pipeline.", start_offset: 0, end_offset: 61, language: "fr" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Exploiter les prévisions dans les revues du pipeline", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("conjunctive budgeting and forecasting facet remains DIRECT FN2", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Led budgeting and forecasting for the region.", start_offset: 0, end_offset: 45, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Budgeting and forecasting", source_span_id: "S-REQ" };
+  const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
+
+test("conjunctive payroll and accounts payable facet remains DIRECT FN3", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Managed payroll and supervised accounts payable.", start_offset: 0, end_offset: 47, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Manage payroll and accounts payable", source_span_id: "S-REQ" };
   const result = sanitizeJudgments([{ ...raw("DIRECT", ["A1"]) }], l);
   assert.equal(result.errors.length, 0);
   assert.equal(result.judgments[0].status, "DIRECT");
