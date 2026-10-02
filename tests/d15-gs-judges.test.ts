@@ -64,3 +64,21 @@ test('chronology alone cannot license a stronger cause even if G says YES',()=>{
  assert.throws(()=>validateD15ModelPreflight({model:'gpt-4o-mini-2024-07-18',choices:[{message:{content:'{"ready":false}'}}]}));
  assert.equal(validateD15ModelPreflight({model:'gpt-4o-mini-2024-07-18',choices:[{message:{content:'{"ready":true}'}}]}).status,'PASS');
  });
+
+test('enumeration reading cannot invent a relationship or route a raw S YES into a question',async()=>{
+ const {validateSemanticReading,readingVetoes}=await import('../src/lib/d15-semantic-reading.ts');
+ const reading=validateSemanticReading({asserted_proposition:'The candidate prepares forecasts and conducts reviews; no interaction is asserted.',component_claims:['prepares forecasts','conducts reviews'],form:'ENUMERATION',relationship_assertion:null,reading_reason:'Two activities joined by and.'});
+ assert.throws(()=>validateSemanticReading({...reading,relationship_assertion:'Forecasts feed reviews.'}));
+ const decision=combineGS('claim',{...G,supported:false,licensing_spans:[]},S,readingVetoes(reading),reading.asserted_proposition);
+ assert.equal(decision.S.supported,true); // Preserve the raw error, do not hide it.
+ assert.equal(decision.accepted,false);assert.equal(clarificationQuestion(decision,'en'),null);
+});
+test('packaging remains insignificant despite a strong generic connection reading',async()=>{
+ const {readingVetoes}=await import('../src/lib/d15-semantic-reading.ts');
+ const veto=readingVetoes({asserted_proposition:'Two domains are connected.',component_claims:['financial systems','business change'],form:'PACKAGING',relationship_assertion:'Two domains are connected.',reading_reason:'No substantive flow is asserted.'});
+ assert.equal(combineGS('claim',G,S,veto).accepted,false);
+});
+test('a substantive ungrounded relationship asks about the missing link rather than a list',()=>{
+ const decision={...combineGS('headline',{...G,supported:false,licensing_spans:[]},S,[]),semantic_reading:{asserted_proposition:'Forecasts feed reviews.',component_claims:['prepares forecasts','conducts reviews'],form:'RELATIONSHIP' as const,relationship_assertion:'Your forecasts feed the pipeline review.',reading_reason:'Information flow is asserted.'}};
+ assert.ok(clarificationQuestion(decision,'en')?.includes('Your forecasts feed the pipeline review.'));
+});
