@@ -32,3 +32,21 @@ https://developers.openai.com/api/docs/guides/structured-outputs
 Cases and unchanged expectations are those in D16_AUTOMATIC_DEVELOPMENT_PREREGISTRATION_2026-10-02.md: Nancy/Thomas saved synthetic standards comparison, David EN/FR no-JD five-requirement role with simulated prior elicitation. All use one corrected engine; no E1 extraction or D15 G/S rerun. Expected calls: two existing model capability probes, two exact support-schema compatibility probes, two David support judgments, up to four selectors. If schema compatibility fails, abort before candidate judgments. If later a case fails, preserve it and attempt remaining cases once. Semantic relevance/action content review remains mandatory.
 
 Owner decision required only to override the existing "successful model outputs will not be resampled" master-record instruction for this separately labelled validation. This document does not grant that exception itself.
+
+
+## 2 October semantic HOLD and general correction
+
+Authorized development run 37052068438 showed that structural basis isolation was necessary but insufficient. The exact EN/FR schemas were API-compatible, yet ROLE-FORECAST-F0 was returned as DOCUMENTED DIRECT by composing separate documented forecasting and pipeline-review activities. The French rationale also explicitly relied on an elicited atom outside the returned supporting IDs. This is a semantic truth-boundary defect in the canonical support judge, not a D16 selector defect. The run remains preserved as failed validation evidence.
+
+The correction therefore reuses the frozen D15 G relationship-grounding principles rather than adding case-specific exceptions:
+
+- Co-occurrence is not a relationship; chronology does not license causality, purpose, response or mechanism.
+- A facet is deterministically classified as relational when its wording asserts a connection such as input-to, based-on, used-to, response, purpose, causality, feeding, shaping, enabling, influence or dependency (including conservative French equivalents).
+- For relational DIRECT, the judge must return the asserted connector and exact licensing span(s). Each licensing span must occur verbatim in the minimal supporting evidence. When multiple atoms are cited, the relationship itself must be licensed within one cited atom; independent activities cannot be composed into DIRECT.
+- supporting_evidence_ids is the minimal licensing subset. context_evidence_ids is optional non-licensing context and must be disjoint. Abstentions carry neither.
+- Rationale consistency is checked independently: an uncited evidence ID, or a distinctive exact phrase uniquely traceable to an atom outside the minimal subset, rejects the judgment.
+- The prior MBA/Finance sanitizer rewrite is removed. This patch does not add another credential-specific or candidate-specific rewrite.
+- No MIXED support basis is introduced. A relationship supported only by elicitation remains CANDIDATE_SELF_REPORTED and cannot be DIRECT.
+- The support judge remains on the existing gpt-4o-mini configuration for this correction. Changing the model at the same time would confound whether the deterministic boundary itself fixed the defect. Model adequacy remains a qualification question after the boundary passes static/adversarial review.
+
+No new live/model validation is authorized by this record. Before any such run, the independent EPA Sales Manager role baseline, prospective expectations, exact correction commit, tests and provenance must be frozen. PR #69 remains HOLD until full-rigor review is complete.
