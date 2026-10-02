@@ -1,4 +1,4 @@
-import { judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
+import { clarificationQuestion, judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
@@ -20,6 +20,7 @@ export type D15BVerifiedThread = D15BSemanticThreadProposal & {
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
   rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; gs_decision?: GSDecision }>;
+  clarification_questions?: Array<{ proposal_id: string; question: string; evidence_ids: string[]; gs_decision: GSDecision }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
@@ -197,14 +198,14 @@ function deterministicProposalErrors(
   const uniqueIds = [...new Set(proposal.evidence_ids)];
 
   if (uniqueIds.length !== proposal.evidence_ids.length) errors.push("duplicate evidence IDs");
-  if (uniqueIds.length < 2) errors.push("semantic thread requires at least two evidence atoms");
+  if (uniqueIds.length < 1) errors.push("semantic thread requires cited evidence");
   if (!proposal.headline.trim()) errors.push("headline is empty");
 
   const cited = uniqueIds.map((id) => byId.get(id));
   if (cited.some((atom) => !atom)) errors.push("proposal cites unknown or ineligible evidence");
 
   const citedSpans = new Set(cited.filter(Boolean).map((atom) => atom!.source_span_id));
-  if (citedSpans.size < 2) errors.push("semantic thread requires at least two independent source spans");
+  if (citedSpans.size < 1) errors.push("semantic thread requires a source span");
 
   const source = citedText(ledger, uniqueIds);
   const sourceNorm = normalized(source);
@@ -368,7 +369,7 @@ const CANDIDATE_SET_SCHEMA = {
         properties: {
           id: { type: "string" },
           dimension: { type: "string", enum: ["CHANGE_CONTINUITY","INFORMATION_DECISION","DIAGNOSIS_CHANGE","MULTIPARTY_RESOLUTION","OPERATING_RHYTHM","EXTERNAL_INTERNAL_BRIDGE","CHANGE_USER_INTERFACE","OTHER"] },
-          evidence_ids: { type: "array", minItems: 2, items: { type: "string" } },
+          evidence_ids: { type: "array", minItems: 1, items: { type: "string" } },
         },
         required: ["id","dimension","evidence_ids"],
       },
@@ -386,7 +387,7 @@ const INTERPRETATION_SCHEMA = {
 
 async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCandidateSet[]> {
   const input = buildD15BSemanticInput(ledger);
-  if (input.atoms.length < 2) return [];
+  if (input.atoms.length < 1) return [];
   const response = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
@@ -394,7 +395,7 @@ async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCa
     messages: [
       { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything.
 Return only candidate evidence sets; do NOT write headlines, summaries, questions, or candidate-facing prose.
-A candidate set needs at least two independent source spans whose relationship reveals a professional operating pattern that no single atom states alone.
+A candidate set may contain one atom with an explicit meaningful relationship, or several atoms suggesting a meaningful relationship to confirm. Do not require cross-line synthesis. An unconfirmed relationship is a hypothesis for a question, never evidence.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
 Select the SMALLEST sufficient evidence set that captures the COMPLETE relationship. Do not add atoms merely because they share a topic and do not optimize coverage.
 Rank candidate relationships by professional information gain. Treat the dimensions as operational ranking rules, not labels:
@@ -429,8 +430,8 @@ async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15B
     messages: [
       { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
 Address the candidate directly. If source_language is "en", the headline MUST begin exactly with "You ". If source_language is "fr", it MUST begin exactly with "Vous ". Never output the other language.
-State what the cross-line pattern MEANS about how the candidate works; do not simply concatenate, enumerate, or relabel the activities. The insight must reveal a relationship/function that no single cited line states alone while remaining a reasonable reading of the lines together.
-Good shape: "You work where a new system meets the people who have to use it." Bad shape: "You combine rollout support with feedback collection and training assistance."
+Write a precise relational claim for assessment, preserving exact agency and scope. It can be stated in one atom or be an unconfirmed hypothesis connecting atoms. Do not concatenate activities or write category packaging. Never write "Documented connection between" or "Lien documenté". Unsupported hypotheses will become questions, never accepted facts.
+Use a concrete relationship, not a metaphor such as intersection or bridge. Preserve assisted/supported as assisted/supported; never upgrade them to facilitating or leading.
 Do not explain why the pattern is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
@@ -448,7 +449,7 @@ export async function proposeD15BSemanticThreads(ledger: EvidenceLedger): Promis
   const proposals: D15BSemanticThreadProposal[] = [];
   for (const candidate of candidates) {
     const ids = [...new Set(candidate.evidence_ids)];
-    if (ids.length < 2 || ids.some((id) => !eligible.has(id))) continue;
+    if (ids.length < 1 || ids.some((id) => !eligible.has(id))) continue;
     const headline = await interpretD15BCandidateSet(ledger, { ...candidate, evidence_ids: ids });
     if (!headline) continue;
     proposals.push({ id: candidate.id, headline, evidence_ids: ids, question_back: null });
@@ -472,7 +473,7 @@ export async function verifyD15BClaimIndependently(
     return { supported: decision.S.supported, reason: decision.S.reason };
   }
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
-  if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
+  if (!claim.trim() || atoms.length < 1) return { supported: false, reason: "insufficient cited evidence" };
   const response = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
@@ -633,42 +634,22 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   const deterministic = verifyD15BSemanticThreadProposals(ledger, guardRepaired);
   const accepted: D15BVerifiedThread[] = [];
   const rejected = [...deterministic.rejected];
+  const clarification_questions: NonNullable<D15BVerificationResult["clarification_questions"]> = [];
 
   for (const proposal of deterministic.accepted) {
     let workingProposal={...proposal};
     if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: Title Case headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
-        continue;
-      }
-      workingProposal=floorProposal;
-    }
-    let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
-    if (!headline.supported) {
       const repaired=await repairHeadlineOnce(ledger,workingProposal);
-      if(repaired){
-        const repairedProposal={...workingProposal,headline:repaired};
-        const guardErrors=deterministicProposalErrors(ledger,repairedProposal);
-        const repairedCheck=guardErrors.length ? {supported:false,reason:guardErrors.join(" | ")} : await verifyD15BClaimIndependently(ledger,proposal.evidence_ids,repaired,"HEADLINE");
-        if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; }
-      }
-    }
-    if (!headline.supported) {
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
+      if(!repaired||deterministicProposalErrors(ledger,{...workingProposal,headline:repaired}).length){
+        rejected.push({proposal_id:proposal.id,reasons:['PRESENTATION_UNREPAIRABLE: no valid candidate-facing headline']});
         continue;
       }
-      workingProposal=floorProposal;
-      headline={supported:true,reason:"reviewed deterministic headline floor"};
+      workingProposal={...workingProposal,headline:repaired};
     }
     const gs = await judgeD15GS(ledger, workingProposal.evidence_ids, workingProposal.headline);
     if (!gs.accepted) {
+      const question=clarificationQuestion(gs,sourceLanguageForEvidence(ledger,workingProposal.evidence_ids));
+      if(question) clarification_questions.push({proposal_id:proposal.id,question,evidence_ids:workingProposal.evidence_ids,gs_decision:gs});
       rejected.push({ proposal_id: proposal.id, diagnostic_headline: workingProposal.headline, gs_decision: gs, reasons: [`G/S v1.1 rejected: G=${gs.G.supported}; S=${gs.S.supported}; vetoes=${gs.vetoes.join(",")}; G: ${gs.G.reason}; S: ${gs.S.reason}`] });
       continue;
     }
@@ -747,7 +728,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       ? "COMPLETED_NO_QUALIFYING_RELATIONSHIP"
       : "ALL_REJECTED";
   const safeCvQuestion=completion_state==="COMPLETED_NO_QUALIFYING_RELATIONSHIP" ? cv_question_back : null;
-  return { accepted, rejected, cv_question_back:safeCvQuestion, completion_state };
+  return { accepted, rejected, clarification_questions, cv_question_back:safeCvQuestion, completion_state };
 }
 
 export type D15BSemanticInput = {
