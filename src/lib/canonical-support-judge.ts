@@ -122,8 +122,8 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
 
 
 const RELATIONAL_CONNECTOR_PATTERNS = [
-  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with|aligns?\s+.+\s+with)\b/i,
-  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|dépend\s+(?:de|des|du)|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+(?:de|des|du)|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
+  /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with|aligns?\s+.+\s+with|(?:use|uses|using|used|apply|applies|applying|applied|integrate|integrates|integrating|integrated|translate|translates|translating|translated)\s+.+\s+(?:in|into|to|for|with)\s+.+)\b/i,
+  /(?:^|[^\p{L}\p{N}])(?:en\s+reponse\s+a|base(?:e|es|s)?\s+sur|fonde(?:e|es|s)?\s+sur|grace\s+a|afin\s+de|depend\s+(?:de|des|du)|recurr(?:ent|ente|ents|entes|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+a|coordonne\s+.+\s+avec|au\s+service\s+(?:de|des|du)|alimente|faconne|permet\s+de|influence|conduit\s+a|transforme\s+.+\s+en|(?:utilise|utiliser|utilisant|applique|appliquer|integrer|integre|integrant|traduit|traduire|traduisant)\s+.+\s+(?:dans|en|a|pour|avec)\s+.+)(?=$|[^\p{L}\p{N}])/iu,
 ] as const;
 
 // This classifier is intentionally conservative. The frozen G codebook says
@@ -133,7 +133,9 @@ const RELATIONAL_CONNECTOR_PATTERNS = [
 // when a relationship is not mechanically classified here.
 
 function isRelationalFacet(requirement: string): boolean {
-  const canonical = requirement.normalize("NFC");
+  // Match on the same accent-folded representation used by the semantic boundary.
+  // This avoids French gender/number/Unicode variants bypassing classification.
+  const canonical = normalizeEvidenceText(requirement);
   return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(canonical));
 }
 
@@ -164,7 +166,13 @@ function connectorBindsFacetSides(facetRequirement: string, connector: string, l
   const rightTokens = relationshipSideTokens(facet.slice(facetIndex + normalizedConnector.length));
   if (!leftTokens.length || !rightTokens.length) return false;
 
-  const sentences = licensingSpan.normalize("NFC").split(/[.!?;:\n]+/).map(sentence => normalizeEvidenceText(sentence)).filter(Boolean);
+  // A connector must bind both facet sides inside one semantic clause. Commas and
+  // coordinators delimit independent propositions so co-occurrence cannot masquerade
+  // as a relationship merely because it appears in one sentence/source span.
+  const sentences = licensingSpan.normalize("NFC")
+    .split(/[.!?;:,\n]+|\b(?:and|but|while|whereas|et|mais|tandis\s+que|alors\s+que)\b/iu)
+    .map(sentence => normalizeEvidenceText(sentence))
+    .filter(Boolean);
   return sentences.some(sentence => {
     const connectorIndex = sentence.indexOf(normalizedConnector);
     if (connectorIndex < 0) return false;
@@ -365,13 +373,20 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     item.support_basis = hasElicited ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED";
 
     // General anti-composition invariant: DIRECT support cannot be assembled from
-    // independent source spans. Multiple atoms are permitted only when they retain
-    // the same preserved source-span reference.
+    // independent source spans. For relational facets this is a hard rejection because
+    // composition could manufacture the relationship. For non-relational facets the
+    // evidence can still support the requirement, but only at PARTIAL.
     if (item.status === "DIRECT") {
       const sourceSpanIds = new Set(citedAtoms.map(atom => atom.source_span_id));
       if (sourceSpanIds.size > 1) {
-        errors.push("Rejected judgment " + item.id + ": DIRECT support cannot compose independent source spans; downgrade or use a single preserved source reference.");
-        continue;
+        if (isRelationalFacet(facet.requirement) || Boolean(item.relationship_connector?.trim())) {
+          errors.push("Rejected judgment " + item.id + ": relational DIRECT cannot compose independent source spans; use a single preserved source reference.");
+          continue;
+        }
+        item.status = "PARTIAL";
+        deterministicRationaleOverride = "Multiple independent source spans support this facet, so DIRECT is conservatively downgraded to PARTIAL.";
+        item.rationale = deterministicRationaleOverride;
+        item.confidence = Math.min(item.confidence, 0.8);
       }
     }
 
