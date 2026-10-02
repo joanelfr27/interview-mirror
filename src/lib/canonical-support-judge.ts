@@ -123,7 +123,7 @@ export function buildSupportJudgeSchema(ledger: EvidenceLedger) {
 
 const RELATIONAL_CONNECTOR_PATTERNS = [
   /\b(?:input\s+(?:to|into|for)|based\s+on|in\s+response\s+to|drives?|feeds?\s+(?:into|to)|shapes?|enables?|influences?|leads?\s+(?:to|into)|turns?\s+.+\s+into|moves?\s+from\s+.+\s+to|because\s+of|as\s+a\s+result\s+of|so\s+that|in\s+order\s+to|depends?\s+on|dependent\s+on|recurr(?:ing|ence)|rhythm|cadence|interface\s+between|connects?\s+.+\s+(?:to|with)|coordinates?\s+.+\s+with|aligns?\s+.+\s+with)\b/i,
-  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|dépend\s+de|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+(?:de|des|du)|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
+  /(?:^|[^\p{L}\p{N}])(?:en\s+réponse\s+à|bas[ée]e?\s+sur|fond[ée]e?\s+sur|grâce\s+à|afin\s+de|dépend\s+(?:de|des|du)|récurr(?:ent|ence)|rythme|cadence|interface\s+entre|relie\s+.+\s+à|coordonne\s+.+\s+avec|au\s+service\s+(?:de|des|du)|alimente|façonne|permet\s+de|influence|conduit\s+à|transforme\s+.+\s+en)(?=$|[^\p{L}\p{N}])/iu,
 ] as const;
 
 // This classifier is intentionally conservative. The frozen G codebook says
@@ -133,7 +133,8 @@ const RELATIONAL_CONNECTOR_PATTERNS = [
 // when a relationship is not mechanically classified here.
 
 function isRelationalFacet(requirement: string): boolean {
-  return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(requirement));
+  const canonical = requirement.normalize("NFC");
+  return RELATIONAL_CONNECTOR_PATTERNS.some(pattern => pattern.test(canonical));
 }
 
 function normalizeEvidenceText(value: string): string {
@@ -143,6 +144,34 @@ function normalizeEvidenceText(value: string): string {
 function containsNormalizedPhrase(haystack: string, needle: string): boolean {
   const normalizedNeedle = normalizeEvidenceText(needle);
   return normalizedNeedle.length > 0 && normalizeEvidenceText(haystack).includes(normalizedNeedle);
+}
+
+const RELATION_STOPWORDS = new Set([
+  "use","uses","used","using","the","a","an","as","to","into","for","of","and","or","with","from","on","in","by",
+  "utilise","utiliser","utilisees","les","la","le","un","une","des","du","de","au","aux","et","ou","avec","pour","par","dans","sur",
+]);
+
+function relationshipSideTokens(value: string): string[] {
+  return normalizeEvidenceText(value).split(/\s+/).filter(token => token.length >= 3 && !RELATION_STOPWORDS.has(token));
+}
+
+function connectorBindsFacetSides(facetRequirement: string, connector: string, licensingSpan: string): boolean {
+  const facet = normalizeEvidenceText(facetRequirement);
+  const normalizedConnector = normalizeEvidenceText(connector);
+  const facetIndex = facet.indexOf(normalizedConnector);
+  if (facetIndex < 0) return false;
+  const leftTokens = relationshipSideTokens(facet.slice(0, facetIndex));
+  const rightTokens = relationshipSideTokens(facet.slice(facetIndex + normalizedConnector.length));
+  if (!leftTokens.length || !rightTokens.length) return false;
+
+  const sentences = licensingSpan.normalize("NFC").split(/[.!?;:\n]+/).map(sentence => normalizeEvidenceText(sentence)).filter(Boolean);
+  return sentences.some(sentence => {
+    const connectorIndex = sentence.indexOf(normalizedConnector);
+    if (connectorIndex < 0) return false;
+    const before = sentence.slice(0, connectorIndex);
+    const after = sentence.slice(connectorIndex + normalizedConnector.length);
+    return leftTokens.some(token => before.includes(token)) && rightTokens.some(token => after.includes(token));
+  });
 }
 
 function buildCanonicalRationale(item: RawJudgment): string {
@@ -195,6 +224,8 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
         errors.push("relational DIRECT licensing span must be an exact quote from the minimal supporting evidence subset.");
       } else if (connector && !containsNormalizedPhrase(exact, connector)) {
         errors.push("relational DIRECT licensing span must explicitly contain the asserted relationship connector.");
+      } else if (connector && !connectorBindsFacetSides(facet.requirement, connector, exact)) {
+        errors.push("relational DIRECT licensing span must bind content from both sides of the facet relationship in the same clause.");
       }
     }
     if (item.supporting_evidence_ids.length > 1) {
@@ -292,6 +323,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
   const seenFacetKeys = new Set<string>();
 
   for (const item of raw) {
+    let deterministicRationaleOverride: string | null = null;
     const req = requirements.get(item.requirement_id);
     const facet = req?.facets.find(x => x.id === item.facet_id);
     if (!req || !facet) { errors.push("Rejected judgment " + item.id + ": unknown requirement/facet."); continue; }
@@ -353,7 +385,8 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       );
       if (citedCredentials.length > 0 && !hasSpecificField) {
         item.status = "PARTIAL";
-        item.rationale = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
+        deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
+        item.rationale = deterministicRationaleOverride;
         item.confidence = Math.min(item.confidence, 0.8);
       }
     }
@@ -368,7 +401,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     // Candidate-facing/downstream rationale is deterministic and derived only from the
     // validated minimal subset. The raw model rationale remains available in diagnostics.
-    item.rationale = buildCanonicalRationale(item);
+    item.rationale = deterministicRationaleOverride ?? buildCanonicalRationale(item);
     valid.push(item);
   }
 
