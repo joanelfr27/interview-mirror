@@ -382,3 +382,25 @@ test("apply integrate and translate relation-bearing constructions require licen
     assert.ok(result.errors.some(error => error.includes("relational DIRECT requires")), requirementText);
   }
 });
+
+
+test("generic preposition cannot license a relation without the facet relation verb", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Prepared forecasts in June for pipeline reviews.", start_offset: 0, end_offset: 48, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "prepared", object: "forecasts in June for pipeline reviews" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "in", licensing_spans: ["Prepared forecasts in June for pipeline reviews."] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.ok(result.errors.some(error => error.includes("bind content from both sides")));
+});
+
+test("generic preposition licenses a relation when the facet relation verb is preserved", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts in pipeline reviews.", start_offset: 0, end_offset: 35, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts in pipeline reviews" } };
+  l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts in pipeline reviews", source_span_id: "S-REQ" };
+  const judgment = { ...raw("DIRECT", ["A1"]), relationship_connector: "in", licensing_spans: ["Used forecasts in pipeline reviews."] };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "DIRECT");
+});
