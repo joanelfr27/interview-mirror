@@ -240,7 +240,10 @@ test("rationale cannot explicitly invoke an uncited evidence ID", () => {
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2" });
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "A2 establishes the missing relationship." };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "NONE");\n  assert.equal(result.judgments[0].abstained, true);\n  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 test("rationale cannot borrow a distinctive phrase from uncited evidence", () => {
@@ -806,7 +809,10 @@ test("explicit out-of-subset evidence ID reference remains rejected", () => {
   l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
   const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID: 2 also supports this judgment." };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "NONE");\n  assert.equal(result.judgments[0].abstained, true);\n  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 
