@@ -31,7 +31,9 @@ function serializableRequirements(items: readonly RawRequirement[]) {
 }
 
 const result: any = {
-  schema_version: 1,
+  schema_version: 2,
+  mode: "REAL",
+  model_id: null,
   expected_calls: 2,
   calls: [
     { call: 1, status: "NOT_STARTED" },
@@ -48,6 +50,7 @@ writeResult();
 try {
   result.calls[0].status = "STARTED"; writeResult();
   const firstItems = await extractRawRequirementsForStability(jd);
+  result.model_id = process.env.JD_STABILITY_MODEL_ID ?? "canonical-shadow-extractor-configured-model";
   result.calls[0] = { call: 1, status: "COMPLETED", requirements: serializableRequirements(firstItems), snapshot: snapshot(firstItems) };
   writeResult();
 
