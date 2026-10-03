@@ -689,7 +689,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     // General downgrade-only specificity boundary: a LEVEL requirement that names
     // a specific professional field cannot be DIRECT from generic tenure alone.
     // This guard never creates NONE and intentionally uses only the frozen alias set.
-    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger, req.requirement)) {
+    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger, req.normalized_requirement)) {
       item.status = "PARTIAL";
       deterministicRationaleOverride = "The cited evidence establishes relevant experience, but does not explicitly document experience in one of the specific professional fields named by the requirement.";
       item.rationale = deterministicRationaleOverride;
@@ -697,7 +697,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
 
 // Education-field specificity uses the same downgrade-only boundary rather than a credential-specific exception.
-    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms, ledger, req.requirement)) {
+    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms, ledger, req.normalized_requirement)) {
       item.status = "PARTIAL";
       deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
       item.rationale = deterministicRationaleOverride;
