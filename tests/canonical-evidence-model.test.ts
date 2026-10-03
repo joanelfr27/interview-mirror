@@ -758,6 +758,16 @@ test("facet source mapping keeps exact offsets when NFKC expansion precedes the 
 });
 
 
+test("facet source mapping preserves UTF-16 offsets after emoji and collapses mixed whitespace", () => {
+  const original = "📌 Date\u00a0  début : janvier 2025";
+  const parent = { id: "SPAN-JD-EMOJI", document_id: "JD", text: original, start_offset: 100, end_offset: 100 + original.length, language: "fr" };
+  const span = spanWithinParent(parent, "Date début : janvier 2025");
+  assert.ok(span);
+  assert.equal(span?.text, "Date\u00a0  début : janvier 2025");
+  assert.equal(span?.start_offset, 100 + original.indexOf("Date"));
+  assert.equal(span?.end_offset, 100 + original.length);
+});
+
 test("field-level grounding rejects an invented actor while allowing the canonical candidate placeholder", () => {
   const evidence = atom("A1");
   evidence.subject.actor = "John Doe";
