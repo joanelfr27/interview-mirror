@@ -654,6 +654,15 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.confidence = Math.min(item.confidence, 0.8);
     }
 
+    const sourceSectionBySpanId = new Map(ledger.source_spans.map(span => [span.id, span.source_section]));
+    const citesSummaryOrProfile = citedAtoms.some(atom => sourceSectionBySpanId.get(atom.source_span_id) === "SUMMARY_OR_PROFILE");
+    if (citesSummaryOrProfile && item.status === "DIRECT") {
+      item.status = "PARTIAL";
+      deterministicRationaleOverride = "Summary/profile assertions cannot independently establish DIRECT support; conservatively downgraded to PARTIAL.";
+      item.rationale = deterministicRationaleOverride;
+      item.confidence = Math.min(item.confidence, 0.8);
+    }
+
     // General anti-composition invariant: DIRECT support cannot be assembled from
     // independent source spans. For relational facets this is a hard rejection because
     // composition could manufacture the relationship. For non-relational facets the
