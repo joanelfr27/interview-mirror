@@ -777,3 +777,30 @@ test("explicit out-of-subset evidence ID reference remains rejected", () => {
   const result = sanitizeJudgments([judgment], l);
   assert.equal(result.errors.some(error => error.includes("evidence ID outside")), true);
 });
+
+
+test("EDF decomposed experience facet keeps source-quote field restrictions", () => {
+  const l = ledger();
+  const jd = "Expérience : Minimum 7 à 10 ans d'expérience en Asset Management, Financement de projet, Private Equity ou M&A, idéalement dans le secteur de l'énergie et/ou en Afrique";
+  l.source_spans[1] = { id: "S-REQ", document_id: "JD", text: jd, start_offset: 0, end_offset: jd.length, language: "fr" };
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Finance leader with 13+ years of multinational experience across Africa.", start_offset: 0, end_offset: 68, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "worked", object: "finance for 13+ years" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "Minimum 7 à 10 ans d'expérience", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("specific professional fields"));
+});
+
+test("EDF decomposed degree facet keeps source-quote finance specialization", () => {
+  const l = ledger();
+  const jd = "Formation : Bac+5 spécialisation finance / corporate finance";
+  l.source_spans[1] = { id: "S-REQ", document_id: "JD", text: jd, start_offset: 0, end_offset: jd.length, language: "fr" };
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "MBA", object: "Global Business & Management Studies" }, assertion: { type: "CREDENTIAL", polarity: "AFFIRMATIVE" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "Bac+5", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("required Finance or Accounting specialization"));
+});
