@@ -164,3 +164,27 @@ test("gold quote absent from current CV fails coverage", () => {
   assert.equal(result.pass, false);
   assert.deepEqual(result.not_extracted_quotes, ["Stale bullet."]);
 });
+
+
+test("borderline gold is report-only and cannot decide the gate", () => {
+  const borderline = [{ session_fingerprint: "s", source_quote: "Recommendations to senior management and headquarters.", expected_scopes: ["senior management", "headquarters"], borderline: true }] as const;
+  const missed = evaluateContextGold(borderline, []);
+  assert.equal(missed.expected_phrase_count, 0);
+  assert.equal(missed.recall, 1);
+  assert.equal(missed.pass, true);
+  assert.equal(missed.borderline_results[0].found, false);
+
+  const alternative = evaluateContextGold(borderline, [{ source_quote: "senior management", scope: "senior management" }]);
+  assert.equal(alternative.expected_phrase_count, 0);
+  assert.equal(alternative.non_substring_values.length, 0);
+  assert.equal(alternative.false_positive_quotes.length, 0);
+  assert.equal(alternative.pass, true);
+  assert.equal(alternative.borderline_results[0].found, true);
+});
+
+test("frozen gold metadata survives parsing", () => {
+  const parsed = parseContextGold(JSON.stringify([{ session_fingerprint: "s", bullet_number: 6, source_quote: "Recommendations to senior management.", expected_scopes: ["senior management"], borderline: true, note: "borderline scope" }]));
+  assert.equal(parsed?.[0].bullet_number, 6);
+  assert.equal(parsed?.[0].borderline, true);
+  assert.equal(parsed?.[0].note, "borderline scope");
+});
