@@ -11,7 +11,8 @@ function conceptPresence(items: readonly RawRequirement[]): Record<JdStabilityCo
     investor_funder_relations: /investor|investisseur|lender|prêteur|funder|bailleur|shareholder|actionnaire/i.test(text),
     required_experience: /(?:experience|expérience).{0,60}(?:year|ans|année)|(?:year|ans|année).{0,60}(?:experience|expérience)/i.test(text),
     bilingualism: /bilingual|bilingue|english.{0,40}french|french.{0,40}english|anglais.{0,40}français|français.{0,40}anglais/i.test(text),
-    degree_finance_specialization: /bac\s*\+?\s*5|master|degree|diplôme|finance|corporate finance|finance d'entreprise/i.test(text),
+    degree_finance_specialization:
+      /(?:bac\s*\+?\s*5|master|degree|diplôme).{0,80}(?:finance|corporate finance|finance d'entreprise)|(?:finance|corporate finance|finance d'entreprise).{0,80}(?:bac\s*\+?\s*5|master|degree|diplôme)/i.test(text),
   };
 }
 function snapshot(items: readonly RawRequirement[]): JdDecompositionSnapshot {
