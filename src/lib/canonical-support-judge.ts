@@ -465,10 +465,19 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     const otherSources = ledger.evidence
       .filter(other => other.id !== atom.id)
       .map(other => spans.get(other.source_span_id) ?? "");
+    const citedSources = citedSourceTexts.map(sourceText => normalizeEvidenceText(sourceText));
     const uniquePhrases = distinctivePhrases(source).filter(phrase =>
       !otherSources.some(other => normalizeEvidenceText(other).includes(phrase))
     );
-    if (uniquePhrases.some(phrase => rationale.includes(phrase))) {
+    const leakedPhrase = uniquePhrases.find(phrase => {
+      if (!rationale.includes(phrase)) return false;
+      const phraseStems = phrase.split(/\\s+/).map(stemContentToken).filter(Boolean);
+      return !citedSources.some(citedSource => {
+        const citedStems = new Set(citedSource.split(/\\s+/).map(stemContentToken).filter(Boolean));
+        return phraseStems.every(token => citedStems.has(token));
+      });
+    });
+    if (leakedPhrase) {
       errors.push("rationale contains a distinctive phrase from evidence outside the minimal supporting subset.");
     }
   }
