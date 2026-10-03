@@ -325,12 +325,25 @@ const sessionFingerprintFilter = new Set(
     .map((value) => value.trim())
     .filter(Boolean),
 );
+const runnerArgs = process.argv.slice(2);
+const cvJdOnlyMode = runnerArgs.includes("--cv-jd-only-no-answers");
+if (runnerArgs.some((arg) => arg !== "--cv-jd-only-no-answers")) {
+  throw new Error("Unsupported runtime runner argument.");
+}
 const sealedStrategyMode = sessionFingerprintFilter.has(EDF_DECISIVE_FINGERPRINT);
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
 }
 if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== requestedSessionCount) {
   throw new Error("D15_RUNTIME_SESSION_FINGERPRINTS count must match D15_RUNTIME_SESSION_COUNT.");
+}
+if (
+  cvJdOnlyMode &&
+  (requestedSessionCount !== 1 ||
+    sessionFingerprintFilter.size !== 1 ||
+    !sessionFingerprintFilter.has(EDF_DECISIVE_FINGERPRINT))
+) {
+  throw new Error("CV+JD-only experiment requires exactly the frozen EDF session.");
 }
 
 const chosen: SessionRow[] = [];
@@ -391,7 +404,13 @@ const runtimeProvenance = {
 
 const report = {
   run: {
-    mode: "D15_REAL_SESSION_SHADOW",
+    mode: cvJdOnlyMode ? "CV_JD_ONLY_D16_EXPERIMENT" : "D15_REAL_SESSION_SHADOW",
+    ...(cvJdOnlyMode
+      ? {
+          experiment_label: "CV + JD only, no candidate answers, product code bfd3f3042fa8ba79a2a96c90c9e222d2d00cfd7c",
+          candidate_answers_consumed: 0,
+        }
+      : {}),
     provenance: runtimeProvenance,
     writes_performed: false,
     sessions_requested: chosen.length,
@@ -440,12 +459,43 @@ for (const row of chosen) {
   try {
     let sealedMappings: Array<Record<string, string>> = [];
     let sealedAnswers: string[] = [];
+    let preservedUnresolvedItemIds: string[] = [];
+    let candidateAnswersConsumed = 0;
     const result = await runD16ShadowRuntimeIntegration(session, async (ledger, runtimeSession) => {
+      if (cvJdOnlyMode) {
+        preservedUnresolvedItemIds = ledger.unresolved_items.map((item) => item.id);
+        if (
+          !ledger.candidate_elicitations.length ||
+          ledger.candidate_elicitations.some((elicitation) =>
+            elicitation.answer !== undefined || elicitation.classification !== undefined ||
+            !ledger.unresolved_items.some((item) => item.id === elicitation.unresolved_item_id)
+          )
+        ) {
+          throw new Error("CV_JD_ONLY_UNANSWERED_ELICITATION_GUARD_FAILED");
+        }
+        return { ledger, diagnostics: ["CV+JD-only experiment: candidate answer step skipped."] };
+      }
       const applied = await applySealedEdfAnswers(ledger, runtimeSession);
       sealedMappings = applied.mappings;
       sealedAnswers = applied.answers;
+      candidateAnswersConsumed = applied.mappings.length;
       return { ledger: applied.ledger, diagnostics: applied.diagnostics };
     });
+
+    const elicitedEvidenceCount = result.ledger.evidence.filter(
+      (atom) => atom.provenance.source_type === "CANDIDATE_ELICITED",
+    ).length;
+    if (
+      cvJdOnlyMode &&
+      (candidateAnswersConsumed !== 0 ||
+        elicitedEvidenceCount !== 0 ||
+        preservedUnresolvedItemIds.length === 0 ||
+        preservedUnresolvedItemIds.some((id) =>
+          !result.ledger.unresolved_items.some((item) => item.id === id)
+        ))
+    ) {
+      throw new Error("CV_JD_ONLY_ZERO_ANSWER_OR_UNRESOLVED_PRESERVATION_GUARD_FAILED");
+    }
 
     const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
       id: requirement.id,
@@ -477,7 +527,13 @@ for (const row of chosen) {
       d16_executed: true,
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
-      elicited_evidence_atoms: result.ledger.evidence.filter((atom) => atom.provenance.source_type === "CANDIDATE_ELICITED").length,
+      elicited_evidence_atoms: elicitedEvidenceCount,
+      ...(cvJdOnlyMode
+        ? {
+            candidate_answers_consumed: candidateAnswersConsumed,
+            unresolved_items_preserved: preservedUnresolvedItemIds.length,
+          }
+        : {}),
       sealed_answer_mappings: sealedMappings,
       sealed_answer_5: {
         treatment: "ASSESSMENT_CONTEXT_ONLY_NOT_CONSUMED_BY_CURRENT_D16_SCHEMA",
@@ -539,7 +595,27 @@ const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
 });
-if (sealedStrategyMode) {
+if (cvJdOnlyMode) {
+  const candidateAnswersConsumed = report.sessions.reduce(
+    (total, item) => total + Number(item.candidate_answers_consumed ?? 0),
+    0,
+  );
+  const elicitedEvidenceAtoms = report.sessions.reduce(
+    (total, item) => total + Number(item.elicited_evidence_atoms ?? 0),
+    0,
+  );
+  (report as typeof report & { experiment_gate?: unknown }).experiment_gate = {
+    expected_sessions: chosen.length,
+    d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
+    candidate_answers_consumed: candidateAnswersConsumed,
+    elicited_evidence_atoms: elicitedEvidenceAtoms,
+    extraction_incompleteness_labeled: incomplete.length,
+    pass: failures.length === 0 &&
+      report.sessions.every((item) => item.d16_executed === true) &&
+      candidateAnswersConsumed === 0 &&
+      elicitedEvidenceAtoms === 0,
+  };
+} else if (sealedStrategyMode) {
   (report as typeof report & { strategy_gate?: unknown }).strategy_gate = {
     expected_sessions: chosen.length,
     d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
@@ -561,7 +637,10 @@ if (sealedStrategyMode) {
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (sealedStrategyMode) {
+if (cvJdOnlyMode) {
+  const experimentGate = (report as typeof report & { experiment_gate?: { pass?: boolean } }).experiment_gate;
+  if (experimentGate?.pass !== true) process.exitCode = 1;
+} else if (sealedStrategyMode) {
   if (failures.length || report.sessions.some((item) => item.d16_executed !== true)) process.exitCode = 1;
 } else if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) {
   process.exitCode = 1;
