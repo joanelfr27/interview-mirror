@@ -46,10 +46,8 @@ function ownershipMarkerInText(text: string): boolean {
 function surroundingSourceQuote(document: string, quote: string): string {
   const index = document.indexOf(quote);
   if (index < 0) return "";
-  const lineStart = document.lastIndexOf("
-", index) + 1;
-  const lineEndIndex = document.indexOf("
-", index + quote.length);
+  const lineStart = document.lastIndexOf("\n", index) + 1;
+  const lineEndIndex = document.indexOf("\n", index + quote.length);
   const lineEnd = lineEndIndex >= 0 ? lineEndIndex : document.length;
   return document.slice(lineStart, lineEnd).trim();
 }
