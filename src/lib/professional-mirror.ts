@@ -2,7 +2,7 @@ import type { AtomicEvidence, EvidenceLedger, EvidenceSourceType } from "@/lib/c
 import { d15EligibleIndependentAtoms, d15ThreadEligibleAtoms } from "@/lib/d15-evidence-eligibility";
 
 export type MirrorStatementKind = "FACT" | "PATTERN" | "INTERPRETATION";
-export type MirrorMaturity = "INSUFFICIENT_EVIDENCE" | "EMERGING_PATTERN" | "SUPPORTED_CONCLUSION" | "SUSTAINED_STRENGTH";
+export type MirrorMaturity = "CONFIRMED_RELATIONSHIP" | "INSUFFICIENT_EVIDENCE" | "EMERGING_PATTERN" | "SUPPORTED_CONCLUSION" | "SUSTAINED_STRENGTH";
 
 export type MirrorEvidenceRef = {
   evidence_id: string;
