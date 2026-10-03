@@ -351,6 +351,7 @@ for (const row of chosen) {
       d15Semantic,
       SHARED_CANDIDATE_QUESTION_BUDGET,
       preAnswerD16.strategy.tensions,
+      {jdPresent:Boolean(session.job_description.trim()),language:session.preparation_language==="fr"?"fr":"en"},
     );
     const questions = selectedQuestions.map((item) => item.question);
     const suppliedSelectedAnswers = Object.fromEntries(
