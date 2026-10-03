@@ -268,6 +268,11 @@ export function deriveDeterministicVerifiability(source: string): VerifiabilityS
   return { has_quantifiable_metric, has_third_party_entity, has_time_anchor };
 }
 
+export function hasActorRelativeClauseBoundary(text:string):boolean {
+ const clauses=text.replace(/\\b(?:in|during|at|on|after|before|from|for|through|with)\\s+that\\s+(?=[\\p{L}])/giu,' ');
+ return /\\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\\b/iu.test(clauses);
+}
+
 export function hasActionLocalCandidateMarker(source: string, normalizedAction: string): boolean {
   const action = normalizedAction.trim();
   if (!action) return false;
