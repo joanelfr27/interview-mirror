@@ -1,4 +1,5 @@
 export type ContextGoldItem = Readonly<{
+  session_fingerprint: string;
   source_quote: string;
   expected_domain?: string;
   expected_scope?: string;
@@ -13,8 +14,8 @@ export function parseContextGold(value: string | undefined): readonly ContextGol
   if (!Array.isArray(parsed)) throw new Error("E1_CONTEXT_GOLD_JSON must be a JSON array.");
   if (parsed.length === 0) throw new Error("E1_CONTEXT_GOLD_JSON must contain at least one gold item.");
   for (const [index, item] of parsed.entries()) {
-    if (!item || typeof item !== "object" || typeof (item as ContextGoldItem).source_quote !== "string") {
-      throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} must contain source_quote.`);
+    if (!item || typeof item !== "object" || typeof (item as ContextGoldItem).source_quote !== "string" || typeof (item as ContextGoldItem).session_fingerprint !== "string" || !(item as ContextGoldItem).session_fingerprint.trim()) {
+      throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} must contain session_fingerprint and source_quote.`);
     }
     const candidate = item as ContextGoldItem;
     for (const key of ["expected_domain", "expected_scope"] as const) {
