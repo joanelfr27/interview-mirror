@@ -482,7 +482,10 @@ Hard rules:
 - Every populated structured field is an ATOM-LOCAL EXTRACTION, not a semantic summary. The value must be an exact contiguous phrase or literal value that appears inside that atom's source_quote.
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
-- actor: use the exact actor phrase from the quote when explicitly named; otherwise use the canonical placeholder "candidate". Never invent a person, employer, team, or role as actor.
+- actor: for EXPLICIT_OTHER, copy the exact actor phrase from the quote. For EXPLICIT_CANDIDATE or IMPLICIT_CANDIDATE use the canonical placeholder "candidate". For UNSPECIFIED use "unspecified". Never invent or paraphrase a person, employer, team, or role as actor.
+- actor_basis: apply the actor-basis rule below. Subjectless action bullets and nominal CV bullets are IMPLICIT_CANDIDATE; genuine agentless passives and unresolved impersonal constructions are UNSPECIFIED.
+- ACTOR BASIS RULE:
+${ACTOR_BASIS_EXTRACTION_RULE}
 - ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
 - OWNERSHIP RULE:
 ${OWNERSHIP_EXTRACTION_RULE}
