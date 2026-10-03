@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateContextGold, parseContextGold } from "../src/lib/context-gold-evaluator.ts";
+import { evaluateContextGold, parseContextGold, parseContextGoldPolicy } from "../src/lib/context-gold-evaluator.ts";
 
 const gold = [
   { session_fingerprint: "test-session", source_quote: "Supported decisions across 14 African countries.", expected_scopes: ["14 African countries"] },
@@ -187,4 +187,23 @@ test("frozen gold metadata survives parsing", () => {
   assert.equal(parsed?.[0].bullet_number, 6);
   assert.equal(parsed?.[0].borderline, true);
   assert.equal(parsed?.[0].note, "borderline scope");
+});
+
+test("phrase-level policy excludes only named borderline scopes and keeps mixed-bullet domains in recall and coverage", () => {
+  const policy = parseContextGoldPolicy(JSON.stringify({schema_version:1,gold_blob_sha:"x",session_fingerprint:"s",field_none_semantics:{omitted_expected_domains:"NONE",omitted_expected_scopes:"NONE"},borderline_exclusions:[{bullet_number:6,field:"scope",phrases:["senior management","headquarters"]},{bullet_number:8,field:"scope",phrases:["regional investment"]}]}))!;
+  const mixed = [{session_fingerprint:"s",bullet_number:6,source_quote:"Conducted market assessments, providing recommendations to senior management and headquarters.",expected_domains:["market assessments"],expected_scopes:["senior management","headquarters"],borderline:true}] as const;
+  const result=evaluateContextGold(mixed,[{source_quote:"market assessments",domain:"market assessments"}],undefined,policy);
+  assert.equal(result.expected_phrase_count,1); assert.equal(result.recovered_phrase_count,1); assert.equal(result.recall,1); assert.equal(result.bullet_coverage,1); assert.equal(result.pass,true);
+  assert.equal(result.borderline_results.length,2);
+});
+test("field-level NONE policy rejects scope when only domains were marked", () => {
+  const policy = parseContextGoldPolicy(JSON.stringify({schema_version:1,gold_blob_sha:"x",session_fingerprint:"s",field_none_semantics:{omitted_expected_domains:"NONE",omitted_expected_scopes:"NONE"},borderline_exclusions:[]}))!;
+  const g=[{session_fingerprint:"s",bullet_number:1,source_quote:"Managed finance for headquarters.",expected_domains:["finance"]}] as const;
+  const result=evaluateContextGold(g,[{source_quote:g[0].source_quote,domain:"finance",scope:"headquarters"}],undefined,policy);
+  assert.equal(result.pass,false); assert.deepEqual(result.false_positive_quotes,[g[0].source_quote]);
+});
+test("missing mandatory phrase stays in recall denominator", () => {
+  const g=[{session_fingerprint:"s",bullet_number:1,source_quote:"Managed finance.",expected_domains:["finance"]}] as const;
+  const result=evaluateContextGold(g,[]);
+  assert.equal(result.expected_phrase_count,1); assert.equal(result.recovered_phrase_count,0); assert.equal(result.recall,0); assert.equal(result.pass,false);
 });
