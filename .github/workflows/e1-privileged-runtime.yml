@@ -40,6 +40,15 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
+      - name: Load pre-registered context gold
+        shell: bash
+        run: |
+          test -s validation/gold/edf-e1-context-gold-2026-10-03.json
+          {
+            echo 'E1_CONTEXT_GOLD_JSON<<__E1_CONTEXT_GOLD__'
+            cat validation/gold/edf-e1-context-gold-2026-10-03.json
+            echo '__E1_CONTEXT_GOLD__'
+          } >> "$GITHUB_ENV"
       - name: D15-D16 privileged runtime validation
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
