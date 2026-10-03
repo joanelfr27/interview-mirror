@@ -16,6 +16,7 @@ import {
   deriveDeterministicVerifiability,
   validateAtomicEvidenceAgainstSource,
   hasActionLocalCandidateMarker,
+  hasActorRelativeClauseBoundary,
   validateSourceSpan,
   validateSpanBounds,
   forbiddenInferenceViolations,
@@ -460,7 +461,7 @@ function toAtomicEvidence(
   };
 }
 
-async function extractAtoms(
+export async function extractAtoms(
   cv: string,
 ): Promise<RawCandidateAtom[]> {
   const openai = getOpenAI();
@@ -482,7 +483,7 @@ Hard rules:
 - Every populated structured field is an ATOM-LOCAL EXTRACTION, not a semantic summary. The value must be an exact contiguous phrase or literal value that appears inside that atom's source_quote.
 - normalized_action is NOT a lemma, synonym, or generalized capability. Copy the explicit action phrase from the quote (for example, use "Leading" rather than "lead" when the quote says "Leading"). Do not convert nouns to verbs or verbs to abstract concepts.
 - object is the exact noun/object phrase stated in the quote. Do not replace it with a broader concept.
-- actor: for EXPLICIT_OTHER, copy the exact actor phrase from the quote. For EXPLICIT_CANDIDATE or IMPLICIT_CANDIDATE use the canonical placeholder "candidate". For UNSPECIFIED use "unspecified". Never invent or paraphrase a person, employer, team, or role as actor.
+- actor: for EXPLICIT_OTHER, copy the exact actor phrase from the quote. For EXPLICIT_CANDIDATE or IMPLICIT_CANDIDATE use the canonical placeholder "candidate". For UNSPECIFIED use "unspecified". Never invent or paraphrase a person, employer, team, or role as actor.\n- Coordinated verbs share an explicit first-person subject across and/et, including French elision (J’ai fait X et fait Y), unless a new actor or grammatical boundary intervenes. Include the subject marker and coordinated verb in each atom’s source_quote when needed to show this shared agency; multiple atoms may share the same exact sentence while keeping their action/object fields separate. Do not mark the second verb UNSPECIFIED merely because I/je is not repeated.
 - actor_basis: apply the actor-basis rule below. Subjectless action bullets and nominal CV bullets are IMPLICIT_CANDIDATE; genuine agentless passives and unresolved impersonal constructions are UNSPECIFIED.
 - ACTOR BASIS RULE:
 ${ACTOR_BASIS_EXTRACTION_RULE}
@@ -603,6 +604,59 @@ export type CanonicalShadowResult = {
   source_spans: SourceSpan[];
   diagnostics: CanonicalExtractionDiagnostics;
 };
+
+
+/** Same E1 extractor, canonicalizer and validators, applied to candidate answers.
+ * The question is deliberately not part of the extraction input.
+ */
+export function canonicalizeElicitedAtoms(answer:string,responseId:string,rawAtoms:RawCandidateAtom[]) {
+ const sourceSpans:SourceSpan[]=[];const evidence:AtomicEvidence[]=[];const rejected:Array<{id:string;errors:string[]}>=[];
+ const used=new Set<string>();
+ const attribution_corrections:Array<{evidence_id:string;field:string;from:string;to:string;source_text:string}>=[];
+ for(const [index,raw] of rawAtoms.entries()){
+  const span=findExactSpan('ELICIT-'+responseId,answer,raw.source_quote,detectSourceLanguage(answer,''),used,'ATOM');
+  if(!span){rejected.push({id:raw.id,errors:['Answer quote is not exact']});continue;}
+  // Carry a proven first-person subject only across a direct coordinated verb,
+  // using another explicitly attributed atom in the SAME source quote.
+  // Never overwrite EXPLICIT_OTHER or cross a sentence/relative-clause boundary.
+  let attributed=raw;
+  if(raw.actor_basis==='UNSPECIFIED' && /^(?:candidate|unspecified)$/iu.test(raw.actor)) {
+   const target=span.text.toLocaleLowerCase().indexOf(raw.normalized_action.trim().toLocaleLowerCase());
+   const sibling=rawAtoms.find(a=>a!==raw&&a.source_quote===raw.source_quote&&a.actor_basis==='EXPLICIT_CANDIDATE'&&
+    canonicalizeRawCandidateAtom(a,span.text).actor_basis==='EXPLICIT_CANDIDATE'&&(()=>{
+     const start=span.text.toLocaleLowerCase().indexOf(a.normalized_action.trim().toLocaleLowerCase());
+     if(start<0||target<=start) return false;
+     const between=span.text.slice(start+a.normalized_action.trim().length,target);
+     return /\s(?:and|et)\s*$/iu.test(between)&&!/[;.!?«»"“”]/u.test(between)&&
+      !hasActorRelativeClauseBoundary(between)&&!/\b(?:and|et|said|reported|disait|dit)\b/iu.test(between.replace(/\s(?:and|et)\s*$/iu,''));
+    })());
+   if(sibling) attributed={...raw,actor:'candidate',actor_basis:'EXPLICIT_CANDIDATE',ownership:canonicalizeRawCandidateAtom(sibling,span.text).ownership};
+  }
+  const canonical=canonicalizeRawCandidateAtom({...attributed,id:'ELICIT-ATOM-'+responseId+'-'+index},span.text);
+  const extracted=toAtomicEvidence(canonical,span);
+  const atom:AtomicEvidence={...extracted,provenance:{...extracted.provenance,source_type:'CANDIDATE_ELICITED'},assertion:{...extracted.assertion,type:'ELICITED'}};
+  const errors=[...validateSourceSpan(span),...validateSpanBounds(span,answer),...validateAtomicEvidence(atom),...validateAtomicEvidenceAgainstSource(atom,span),...forbiddenInferenceViolations(atom)];
+  if(errors.length){rejected.push({id:raw.id,errors});continue;}
+  if(!sourceSpans.some(s=>s.id===span.id)) sourceSpans.push(span);evidence.push(atom);
+  if(raw.actor_basis!==atom.subject.actor_basis) attribution_corrections.push({evidence_id:atom.id,field:'subject.actor_basis',from:raw.actor_basis??'MISSING',to:atom.subject.actor_basis??'MISSING',source_text:span.text});
+ }
+ // Resolve only a unique, earlier, exact review noun phrase in this answer.
+ // Keep the original deictic source text; offsets make the association auditable.
+ const resolved_references=evidence.flatMap(atom=>{
+  if(!/^(?:that review|cette revue)$/iu.test(atom.context.situation??'')) return [];
+  const span=sourceSpans.find(s=>s.id===atom.source_span_id)!;
+  const earlier=answer.slice(0,span.start_offset);
+  const matches=[...earlier.matchAll(/\b(?:the|a)\s+(?:[\p{L}-]+\s+){0,3}review\b/giu)];
+  if(matches.length!==1) return [];
+  const match=matches[0];
+  return [{evidence_id:atom.id,field:'context.situation',source_text:atom.context.situation!,antecedent:match[0],antecedent_start:match.index!,antecedent_end:match.index!+match[0].length,document_id:span.document_id}];
+ });
+ return {source_spans:sourceSpans,evidence,rejected,answer,resolved_references,attribution_corrections};
+}
+export async function extractCanonicalElicitedAnswer(answer:string,responseId:string) {
+ if(!answer.trim()||/^(?:yes|no|oui|non)[.!\s]*$/iu.test(answer.trim())) return {source_spans:[] as SourceSpan[],evidence:[] as AtomicEvidence[],rejected:[{id:responseId,errors:['Bare confirmation is not relational evidence']}],answer};
+ return canonicalizeElicitedAtoms(answer,responseId,await extractAtoms(answer));
+}
 
 export async function extractCanonicalShadow(
   session: SessionRecord,
