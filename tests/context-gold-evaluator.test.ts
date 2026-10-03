@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { evaluateContextGold } from "../src/lib/context-gold-evaluator.ts";
+import { evaluateContextGold, parseContextGold } from "../src/lib/context-gold-evaluator.ts";
 
 const gold = [
   { source_quote: "Supported decisions across 14 African countries.", expected_scope: "14 African countries" },
@@ -36,4 +36,30 @@ test("context gold rejects any value that is not an exact source substring", () 
   ]);
   assert.equal(result.pass, false);
   assert.deepEqual(result.non_substring_values, ["multi-country Africa"]);
+});
+
+test("context gold rejects malformed configured JSON instead of treating it as unconfigured", () => {
+  assert.throws(() => parseContextGold("{}"), /must be a JSON array/);
+  assert.equal(parseContextGold(undefined), null);
+});
+
+test("context gold does not recover a domain from the scope field", () => {
+  const result = evaluateContextGold(
+    [{ source_quote: "Worked across Africa.", expected_domain: "Africa" }],
+    [{ source_quote: "Worked across Africa.", scope: "Africa" }],
+  );
+  assert.equal(result.recall, 0);
+  assert.equal(result.pass, false);
+});
+
+test("context gold retains duplicate observations for the same quote", () => {
+  const result = evaluateContextGold(
+    [{ source_quote: "Managed finance across Africa.", expected_domain: "finance", expected_scope: "Africa" }],
+    [
+      { source_quote: "Managed finance across Africa.", domain: "finance" },
+      { source_quote: "Managed finance across Africa.", scope: "Africa" },
+    ],
+  );
+  assert.equal(result.recall, 1);
+  assert.equal(result.pass, true);
 });
