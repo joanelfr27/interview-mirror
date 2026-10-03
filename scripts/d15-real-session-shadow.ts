@@ -395,6 +395,7 @@ for (const row of chosen) {
         d15_evidence_ids: d15_target?.evidence_ids ?? [],
       })),
       candidate_question_budget: SHARED_CANDIDATE_QUESTION_BUDGET,
+      owner_answer_traces: answerStage?.traces ?? [],
       context_population_diagnostic: {
         by_atom: result.extraction.context_population_by_atom_id,
         summary: result.ledger.evidence.reduce(
