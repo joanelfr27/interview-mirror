@@ -119,7 +119,7 @@ test("context gold counts a missing CV bullet as extraction coverage failure", (
       { session_fingerprint: "test-session", source_quote: "Extracted finance bullet.", expected_domains: ["finance"] },
       { session_fingerprint: "test-session", source_quote: "Missing controls bullet.", expected_domains: ["controls"] },
     ],
-    [{ session_fingerprint: "test-session", source_quote: "Extracted finance bullet.", domain: "finance" }],
+    [{ source_quote: "Extracted finance bullet.", domain: "finance" }],
   );
   assert.equal(result.bullet_coverage, 0.5);
   assert.deepEqual(result.not_extracted_quotes, ["Missing controls bullet."]);
