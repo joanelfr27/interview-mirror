@@ -1,0 +1,28 @@
+name: JD Stability Offline Controls
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Exact trusted ref containing offline controls"
+        required: true
+        default: "1de120a6830dc3d776cb43cd0ce3e5c49f260e8c"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-controls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run A1 A2 B offline controls
+        run: npm run test:jd-stability-capture
