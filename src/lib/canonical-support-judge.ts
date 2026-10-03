@@ -20,7 +20,7 @@ type RawJudgment = {
   supporting_evidence_ids: string[]; context_evidence_ids: string[];
   rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
   relationship_connector?: string | null; licensing_spans: string[];
-  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
+  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] } | null;
 };
 
 
@@ -753,7 +753,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         item.context_evidence_ids = [];
         item.relationship_connector = null;
         item.licensing_spans = [];
-        item.analogical_mapping = undefined as never;
+        item.analogical_mapping = undefined;
         item.confidence = 0;
         item.abstention_reason = "Raw model rationale crossed the minimal-support boundary; facet isolated and abstained.";
         deterministicRationaleOverride = "No validated evidence subset supports a positive judgment for this facet.";
