@@ -40,13 +40,19 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:canonical
       - run: npm run build
-      - name: Load pre-registered context gold
+      - name: Verify and load frozen context gold
         shell: bash
         run: |
-          test -s validation/gold/edf-e1-context-gold-2026-10-03.json
+          GOLD_PATH="validation/gold/edf-e1-context-gold-2026-10-03.json"
+          EXPECTED_BLOB="cd9eb4795421d26350e7a43969f784624f74cd0c"
+          test -s "$GOLD_PATH"
+          ACTUAL_BLOB="$(git hash-object "$GOLD_PATH")"
+          echo "context_gold_path=$GOLD_PATH"
+          echo "context_gold_blob_sha=$ACTUAL_BLOB"
+          test "$ACTUAL_BLOB" = "$EXPECTED_BLOB"
           {
             echo 'E1_CONTEXT_GOLD_JSON<<__E1_CONTEXT_GOLD__'
-            cat validation/gold/edf-e1-context-gold-2026-10-03.json
+            cat "$GOLD_PATH"
             echo '__E1_CONTEXT_GOLD__'
           } >> "$GITHUB_ENV"
       - name: D15-D16 privileged runtime validation
