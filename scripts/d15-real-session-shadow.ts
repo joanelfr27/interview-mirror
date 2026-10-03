@@ -1,5 +1,6 @@
 // Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { AI_MODEL } from "@/lib/openai";
@@ -16,6 +17,7 @@ import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { CandidateElicitation, EvidenceLedger, UnresolvedItem } from "@/lib/canonical-evidence-model";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
+import { verifyRuntimeCommit } from "@/lib/runtime-provenance";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
 import { evaluateContextGold, parseContextGold, parseContextGoldPolicy } from "@/lib/context-gold-evaluator";
 import type { SessionRecord } from "@/types";
@@ -297,7 +299,9 @@ async function applySealedEdfAnswers(
     const elicitation: CandidateElicitation = {
       id: "SEALED-EDF-" + String(selector.answerIndex + 1),
       unresolved_item_id: item.id,
-      question: "Builder-written sealed probe; question selection evaluated separately.",
+      question: selector.label === "VALUATION_BOUNDARY"
+        ? "Have you personally performed the following professional activities: valuation, financial modelling, due diligence, deal analysis, investment appraisal, IRR/NPV analysis, or transaction execution?"
+        : "Builder-written sealed probe; question selection evaluated separately.",
     };
     const classified = await classifyCandidateElicitation(session, next, elicitation, answers[selector.answerIndex]);
     next = classified.ledger;
@@ -321,12 +325,25 @@ const sessionFingerprintFilter = new Set(
     .map((value) => value.trim())
     .filter(Boolean),
 );
+const runnerArgs = process.argv.slice(2);
+const cvJdOnlyMode = runnerArgs.includes("--cv-jd-only-no-answers");
+if (runnerArgs.some((arg) => arg !== "--cv-jd-only-no-answers")) {
+  throw new Error("Unsupported runtime runner argument.");
+}
 const sealedStrategyMode = sessionFingerprintFilter.has(EDF_DECISIVE_FINGERPRINT);
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
 }
 if (sessionFingerprintFilter.size > 0 && sessionFingerprintFilter.size !== requestedSessionCount) {
   throw new Error("D15_RUNTIME_SESSION_FINGERPRINTS count must match D15_RUNTIME_SESSION_COUNT.");
+}
+if (
+  cvJdOnlyMode &&
+  (requestedSessionCount !== 1 ||
+    sessionFingerprintFilter.size !== 1 ||
+    !sessionFingerprintFilter.has(EDF_DECISIVE_FINGERPRINT))
+) {
+  throw new Error("CV+JD-only experiment requires exactly the frozen EDF session.");
 }
 
 const chosen: SessionRow[] = [];
@@ -370,8 +387,11 @@ async function sourceDigest(path: string): Promise<string> {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
+const checkedOutRuntimeSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const runtimeCommit = verifyRuntimeCommit(checkedOutRuntimeSha, process.env.E1_TRUSTED_RUNTIME_SHA);
+
 const runtimeProvenance = {
-  commit: process.env.GITHUB_SHA ?? null,
+  commit: runtimeCommit,
   workflow_run_id: process.env.GITHUB_RUN_ID ?? null,
   model: AI_MODEL,
   source_sha256: {
@@ -384,7 +404,13 @@ const runtimeProvenance = {
 
 const report = {
   run: {
-    mode: "D15_REAL_SESSION_SHADOW",
+    mode: cvJdOnlyMode ? "CV_JD_ONLY_D16_EXPERIMENT" : "D15_REAL_SESSION_SHADOW",
+    ...(cvJdOnlyMode
+      ? {
+          experiment_label: `CV + JD only, no candidate answers, runtime code ${runtimeCommit}, including Phase 1b fixes`,
+          candidate_answers_consumed: 0,
+        }
+      : {}),
     provenance: runtimeProvenance,
     writes_performed: false,
     sessions_requested: chosen.length,
@@ -433,12 +459,43 @@ for (const row of chosen) {
   try {
     let sealedMappings: Array<Record<string, string>> = [];
     let sealedAnswers: string[] = [];
+    let preservedUnresolvedItemIds: string[] = [];
+    let candidateAnswersConsumed = 0;
     const result = await runD16ShadowRuntimeIntegration(session, async (ledger, runtimeSession) => {
+      if (cvJdOnlyMode) {
+        preservedUnresolvedItemIds = ledger.unresolved_items.map((item) => item.id);
+        if (
+          !ledger.candidate_elicitations.length ||
+          ledger.candidate_elicitations.some((elicitation) =>
+            elicitation.answer !== undefined || elicitation.classification !== undefined ||
+            !ledger.unresolved_items.some((item) => item.id === elicitation.unresolved_item_id)
+          )
+        ) {
+          throw new Error("CV_JD_ONLY_UNANSWERED_ELICITATION_GUARD_FAILED");
+        }
+        return { ledger, diagnostics: ["CV+JD-only experiment: candidate answer step skipped."] };
+      }
       const applied = await applySealedEdfAnswers(ledger, runtimeSession);
       sealedMappings = applied.mappings;
       sealedAnswers = applied.answers;
+      candidateAnswersConsumed = applied.mappings.length;
       return { ledger: applied.ledger, diagnostics: applied.diagnostics };
     });
+
+    const elicitedEvidenceCount = result.ledger.evidence.filter(
+      (atom) => atom.provenance.source_type === "CANDIDATE_ELICITED",
+    ).length;
+    if (
+      cvJdOnlyMode &&
+      (candidateAnswersConsumed !== 0 ||
+        elicitedEvidenceCount !== 0 ||
+        preservedUnresolvedItemIds.length === 0 ||
+        preservedUnresolvedItemIds.some((id) =>
+          !result.ledger.unresolved_items.some((item) => item.id === id)
+        ))
+    ) {
+      throw new Error("CV_JD_ONLY_ZERO_ANSWER_OR_UNRESOLVED_PRESERVATION_GUARD_FAILED");
+    }
 
     const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
       id: requirement.id,
@@ -470,7 +527,13 @@ for (const row of chosen) {
       d16_executed: true,
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
-      elicited_evidence_atoms: result.ledger.evidence.filter((atom) => atom.provenance.source_type === "CANDIDATE_ELICITED").length,
+      elicited_evidence_atoms: elicitedEvidenceCount,
+      ...(cvJdOnlyMode
+        ? {
+            candidate_answers_consumed: candidateAnswersConsumed,
+            unresolved_items_preserved: preservedUnresolvedItemIds.length,
+          }
+        : {}),
       sealed_answer_mappings: sealedMappings,
       sealed_answer_5: {
         treatment: "ASSESSMENT_CONTEXT_ONLY_NOT_CONSUMED_BY_CURRENT_D16_SCHEMA",
@@ -532,7 +595,27 @@ const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
 });
-if (sealedStrategyMode) {
+if (cvJdOnlyMode) {
+  const candidateAnswersConsumed = report.sessions.reduce(
+    (total, item) => total + Number(item.candidate_answers_consumed ?? 0),
+    0,
+  );
+  const elicitedEvidenceAtoms = report.sessions.reduce(
+    (total, item) => total + Number(item.elicited_evidence_atoms ?? 0),
+    0,
+  );
+  (report as typeof report & { experiment_gate?: unknown }).experiment_gate = {
+    expected_sessions: chosen.length,
+    d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
+    candidate_answers_consumed: candidateAnswersConsumed,
+    elicited_evidence_atoms: elicitedEvidenceAtoms,
+    extraction_incompleteness_labeled: incomplete.length,
+    pass: failures.length === 0 &&
+      report.sessions.every((item) => item.d16_executed === true) &&
+      candidateAnswersConsumed === 0 &&
+      elicitedEvidenceAtoms === 0,
+  };
+} else if (sealedStrategyMode) {
   (report as typeof report & { strategy_gate?: unknown }).strategy_gate = {
     expected_sessions: chosen.length,
     d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
@@ -554,7 +637,10 @@ if (sealedStrategyMode) {
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (sealedStrategyMode) {
+if (cvJdOnlyMode) {
+  const experimentGate = (report as typeof report & { experiment_gate?: { pass?: boolean } }).experiment_gate;
+  if (experimentGate?.pass !== true) process.exitCode = 1;
+} else if (sealedStrategyMode) {
   if (failures.length || report.sessions.some((item) => item.d16_executed !== true)) process.exitCode = 1;
 } else if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) {
   process.exitCode = 1;

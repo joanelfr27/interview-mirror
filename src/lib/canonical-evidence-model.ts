@@ -508,6 +508,22 @@ export function validateCandidateElicitation(value: CandidateElicitation, ledger
   return errors;
 }
 
+export function reconcileCandidateElicitations(
+  previous: EvidenceLedger,
+  current: EvidenceLedger,
+): EvidenceLedger {
+  const previousById = new Map(previous.unresolved_items.map(item => [item.id, item]));
+  const currentByRequirement = new Map(current.unresolved_items.map(item => [item.requirement_id, item]));
+  const candidate_elicitations = current.candidate_elicitations.flatMap(elicitation => {
+    const previousItem = previousById.get(elicitation.unresolved_item_id);
+    if (!previousItem) return [elicitation];
+    const currentItem = currentByRequirement.get(previousItem.requirement_id);
+    if (!currentItem) return [];
+    return [{ ...elicitation, unresolved_item_id: currentItem.id }];
+  });
+  return { ...current, candidate_elicitations, demonstration_objectives: [] };
+}
+
 export function validateRequirementGraph(
   ledger: EvidenceLedger,
   options: { allowUnjudgedFacets?: boolean } = {},
