@@ -63,3 +63,34 @@ test("context gold retains duplicate observations for the same quote", () => {
   assert.equal(result.recall, 1);
   assert.equal(result.pass, true);
 });
+
+
+test("context gold matches atomic source spans within a hand-marked bullet", () => {
+  const bullet = "Delivered financial and commercial analysis across 14 African countries to support investment decisions.";
+  const result = evaluateContextGold(
+    [{ source_quote: bullet, expected_scope: "14 African countries" }],
+    [{ source_quote: "financial and commercial analysis across 14 African countries", scope: "14 African countries" }],
+  );
+  assert.equal(result.recall, 1);
+  assert.equal(result.pass, true);
+});
+
+test("context gold grounding is checked against the atomic span, not merely the surrounding bullet", () => {
+  const bullet = "Delivered financial analysis across 14 African countries to support investment decisions.";
+  const result = evaluateContextGold(
+    [{ source_quote: bullet, expected_scope: "14 African countries" }],
+    [{ source_quote: "Delivered financial analysis", scope: "14 African countries" }],
+  );
+  assert.equal(result.pass, false);
+  assert.deepEqual(result.non_substring_values, ["14 African countries"]);
+});
+
+test("negative bullet fails when any contained atomic span carries context", () => {
+  const bullet = "Strengthened internal controls and operational effectiveness.";
+  const result = evaluateContextGold(
+    [{ source_quote: bullet, expect_none: true }],
+    [{ source_quote: "internal controls", domain: "internal controls" }],
+  );
+  assert.equal(result.pass, false);
+  assert.deepEqual(result.false_positive_quotes, [bullet]);
+});
