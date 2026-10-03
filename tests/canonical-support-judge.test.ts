@@ -252,6 +252,17 @@ test("rationale cannot borrow a distinctive phrase from uncited evidence", () =>
   assert.ok(result.errors.some(error => error.includes("distinctive phrase")));
 });
 
+test("repeated near-identical role wording is not treated as uncited rationale leakage", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Lead budgeting, forecasting and financial reporting.", start_offset: 0, end_offset: 49, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Led budgeting, forecasting and financial analysis.", start_offset: 50, end_offset: 99, language: "en" });
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "The candidate has led budgeting, forecasting and financial reporting." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.some(error => error.includes("distinctive phrase")), false);
+});
+
 test("minimal support and optional context IDs must remain disjoint", () => {
   const l = ledger();
   const judgment = { ...raw("PARTIAL", ["A1"]), context_evidence_ids: ["A1"] };
