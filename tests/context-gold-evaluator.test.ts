@@ -132,3 +132,35 @@ test("configured gold phrases must be verbatim substrings of their CV bullet", (
     /not copied verbatim/,
   );
 });
+
+
+test("context gold rejects blank or vacuous configured items", () => {
+  assert.throws(() => parseContextGold('[{"session_fingerprint":"s","source_quote":"real text"}]'), /expected context or expect_none/);
+  assert.throws(() => parseContextGold('[{"session_fingerprint":"s","source_quote":"   ","expect_none":true}]'), /session_fingerprint and source_quote/);
+});
+
+test("source offsets prevent a repeated atomic clause from satisfying two bullets", () => {
+  const source = "Managed finance for Fund A.\nManaged finance for Fund B.";
+  const secondStart = source.indexOf("Managed finance for Fund B.");
+  const result = evaluateContextGold(
+    [
+      { session_fingerprint: "s", source_quote: "Managed finance for Fund A.", expected_domains: ["finance"] },
+      { session_fingerprint: "s", source_quote: "Managed finance for Fund B.", expected_domains: ["finance"] },
+    ],
+    [{ source_quote: "Managed finance", start_offset: 0, end_offset: "Managed finance".length, domain: "finance" }],
+    source,
+  );
+  assert.equal(result.bullet_coverage, 0.5);
+  assert.equal(result.pass, false);
+  assert.ok(secondStart > 0);
+});
+
+test("gold quote absent from current CV fails coverage", () => {
+  const result = evaluateContextGold(
+    [{ session_fingerprint: "s", source_quote: "Stale bullet.", expect_none: true }],
+    [],
+    "Current CV bullet.",
+  );
+  assert.equal(result.pass, false);
+  assert.deepEqual(result.not_extracted_quotes, ["Stale bullet."]);
+});
