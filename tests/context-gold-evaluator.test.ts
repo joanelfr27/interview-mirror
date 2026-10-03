@@ -166,15 +166,16 @@ test("gold quote absent from current CV fails coverage", () => {
 });
 
 
-test("borderline gold is report-only and cannot decide the gate", () => {
-  const borderline = [{ session_fingerprint: "s", source_quote: "Recommendations to senior management and headquarters.", expected_scopes: ["senior management", "headquarters"], borderline: true }] as const;
-  const missed = evaluateContextGold(borderline, []);
+test("borderline policy is phrase-level and cannot decide the gate", () => {
+  const borderline = [{ session_fingerprint: "s", bullet_number: 6, source_quote: "Recommendations to senior management and headquarters.", expected_scopes: ["senior management", "headquarters"], borderline: true }] as const;
+  const policy = parseContextGoldPolicy(JSON.stringify({schema_version:1,gold_blob_sha:"x",session_fingerprint:"s",field_none_semantics:{omitted_expected_domains:"NONE",omitted_expected_scopes:"NONE"},borderline_exclusions:[{bullet_number:6,field:"scope",phrases:["senior management","headquarters"]}]}))!;
+  const missed = evaluateContextGold(borderline, [], undefined, policy);
   assert.equal(missed.expected_phrase_count, 0);
   assert.equal(missed.recall, 1);
   assert.equal(missed.pass, true);
   assert.equal(missed.borderline_results[0].found, false);
 
-  const alternative = evaluateContextGold(borderline, [{ source_quote: "senior management", scope: "senior management" }]);
+  const alternative = evaluateContextGold(borderline, [{ source_quote: "senior management", scope: "senior management" }], undefined, policy);
   assert.equal(alternative.expected_phrase_count, 0);
   assert.equal(alternative.non_substring_values.length, 0);
   assert.equal(alternative.false_positive_quotes.length, 0);
