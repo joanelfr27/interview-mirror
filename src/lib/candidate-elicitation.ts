@@ -55,6 +55,80 @@ export function buildElicitationQuestion(
   return { id: "ELICIT-" + item.id, unresolved_item_id: item.id, question };
 }
 
+const EXPLICIT_ACTIVITY_QUESTION = /^Have you personally performed the following professional activities:\s*(.+?)\?\s*$/i;
+
+function normalizedQuestionText(value: string): string {
+  return value.toLocaleLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function activityAffirmed(answer: string, activity: string): boolean {
+  const normalizedAnswer = normalizedQuestionText(answer);
+  const normalizedActivity = normalizedQuestionText(activity);
+  let index = normalizedAnswer.indexOf(normalizedActivity);
+  while (index >= 0) {
+    const preceding = normalizedAnswer.slice(Math.max(0, index - 90), index);
+    if (
+      !/\b(?:not|never|no|without|didnt|haven t|havent)\b/.test(preceding) &&
+      /\b(?:performed|conducted|carried out|executed|completed|led|managed|handled|did|worked on|participated in|was involved in|was responsible for|contributed to)\b(?:\W+\w+){0,5}\W*$/.test(preceding)
+    ) return true;
+    index = normalizedAnswer.indexOf(normalizedActivity, index + normalizedActivity.length);
+  }
+  return false;
+}
+
+function activityExplicitlyNegated(answer: string, activity: string): boolean {
+  const normalizedAnswer = normalizedQuestionText(answer);
+  const normalizedActivity = normalizedQuestionText(activity);
+  const index = normalizedAnswer.indexOf(normalizedActivity);
+  if (index < 0) return false;
+  const preceding = normalizedAnswer.slice(Math.max(0, index - 55), index);
+  return /\b(?:not|never|without|didnt|haven t|havent)\b(?:\W+\w+){0,2}\W*$/.test(preceding);
+}
+
+export function buildExplicitNoEvidence(
+  elicitation: CandidateElicitation,
+  answer: string,
+): {
+  quote: string;
+  classification: CandidateGapClassification;
+  rationale: string;
+  atoms: Array<Pick<AtomicEvidence, "id" | "action" | "assertion">>;
+} | null {
+  const questionMatch = EXPLICIT_ACTIVITY_QUESTION.exec(elicitation.question);
+  const answerMatch = /^\s*no\b/i.exec(answer);
+  if (!questionMatch || !answerMatch) return null;
+
+  const quoteOffset = answerMatch[0].search(/\S/);
+  const quote = answer.slice(quoteOffset, quoteOffset + 2);
+  const questionedActivities = questionMatch[1]
+    .replace(/,\s*or\s+/i, ", ")
+    .replace(/\s+or\s+/i, ", ")
+    .split(",")
+    .map(activity => activity.trim())
+    .filter(Boolean);
+  const answerRemainder = answer.slice(quoteOffset + quote.length);
+  const hasCollectiveDenial = /\bnot\s+(?:the\s+)?(?:other|remaining|rest)\s+(?:activities|work)\b/i.test(answerRemainder);
+  const hasQualifiedActivityReference = questionedActivities.some(activity =>
+    normalizedQuestionText(answerRemainder).includes(normalizedQuestionText(activity)));
+  const activities = hasQualifiedActivityReference && !hasCollectiveDenial
+    ? questionedActivities.filter(activity => activityExplicitlyNegated(answerRemainder, activity))
+    : questionedActivities.filter(activity => !activityAffirmed(answerRemainder, activity));
+  if (!activities.length) return null;
+
+  return {
+    quote,
+    classification: "EXPERIENCE_GAP",
+    rationale: "The candidate explicitly answered No to a question about performing the listed professional activities; evidence is limited to the activities asked.",
+    atoms: activities.map((activity, index) => ({
+      id: index === 0
+        ? "ELICIT-ATOM-" + elicitation.id
+        : "ELICIT-ATOM-" + elicitation.id + "-" + String(index + 1),
+      action: { normalized_action: "perform", object: activity },
+      assertion: { type: "ELICITED", polarity: "NEGATED" },
+    })),
+  };
+}
+
 export async function classifyCandidateElicitation(
   session: SessionRecord,
   ledger: EvidenceLedger,
@@ -66,38 +140,62 @@ export async function classifyCandidateElicitation(
   if (!item) throw new Error("Unknown unresolved item: " + elicitation.unresolved_item_id);
 
   const requirement = ledger.requirements.find(x => x.id === item.requirement_id);
-  const response = await getOpenAI().chat.completions.create({
-    model: AI_MODEL, temperature: 0,
-    response_format: responseFormat("candidate_elicitation_classification", SCHEMA),
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are an internal canonical evidence classifier. Return classification rationale and normalized fields in stable English; preserve the candidate's quoted answer text verbatim. Do not translate the evidence into the product language. " +
-          "Classify the candidate's answer only after the candidate has supplied it. " +
-          "EVIDENCE_GAP means the answer establishes that the candidate has done the required thing but the CV omitted or failed to document it. " +
-          "EXPERIENCE_GAP means the answer establishes that the candidate has not actually done the required thing. " +
-          "TRANSFERABLE means the answer establishes a genuinely adjacent experience that could transfer but is not the same requirement. " +
-          "Do not classify from plausibility. The atom_quote must be an exact substring of the supplied answer. Never invent an outcome, scope or ownership.",
-      },
-      {
-        role: "user",
-        content: "REQUIREMENT:\n" + JSON.stringify(requirement) + "\nUNRESOLVED ITEM:\n" + JSON.stringify(item) + "\nCANDIDATE ANSWER:\n" + answer,
-      },
-    ],
-  });
-  const raw = response.choices[0]?.message?.content;
-  if (!raw) throw new Error("Empty candidate elicitation classification response.");
-  const parsed = JSON.parse(raw) as {
-    classification: CandidateGapClassification; rationale: string; atom_quote: string;
-    actor: string; ownership: EvidenceOwnership; normalized_action: string; object: string;
+  const explicitNo = buildExplicitNoEvidence(elicitation, answer);
+  let parsed: {
+    classification: CandidateGapClassification;
+    rationale: string;
+    atom_quote: string;
+    actor: string;
+    ownership: EvidenceOwnership;
+    normalized_action: string;
+    object: string;
     polarity: "AFFIRMATIVE" | "NEGATED";
+    additional_atoms?: Array<Pick<AtomicEvidence, "id" | "action" | "assertion">>;
   };
+
+  if (explicitNo) {
+    parsed = {
+      classification: explicitNo.classification,
+      rationale: explicitNo.rationale,
+      atom_quote: explicitNo.quote,
+      actor: "candidate",
+      ownership: "INDIVIDUAL",
+      normalized_action: "perform",
+      object: explicitNo.atoms[0].action.object,
+      polarity: "NEGATED",
+      additional_atoms: explicitNo.atoms.slice(1),
+    };
+  } else {
+    const response = await getOpenAI().chat.completions.create({
+      model: AI_MODEL, temperature: 0,
+      response_format: responseFormat("candidate_elicitation_classification", SCHEMA),
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an internal canonical evidence classifier. Return classification rationale and normalized fields in stable English; preserve the candidate's quoted answer text verbatim. Do not translate the evidence into the product language. " +
+            "Classify the candidate's answer only after the candidate has supplied it, using the exact question as context. " +
+            "EVIDENCE_GAP means the answer establishes that the candidate has done the required thing but the CV omitted or failed to document it. " +
+            "EXPERIENCE_GAP means the answer establishes that the candidate has not actually done the required thing. " +
+            "When an answer explicitly begins No to a question about performing concrete activities, that answer may negate only the activities asserted by that exact question. Do not apply a No to unrelated activities or broaden a qualified answer. Preserve the exact answer token used as evidence and keep the question context in view. " +
+            "TRANSFERABLE means the answer establishes a genuinely adjacent experience that could transfer but is not the same requirement. " +
+            "Do not classify from plausibility. The atom_quote must be an exact substring of the supplied answer. Never invent an outcome, scope or ownership.",
+        },
+        {
+          role: "user",
+          content: "QUESTION:\n" + elicitation.question + "\nREQUIREMENT:\n" + JSON.stringify(requirement) + "\nUNRESOLVED ITEM:\n" + JSON.stringify(item) + "\nCANDIDATE ANSWER:\n" + answer,
+        },
+      ],
+    });
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error("Empty candidate elicitation classification response.");
+    parsed = JSON.parse(raw) as typeof parsed;
+  }
 
   const quote = parsed.atom_quote.trim();
   const start = answer.indexOf(quote);
   const diagnostics: string[] = [];
-  let atom: AtomicEvidence | null = null;
+  const atoms: AtomicEvidence[] = [];
   let span: SourceSpan | null = null;
 
   if (!quote || start < 0) {
@@ -108,24 +206,38 @@ export async function classifyCandidateElicitation(
       document_id: "ELICIT-" + session.id,
       text: quote, start_offset: start, end_offset: start + quote.length, language,
     };
-    atom = {
-      id: "ELICIT-ATOM-" + elicitation.id,
-      source_span_id: span.id,
+    const makeAtom = (
+      id: string,
+      action: { normalized_action: string; object: string },
+      polarity: "AFFIRMATIVE" | "NEGATED",
+    ): AtomicEvidence => ({
+      id,
+      source_span_id: span!.id,
       provenance: { source_type: "CANDIDATE_ELICITED", language, extraction_method: "LLM" },
       subject: { actor: parsed.actor, ownership: parsed.ownership },
-      action: { normalized_action: parsed.normalized_action, object: parsed.object },
+      action,
       context: {}, scale: {}, time: {}, outcome: null,
-      assertion: { type: "ELICITED", polarity: parsed.polarity },
+      assertion: { type: "ELICITED", polarity },
       verifiability: {
         has_quantifiable_metric: /[%€$£]|\b\d+(?:\.\d+)?\b/.test(quote),
         has_third_party_entity: false,
         has_time_anchor: /\b(?:19|20)\d{2}\b/.test(quote),
       },
       extraction_confidence: 1,
-    };
-    const atomErrors = validateAtomicEvidence(atom);
-    if (atomErrors.length) {
-      throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
+    });
+    atoms.push(makeAtom(
+      "ELICIT-ATOM-" + elicitation.id,
+      { normalized_action: parsed.normalized_action, object: parsed.object },
+      parsed.polarity,
+    ));
+    for (const additional of parsed.additional_atoms ?? []) {
+      atoms.push(makeAtom(additional.id, additional.action, additional.assertion.polarity));
+    }
+    for (const atom of atoms) {
+      const atomErrors = validateAtomicEvidence(atom);
+      if (atomErrors.length) {
+        throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
+      }
     }
   }
 
@@ -139,7 +251,7 @@ export async function classifyCandidateElicitation(
   const next: EvidenceLedger = {
     ...ledger,
     source_spans: span ? [...ledger.source_spans, span] : ledger.source_spans,
-    evidence: atom && !validateAtomicEvidence(atom).length ? [...ledger.evidence, atom] : ledger.evidence,
+    evidence: [...ledger.evidence, ...atoms],
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
   const judged = await judgeCanonicalSupport(session, next);

@@ -10,6 +10,7 @@ import {
   validateSupportJudgmentAgainstEvidence,
   aggregateRequirementStatus,
   buildUnresolvedItems,
+  reconcileCandidateElicitations,
   validateRequirementGraph,
   assertCompleteFacetJudgments,
   validateSupportJudgmentAgainstFacet,
@@ -794,15 +795,24 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
 }
 
 export function buildSupportJudgeEvidence(ledger: EvidenceLedger) {
-  return ledger.evidence.map(atom => ({
-    id: atom.id,
-    source_type: atom.provenance.source_type,
-    support_basis: atom.provenance.source_type === "CANDIDATE_ELICITED"
-      ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED",
-    source_quote: ledger.source_spans.find(s => s.id === atom.source_span_id)?.text ?? "",
-    ownership: atom.subject.ownership, action: atom.action, context: atom.context,
-    scale: atom.scale, time: atom.time, outcome: atom.outcome, assertion: atom.assertion,
-  }));
+  return ledger.evidence.map(atom => {
+    const elicitation = atom.provenance.source_type === "CANDIDATE_ELICITED"
+      ? ledger.candidate_elicitations.find(item => {
+          const primaryAtomId = "ELICIT-ATOM-" + item.id;
+          return atom.id === primaryAtomId || atom.id.startsWith(primaryAtomId + "-");
+        })
+      : undefined;
+    return {
+      id: atom.id,
+      source_type: atom.provenance.source_type,
+      support_basis: atom.provenance.source_type === "CANDIDATE_ELICITED"
+        ? "CANDIDATE_SELF_REPORTED" : "DOCUMENTED",
+      source_quote: ledger.source_spans.find(s => s.id === atom.source_span_id)?.text ?? "",
+      question_context: elicitation?.question ?? null,
+      ownership: atom.subject.ownership, action: atom.action, context: atom.context,
+      scale: atom.scale, time: atom.time, outcome: atom.outcome, assertion: atom.assertion,
+    };
+  });
 }
 
 export async function judgeCanonicalSupport(
@@ -828,7 +838,7 @@ export async function judgeCanonicalSupport(
     "DIRECT = explicit atom(s) directly satisfy the facet. PARTIAL = explicit atom(s) address part but a material dimension remains unresolved. " +
     "ANALOGICAL_TRANSFER = explicit atom shows genuinely adjacent capability/context, not the same requirement. " +
     "CONTRADICTORY = explicit candidate evidence conflicts with the facet. NONE = supplied evidence does not support the facet; abstain when uncertain.\n\n" +
-    "Evidence basis rules: each supplied atom includes source_type and support_basis. supporting_evidence_ids is the MINIMAL subset that licenses the returned status; optional non-licensing background belongs only in context_evidence_ids. The two lists must be disjoint. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
+    "Evidence basis rules: each supplied atom includes source_type and support_basis. Candidate-elicited atoms may include question_context to establish which proposition an exact answer token such as 'No' addresses; question_context is not itself candidate evidence. supporting_evidence_ids is the MINIMAL subset that licenses the returned status; optional non-licensing background belongs only in context_evidence_ids. The two lists must be disjoint. Each facet judgment must cite atoms from only one support_basis; never mix DOCUMENTED and CANDIDATE_SELF_REPORTED IDs in one judgment. " +
     "Use DOCUMENTED with documented atoms only. Use CANDIDATE_SELF_REPORTED with CANDIDATE_ELICITED atoms only; candidate self-report can never be DIRECT. " +
     "When both bases address a facet, choose the single basis that supports the most defensible allowed judgment and explain its limits; do not combine the bases to manufacture stronger support. If neither basis alone supports a defensible judgment, abstain as NONE with no citations.\n" +
     "Relationship grounding is classified deterministically from the FACET wording; do not infer the classification yourself. For a relational DIRECT judgment, relationship_connector is required and licensing_spans must quote the exact words in the minimal supporting evidence that license that connector. Co-occurrence is not a relationship; chronology is not causality or purpose. Two separately documented activities cannot be combined to manufacture a DIRECT relationship. If the relationship exists only in candidate elicitation, use CANDIDATE_SELF_REPORTED and remain below DIRECT. Never mention or paraphrase evidence outside supporting_evidence_ids in the rationale; context_evidence_ids is non-licensing context only.\n" +
@@ -902,7 +912,7 @@ export async function judgeCanonicalSupport(
     );
   }
   const judgments = sanitized.judgments;
-  const next: EvidenceLedger = {
+  const rebuilt: EvidenceLedger = {
     ...ledger,
     support_judgments: judgments,
     requirement_statuses: ledger.requirements.map(requirement => ({
@@ -910,7 +920,8 @@ export async function judgeCanonicalSupport(
     })),
     unresolved_items: [],
   };
-  next.unresolved_items = buildUnresolvedItems(next);
+  rebuilt.unresolved_items = buildUnresolvedItems(rebuilt);
+  const next = reconcileCandidateElicitations(ledger, rebuilt);
   const graphErrors = validateRequirementGraph(next);
   if (graphErrors.length) {
     throw new Error("Canonical support graph failed validation: " + graphErrors.join(" | "));

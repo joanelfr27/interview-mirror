@@ -41,6 +41,7 @@ jobs:
           [[ "${{ inputs.ref || github.sha }}" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "${{ inputs.ref || github.sha }}"
           test "${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}" = "8a05fcb6dbe3"
+          echo "E1_TRUSTED_RUNTIME_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "runtime_commit=$(git rev-parse HEAD)"
           echo "runtime_session_fingerprint=${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}"
       - uses: actions/setup-node@v4

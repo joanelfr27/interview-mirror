@@ -1,5 +1,6 @@
 // Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { AI_MODEL } from "@/lib/openai";
@@ -16,6 +17,7 @@ import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { CandidateElicitation, EvidenceLedger, UnresolvedItem } from "@/lib/canonical-evidence-model";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
+import { verifyRuntimeCommit } from "@/lib/runtime-provenance";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
 import { evaluateContextGold, parseContextGold, parseContextGoldPolicy } from "@/lib/context-gold-evaluator";
 import type { SessionRecord } from "@/types";
@@ -297,7 +299,9 @@ async function applySealedEdfAnswers(
     const elicitation: CandidateElicitation = {
       id: "SEALED-EDF-" + String(selector.answerIndex + 1),
       unresolved_item_id: item.id,
-      question: "Builder-written sealed probe; question selection evaluated separately.",
+      question: selector.label === "VALUATION_BOUNDARY"
+        ? "Have you personally performed the following professional activities: valuation, financial modelling, due diligence, deal analysis, investment appraisal, IRR/NPV analysis, or transaction execution?"
+        : "Builder-written sealed probe; question selection evaluated separately.",
     };
     const classified = await classifyCandidateElicitation(session, next, elicitation, answers[selector.answerIndex]);
     next = classified.ledger;
@@ -370,8 +374,11 @@ async function sourceDigest(path: string): Promise<string> {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
+const checkedOutRuntimeSha = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+const runtimeCommit = verifyRuntimeCommit(checkedOutRuntimeSha, process.env.E1_TRUSTED_RUNTIME_SHA);
+
 const runtimeProvenance = {
-  commit: process.env.GITHUB_SHA ?? null,
+  commit: runtimeCommit,
   workflow_run_id: process.env.GITHUB_RUN_ID ?? null,
   model: AI_MODEL,
   source_sha256: {
