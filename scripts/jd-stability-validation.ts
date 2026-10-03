@@ -44,7 +44,16 @@ const result: any = {
 };
 
 function writeResult() {
-  fs.writeFileSync(outputPath, JSON.stringify(result, null, 2) + "\n", "utf8");
+  const tempPath = outputPath + ".tmp";
+  const serialized = JSON.stringify(result, null, 2) + "\n";
+  fs.writeFileSync(tempPath, serialized, "utf8");
+  fs.renameSync(tempPath, outputPath);
+  const reread = fs.readFileSync(outputPath, "utf8");
+  const parsed = JSON.parse(reread);
+  if (parsed.schema_version !== result.schema_version || parsed.mode !== result.mode ||
+      !Array.isArray(parsed.calls) || parsed.calls.length !== result.calls.length) {
+    throw new Error("Persisted JD stability artifact failed disk re-read validation.");
+  }
 }
 writeResult();
 
@@ -62,6 +71,11 @@ try {
   result.complete = true;
   result.verdict = result.evaluation.pass ? "PASS" : "FAIL";
   writeResult();
+  const persisted = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+  if (!persisted.complete || persisted.verdict !== result.verdict ||
+      persisted.calls.some((call: any) => call.status !== "COMPLETED") || !persisted.evaluation) {
+    throw new Error("Final persisted JD stability artifact is incomplete after disk re-read.");
+  }
   console.log(JSON.stringify({ verdict: result.verdict, evaluation: result.evaluation }, null, 2));
   if (!result.evaluation.pass) process.exitCode = 1;
 } catch (error) {
