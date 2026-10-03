@@ -168,6 +168,7 @@ function relationBearingVerbFamily(facetRequirement: string): Set<string> | null
     ["apply","applies","applying","applied"],
     ["integrate","integrates","integrating","integrated"],
     ["translate","translates","translating","translated"],
+    ["leverage","leverages","leveraging","leveraged"],
     ["utilise","utiliser","utilisant"],
     ["applique","appliquer","appliquant"],
     ["integrer","integre","integrant"],
@@ -606,6 +607,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
   const seenFacetKeys = new Set<string>();
 
   for (const item of raw) {
+    const rawModelRationale = item.rationale;
     let deterministicRationaleOverride: string | null = null;
     const req = requirements.get(item.requirement_id);
     const facet = req?.facets.find(x => x.id === item.facet_id);
@@ -712,7 +714,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       item.confidence = Math.min(item.confidence, 0.8);
     }
 
-    const semanticBoundaryErrors = validateRelationalAndRationaleBoundary(item, facet, ledger);
+    const semanticBoundaryErrors = validateRelationalAndRationaleBoundary({ ...item, rationale: rawModelRationale }, facet, ledger);
     if (semanticBoundaryErrors.length) {
       errors.push(...semanticBoundaryErrors.map(error => "[" + item.id + "] " + error));
       continue;
