@@ -240,7 +240,7 @@ test("rationale cannot explicitly invoke an uncited evidence ID", () => {
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2" });
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "A2 establishes the missing relationship." };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("outside the minimal supporting subset")));
+  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "NONE");\n  assert.equal(result.judgments[0].abstained, true);\n  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 test("rationale cannot borrow a distinctive phrase from uncited evidence", () => {
@@ -264,6 +264,23 @@ test("repeated near-identical role wording is not treated as uncited rationale l
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "The candidate has led budgeting, forecasting and financial reporting." };
   const result = sanitizeJudgments([judgment], l);
   assert.equal(result.errors.some(error => error.includes("distinctive phrase")), false);
+});
+
+test("raw rationale leak isolates only the affected facet and preserves another facet status", () => {
+  const l = ledger();
+  l.requirements[0].facets.push({ id: "F-2", type: "FUNCTION", requirement: "Prepare forecasts", source_span_id: "S-REQ" });
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Forecasts directly shaped quarterly pipeline review decisions", start_offset: 18, end_offset: 75, language: "en" });
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  const leaking = { ...raw("PARTIAL", ["A1"]), rationale: "Forecasts directly shaped quarterly pipeline review decisions." };
+  const valid = { ...raw("PARTIAL", ["A1"]), id: "SJ-2", facet_id: "F-2", rationale: "The cited evidence supports forecasting experience." };
+  const result = sanitizeJudgments([leaking, valid], l);
+  assert.equal(result.errors.length, 0);
+  const isolated = result.judgments.find(j => j.facet_id === "F-1");
+  const preserved = result.judgments.find(j => j.facet_id === "F-2");
+  assert.equal(isolated?.status, "NONE");
+  assert.equal(isolated?.abstained, true);
+  assert.equal(preserved?.status, "PARTIAL");
+  assert.equal(preserved?.abstained, false);
 });
 
 test("minimal support and optional context IDs must remain disjoint", () => {
@@ -789,7 +806,7 @@ test("explicit out-of-subset evidence ID reference remains rejected", () => {
   l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
   const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID: 2 also supports this judgment." };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.some(error => error.includes("evidence ID outside")), true);
+  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "NONE");\n  assert.equal(result.judgments[0].abstained, true);\n  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 
