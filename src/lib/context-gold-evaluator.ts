@@ -11,6 +11,7 @@ export function parseContextGold(value: string | undefined): readonly ContextGol
   if (value === undefined || value.trim() === "") return null;
   const parsed: unknown = JSON.parse(value);
   if (!Array.isArray(parsed)) throw new Error("E1_CONTEXT_GOLD_JSON must be a JSON array.");
+  if (parsed.length === 0) throw new Error("E1_CONTEXT_GOLD_JSON must contain at least one gold item.");
   for (const [index, item] of parsed.entries()) {
     if (!item || typeof item !== "object" || typeof (item as ContextGoldItem).source_quote !== "string") {
       throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} must contain source_quote.`);
