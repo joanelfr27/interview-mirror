@@ -3,8 +3,9 @@ import type { SessionRecord } from "@/types";
 import {
   type AtomicEvidence, type CandidateElicitation, type CandidateGapClassification,
   type EvidenceLedger, type UnresolvedItem, type SourceSpan,
-  type EvidenceOwnership, type AssertionType,
-  validateAtomicEvidence, validateRequirementGraph,
+  type EvidenceOwnership, type ActorBasis, type AssertionType,
+  validateAtomicEvidence, validateAtomicEvidenceAgainstSource, validateRequirementGraph,
+  deriveDeterministicVerifiability,
 } from "@/lib/canonical-evidence-model";
 import { judgeCanonicalSupport } from "@/lib/canonical-support-judge";
 import { attachDemonstrationObjectives } from "@/lib/demonstration-objectives";
@@ -30,12 +31,13 @@ const SCHEMA = {
     rationale: { type: "string" },
     atom_quote: { type: "string" },
     actor: { type: "string" },
+    actor_basis: { type: "string", enum: ["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDATE","EXPLICIT_OTHER","UNSPECIFIED"] },
     ownership: { type: "string", enum: ["INDIVIDUAL","TEAM","SHARED","SUPERVISED","UNKNOWN"] },
     normalized_action: { type: "string" },
     object: { type: "string" },
     polarity: { type: "string", enum: ["AFFIRMATIVE", "NEGATED"] },
   },
-  required: ["classification","rationale","atom_quote","actor","ownership","normalized_action","object","polarity"],
+  required: ["classification","rationale","atom_quote","actor","actor_basis","ownership","normalized_action","object","polarity"],
 } as const;
 
 function responseFormat(name: string, schema: unknown) {
@@ -78,7 +80,9 @@ export async function classifyCandidateElicitation(
           "EVIDENCE_GAP means the answer establishes that the candidate has done the required thing but the CV omitted or failed to document it. " +
           "EXPERIENCE_GAP means the answer establishes that the candidate has not actually done the required thing. " +
           "TRANSFERABLE means the answer establishes a genuinely adjacent experience that could transfer but is not the same requirement. " +
-          "Do not classify from plausibility. The atom_quote must be an exact substring of the supplied answer. Never invent an outcome, scope or ownership.",
+          "Do not classify from plausibility. The atom_quote must be an exact substring of the supplied answer. Never invent an outcome, scope or ownership. " +
+          "actor_basis is action-local: EXPLICIT_CANDIDATE only when the answer explicitly makes the candidate or candidate-including group the actor of this action; EXPLICIT_OTHER when another actor is explicit; UNSPECIFIED for genuine agentless passives or unresolved impersonal agency. Do not infer candidate agency from context. " +
+          "normalized_action and object must be exact source-language substrings of atom_quote; do not translate or paraphrase them.",
       },
       {
         role: "user",
@@ -90,7 +94,7 @@ export async function classifyCandidateElicitation(
   if (!raw) throw new Error("Empty candidate elicitation classification response.");
   const parsed = JSON.parse(raw) as {
     classification: CandidateGapClassification; rationale: string; atom_quote: string;
-    actor: string; ownership: EvidenceOwnership; normalized_action: string; object: string;
+    actor: string; actor_basis: ActorBasis; ownership: EvidenceOwnership; normalized_action: string; object: string;
     polarity: "AFFIRMATIVE" | "NEGATED";
   };
 
@@ -112,18 +116,17 @@ export async function classifyCandidateElicitation(
       id: "ELICIT-ATOM-" + elicitation.id,
       source_span_id: span.id,
       provenance: { source_type: "CANDIDATE_ELICITED", language, extraction_method: "LLM" },
-      subject: { actor: parsed.actor, ownership: parsed.ownership },
+      subject: { actor: parsed.actor, actor_basis: parsed.actor_basis, ownership: parsed.ownership },
       action: { normalized_action: parsed.normalized_action, object: parsed.object },
       context: {}, scale: {}, time: {}, outcome: null,
       assertion: { type: "ELICITED", polarity: parsed.polarity },
-      verifiability: {
-        has_quantifiable_metric: /[%€$£]|\b\d+(?:\.\d+)?\b/.test(quote),
-        has_third_party_entity: false,
-        has_time_anchor: /\b(?:19|20)\d{2}\b/.test(quote),
-      },
+      verifiability: deriveDeterministicVerifiability(quote),
       extraction_confidence: 1,
     };
-    const atomErrors = validateAtomicEvidence(atom);
+    const atomErrors = [
+      ...validateAtomicEvidence(atom),
+      ...validateAtomicEvidenceAgainstSource(atom, span),
+    ];
     if (atomErrors.length) {
       throw new Error("Elicited evidence failed validation: " + atomErrors.join(" | "));
     }
@@ -139,7 +142,11 @@ export async function classifyCandidateElicitation(
   const next: EvidenceLedger = {
     ...ledger,
     source_spans: span ? [...ledger.source_spans, span] : ledger.source_spans,
-    evidence: atom && !validateAtomicEvidence(atom).length ? [...ledger.evidence, atom] : ledger.evidence,
+    evidence: atom && span &&
+      !validateAtomicEvidence(atom).length &&
+      !validateAtomicEvidenceAgainstSource(atom, span).length
+      ? [...ledger.evidence, atom]
+      : ledger.evidence,
     candidate_elicitations: [...ledger.candidate_elicitations.filter(x => x.id !== elicitation.id), updatedElicitation],
   };
   const judged = await judgeCanonicalSupport(session, next);
