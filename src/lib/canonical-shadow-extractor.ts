@@ -62,7 +62,7 @@ type RawCandidateAtom = {
   extraction_confidence: number;
 };
 
-type RawRequirement = {
+export type RawRequirement = {
   id: string;
   source_quote: string;
   normalized_requirement: string;
