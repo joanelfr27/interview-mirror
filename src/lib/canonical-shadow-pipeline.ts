@@ -7,11 +7,14 @@ import { normalizeLanguage } from "@/lib/openai";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
 
 export type CanonicalShadowEarlyReturnReason =
-  | "EXTRACTION_ERRORS"
-  | "REJECTED_ATOMS"
-  | "REJECTED_REQUIREMENTS"
   | "NO_EVIDENCE"
   | "NO_REQUIREMENTS";
+
+export type CanonicalShadowCompleteness = Readonly<{
+  status: "COMPLETE" | "INCOMPLETE";
+  dropped_atom_ids: readonly string[];
+  dropped_requirement_ids: readonly string[];
+}>;
 
 export class CanonicalShadowExtractionEarlyReturnError extends Error {
   public readonly extraction: CanonicalShadowResult["diagnostics"];
@@ -33,9 +36,9 @@ export function getCanonicalShadowEarlyReturnReasons(
   ledger: EvidenceLedger,
 ): CanonicalShadowEarlyReturnReason[] {
   const reasons: CanonicalShadowEarlyReturnReason[] = [];
-  if (diagnostics.errors.length) reasons.push("EXTRACTION_ERRORS");
-  // Rejected atoms have already failed closed at atom level and are excluded from the ledger.\n  // Do not abort otherwise usable extraction merely because one proposed atom was rejected.\n  // A total loss of evidence is still caught independently by NO_EVIDENCE.
-  if (diagnostics.rejected_requirements.length) reasons.push("REJECTED_REQUIREMENTS");
+  // Item-local validation failures are already excluded from the canonical ledger.
+  // Preserve them in diagnostics/completeness, but do not turn partial extraction
+  // into a session-level stop. Only total loss of a required collection is fatal.
   if (!ledger.evidence.length) reasons.push("NO_EVIDENCE");
   if (!ledger.requirements.length) reasons.push("NO_REQUIREMENTS");
   return reasons;
@@ -49,11 +52,29 @@ export async function runCanonicalShadowPipeline(session: SessionRecord): Promis
   ledger: EvidenceLedger;
   diagnostics: string[];
   extraction: CanonicalShadowResult["diagnostics"];
+  completeness: CanonicalShadowCompleteness;
 }> {
   const extraction = await extractCanonicalShadow(session);
   let ledger = extraction.ledger;
   const diagnostics = [...extraction.diagnostics.errors, ...extraction.diagnostics.warnings];
   const earlyReturnReasons = getCanonicalShadowEarlyReturnReasons(extraction.diagnostics, ledger);
+  const completeness: CanonicalShadowCompleteness = {
+    status:
+      extraction.diagnostics.rejected_atoms.length || extraction.diagnostics.rejected_requirements.length
+        ? "INCOMPLETE"
+        : "COMPLETE",
+    dropped_atom_ids: [...extraction.diagnostics.rejected_atoms],
+    dropped_requirement_ids: [...extraction.diagnostics.rejected_requirements],
+  };
+  if (completeness.status === "INCOMPLETE") {
+    diagnostics.push(
+      "Canonical extraction is incomplete: dropped atoms=" +
+        completeness.dropped_atom_ids.join(",") +
+        "; dropped requirements=" +
+        completeness.dropped_requirement_ids.join(",") +
+        ". Downstream outputs must not present this assessment as complete.",
+    );
+  }
 
   if (earlyReturnReasons.length) {
     throw new CanonicalShadowExtractionEarlyReturnError(
@@ -82,5 +103,5 @@ export async function runCanonicalShadowPipeline(session: SessionRecord): Promis
     throw new Error("Canonical shadow graph failed final validation: " + finalErrors.join(" | "));
   }
 
-  return { ledger, diagnostics, extraction: extraction.diagnostics };
+  return { ledger, diagnostics, extraction: extraction.diagnostics, completeness };
 }
