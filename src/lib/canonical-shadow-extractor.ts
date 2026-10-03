@@ -285,32 +285,37 @@ function normalizeForContainmentWithOffsets(value: string): NormalizedWithOffset
   const originalStartByNormalizedIndex: number[] = [];
   const originalEndByNormalizedIndex: number[] = [];
   let pendingWhitespace: { start: number; end: number } | null = null;
-
   const append = (normalized: string, start: number, end: number) => {
-    for (const char of normalized) {
-      text += char;
+    text += normalized;
+    for (let unit = 0; unit < normalized.length; unit += 1) {
       originalStartByNormalizedIndex.push(start);
       originalEndByNormalizedIndex.push(end);
     }
   };
-
+  const segments: Array<{ segment: string; index: number }> = [];
   for (let i = 0; i < value.length;) {
-    const codePoint = value.codePointAt(i)!;
-    const original = String.fromCodePoint(codePoint);
-    const end = i + original.length;
-    const normalized = original.normalize("NFKC").replace(/[’‘]/g, "'");
-
+    const start = i;
+    const first = String.fromCodePoint(value.codePointAt(i)!);
+    i += first.length;
+    while (i < value.length) {
+      const next = String.fromCodePoint(value.codePointAt(i)!);
+      if (!/^\\p{M}$/u.test(next)) break;
+      i += next.length;
+    }
+    segments.push({ segment: value.slice(start, i), index: start });
+  }
+  for (const item of segments) {
+    const end = item.index + item.segment.length;
+    const normalized = item.segment.normalize("NFKC").replace(/[’‘]/g, "'");
     if (/^\\s+$/u.test(normalized)) {
-      pendingWhitespace ??= { start: i, end };
+      pendingWhitespace ??= { start: item.index, end };
       pendingWhitespace.end = end;
     } else {
       if (pendingWhitespace && text.length > 0) append(" ", pendingWhitespace.start, pendingWhitespace.end);
       pendingWhitespace = null;
-      append(normalized, i, end);
+      append(normalized, item.index, end);
     }
-    i = end;
   }
-
   return { text, originalStartByNormalizedIndex, originalEndByNormalizedIndex };
 }
 
@@ -328,12 +333,14 @@ export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "F
   const localEnd = normalizedParent.originalEndByNormalizedIndex[first + target.length - 1];
   if (localStart === undefined || localEnd === undefined) return null;
 
+  const originalSlice = parent.text.slice(localStart, localEnd);
+  if (normalizeForContainmentWithOffsets(originalSlice).text !== target) return null;
   const start = parent.start_offset + localStart;
   const end = parent.start_offset + localEnd;
   return {
     id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + end,
     document_id: parent.document_id,
-    text: parent.text.slice(localStart, localEnd),
+    text: originalSlice,
     start_offset: start,
     end_offset: end,
     language: parent.language,
@@ -678,11 +685,7 @@ export async function extractCanonicalShadow(
     const facets: RequirementFacet[] = [];
     let facetMappingFailed = false;
     for (const rawFacet of raw.facets) {
-      if (!requirementSpan.text.includes(rawFacet.source_quote)) {
-        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote.`);
-        facetMappingFailed = true;
-        break;
-      }
+
 
       const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote, "FACET");
 
