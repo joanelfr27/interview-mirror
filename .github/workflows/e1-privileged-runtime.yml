@@ -90,7 +90,7 @@ jobs:
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter || '' }}
           D15_RUNTIME_SESSION_FINGERPRINTS: ${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}
           D15_GOLD_DIAGNOSTICS: "true"
-          E1_PROBE_DIAGNOSTICS: "true"
+          E1_PROBE_DIAGNOSTICS: "true"\n          D16_SEALED_ANSWERS_PATH: "validation/edf-d16-sealed-answers-2026-10-03.json"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
       - name: Verify D15-D16 runtime report exists
         if: always()
