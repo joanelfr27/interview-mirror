@@ -741,7 +741,8 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         error === "rationale explicitly relies on an evidence ID outside the minimal supporting subset." ||
         error === "rationale contains a distinctive phrase from evidence outside the minimal supporting subset."
       );
-      const rationaleOnlySet = new Set<string>(rationaleOnlyErrors);\n      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlySet.has(error));
+      const rationaleOnlySet = new Set<string>(rationaleOnlyErrors);
+      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlySet.has(error));
       if (structuralErrors.length) {
         errors.push(...structuralErrors.map(error => "[" + item.id + "] " + error));
         continue;
