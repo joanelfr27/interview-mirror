@@ -28,7 +28,7 @@ test("D15-B semantic input excludes summary/profile assertions from pattern matu
     atom("A0","S0","Proven","expertise in FP&A and restricted fund management"),
     atom("A1","S1","Managed","restricted CSR project funds"),
   ],[summary,bullet]);
-  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.id),["A1"]);
+  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A1"]);
 });
 
 test("D15-B accepts a grounded two-atom semantic thread and caps maturity at Emerging",()=>{
