@@ -508,6 +508,8 @@ Hard rules:
 export type CanonicalContextPopulationDiagnostic = Readonly<{
   raw_domain_populated: boolean;
   canonical_domain_populated: boolean;
+  raw_scope_populated: boolean;
+  canonical_scope_populated: boolean;
   raw_tools_populated: boolean;
   canonical_tools_populated: boolean;
   raw_standards_populated: boolean;
