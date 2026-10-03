@@ -5,7 +5,7 @@ export type ContextGoldItem = Readonly<{
   expected_scopes?: readonly string[];
   expect_none?: boolean;
 }>;
-export type ContextObservedItem = Readonly<{ source_quote: string; domain?: string; scope?: string }>;
+export type ContextObservedItem = Readonly<{ source_quote: string; start_offset?: number; end_offset?: number; domain?: string; scope?: string }>;
 export const CONTEXT_GOLD_MIN_RECALL = 0.8;
 
 export function parseContextGold(value: string | undefined): readonly ContextGoldItem[] | null {
@@ -14,7 +14,7 @@ export function parseContextGold(value: string | undefined): readonly ContextGol
   if (!Array.isArray(parsed)) throw new Error("E1_CONTEXT_GOLD_JSON must be a JSON array.");
   if (parsed.length === 0) throw new Error("E1_CONTEXT_GOLD_JSON must contain at least one gold item.");
   for (const [index, item] of parsed.entries()) {
-    if (!item || typeof item !== "object" || typeof (item as ContextGoldItem).source_quote !== "string" || typeof (item as ContextGoldItem).session_fingerprint !== "string" || !(item as ContextGoldItem).session_fingerprint.trim()) {
+    if (!item || typeof item !== "object" || typeof (item as ContextGoldItem).source_quote !== "string" || !(item as ContextGoldItem).source_quote.trim() || typeof (item as ContextGoldItem).session_fingerprint !== "string" || !(item as ContextGoldItem).session_fingerprint.trim()) {
       throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} must contain session_fingerprint and source_quote.`);
     }
     const candidate = item as ContextGoldItem;
@@ -28,21 +28,35 @@ export function parseContextGold(value: string | undefined): readonly ContextGol
       }
     }
     if (candidate.expect_none !== undefined && typeof candidate.expect_none !== "boolean") throw new Error(`E1_CONTEXT_GOLD_JSON item ${index}.expect_none must be boolean.`);
-    if (candidate.expect_none && ((candidate.expected_domains?.length ?? 0) || (candidate.expected_scopes?.length ?? 0))) throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} cannot combine expect_none with expected context.`);
+    const assertionCount = (candidate.expected_domains?.length ?? 0) + (candidate.expected_scopes?.length ?? 0);
+    if (candidate.expect_none && assertionCount) throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} cannot combine expect_none with expected context.`);
+    if (!candidate.expect_none && assertionCount === 0) throw new Error(`E1_CONTEXT_GOLD_JSON item ${index} must contain expected context or expect_none:true.`);
   }
   return parsed as ContextGoldItem[];
 }
 
-export function evaluateContextGold(gold: readonly ContextGoldItem[], observed: readonly ContextObservedItem[]) {
+export function evaluateContextGold(gold: readonly ContextGoldItem[], observed: readonly ContextObservedItem[], sourceDocument?: string) {
   let expectedPhraseCount = 0, recoveredPhraseCount = 0;
   const nonSubstringValues: string[] = [], falsePositiveQuotes: string[] = [], notExtractedQuotes: string[] = [];
   for (const expected of gold) {
-    // Gold is marked at source-bullet level, while E1 evidence is atomic and may
-    // preserve only a clause from that bullet. Match only source-grounded atom
-    // spans contained verbatim in the marked bullet; never fuzzy-match text.
-    const actual = observed.filter((item) =>
-      item.source_quote.length > 0 && expected.source_quote.includes(item.source_quote)
-    );
+    // Resolve the gold bullet to one unique occurrence in the current CV, then
+    // credit only atomic spans whose original offsets fall inside that occurrence.
+    // This prevents repeated text in another bullet from satisfying this item.
+    let goldStart = -1, goldEnd = -1;
+    if (sourceDocument !== undefined) {
+      goldStart = sourceDocument.indexOf(expected.source_quote);
+      if (goldStart < 0 || sourceDocument.indexOf(expected.source_quote, goldStart + 1) >= 0) {
+        notExtractedQuotes.push(expected.source_quote);
+        continue;
+      }
+      goldEnd = goldStart + expected.source_quote.length;
+    }
+    const actual = observed.filter((item) => {
+      if (!item.source_quote.length) return false;
+      if (sourceDocument === undefined) return expected.source_quote.includes(item.source_quote);
+      return typeof item.start_offset === "number" && typeof item.end_offset === "number" &&
+        item.start_offset >= goldStart && item.end_offset <= goldEnd;
+    });
     if (actual.length === 0) notExtractedQuotes.push(expected.source_quote);
     for (const phrase of expected.expected_domains ?? []) {
       expectedPhraseCount += 1;
