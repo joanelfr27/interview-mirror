@@ -4,6 +4,7 @@ import {
   type AtomicEvidence,
   type EvidenceLedger, detectSourceLanguage, detectQuoteLanguage,
   type EvidenceOwnership,
+  type ActorBasis,
   type EvidenceSourceType,
   type EvidenceSourceSection,
   type Requirement,
@@ -14,6 +15,7 @@ import {
   validateAtomicEvidence,
   deriveDeterministicVerifiability,
   validateAtomicEvidenceAgainstSource,
+  hasActionLocalCandidateMarker,
   validateSourceSpan,
   validateSpanBounds,
   forbiddenInferenceViolations,
@@ -34,10 +36,11 @@ import {
  * No legacy summary is supplied to either extraction prompt.
  */
 
-type RawCandidateAtom = {
+export type RawCandidateAtom = {
   id: string;
   source_quote: string;
   actor: string;
+  actor_basis?: ActorBasis;
   ownership: EvidenceOwnership;
   normalized_action: string;
   object: string;
@@ -90,6 +93,7 @@ const CANDIDATE_SCHEMA = {
           id: { type: "string" },
           source_quote: { type: "string" },
           actor: { type: "string" },
+          actor_basis: { type: "string", enum: ["EXPLICIT_CANDIDATE", "IMPLICIT_CANDIDATE", "EXPLICIT_OTHER", "UNSPECIFIED"] },
           ownership: { type: "string", enum: ["INDIVIDUAL", "TEAM", "SHARED", "SUPERVISED", "UNKNOWN"] },
           normalized_action: { type: "string" },
           object: { type: "string" },
@@ -114,7 +118,7 @@ const CANDIDATE_SCHEMA = {
           extraction_confidence: { type: "number", minimum: 0, maximum: 1 }
         },
         required: [
-          "id","source_quote","actor","ownership","normalized_action","object",
+          "id","source_quote","actor","actor_basis","ownership","normalized_action","object",
           "domain","jurisdiction","situation","tools_or_systems","standards",
           "quantity","currency","team_size","scope","start","end","recency",
           "outcome","assertion_type","polarity","has_quantifiable_metric",
@@ -125,6 +129,18 @@ const CANDIDATE_SCHEMA = {
   },
   required: ["atoms"]
 } as const;
+
+export const ACTOR_BASIS_EXTRACTION_RULE = `
+Actor basis answers only how the actor of THIS atom's asserted action is attributable. It is separate from ownership level.
+
+- EXPLICIT_CANDIDATE: the source explicitly makes the candidate or a candidate-including group the actor of this action (for example I/je or we/nous attached to the action).
+- IMPLICIT_CANDIDATE: ordinary CV convention makes the candidate the actor even though no grammatical subject is written. This includes subjectless action bullets ("Reconciled payroll cutoffs..."; "Rapprochait les dates...") and nominal CV bullets that name the candidate's work ("Rapprochement des dates..."; "Implementation of controls...").
+- EXPLICIT_OTHER: another actor is explicitly stated as performing this action. Copy that actor phrase exactly into actor. This includes active other actors and passive by/par agents.
+- UNSPECIFIED: the source does not safely identify who performed the action. Use this for true agentless passives ("Payroll cutoffs were reconciled"; "Un calendrier a été mis en place") and impersonal constructions where candidate agency is not explicit (including French "on" when the actor cannot be grounded).
+- Atom-local rule: in mixed sentences, classify the actor of the atom's own asserted action, not the actor of a neighboring action. "Supported the team that reconciled accounts" must not make the candidate the actor of "reconciled accounts."
+- Never use job title, section placement, typical responsibility, or plausibility to turn a true passive/impersonal action into candidate agency.
+- Never paraphrase another actor. If an explicit other actor cannot be copied exactly from the source quote, actor attribution must fail closed to UNSPECIFIED.
+`;
 
 export const OWNERSHIP_EXTRACTION_RULE = `
 Ownership answers who explicitly performs or owns the atom's asserted action. Assertion type is a separate field and does not determine ownership.
@@ -302,30 +318,75 @@ function exactArrayOrEmpty(values: string[] | undefined, source: string): string
   return (values ?? []).map(value => value.trim()).filter(value => value && source.includes(value));
 }
 
-function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
+export function canonicalizeRawCandidateAtom(raw: RawCandidateAtom, source: string): RawCandidateAtom {
   const actor = raw.actor.trim();
-  const groundedActor =
-    actor && /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
-      ? "candidate"
-      : exactOrNull(actor, source) ?? "candidate";
+  // Compatibility for pre-change mocked/raw atoms; the strict production schema now requires actor_basis.
+  // Preserve an exact legacy other actor and the explicit unspecified sentinel;
+  // only historical candidate placeholders default to implicit candidate agency.
+  let actorBasis: ActorBasis = raw.actor_basis ??
+    (/^unspecified$/i.test(actor)
+      ? "UNSPECIFIED"
+      : /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
+        ? "IMPLICIT_CANDIDATE"
+        : "EXPLICIT_OTHER");
+  let groundedActor: string;
+
+  const candidatePlaceholder = /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor);
+  if (
+    (actorBasis === "IMPLICIT_CANDIDATE" || actorBasis === "EXPLICIT_CANDIDATE") &&
+    !candidatePlaceholder
+  ) {
+    // A grounded/non-placeholder other actor conflicts with candidate attribution.
+    // Fail closed rather than discarding the actor signal and manufacturing candidate agency.
+    groundedActor = "unspecified";
+    actorBasis = "UNSPECIFIED";
+  } else if (actorBasis === "EXPLICIT_OTHER") {
+    const exactOther = exactOrNull(actor, source);
+    if (exactOther && !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(exactOther)) {
+      groundedActor = exactOther;
+    } else {
+      // E1-ACTOR-F1: a non-grounded/paraphrased other actor must never collapse
+      // to candidate attribution.
+      groundedActor = "unspecified";
+      actorBasis = "UNSPECIFIED";
+    }
+  } else if (actorBasis === "EXPLICIT_CANDIDATE") {
+    if (hasActionLocalCandidateMarker(source, raw.normalized_action)) {
+      groundedActor = "candidate";
+    } else {
+      groundedActor = "unspecified";
+      actorBasis = "UNSPECIFIED";
+    }
+  } else if (actorBasis === "IMPLICIT_CANDIDATE") {
+    // Deliberately model-classified for the development diagnostic. Do not add
+    // passive/impersonal regex exceptions here before measuring both error
+    // directions on real CV text; see e1-actor-basis-gf2-spec.md.
+    groundedActor = "candidate";
+  } else {
+    groundedActor = "unspecified";
+    actorBasis = "UNSPECIFIED";
+  }
 
   const ownershipMarkers: Record<Exclude<EvidenceOwnership, "UNKNOWN">, RegExp> = {
     INDIVIDUAL: /\b(?:i|i['’]m|i['’]ve|me|my|mine|je|j['’]ai|moi|mon|ma|mes)\b/i,
-    TEAM: /\b(?:we|our|team|teams|nous|notre|nos|équipe|équipes)\b/i,
+    TEAM: /(?:\b(?:we|our|team|teams|nous|notre|nos)\b|(?:^|[^\p{L}])(?:équipe|équipes)(?=$|[^\p{L}]))/iu,
     SHARED: /\b(?:shared|co-owned|partagé|partagée|partagés|partagées)\b/i,
     SUPERVISED: /\b(?:supervised|under supervision|sous supervision|supervisé|supervisée|report(?:ed)? to|rattaché|rattachée)\b/i,
   };
-  const ownership = raw.ownership === "UNKNOWN"
+  const ownership = actorBasis === "UNSPECIFIED" || actorBasis === "EXPLICIT_OTHER"
     ? "UNKNOWN"
-    : ownershipMarkers[raw.ownership]?.test(source)
-      ? raw.ownership
-      : "UNKNOWN";
+    : raw.ownership === "UNKNOWN"
+      ? "UNKNOWN"
+      : ownershipMarkers[raw.ownership]?.test(source)
+        ? raw.ownership
+        : "UNKNOWN";
 
   const deterministic = deriveDeterministicVerifiability(source);
 
   return {
     ...raw,
     actor: groundedActor,
+    actor_basis: actorBasis,
     ownership,
     domain: exactOrNull(raw.domain, source),
     jurisdiction: exactOrNull(raw.jurisdiction, source),
@@ -363,6 +424,7 @@ function toAtomicEvidence(
     },
     subject: {
       actor: raw.actor,
+      ...(raw.actor_basis ? { actor_basis: raw.actor_basis } : {}),
       ownership: raw.ownership,
     },
     action: {
