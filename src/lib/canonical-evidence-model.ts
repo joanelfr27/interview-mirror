@@ -162,6 +162,13 @@ export type DemonstrationObjective = {
   probe_family?: string;
 };
 
+/** Conversation state only: never a support atom or an input to evidence judges. */
+export type MirrorClarificationRecord={
+ key:string; headline:string; asserted_proposition:string; language:'en'|'fr';
+ source_quotes:string[]; status:'DENIED'|'CLOSED_OTHER_ACTOR'|'NEEDS_MORE_DETAIL'|'CONFIRMED';
+ responses:Array<{id:string;answer:string}>; follow_up_issued:boolean;
+};
+
 export type EvidenceLedger = {
   source_spans: SourceSpan[];
   evidence: AtomicEvidence[];
@@ -171,6 +178,7 @@ export type EvidenceLedger = {
   unresolved_items: UnresolvedItem[];
   candidate_elicitations: CandidateElicitation[];
   demonstration_objectives: DemonstrationObjective[];
+  mirror_clarifications?: MirrorClarificationRecord[];
   // CompetencyInstance and CareerTheme remain virtual L2/L3 projections over L1.
   // They are intentionally not persisted in the reasoning ledger and never feed LLM support judgments.
 };
