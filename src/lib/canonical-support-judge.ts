@@ -275,15 +275,19 @@ function prepositionalFacetParts(facetRequirement: string): { words: string[]; p
   const known = relationBearingVerbFamily(first);
   if (known) verbFamily = known;
   else if (first && !PREPOSITIONAL_MODIFIERS.has(first) && !RELATION_STOPWORDS.has(first)) {
-    // Only treat the leading word as an unclassified relation verb when its family
-    // can actually be observed as a predicate in evidence. The caller enforces that.
-    const stem = stemContentToken(first);
-    const forms = new Set([first, stem, stem+"s", stem+"ed", stem+"ing", stem+"e", stem+"er", stem+"é", stem+"ée", stem+"és", stem+"ées"]);
-    if (first.endsWith("er") && first.length > 4) {
-      const fs = first.slice(0,-2);
-      for (const suffix of ["e","é","ée","és","ées","ait","ais","aient"]) forms.add(fs+suffix);
+    // Treat the leading word as an unclassified relation verb only when it looks
+    // verb-like. Nominal heads such as "reporting" remain part of the left content
+    // group; otherwise "Reporting in SAP" would lose its left side entirely.
+    const verbLike = /(?:ed|er|ise|ize|ate|ify)$/.test(first);
+    if (verbLike) {
+      const stem = stemContentToken(first);
+      const forms = new Set([first, stem, stem+"s", stem+"ed", stem+"ing", stem+"e", stem+"er", stem+"é", stem+"ée", stem+"és", stem+"ées"]);
+      if (first.endsWith("er") && first.length > 4) {
+        const fs = first.slice(0,-2);
+        for (const suffix of ["e","é","ée","és","ées","ait","ais","aient"]) forms.add(fs+suffix);
+      }
+      verbFamily = forms;
     }
-    verbFamily = forms;
   }
 
   const leftWords = words.slice(verbFamily ? 1 : 0, prepIndex);
