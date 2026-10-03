@@ -33,7 +33,6 @@ function ledger(evidence = 1, requirements = 1) {
 test("canonical shadow early-return reasons preserve each independent gate", () => {
   const cases: Array<[CanonicalShadowEarlyReturnReason, ReturnType<typeof diagnostics>, any]> = [
     ["EXTRACTION_ERRORS", diagnostics({ errors: ["grounding failure"] }), ledger()],
-    ["REJECTED_ATOMS", diagnostics({ rejected_atoms: ["A-1"] }), ledger()],
     ["REJECTED_REQUIREMENTS", diagnostics({ rejected_requirements: ["R-1"] }), ledger()],
     ["NO_EVIDENCE", diagnostics(), ledger(0, 1)],
     ["NO_REQUIREMENTS", diagnostics(), ledger(1, 0)],
@@ -57,5 +56,26 @@ test("canonical shadow early-return reasons preserve multiple simultaneous cause
       "NO_EVIDENCE",
       "NO_REQUIREMENTS",
     ],
+  );
+});
+
+
+test("rejected atom is isolated when accepted evidence remains", () => {
+  assert.deepEqual(
+    getCanonicalShadowEarlyReturnReasons(
+      diagnostics({ rejected_atoms: ["A-REJECTED"] }) as any,
+      ledger(1, 1),
+    ),
+    [],
+  );
+});
+
+test("rejected atoms still fail closed when no accepted evidence remains", () => {
+  assert.deepEqual(
+    getCanonicalShadowEarlyReturnReasons(
+      diagnostics({ rejected_atoms: ["A-REJECTED"] }) as any,
+      ledger(0, 1),
+    ),
+    ["NO_EVIDENCE"],
   );
 });
