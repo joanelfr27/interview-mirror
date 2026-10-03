@@ -753,7 +753,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         item.context_evidence_ids = [];
         item.relationship_connector = null;
         item.licensing_spans = [];
-        item.analogical_mapping = undefined;
+        item.analogical_mapping = undefined as never;
         item.confidence = 0;
         item.abstention_reason = "Raw model rationale crossed the minimal-support boundary; facet isolated and abstained.";
         deterministicRationaleOverride = "No validated evidence subset supports a positive judgment for this facet.";
