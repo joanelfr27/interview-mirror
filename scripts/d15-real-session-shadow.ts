@@ -368,7 +368,7 @@ for (const row of chosen) {
       completeness: result.completeness,
       context_gold_evaluation: contextGold
         ? evaluateContextGold(
-            contextGold,
+            contextGold.filter((item) => item.session_fingerprint === fingerprint(row.id)),
             result.ledger.evidence.map((atom) => {
               const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
               return {
@@ -455,6 +455,8 @@ function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_ato
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
 const incomplete = report.sessions.filter((item) => (item.completeness as { status?: string } | undefined)?.status === "INCOMPLETE");
+const configuredGoldSessions = new Set(contextGold?.map((item) => item.session_fingerprint) ?? []);
+const missingGoldSessions = contextGold ? chosen.filter((row) => !configuredGoldSessions.has(fingerprint(row.id))) : chosen;
 const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
@@ -464,10 +466,11 @@ const contextGoldFailures = report.sessions.filter((item) => {
   awaiting_candidate_answers: awaiting.length,
   incomplete_extractions: incomplete.length,
   context_gold_failures: contextGoldFailures.length,
-  pass: failures.length === 0 && awaiting.length === chosen.length && incomplete.length === 0 && contextGoldFailures.length === 0,
+  missing_context_gold_sessions: missingGoldSessions.map((row) => fingerprint(row.id)),
+  pass: failures.length === 0 && awaiting.length === chosen.length && incomplete.length === 0 && contextGoldFailures.length === 0 && missingGoldSessions.length === 0,
 };
 
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length) process.exitCode = 1;
+if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) process.exitCode = 1;
