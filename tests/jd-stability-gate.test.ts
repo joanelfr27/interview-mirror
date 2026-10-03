@@ -14,3 +14,13 @@ test("JD stability fails when decomposition counts diverge beyond 20 percent",()
  const r=evaluateJdStability({requirement_count:9,facet_count:12,concepts:all},{requirement_count:22,facet_count:27,concepts:all});
  assert.equal(r.pass,false);
 });
+
+test("JD stability boundary passes below or at the frozen 20 percent limit", () => {
+  assert.equal(evaluateJdStability({requirement_count:10,facet_count:20,concepts:all},{requirement_count:12,facet_count:24,concepts:all}).pass,true);
+});
+test("JD stability fails just beyond the frozen count limit", () => {
+  assert.equal(evaluateJdStability({requirement_count:10,facet_count:20,concepts:all},{requirement_count:13,facet_count:20,concepts:all}).pass,false);
+});
+test("JD stability independently gates facet-count divergence", () => {
+  assert.equal(evaluateJdStability({requirement_count:10,facet_count:10,concepts:all},{requirement_count:10,facet_count:13,concepts:all}).pass,false);
+});
