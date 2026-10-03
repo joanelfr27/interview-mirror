@@ -616,16 +616,30 @@ const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
 });
-(report as typeof report & { question_gate?: unknown }).question_gate = {
-  expected_sessions: chosen.length,
-  awaiting_candidate_answers: awaiting.length,
-  incomplete_extractions: incomplete.length,
-  context_gold_failures: contextGoldFailures.length,
-  missing_context_gold_sessions: missingGoldSessions.map((row) => fingerprint(row.id)),
-  pass: failures.length === 0 && awaiting.length === chosen.length && incomplete.length === 0 && contextGoldFailures.length === 0 && missingGoldSessions.length === 0,
-};
+if (sealedAnswers) {
+  (report as typeof report & { strategy_gate?: unknown }).strategy_gate = {
+    expected_sessions: chosen.length,
+    d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
+    extraction_incompleteness_labeled: incomplete.length,
+    context_gold_measurement_not_used_as_blocker: true,
+    pass: failures.length === 0 && report.sessions.every((item) => item.d16_executed === true),
+  };
+} else {
+  (report as typeof report & { question_gate?: unknown }).question_gate = {
+    expected_sessions: chosen.length,
+    awaiting_candidate_answers: awaiting.length,
+    incomplete_extractions: incomplete.length,
+    context_gold_failures: contextGoldFailures.length,
+    missing_context_gold_sessions: missingGoldSessions.map((row) => fingerprint(row.id)),
+    pass: failures.length === 0 && awaiting.length === chosen.length && incomplete.length === 0 && contextGoldFailures.length === 0 && missingGoldSessions.length === 0,
+  };
+}
 
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) process.exitCode = 1;
+if (sealedAnswers) {
+  if (failures.length || report.sessions.some((item) => item.d16_executed !== true)) process.exitCode = 1;
+} else if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) {
+  process.exitCode = 1;
+}
