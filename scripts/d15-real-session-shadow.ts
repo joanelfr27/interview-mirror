@@ -459,7 +459,7 @@ const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
 const incomplete = report.sessions.filter((item) => (item.completeness as { status?: string } | undefined)?.status === "INCOMPLETE");
 const configuredGoldSessions = new Set(contextGold?.map((item) => item.session_fingerprint) ?? []);
-const missingGoldSessions = contextGold ? chosen.filter((row) => !configuredGoldSessions.has(fingerprint(row.id))) : chosen;
+const missingGoldSessions = contextGold ? chosen.filter((row) => !configuredGoldSessions.has(fingerprint(row.id))) : [];
 const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
