@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { extractRawRequirementsForStability, type RawRequirement } from "../src/lib/canonical-shadow-extractor.ts";
 import { evaluateJdStability, type JdDecompositionSnapshot, type JdStabilityConcept } from "../src/lib/jd-stability-gate.ts";
+import { AI_MODEL } from "../src/lib/openai.ts";
 
 const jd = process.env.JD_STABILITY_TEXT;
 const outputPath = process.env.JD_STABILITY_RESULT_PATH ?? "jd-stability-result.json";
@@ -33,7 +34,7 @@ function serializableRequirements(items: readonly RawRequirement[]) {
 const result: any = {
   schema_version: 2,
   mode: "REAL",
-  model_id: null,
+  model_id: AI_MODEL,
   expected_calls: 2,
   calls: [
     { call: 1, status: "NOT_STARTED" },
@@ -50,7 +51,6 @@ writeResult();
 try {
   result.calls[0].status = "STARTED"; writeResult();
   const firstItems = await extractRawRequirementsForStability(jd);
-  result.model_id = process.env.JD_STABILITY_MODEL_ID ?? "canonical-shadow-extractor-configured-model";
   result.calls[0] = { call: 1, status: "COMPLETED", requirements: serializableRequirements(firstItems), snapshot: snapshot(firstItems) };
   writeResult();
 
