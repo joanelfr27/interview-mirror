@@ -343,10 +343,14 @@ for (const row of chosen) {
     // candidate answers these questions and the answers become canonical evidence.
     const result = await runCanonicalShadowPipeline(session);
     const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
+    // Build a CV-only D16 projection solely to rank candidate attention. It is
+    // not the post-answer strategy and is never presented as candidate guidance.
+    const preAnswerD16 = buildOwnerLoopD16(session, result.ledger);
     const selectedQuestions = selectSharedCandidateQuestions(
       result.ledger,
       d15Semantic,
       SHARED_CANDIDATE_QUESTION_BUDGET,
+      preAnswerD16.strategy.tensions,
     );
     const questions = selectedQuestions.map((item) => item.question);
     const suppliedSelectedAnswers = Object.fromEntries(
@@ -370,9 +374,11 @@ for (const row of chosen) {
     report.sessions.push({
       ...base,
       outcome: d16AfterAnswers ? "PASS_WITH_CANDIDATE_ANSWERS" : "AWAITING_CANDIDATE_ANSWERS",
-      protocol_stage: "D15_QUESTION_GATE",
-      d16_executed: false,
-      d16_block_reason: "Candidate answers must become canonical evidence before D16 strategy generation.",
+      protocol_stage: d16AfterAnswers ? "POST_ANSWER_STRATEGY" : "D15_QUESTION_GATE",
+      d16_executed: Boolean(d16AfterAnswers),
+      d16_pre_answer_projection_used_for_question_ranking: true,
+      d16_block_reason: d16AfterAnswers ? null : "Candidate answers must become canonical evidence before final D16 strategy generation.",
+      d16_after_answers: d16AfterAnswers?.strategy ?? null,
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
       e1_atom_rejection: rejectionRate(result.extraction),
