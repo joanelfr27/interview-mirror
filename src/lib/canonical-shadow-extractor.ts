@@ -424,7 +424,7 @@ Hard rules:
 - ownership: apply the ownership rule below. Ownership must attach to the atom's asserted action; marker presence elsewhere is not enough. Otherwise use UNKNOWN. A job title, managerial title, or ordinary responsibility statement does NOT imply ownership.
 - OWNERSHIP RULE:
 ${OWNERSHIP_EXTRACTION_RULE}
-- domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied from the same source_quote when present. If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
+- domain, jurisdiction, situation, scope, quantity, currency, start, end, recency, outcome, tools_or_systems, and standards must each be copied as an EXACT CONTIGUOUS SUBSTRING from the same source_quote when present. Never return a paraphrase, category label, inferred industry, normalized geography, or semantic summary for these fields. If the quote says "14 African countries", scope may be exactly "14 African countries"; do not rewrite it as "Africa" or "multi-country". If the quote says "restricted CSR project funds", domain/situation may use that exact phrase when appropriate; do not rewrite it as "restricted funds management". If the information appears elsewhere in the CV, do not attach it to this atom; return null or [].
 - Employment dates must NOT be attached to a responsibility/achievement atom unless those dates occur in that atom's source_quote. If dates are useful, create a separate employment atom whose source_quote contains the dates.
 - Never infer geography from an employer location, role location, or surrounding CV section when it is absent from the atom quote.
 - Never infer seniority, scale, scope, ownership, outcome, tool, standard, domain, jurisdiction, or time from the candidate's job title or from neighboring lines.
@@ -720,6 +720,8 @@ export async function extractCanonicalShadow(
         {
           raw_domain_populated: Boolean(raw?.domain?.trim()),
           canonical_domain_populated: Boolean(atom.context.domain?.trim()),
+          raw_scope_populated: Boolean(raw?.scope?.trim()),
+          canonical_scope_populated: Boolean(atom.scale.scope?.trim()),
           raw_tools_populated: Boolean(raw?.tools_or_systems?.some((value) => value.trim())),
           canonical_tools_populated: Boolean(atom.context.tools_or_systems?.length),
           raw_standards_populated: Boolean(raw?.standards?.some((value) => value.trim())),
