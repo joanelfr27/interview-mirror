@@ -51,9 +51,10 @@ export function buildElicitationQuestion(
 ): CandidateElicitation {
   const facets = ledger.requirements.find(r => r.id === item.requirement_id)?.facets
     .filter(f => item.facet_ids.includes(f.id)).map(f => f.requirement).join("; ") ?? "this requirement";
+  const requirementAnchor = facets.length > 220 ? facets.slice(0, 217).trimEnd() + "…" : facets;
   const question = language === "fr"
-    ? "Pour mieux comprendre ce point, décrivez librement toute expérience pertinente que vous avez réellement vécue, votre rôle personnel, le contexte, le périmètre et le résultat. Si vous n’avez pas d’expérience directe, indiquez-le et, si pertinent, décrivez l’expérience la plus proche que vous pourriez transférer."
-    : "To clarify this point, describe any relevant experience you have actually had, your personal role, context, scope and outcome. If you do not have direct experience, say so and, if relevant, describe the closest experience you could transfer.";
+    ? `Le poste demande « ${requirementAnchor} ». Quelle expérience avez-vous réellement sur ce point ? Précisez votre rôle personnel. Si vous ne l’avez pas fait directement, dites-le et décrivez seulement l’expérience la plus proche que vous pourriez transférer.`
+    : `The role asks for “${requirementAnchor}”. What experience have you actually had with this? Describe your personal role. If you have not done it directly, say so and describe only the closest experience you could transfer.`;
   return { id: "ELICIT-" + item.id, unresolved_item_id: item.id, question };
 }
 
