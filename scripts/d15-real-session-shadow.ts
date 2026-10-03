@@ -7,11 +7,7 @@ import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
 import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
-import {
-  diagnoseProfessionalMirrorConnections,
-  diagnosticSignalOverlap,
-  diagnosticSharedObjectWords,
-} from "@/lib/professional-mirror";
+import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -210,21 +206,6 @@ function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
-function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
-  return {
-    version: "rcm-v1",
-    model_id: "d16-shadow-runtime",
-    role_family: "shadow-runtime",
-    role_title: roleTitle || "Runtime Shadow Role",
-    requirements: requirements.map((requirement, index) => ({
-      capability_id: "D16-SHADOW-CAP-" + String(index + 1),
-      normalized_requirement: requirement.normalized_requirement,
-      baseline_criticality: index === 0 ? "CRITICAL" : index === 1 ? "IMPORTANT" : "SUPPORTING",
-      source: { source_type: "ADMIN_CURATED", source_id: "d16-shadow-runtime", source_version: "1" },
-      canonical_requirement_id: requirement.id,
-    })),
-  };
-}
 
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
