@@ -37,6 +37,7 @@ import {
 } from "@/lib/professional-mirror";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { CanonicalExtractionDiagnostics } from "@/lib/canonical-shadow-extractor";
+import type { CanonicalShadowCompleteness } from "@/lib/canonical-shadow-pipeline";
 
 export type D16ShadowRuntimeResult = {
   ledger: EvidenceLedger;
@@ -49,6 +50,8 @@ export type D16ShadowRuntimeResult = {
   diagnostics: string[];
   /** Exact E1 extraction diagnostics object; D16 must consume without mutation or reinterpretation. */
   extraction_diagnostics: CanonicalExtractionDiagnostics;
+  /** E1 completeness is authoritative downstream; D16 must never upgrade INCOMPLETE to complete. */
+  completeness: CanonicalShadowCompleteness;
 };
 
 export async function runD16ShadowRuntimeIntegration(
@@ -162,5 +165,6 @@ export async function runD16ShadowRuntimeIntegration(
     d15,
     diagnostics,
     extraction_diagnostics: shadow.extraction,
+    completeness: shadow.completeness,
   };
 }
