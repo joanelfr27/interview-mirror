@@ -23,6 +23,7 @@ export type EvidenceSourceSection =
   | "EXPERIENCE_NON_BULLET"
   | "UNKNOWN_SECTION";
 export type EvidenceOwnership = "INDIVIDUAL" | "TEAM" | "SHARED" | "SUPERVISED" | "UNKNOWN";
+export type ActorBasis = "EXPLICIT_CANDIDATE" | "IMPLICIT_CANDIDATE" | "EXPLICIT_OTHER" | "UNSPECIFIED";
 export type AssertionType =
   | "STATED" | "QUANTIFIED" | "CREDENTIAL" | "EMPLOYMENT"
   | "RESPONSIBILITY" | "OUTCOME_CLAIM" | "ELICITED";
@@ -52,7 +53,7 @@ export type AtomicEvidence = {
     language: EvidenceLanguage;
     extraction_method: "PARSER" | "LLM" | "USER";
   };
-  subject: { actor: string; ownership: EvidenceOwnership };
+  subject: { actor: string; ownership: EvidenceOwnership; actor_basis?: ActorBasis };
   action: { normalized_action: string; object: string };
   context: {
     domain?: string;
@@ -161,6 +162,13 @@ export type DemonstrationObjective = {
   probe_family?: string;
 };
 
+/** Conversation state only: never a support atom or an input to evidence judges. */
+export type MirrorClarificationRecord={
+ key:string; headline:string; asserted_proposition:string; language:'en'|'fr';
+ source_quotes:string[]; status:'DENIED'|'CLOSED_OTHER_ACTOR'|'NEEDS_MORE_DETAIL'|'CONFIRMED';
+ responses:Array<{id:string;answer:string}>; follow_up_issued:boolean;
+};
+
 export type EvidenceLedger = {
   source_spans: SourceSpan[];
   evidence: AtomicEvidence[];
@@ -170,6 +178,7 @@ export type EvidenceLedger = {
   unresolved_items: UnresolvedItem[];
   candidate_elicitations: CandidateElicitation[];
   demonstration_objectives: DemonstrationObjective[];
+  mirror_clarifications?: MirrorClarificationRecord[];
   // CompetencyInstance and CareerTheme remain virtual L2/L3 projections over L1.
   // They are intentionally not persisted in the reasoning ledger and never feed LLM support judgments.
 };
@@ -184,6 +193,20 @@ const SUPPORT_STATUSES = new Set<SupportStatus>([
   "DIRECT","PARTIAL","ANALOGICAL_TRANSFER","CONTRADICTORY","NONE",
 ]);
 const OWNERSHIPS = new Set<EvidenceOwnership>(["INDIVIDUAL","TEAM","SHARED","SUPERVISED","UNKNOWN"]);
+const ACTOR_BASES = new Set<ActorBasis>(["EXPLICIT_CANDIDATE","IMPLICIT_CANDIDATE","EXPLICIT_OTHER","UNSPECIFIED"]);
+
+/** Backward-compatible read policy for atoms persisted before actor_basis existed. */
+export function effectiveActorBasis(atom: AtomicEvidence): ActorBasis {
+  if (atom.subject.actor_basis) return atom.subject.actor_basis;
+  // Legacy atoms already carrying an exact non-candidate actor must remain
+  // other-attributed; only the historical candidate placeholder receives the
+  // compatibility default.
+  const actor = atom.subject.actor.trim();
+  if (/^unspecified$/i.test(actor)) return "UNSPECIFIED";
+  return /^(?:candidate|the candidate|candidat|le candidat)$/i.test(actor)
+    ? "IMPLICIT_CANDIDATE"
+    : "EXPLICIT_OTHER";
+}
 const ASSERTIONS = new Set<AssertionType>([
   "STATED","QUANTIFIED","CREDENTIAL","EMPLOYMENT","RESPONSIBILITY","OUTCOME_CLAIM","ELICITED",
 ]);
@@ -245,6 +268,51 @@ export function deriveDeterministicVerifiability(source: string): VerifiabilityS
   return { has_quantifiable_metric, has_third_party_entity, has_time_anchor };
 }
 
+export function hasActorRelativeClauseBoundary(text:string):boolean {
+ const clauses=text.replace(/\\b(?:in|during|at|on|after|before|from|for|through|with)\\s+that\\s+(?=[\\p{L}])/giu,' ');
+ return /\\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\\b/iu.test(clauses);
+}
+
+export function hasActionLocalCandidateMarker(source: string, normalizedAction: string): boolean {
+  const action = normalizedAction.trim();
+  if (!action) return false;
+  const lowerSource = source.toLocaleLowerCase();
+  const lowerAction = action.toLocaleLowerCase();
+  const firstActionIndex = lowerSource.indexOf(lowerAction);
+  if (firstActionIndex < 0) return false;
+  // A short/repeated action string cannot safely identify which proposition
+  // this atom represents. Fail closed rather than binding to the first match.
+  if (lowerSource.indexOf(lowerAction, firstActionIndex + lowerAction.length) >= 0) return false;
+
+  const prefix = source.slice(0, firstActionIndex);
+  const markerPattern = /(?:\b(?:i|we|our\s+(?:team|teams)|je|nous|notre\s+équipe|nos\s+équipes)\b|\bj(?=['’]))/gi;
+  const matches = [...prefix.matchAll(markerPattern)];
+  const marker = matches.at(-1);
+  if (!marker || marker.index === undefined) {
+    // Passive postposed first-person agents are explicit candidate agency.
+    const suffix = source.slice(firstActionIndex + action.length);
+    return /^\s*(?:[^;.!?]{0,80}\s)?\b(?:by\s+me|par\s+moi)\b/i.test(suffix);
+  }
+
+  const between = prefix.slice(marker.index + marker[0].length);
+  if (/\b(?:that|who|which|whose|qui|que|dont|lequel|laquelle|lesquels|lesquelles)\b/i.test(between)) return false;
+
+  // Only the clause containing the asserted action can inherit the candidate
+  // marker. If a hard/coordinating boundary follows the marker, any explicit
+  // non-candidate subject at the start of that final clause blocks attribution.
+  const clauses = between.split(/[;.!?]|(?:,\s+(?:and|but|while|whereas|et|mais|tandis\s+que)\s+)/i);
+  const lastClause = clauses.at(-1) ?? "";
+  if (clauses.length > 1) {
+    const trimmed = lastClause.trim();
+    const candidateSubject = /^(?:i|we|our\s+(?:team|teams)|je|j['’]|nous|notre\s+équipe|nos\s+équipes)\b/i.test(trimmed);
+    // A non-empty clause beginning after the boundary is a fresh grammatical
+    // clause. Unless it explicitly restates candidate agency, do not carry the
+    // earlier candidate subject across the boundary.
+    if (trimmed && !candidateSubject) return false;
+  }
+
+  return true;
+}
 export function validateAtomicEvidenceAgainstSource(
   value: AtomicEvidence,
   sourceSpan: SourceSpan,
@@ -259,12 +327,33 @@ export function validateAtomicEvidenceAgainstSource(
     }
   };
 
-  // "candidate" is a canonical actor placeholder, not a claim about a named person.
+  // "candidate" and "unspecified" are canonical actor placeholders, not named source phrases.
   if (
     value.subject.actor.trim() &&
-    !/^(?:candidate|the candidate|candidat|le candidat)$/i.test(value.subject.actor.trim())
+    !/^(?:candidate|the candidate|candidat|le candidat|unspecified)$/i.test(value.subject.actor.trim())
   ) {
     requireExact("subject.actor", value.subject.actor);
+  }
+
+  if (value.subject.actor_basis === "EXPLICIT_CANDIDATE") {
+    if (!hasActionLocalCandidateMarker(source, value.action.normalized_action)) {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_CANDIDATE requires an action-local candidate-involving marker in the source quote.");
+    }
+  }
+  if (value.subject.actor_basis === "EXPLICIT_OTHER") {
+    if (/^(?:candidate|the candidate|candidat|le candidat|unspecified)$/i.test(value.subject.actor.trim()) ||
+        !source.includes(value.subject.actor.trim())) {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_OTHER requires an exact other-actor phrase grounded in the source quote.");
+    }
+    if (value.subject.ownership !== "UNKNOWN") {
+      errors.push("AtomicEvidence.subject.actor_basis=EXPLICIT_OTHER requires ownership=UNKNOWN.");
+    }
+  }
+  if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.actor !== "unspecified") {
+    errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires the canonical actor placeholder unspecified.");
+  }
+  if (value.subject.actor_basis === "UNSPECIFIED" && value.subject.ownership !== "UNKNOWN") {
+    errors.push("AtomicEvidence.subject.actor_basis=UNSPECIFIED requires ownership=UNKNOWN.");
   }
 
   // Free-text semantic fields are deliberately fail-closed: normalization may
@@ -341,6 +430,7 @@ export function validateAtomicEvidence(value: AtomicEvidence): string[] {
   if (!["PARSER","LLM","USER"].includes(value.provenance?.extraction_method)) e.push("AtomicEvidence.provenance.extraction_method is invalid.");
   if (!value.subject?.actor) e.push("AtomicEvidence.subject.actor is required.");
   if (!OWNERSHIPS.has(value.subject?.ownership)) e.push("AtomicEvidence.subject.ownership is invalid.");
+  if (value.subject?.actor_basis !== undefined && !ACTOR_BASES.has(value.subject.actor_basis)) e.push("AtomicEvidence.subject.actor_basis is invalid.");
   if (!value.action?.normalized_action) e.push("AtomicEvidence.action.normalized_action is required.");
   if (!value.action?.object) e.push("AtomicEvidence.action.object is required.");
   if (!ASSERTIONS.has(value.assertion?.type)) e.push("AtomicEvidence.assertion.type is invalid.");

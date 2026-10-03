@@ -1,3 +1,5 @@
+import {closedClarification} from "@/lib/d15-clarification-state";
+import { openRelationshipQuestion, judgeD15GS, type GSDecision } from "@/lib/d15-gs-judges";
 import type { AtomicEvidence, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { MirrorMaturity } from "@/lib/professional-mirror";
 import { AI_MODEL, getOpenAI } from "@/lib/openai";
@@ -13,11 +15,14 @@ export type D15BSemanticThreadProposal = {
 export type D15BVerifiedThread = D15BSemanticThreadProposal & {
   maturity: MirrorMaturity;
   verification: "SUPPORTED";
+  gs_decision?: GSDecision;
+  relationship_support_unit_count?: number;
 };
 
 export type D15BVerificationResult = {
   accepted: D15BVerifiedThread[];
-  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string }>;
+  rejected: Array<{ proposal_id: string; reasons: string[]; diagnostic_headline?: string; gs_decision?: GSDecision }>;
+  clarification_questions?: Array<{ proposal_id: string; question: string; evidence_ids: string[]; gs_decision: GSDecision }>;
   cv_question_back: string | null;
   completion_state: "COMPLETED_WITH_THREADS" | "COMPLETED_NO_QUALIFYING_RELATIONSHIP" | "ALL_REJECTED" | "ERROR";
 };
@@ -195,14 +200,14 @@ function deterministicProposalErrors(
   const uniqueIds = [...new Set(proposal.evidence_ids)];
 
   if (uniqueIds.length !== proposal.evidence_ids.length) errors.push("duplicate evidence IDs");
-  if (uniqueIds.length < 2) errors.push("semantic thread requires at least two evidence atoms");
+  if (uniqueIds.length < 1) errors.push("semantic thread requires cited evidence");
   if (!proposal.headline.trim()) errors.push("headline is empty");
 
   const cited = uniqueIds.map((id) => byId.get(id));
   if (cited.some((atom) => !atom)) errors.push("proposal cites unknown or ineligible evidence");
 
   const citedSpans = new Set(cited.filter(Boolean).map((atom) => atom!.source_span_id));
-  if (citedSpans.size < 2) errors.push("semantic thread requires at least two independent source spans");
+  if (citedSpans.size < 1) errors.push("semantic thread requires a source span");
 
   const source = citedText(ledger, uniqueIds);
   const sourceNorm = normalized(source);
@@ -366,7 +371,7 @@ const CANDIDATE_SET_SCHEMA = {
         properties: {
           id: { type: "string" },
           dimension: { type: "string", enum: ["CHANGE_CONTINUITY","INFORMATION_DECISION","DIAGNOSIS_CHANGE","MULTIPARTY_RESOLUTION","OPERATING_RHYTHM","EXTERNAL_INTERNAL_BRIDGE","CHANGE_USER_INTERFACE","OTHER"] },
-          evidence_ids: { type: "array", minItems: 2, items: { type: "string" } },
+          evidence_ids: { type: "array", minItems: 1, items: { type: "string" } },
         },
         required: ["id","dimension","evidence_ids"],
       },
@@ -384,18 +389,18 @@ const INTERPRETATION_SCHEMA = {
 
 async function discoverD15BCandidateSets(ledger: EvidenceLedger): Promise<D15BCandidateSet[]> {
   const input = buildD15BSemanticInput(ledger);
-  if (input.atoms.length < 2) return [];
+  if (input.atoms.length < 1) return [];
   const response = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
     response_format: jsonSchemaFormat("d15_b_candidate_sets", CANDIDATE_SET_SCHEMA),
     messages: [
-      { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything.
+      { role: "system", content: `You select evidence relationships for Interview Mirror. Read the COMPLETE eligible evidence set before selecting anything. denied_relationships is retained conversation state, never evidence: do not propose those relationships again, including semantic paraphrases, unless the candidate explicitly revises their denial.
 Return only candidate evidence sets; do NOT write headlines, summaries, questions, or candidate-facing prose.
-A candidate set needs at least two independent source spans whose relationship reveals a professional operating pattern that no single atom states alone.
+A candidate set may contain one atom with an explicit meaningful relationship, or several atoms suggesting a meaningful relationship to confirm. Do not require cross-line synthesis. An unconfirmed relationship is a hypothesis for a question, never evidence.
 Use dimensions only as reasoning lenses: CHANGE_CONTINUITY, INFORMATION_DECISION, DIAGNOSIS_CHANGE, MULTIPARTY_RESOLUTION, OPERATING_RHYTHM, EXTERNAL_INTERNAL_BRIDGE, CHANGE_USER_INTERFACE, OTHER.
 Select the SMALLEST sufficient evidence set that captures the COMPLETE relationship. Do not add atoms merely because they share a topic and do not optimize coverage.
-Rank candidate relationships by professional information gain. Treat the dimensions as operational ranking rules, not labels:
+Rank candidate relationships by professional information gain. Inspect explicit source-local connectors first, including following, after, based on, during, après, à partir de, and suite à. Preserve the actual type of link: following licenses temporal sequence, never automatically purpose or causation. In a change/integration candidate, include the atom explicitly linking systems integration to business changes rather than dropping the change context. A single atom with an explicit meaningful connection is allowed. Treat the dimensions as operational ranking rules, not labels:
 - EXTERNAL_INTERNAL_BRIDGE: prefer direct evidence that customer/user/market observations are carried to internal or senior-management audiences over generic coordination.
 - DIAGNOSIS_CHANGE: prefer diagnosis/root-cause evidence paired with a procedure/process change or reorganisation over dashboards/reporting.
 - OPERATING_RHYTHM: prefer recurring planning/forecast evidence paired with a structured review cadence over general account/team activity.
@@ -405,7 +410,7 @@ Rank candidate relationships by professional information gain. Treat the dimensi
 When a stronger dimension above is supported, do not substitute a weaker OTHER or topical-coordination bundle using overlapping or nearby evidence. Choose at most ONE best evidence set per meaningful dimension and suppress generic project/administrative coordination when a more informative relationship exists.
 Prefer 1-2 strong relationships; maximum 2. Return zero when evidence contains only routine unrelated duties or category-level similarity.
 Do not infer facts from titles, employers, typical duties, or outside knowledge. Evidence IDs must come from input. Return JSON only.` },
-      { role: "user", content: JSON.stringify(input) },
+      { role: "user", content: JSON.stringify({...input,denied_relationships:(ledger.mirror_clarifications??[]).filter(r=>r.status==='DENIED'||r.status==='CLOSED_OTHER_ACTOR').map(r=>({proposition:r.asserted_proposition,source_quotes:r.source_quotes}))}) },
     ],
   });
   return parseD15BCandidateDiscoveryContent(response.choices[0]?.message?.content);
@@ -427,8 +432,8 @@ async function interpretD15BCandidateSet(ledger: EvidenceLedger, candidate: D15B
     messages: [
       { role: "system", content: `Write ONE concise candidate-facing professional insight from ONLY the supplied evidence atoms.
 Address the candidate directly. If source_language is "en", the headline MUST begin exactly with "You ". If source_language is "fr", it MUST begin exactly with "Vous ". Never output the other language.
-State what the cross-line pattern MEANS about how the candidate works; do not simply concatenate, enumerate, or relabel the activities. The insight must reveal a relationship/function that no single cited line states alone while remaining a reasonable reading of the lines together.
-Good shape: "You work where a new system meets the people who have to use it." Bad shape: "You combine rollout support with feedback collection and training assistance."
+Write a precise relational hypothesis for assessment, preserving exact agency and scope. State how one activity feeds, informs, changes, structures, or is carried into another. A hypothesis may lack an evidence license: the judges will then ask about the link, never assert it as fact. A list joined by and/et is NOT a relationship and must not be proposed. Good hypothetical shape: You use your sales forecasts to structure the pipeline review. French: Vous utilisez votre analyse des retards pour modifier le processus de traitement des commandes. These are shapes, never assumed facts. Do not copy example wording unless its activities occur in the input. It can be stated in one atom or be an unconfirmed hypothesis connecting atoms. Do not concatenate activities or write category packaging. Never write "Documented connection between" or "Lien documenté". Unsupported hypotheses will become questions, never accepted facts.
+If the supplied atoms state a source-local relationship with following, after or equivalent, preserve that exact relationship in a proposal before inventing a different cross-atom mechanism. Do not silently turn chronology into response or causation. Use a concrete relationship, not a metaphor such as intersection or bridge. Preserve assisted/supported as assisted/supported; never upgrade them to facilitating or leading.
 Do not explain why the pattern is beneficial, valuable, effective, strategic, successful, improved, enhanced, enabled, strengthened, optimized, or what effect it may have unless that exact effect is explicitly stated in the cited evidence.
 Do not add purpose or causality with phrases such as "to improve", "to enhance", "enabling", "supporting better", "driving", or equivalent French constructions unless the cited evidence explicitly states that purpose/effect.
 Do not invent or upgrade ownership, outcome, metric, date, duration, scale, scope, seniority, entity, place, tool, responsibility, purpose, benefit, or causality.
@@ -446,7 +451,7 @@ export async function proposeD15BSemanticThreads(ledger: EvidenceLedger): Promis
   const proposals: D15BSemanticThreadProposal[] = [];
   for (const candidate of candidates) {
     const ids = [...new Set(candidate.evidence_ids)];
-    if (ids.length < 2 || ids.some((id) => !eligible.has(id))) continue;
+    if (ids.length < 1 || ids.some((id) => !eligible.has(id))) continue;
     const headline = await interpretD15BCandidateSet(ledger, { ...candidate, evidence_ids: ids });
     if (!headline) continue;
     proposals.push({ id: candidate.id, headline, evidence_ids: ids, question_back: null });
@@ -465,8 +470,12 @@ export async function verifyD15BClaimIndependently(
   claim: string,
   claimType: "HEADLINE" | "SIGNIFICANCE" | "QUESTION_BACK",
 ): Promise<D15BClaimVerification> {
+  if (claimType === "SIGNIFICANCE") {
+    const decision = await judgeD15GS(ledger, evidenceIds, claim);
+    return { supported: decision.S.supported, reason: decision.S.reason };
+  }
   const atoms = citedAtomsForVerifier(ledger, evidenceIds);
-  if (!claim.trim() || atoms.length < 2) return { supported: false, reason: "insufficient cited evidence" };
+  if (!claim.trim() || atoms.length < 1) return { supported: false, reason: "insufficient cited evidence" };
   const response = await getOpenAI().chat.completions.create({
     model: AI_MODEL,
     temperature: 0,
@@ -478,20 +487,6 @@ export async function verifyD15BClaimIndependently(
 Judge whether the claim stays within those atoms. Do not use outside knowledge or infer from titles or typical duties.
 Reject ownership upgrades, invented outcomes, metrics, dates/durations, named entities/places, seniority/scope, tools, responsibilities, purpose links, or causal claims. Be strict about semantic upgrades even when they are linguistically subtle: support/assist wording does not entail providing/owning the activity; coordination/organisation does not entail managing it; and two separately documented activities do not entail that one was done to solve, improve, enable, or cause the other.
 For HEADLINE, verify ONLY factual entailment and truth-boundary safety. Semantic synthesis is allowed when every substantive factual assertion is grounded in the cited atoms. Do not reject a headline merely because it is broad, interpretive, generic, or not insightful; SIGNIFICANCE is evaluated separately.
-For SIGNIFICANCE, the relationship is EXPECTED not to be stated in any single cited line; discovering that cross-line relationship is the point of a semantic thread. Truth, factual entailment, invented facts, ownership, outcomes and causality are checked separately by deterministic guards and the HEADLINE verifier. DO NOT reject because the lines fail to say that they are connected, fail to say that one leads to/supports/influences another, or merely appear as separate CV bullets.
-
-Apply these THREE tests:
-(a) RELATIONAL MEANING: Is the proposed connection more than naming, listing, paraphrasing, or assigning a general category to the activities?
-(b) REASONABLE SYNTHESIS: Would a reasonable reader, seeing these cited lines together, accept this connection as a fair synthesis of how the activities relate?
-(c) ROLE-TITLE SPECIFICITY: Reject if the headline would be equally true of most people holding the candidate's ordinary job title or function. A generic duty-summary such as "You provide administrative support" or "You keep a manager's day running" is not a Mirror insight. Accept only when the cited lines together reveal a more specific recurring relationship, interface, pattern, or way of working than the role title itself implies.
-Return supported=true if and only if (a) and (b) are yes AND the proposal passes (c).
-
-Worked examples (illustrative only; these are not benchmark cases):
-1. REJECT / generic receptionist duties. Lines: "Greeted clients at reception." + "Managed the main phone line." + "Ordered office stationery." Headline: "You keep front-desk administration running." => supported=false. This is a generic duty summary that would be equally true of many receptionists.
-2. ACCEPT / warehouse tool-to-user interface. Lines: "Introduced a new stock-tracking tool in the warehouse." + "Trained warehouse staff to use the tool." + "Collected staff feedback after go-live." Headline: "You work where a new operational tool meets the people who have to use it." => supported=true. The lines reveal a specific implementation-to-user relationship beyond a generic warehouse-supervision title.
-3. ACCEPT / accountant recurring around audit change. Lines: "Prepared account reconciliations for the annual audit." + "Mapped ledger balances during a finance-system migration." + "Reconciled migrated balances for auditor review." Headline: "Your accounting work repeatedly connects financial-system change with audit-ready evidence." => supported=true. The recurring relationship between system change, reconciliation and audit evidence is more specific than generic accounting work.
-
-The lines themselves do NOT need to contain an explicit linking sentence, causal statement, or explanation of interconnection. Do not ask for one. Do not re-run factual entailment here.
 For QUESTION_BACK, a genuine question may ask to establish an unknown fact; reject it only when its wording asserts an unsupported premise as already true. A neutral question asking what the candidate personally owned/did versus supported/assisted is SUPPORTED when cited evidence contains support/assist/help/participate/contribute wording. Do not treat the words "owned", "led", "result", or equivalent inside an interrogative as assertions when they are explicitly asking whether/how much of that unknown was true.
 Reject the claim when its language differs from expected_language. Return supported=false whenever uncertain. Return JSON only.`,
       },
@@ -641,43 +636,30 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
   const deterministic = verifyD15BSemanticThreadProposals(ledger, guardRepaired);
   const accepted: D15BVerifiedThread[] = [];
   const rejected = [...deterministic.rejected];
+  const clarification_questions: NonNullable<D15BVerificationResult["clarification_questions"]> = [];
 
   for (const proposal of deterministic.accepted) {
+    const language=sourceLanguageForEvidence(ledger,proposal.evidence_ids);
+    if(closedClarification(ledger,proposal.evidence_ids,proposal.headline,language)) {
+      rejected.push({proposal_id:proposal.id,diagnostic_headline:proposal.headline,reasons:['RELATIONSHIP_PREVIOUSLY_DENIED']});continue;
+    }
     let workingProposal={...proposal};
     if(isFullyTitleCaseHeadline(workingProposal.headline) || obviousHeadlineLanguageMismatch(sourceLanguageForEvidence(ledger,workingProposal.evidence_ids),workingProposal.headline)){
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: Title Case headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
-        continue;
-      }
-      workingProposal=floorProposal;
-    }
-    let headline = await verifyD15BClaimIndependently(ledger, proposal.evidence_ids, workingProposal.headline, "HEADLINE");
-    if (!headline.supported) {
       const repaired=await repairHeadlineOnce(ledger,workingProposal);
-      if(repaired){
-        const repairedProposal={...workingProposal,headline:repaired};
-        const guardErrors=deterministicProposalErrors(ledger,repairedProposal);
-        const repairedCheck=guardErrors.length ? {supported:false,reason:guardErrors.join(" | ")} : await verifyD15BClaimIndependently(ledger,proposal.evidence_ids,repaired,"HEADLINE");
-        if(repairedCheck.supported){ workingProposal=repairedProposal; headline=repairedCheck; }
-      }
-    }
-    if (!headline.supported) {
-      const floor=deterministicHeadlineFloor(ledger,workingProposal);
-      const floorProposal={...workingProposal,headline:floor};
-      const floorErrors=deterministicProposalErrors(ledger,floorProposal,{headlineSource:"deterministic_floor"});
-      if(floorErrors.length){
-        rejected.push({proposal_id:proposal.id,reasons:[`PRESENTATION_UNREPAIRABLE: headline floor failed deterministic truth guards: ${floorErrors.join(" | ")}`]});
+      if(!repaired||deterministicProposalErrors(ledger,{...workingProposal,headline:repaired}).length){
+        rejected.push({proposal_id:proposal.id,reasons:['PRESENTATION_UNREPAIRABLE: no valid candidate-facing headline']});
         continue;
       }
-      workingProposal=floorProposal;
-      headline={supported:true,reason:"reviewed deterministic headline floor"};
+      workingProposal={...workingProposal,headline:repaired};
     }
-    const significance = await verifyD15BSignificanceByMajority(ledger, workingProposal.evidence_ids, workingProposal.headline);
-    if (!significance.supported) {
-      rejected.push({ proposal_id: proposal.id, reasons: [`significance majority rejected: ${significance.reason}`] });
+    const gs = await judgeD15GS(ledger, workingProposal.evidence_ids, workingProposal.headline);
+    if(closedClarification(ledger,workingProposal.evidence_ids,gs.asserted_proposition,language)) {
+      rejected.push({proposal_id:proposal.id,diagnostic_headline:workingProposal.headline,gs_decision:gs,reasons:['RELATIONSHIP_PREVIOUSLY_DENIED']});continue;
+    }
+    if (!gs.accepted) {
+      const question=openRelationshipQuestion(ledger,workingProposal.evidence_ids,gs,sourceLanguageForEvidence(ledger,workingProposal.evidence_ids));
+      if(question) clarification_questions.push({proposal_id:proposal.id,question,evidence_ids:workingProposal.evidence_ids,gs_decision:gs});
+      rejected.push({ proposal_id: proposal.id, diagnostic_headline: workingProposal.headline, gs_decision: gs, reasons: [`G/S v1.1 rejected: G=${gs.G.supported}; S=${gs.S.supported}; vetoes=${gs.vetoes.join(",")}; G: ${gs.G.reason}; S: ${gs.S.reason}`] });
       continue;
     }
     if (workingProposal.question_back) {
@@ -707,7 +689,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       rejected.push({ proposal_id: proposal.id, reasons: [`PRESENTATION_UNREPAIRABLE: question repair failed: ${questionCheck.reason}`] });
       continue;
     }
-    accepted.push({ ...workingProposal, question_back: generatedQuestion });
+    accepted.push({ ...workingProposal, question_back: generatedQuestion, gs_decision: gs });
   }
   const cvLanguage=(()=>{
     const languages=new Set(ledger.source_spans.map(span=>span.language).filter((x):x is "en"|"fr"=>x==="en"||x==="fr"));
@@ -755,7 +737,7 @@ export async function runD15BSemanticThreadEngine(ledger: EvidenceLedger): Promi
       ? "COMPLETED_NO_QUALIFYING_RELATIONSHIP"
       : "ALL_REJECTED";
   const safeCvQuestion=completion_state==="COMPLETED_NO_QUALIFYING_RELATIONSHIP" ? cv_question_back : null;
-  return { accepted, rejected, cv_question_back:safeCvQuestion, completion_state };
+  return { accepted, rejected, clarification_questions, cv_question_back:safeCvQuestion, completion_state };
 }
 
 export type D15BSemanticInput = {

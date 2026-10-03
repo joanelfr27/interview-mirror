@@ -8,6 +8,8 @@ import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
+import { selectSharedCandidateQuestions, SHARED_CANDIDATE_QUESTION_BUDGET } from "@/lib/candidate-question-selection";
+import { applyOwnerLoopAnswers, buildOwnerLoopD16 } from "@/lib/owner-loop-runtime";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -207,6 +209,14 @@ function fingerprint(value: string): string {
 }
 
 
+const ownerAnswersRaw = process.env.D15_RUNTIME_CANDIDATE_ANSWERS_JSON?.trim() || "";
+let ownerAnswers: Record<string,string> = {};
+if (ownerAnswersRaw) {
+  const parsed = JSON.parse(ownerAnswersRaw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("D15_RUNTIME_CANDIDATE_ANSWERS_JSON must be a JSON object keyed by selected question id.");
+  ownerAnswers = Object.fromEntries(Object.entries(parsed as Record<string,unknown>).filter((entry): entry is [string,string] => typeof entry[1] === "string"));
+}
+
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
 const sessionFingerprintFilter = new Set(
@@ -272,6 +282,10 @@ const runtimeProvenance = {
     support_judge: await sourceDigest("src/lib/canonical-support-judge.ts"),
     d15_semantic_engine: await sourceDigest("src/lib/d15-semantic-thread-engine.ts"),
     d16_strategy: await sourceDigest("src/lib/d16-personalized-interview-strategy.ts"),
+    d15_conversational_mirror: await sourceDigest("src/lib/d15-conversational-mirror.ts"),
+    candidate_elicitation: await sourceDigest("src/lib/candidate-elicitation.ts"),
+    candidate_question_selection: await sourceDigest("src/lib/candidate-question-selection.ts"),
+    owner_loop_runtime: await sourceDigest("src/lib/owner-loop-runtime.ts"),
   },
 };
 
@@ -329,13 +343,24 @@ for (const row of chosen) {
     // candidate answers these questions and the answers become canonical evidence.
     const result = await runCanonicalShadowPipeline(session);
     const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
-    const questions = [
-      ...d15Semantic.accepted
-        .map((thread) => thread.question_back)
-        .filter((question): question is string => Boolean(question?.trim())),
-      ...(d15Semantic.cv_question_back?.trim() ? [d15Semantic.cv_question_back] : []),
-      ...result.ledger.candidate_elicitations.map((item) => item.question).filter(Boolean),
-    ].filter((question, index, all) => all.indexOf(question) === index);
+    // Build a CV-only D16 projection solely to rank candidate attention. It is
+    // not the post-answer strategy and is never presented as candidate guidance.
+    const preAnswerD16 = buildOwnerLoopD16(session, result.ledger);
+    const selectedQuestions = selectSharedCandidateQuestions(
+      result.ledger,
+      d15Semantic,
+      SHARED_CANDIDATE_QUESTION_BUDGET,
+      preAnswerD16.strategy.tensions,
+      {jdPresent:Boolean(session.job_description.trim()),language:session.preparation_language==="fr"?"fr":"en"},
+    );
+    const questions = selectedQuestions.map((item) => item.question);
+    const suppliedSelectedAnswers = Object.fromEntries(
+      selectedQuestions.filter((item) => ownerAnswers[item.id]?.trim()).map((item) => [item.id, ownerAnswers[item.id]]),
+    );
+    const answerStage = Object.keys(suppliedSelectedAnswers).length
+      ? await applyOwnerLoopAnswers(session, result.ledger, selectedQuestions, suppliedSelectedAnswers)
+      : null;
+    const d16AfterAnswers = answerStage ? buildOwnerLoopD16(session, answerStage.ledger) : null;
 
     const evidenceText = result.ledger.evidence.map((atom) => {
       const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
@@ -349,10 +374,12 @@ for (const row of chosen) {
 
     report.sessions.push({
       ...base,
-      outcome: "AWAITING_CANDIDATE_ANSWERS",
-      protocol_stage: "D15_QUESTION_GATE",
-      d16_executed: false,
-      d16_block_reason: "Candidate answers must become canonical evidence before D16 strategy generation.",
+      outcome: d16AfterAnswers ? "PASS_WITH_CANDIDATE_ANSWERS" : "AWAITING_CANDIDATE_ANSWERS",
+      protocol_stage: d16AfterAnswers ? "POST_ANSWER_STRATEGY" : "D15_QUESTION_GATE",
+      d16_executed: Boolean(d16AfterAnswers),
+      d16_pre_answer_projection_used_for_question_ranking: true,
+      d16_block_reason: d16AfterAnswers ? null : "Candidate answers must become canonical evidence before final D16 strategy generation.",
+      d16_after_answers: d16AfterAnswers?.strategy ?? null,
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
       e1_atom_rejection: rejectionRate(result.extraction),
@@ -362,6 +389,14 @@ for (const row of chosen) {
       analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
       d15_semantic: d15Semantic,
       candidate_questions: questions,
+      selected_candidate_questions: selectedQuestions.map(({d15_target,elicitation,...item}) => ({
+        ...item,
+        unresolved_item_id: elicitation?.unresolved_item_id ?? null,
+        d15_proposal_id: d15_target?.proposal_id ?? null,
+        d15_evidence_ids: d15_target?.evidence_ids ?? [],
+      })),
+      candidate_question_budget: SHARED_CANDIDATE_QUESTION_BUDGET,
+      owner_answer_traces: answerStage?.traces ?? [],
       context_population_diagnostic: {
         by_atom: result.extraction.context_population_by_atom_id,
         summary: result.ledger.evidence.reduce(
@@ -437,13 +472,15 @@ function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_ato
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
+const completedWithAnswers = report.sessions.filter((item) => item.outcome === "PASS_WITH_CANDIDATE_ANSWERS");
 (report as typeof report & { question_gate?: unknown }).question_gate = {
   expected_sessions: chosen.length,
   awaiting_candidate_answers: awaiting.length,
-  pass: failures.length === 0 && awaiting.length === chosen.length,
+  completed_with_answers: completedWithAnswers.length,
+  pass: failures.length === 0 && (awaiting.length + completedWithAnswers.length) === chosen.length,
 };
 
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (failures.length || awaiting.length !== chosen.length) process.exitCode = 1;
+if (failures.length || (awaiting.length + completedWithAnswers.length) !== chosen.length) process.exitCode = 1;

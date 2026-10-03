@@ -5,6 +5,7 @@ on:
     branches:
       - d16-integration
       - e1-support-basis-contract
+      - edf-owner-loop-integration
   pull_request:
     branches:
       - audit-version
