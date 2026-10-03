@@ -810,7 +810,7 @@ test("EDF decomposed Bac+5 facet inherits finance specialization from parent req
   l.source_spans[1] = { id:"S-REQ", document_id:"JD", text:"Bac+5", start_offset:0, end_offset:5, language:"fr" };
   l.source_spans[0] = { id:"S-A1", document_id:"CV", text:"MBA in Global Business & Management Studies", start_offset:0, end_offset:43, language:"en" };
   l.evidence[0] = { ...l.evidence[0], source_span_id:"S-A1", action:{normalized_action:"MBA",object:"Global Business & Management Studies"}, assertion:{type:"CREDENTIAL",polarity:"AFFIRMATIVE"} };
-  l.requirements[0] = { ...l.requirements[0], requirement:"Formation : Bac+5 spécialisation finance / corporate finance", facets:[{id:"F-1",type:"LEVEL",requirement:"Bac+5",source_span_id:"S-REQ"}] };
+  l.requirements[0] = { ...l.requirements[0], normalized_requirement:"Formation : Bac+5 spécialisation finance / corporate finance", facets:[{id:"F-1",type:"LEVEL",requirement:"Bac+5",source_span_id:"S-REQ"}] };
   const result=sanitizeJudgments([raw("DIRECT",["A1"])],l);
   assert.equal(result.errors.length,0); assert.equal(result.judgments[0].status,"PARTIAL");
 });
@@ -819,7 +819,7 @@ test("EDF decomposed experience facet inherits named fields from parent requirem
   l.source_spans[1]={id:"S-REQ",document_id:"JD",text:"Minimum 7 à 10 ans d'expérience",start_offset:0,end_offset:31,language:"fr"};
   l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Finance leader with over 13 years of multinational experience.",start_offset:0,end_offset:62,language:"en"};
   l.evidence[0]={...l.evidence[0],source_span_id:"S-A1",action:{normalized_action:"worked",object:"finance for over 13 years"}};
-  l.requirements[0]={...l.requirements[0],requirement:"Minimum 7 à 10 ans d'expérience en Asset Management, Financement de projet, Private Equity ou M&A",facets:[{id:"F-1",type:"LEVEL",requirement:"Minimum 7 à 10 ans d'expérience",source_span_id:"S-REQ"}]};
+  l.requirements[0]={...l.requirements[0],normalized_requirement:"Minimum 7 à 10 ans d'expérience en Asset Management, Financement de projet, Private Equity ou M&A",facets:[{id:"F-1",type:"LEVEL",requirement:"Minimum 7 à 10 ans d'expérience",source_span_id:"S-REQ"}]};
   const result=sanitizeJudgments([raw("DIRECT",["A1"])],l);
   assert.equal(result.errors.length,0); assert.equal(result.judgments[0].status,"PARTIAL");
 });
