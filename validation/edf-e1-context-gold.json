@@ -1,158 +1,134 @@
 [
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 1,
     "source_quote": "Partner with Regional Leadership to simplify complex financial data, performance reporting and strategic decision support across West & Central Africa.",
-    "expected_domains": [
-      "financial data",
-      "performance reporting",
-      "strategic decision support"
-    ],
-    "expected_scopes": [
-      "Regional Leadership",
-      "West & Central Africa"
-    ]
+    "expected_domains": ["financial data", "performance reporting", "strategic decision support"],
+    "expected_scopes": ["Regional Leadership", "West & Central Africa"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 2,
     "source_quote": "Lead budgeting, forecasting, month-end close and variance analysis, ensuring timely and accurate financial reporting.",
-    "expected_domains": [
-      "budgeting",
-      "forecasting",
-      "month-end close",
-      "variance analysis",
-      "financial reporting"
-    ]
+    "expected_domains": ["budgeting", "forecasting", "month-end close", "variance analysis", "financial reporting"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 3,
     "source_quote": "Strengthen internal controls, governance and regulatory compliance while driving continuous process improvements.",
-    "expected_domains": [
-      "internal controls",
-      "governance",
-      "regulatory compliance",
-      "process improvements"
-    ]
+    "expected_domains": ["internal controls", "governance", "regulatory compliance", "process improvements"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 4,
     "source_quote": "Optimize working capital, cash flow and CAPEX to improve financial performance and support business growth.",
-    "expected_domains": [
-      "working capital",
-      "cash flow",
-      "CAPEX",
-      "financial performance"
-    ]
+    "expected_domains": ["working capital", "cash flow", "CAPEX", "financial performance"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 5,
     "source_quote": "Delivered financial and commercial analysis across 14 African countries to support investment and business development decisions.",
-    "expected_domains": [
-      "financial and commercial analysis",
-      "investment and business development decisions"
-    ],
-    "expected_scopes": [
-      "14 African countries"
-    ]
+    "expected_domains": ["financial and commercial analysis", "investment and business development decisions"],
+    "expected_scopes": ["14 African countries"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 6,
     "source_quote": "Conducted market, financial and risk assessments, providing recommendations to senior management and headquarters.",
-    "expected_domains": [
-      "market, financial and risk assessments"
-    ],
-    "expected_scopes": [
-      "senior management",
-      "headquarters"
-    ]
+    "expected_domains": ["market, financial and risk assessments"],
+    "expected_scopes": ["senior management", "headquarters"],
+    "borderline": true,
+    "note": "\"senior management and headquarters\" indicates organizational reach/recipient boundary for the recommendations."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 7,
     "source_quote": "Managed USD 50,000 restricted CSR project funds, ensuring strict compliance with corporate social investment policies and 'donor-style' reporting requirements.",
-    "expected_domains": [
-      "CSR project funds",
-      "corporate social investment policies",
-      "'donor-style' reporting"
-    ]
+    "expected_domains": ["CSR project funds", "corporate social investment policies", "'donor-style' reporting"],
+    "borderline": false,
+    "note": "\"USD 50,000 restricted\" is a financial quantity/constraint rather than a geographic or organizational scope phrase."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 8,
     "source_quote": "Produced executive reports and presentations that supported regional investment and operational decisions.",
-    "expected_domains": [
-      "executive reports",
-      "presentations",
-      "operational decisions"
-    ],
-    "expected_scopes": [
-      "regional investment"
-    ]
+    "expected_domains": ["executive reports", "presentations", "operational decisions"],
+    "expected_scopes": ["regional investment"],
+    "borderline": true,
+    "note": "\"regional investment\" embeds both a geographic perimeter (\"regional\") and a domain (\"investment\")."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 9,
     "source_quote": "Managed financial reporting, month-end close and account reconciliations, ensuring accurate and timely reporting.",
-    "expected_domains": [
-      "financial reporting",
-      "month-end close",
-      "account reconciliations"
-    ]
+    "expected_domains": ["financial reporting", "month-end close", "account reconciliations"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 10,
     "source_quote": "Led budgeting, forecasting and financial analysis to support operational and strategic decision-making.",
-    "expected_domains": [
-      "budgeting",
-      "forecasting",
-      "financial analysis",
-      "operational and strategic decision-making"
-    ]
+    "expected_domains": ["budgeting", "forecasting", "financial analysis", "operational and strategic decision-making"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 11,
     "source_quote": "Managed statutory audits, tax compliance and internal controls, achieving strong governance and regulatory compliance.",
-    "expected_domains": [
-      "statutory audits",
-      "tax compliance",
-      "internal controls",
-      "governance",
-      "regulatory compliance"
-    ]
+    "expected_domains": ["statutory audits", "tax compliance", "internal controls", "governance", "regulatory compliance"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 12,
     "source_quote": "Improved finance processes and reporting efficiency through standardization and continuous improvement initiatives.",
-    "expected_domains": [
-      "finance processes",
-      "reporting efficiency"
-    ]
+    "expected_domains": ["finance processes", "reporting efficiency"],
+    "borderline": false,
+    "note": "Retained in denominator per pre-registration rule."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 13,
     "source_quote": "Executed audits ensuring compliance with SYSCOHADA accounting standards and EY methodology.",
-    "expected_domains": [
-      "audits",
-      "SYSCOHADA accounting standards"
-    ]
+    "expected_domains": ["audits", "SYSCOHADA accounting standards"],
+    "borderline": false,
+    "note": "\"EY methodology\" is a methodology/standard rather than a scope perimeter."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 14,
     "source_quote": "Delivered recommendations to improve internal controls.",
-    "expected_domains": [
-      "internal controls"
-    ]
+    "expected_domains": ["internal controls"],
+    "borderline": false,
+    "note": "Retained in denominator per pre-registration rule."
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 15,
     "source_quote": "Strengthened internal controls and operational effectiveness.",
-    "expected_domains": [
-      "internal controls",
-      "operational effectiveness"
-    ]
+    "expected_domains": ["internal controls", "operational effectiveness"],
+    "borderline": false,
+    "note": null
   },
   {
     "session_fingerprint": "8a05fcb6dbe3",
+    "bullet_number": 16,
     "source_quote": "Managed accounting operations and supported cash flow monitoring.",
-    "expected_domains": [
-      "accounting operations",
-      "cash flow monitoring"
-    ]
+    "expected_domains": ["accounting operations", "cash flow monitoring"],
+    "borderline": false,
+    "note": null
   }
 ]
