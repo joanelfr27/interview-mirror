@@ -34,7 +34,7 @@ export function getCanonicalShadowEarlyReturnReasons(
 ): CanonicalShadowEarlyReturnReason[] {
   const reasons: CanonicalShadowEarlyReturnReason[] = [];
   if (diagnostics.errors.length) reasons.push("EXTRACTION_ERRORS");
-  if (diagnostics.rejected_atoms.length) reasons.push("REJECTED_ATOMS");
+  // Rejected atoms have already failed closed at atom level and are excluded from the ledger.\n  // Do not abort otherwise usable extraction merely because one proposed atom was rejected.\n  // A total loss of evidence is still caught independently by NO_EVIDENCE.
   if (diagnostics.rejected_requirements.length) reasons.push("REJECTED_REQUIREMENTS");
   if (!ledger.evidence.length) reasons.push("NO_EVIDENCE");
   if (!ledger.requirements.length) reasons.push("NO_REQUIREMENTS");
