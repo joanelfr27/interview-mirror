@@ -274,20 +274,68 @@ export function findExactSpan(
   return null;
 }
 
+type NormalizedWithOffsets = {
+  text: string;
+  originalStartByNormalizedIndex: number[];
+  originalEndByNormalizedIndex: number[];
+};
+
+function normalizeForContainmentWithOffsets(value: string): NormalizedWithOffsets {
+  let text = "";
+  const originalStartByNormalizedIndex: number[] = [];
+  const originalEndByNormalizedIndex: number[] = [];
+  let pendingWhitespace: { start: number; end: number } | null = null;
+
+  const append = (normalized: string, start: number, end: number) => {
+    for (const char of normalized) {
+      text += char;
+      originalStartByNormalizedIndex.push(start);
+      originalEndByNormalizedIndex.push(end);
+    }
+  };
+
+  for (let i = 0; i < value.length;) {
+    const codePoint = value.codePointAt(i)!;
+    const original = String.fromCodePoint(codePoint);
+    const end = i + original.length;
+    const normalized = original.normalize("NFKC").replace(/[’‘]/g, "'");
+
+    if (/^\\s+$/u.test(normalized)) {
+      pendingWhitespace ??= { start: i, end };
+      pendingWhitespace.end = end;
+    } else {
+      if (pendingWhitespace && text.length > 0) append(" ", pendingWhitespace.start, pendingWhitespace.end);
+      pendingWhitespace = null;
+      append(normalized, i, end);
+    }
+    i = end;
+  }
+
+  return { text, originalStartByNormalizedIndex, originalEndByNormalizedIndex };
+}
+
 export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "FACET" = "FACET"): SourceSpan | null {
-  const target = quote.trim();
+  const target = normalizeForContainmentWithOffsets(quote.trim()).text;
   if (!target) return null;
-  const first = parent.text.indexOf(target);
+
+  const normalizedParent = normalizeForContainmentWithOffsets(parent.text);
+  const first = normalizedParent.text.indexOf(target);
   if (first < 0) return null;
-  const second = parent.text.indexOf(target, first + Math.max(1, target.length));
+  const second = normalizedParent.text.indexOf(target, first + Math.max(1, target.length));
   if (second >= 0) return null;
-  const start = parent.start_offset + first;
+
+  const localStart = normalizedParent.originalStartByNormalizedIndex[first];
+  const localEnd = normalizedParent.originalEndByNormalizedIndex[first + target.length - 1];
+  if (localStart === undefined || localEnd === undefined) return null;
+
+  const start = parent.start_offset + localStart;
+  const end = parent.start_offset + localEnd;
   return {
-    id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + (start + target.length),
+    id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + end,
     document_id: parent.document_id,
-    text: target,
+    text: parent.text.slice(localStart, localEnd),
     start_offset: start,
-    end_offset: start + target.length,
+    end_offset: end,
     language: parent.language,
     source_section: parent.source_section,
   };
