@@ -34,6 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       writes_performed: false,
       production_strategy_invoked: false,
       diagnostics: result.diagnostics,
+      completeness: result.completeness,
       ledger: result.ledger,
       d2: result.d2,
       d3: result.d3,
@@ -98,6 +99,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       writes_performed: false,
       production_strategy_invoked: false,
       diagnostics: result.diagnostics,
+      completeness: initial.completeness,
       ledger: result.ledger,
     });
   } catch (caught) {

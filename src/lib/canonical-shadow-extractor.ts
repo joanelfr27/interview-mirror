@@ -62,7 +62,7 @@ type RawCandidateAtom = {
   extraction_confidence: number;
 };
 
-type RawRequirement = {
+export type RawRequirement = {
   id: string;
   source_quote: string;
   normalized_requirement: string;
@@ -274,20 +274,75 @@ export function findExactSpan(
   return null;
 }
 
+type NormalizedWithOffsets = {
+  text: string;
+  originalStartByNormalizedIndex: number[];
+  originalEndByNormalizedIndex: number[];
+};
+
+function normalizeForContainmentWithOffsets(value: string): NormalizedWithOffsets {
+  let text = "";
+  const originalStartByNormalizedIndex: number[] = [];
+  const originalEndByNormalizedIndex: number[] = [];
+  let pendingWhitespace: { start: number; end: number } | null = null;
+  const append = (normalized: string, start: number, end: number) => {
+    text += normalized;
+    for (let unit = 0; unit < normalized.length; unit += 1) {
+      originalStartByNormalizedIndex.push(start);
+      originalEndByNormalizedIndex.push(end);
+    }
+  };
+  const segments: Array<{ segment: string; index: number }> = [];
+  for (let i = 0; i < value.length;) {
+    const start = i;
+    const first = String.fromCodePoint(value.codePointAt(i)!);
+    i += first.length;
+    while (i < value.length) {
+      const next = String.fromCodePoint(value.codePointAt(i)!);
+      if (!/^\p{M}$/u.test(next)) break;
+      i += next.length;
+    }
+    segments.push({ segment: value.slice(start, i), index: start });
+  }
+  for (const item of segments) {
+    const end = item.index + item.segment.length;
+    const normalized = item.segment.normalize("NFKC").replace(/[’‘]/g, "'");
+    if (/^\s+$/u.test(normalized)) {
+      pendingWhitespace ??= { start: item.index, end };
+      pendingWhitespace.end = end;
+    } else {
+      if (pendingWhitespace && text.length > 0) append(" ", pendingWhitespace.start, pendingWhitespace.end);
+      pendingWhitespace = null;
+      append(normalized, item.index, end);
+    }
+  }
+  return { text, originalStartByNormalizedIndex, originalEndByNormalizedIndex };
+}
+
 export function spanWithinParent(parent: SourceSpan, quote: string, spanKind: "FACET" = "FACET"): SourceSpan | null {
-  const target = quote.trim();
+  const target = normalizeForContainmentWithOffsets(quote.trim()).text;
   if (!target) return null;
-  const first = parent.text.indexOf(target);
+
+  const normalizedParent = normalizeForContainmentWithOffsets(parent.text);
+  const first = normalizedParent.text.indexOf(target);
   if (first < 0) return null;
-  const second = parent.text.indexOf(target, first + Math.max(1, target.length));
+  const second = normalizedParent.text.indexOf(target, first + Math.max(1, target.length));
   if (second >= 0) return null;
-  const start = parent.start_offset + first;
+
+  const localStart = normalizedParent.originalStartByNormalizedIndex[first];
+  const localEnd = normalizedParent.originalEndByNormalizedIndex[first + target.length - 1];
+  if (localStart === undefined || localEnd === undefined) return null;
+
+  const originalSlice = parent.text.slice(localStart, localEnd);
+  if (normalizeForContainmentWithOffsets(originalSlice).text !== target) return null;
+  const start = parent.start_offset + localStart;
+  const end = parent.start_offset + localEnd;
   return {
-    id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + (start + target.length),
+    id: "SPAN-" + parent.document_id + "-" + spanKind + "-" + start + "-" + end,
     document_id: parent.document_id,
-    text: target,
+    text: originalSlice,
     start_offset: start,
-    end_offset: start + target.length,
+    end_offset: end,
     language: parent.language,
     source_section: parent.source_section,
   };
@@ -461,7 +516,7 @@ ${OWNERSHIP_EXTRACTION_RULE}
   return JSON.parse(raw).atoms as RawCandidateAtom[];
 }
 
-async function extractRequirements(
+export async function extractRawRequirementsForStability(
   jd: string,
 ): Promise<RawRequirement[]> {
   const openai = getOpenAI();
@@ -554,7 +609,7 @@ export async function extractCanonicalShadow(
   const contextErrors = validatePipelineContext(context);
   const [rawAtoms, rawRequirements] = await Promise.all([
     extractAtoms(session.cv_text ?? ""),
-    extractRequirements(session.job_description ?? ""),
+    extractRawRequirementsForStability(session.job_description ?? ""),
   ]);
 
   // Instrumentation sidecar: capture raw LLM ownership before any source
@@ -630,11 +685,7 @@ export async function extractCanonicalShadow(
     const facets: RequirementFacet[] = [];
     let facetMappingFailed = false;
     for (const rawFacet of raw.facets) {
-      if (!requirementSpan.text.includes(rawFacet.source_quote)) {
-        warnings.push(`[${raw.id}/${rawFacet.id}] Facet source quote is not contained in the requirement source quote.`);
-        facetMappingFailed = true;
-        break;
-      }
+
 
       const facetSpan = spanWithinParent(requirementSpan, rawFacet.source_quote, "FACET");
 

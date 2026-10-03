@@ -1,0 +1,84 @@
+name: EDF JD Stability Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Exact trusted ref containing the pre-registered stability gate"
+        required: true
+        default: "e1-french-span-normalization"
+
+permissions:
+  contents: read
+
+jobs:
+  jd-stability:
+    runs-on: ubuntu-latest
+    environment: e1-runtime
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Record frozen provenance
+        shell: bash
+        run: |
+          git rev-parse HEAD > jd-stability-commit.txt
+          cat > jd-stability-criteria.json <<'JSON'
+          {
+            "calls": 2,
+            "input": "identical EDF JD only",
+            "material_concepts": [
+              "fund_financial_steering",
+              "investor_funder_relations",
+              "required_experience",
+              "bilingualism",
+              "degree_finance_specialization"
+            ],
+            "max_requirement_count_divergence": 0.20,
+            "max_facet_count_divergence": 0.20,
+            "failure_response": "PERSIST_VALIDATED_DECOMPOSITION_PER_OPPORTUNITY"
+          }
+          JSON
+      - name: Run exactly two JD-only decompositions
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          JD_STABILITY_TEXT: ${{ secrets.EDF_JD_STABILITY_TEXT }}
+          JD_STABILITY_RESULT_PATH: jd-stability-result.json
+        run: |
+          set -o pipefail
+          npm run validate:jd-stability
+      - name: Validate captured stability artifact
+        if: always()
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const path = "jd-stability-result.json";
+          if (!fs.existsSync(path) || fs.statSync(path).size === 0) throw new Error("JD stability result is missing or empty.");
+          const r = JSON.parse(fs.readFileSync(path, "utf8"));
+          if (r.mode !== "REAL") throw new Error("Real JD stability workflow rejects non-REAL mode.");
+          if (typeof r.model_id !== "string" || !r.model_id.trim()) throw new Error("Real JD stability result must record model_id.");
+          if (r.expected_calls !== 2 || !Array.isArray(r.calls) || r.calls.length !== 2) throw new Error("JD stability result has invalid call provenance.");
+          if (!r.complete || r.calls.some(c => c.status !== "COMPLETED") || !r.evaluation || !["PASS","FAIL"].includes(r.verdict)) {
+            throw new Error("JD stability result is incomplete; see artifact call-state/error evidence.");
+          }
+          for (const call of r.calls) {
+            if (!Array.isArray(call.requirements) || !call.snapshot) throw new Error("JD stability decomposition evidence is incomplete.");
+          }
+          NODE
+      - name: Upload JD stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edf-jd-stability-${{ github.run_id }}
+          path: |
+            jd-stability-result.json
+            jd-stability-commit.txt
+            jd-stability-criteria.json
+          if-no-files-found: error

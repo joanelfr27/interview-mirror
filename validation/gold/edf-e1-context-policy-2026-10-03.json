@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "gold_blob_sha": "cd9eb4795421d26350e7a43969f784624f74cd0c",
+  "session_fingerprint": "8a05fcb6dbe3",
+  "field_none_semantics": {
+    "omitted_expected_domains": "NONE",
+    "omitted_expected_scopes": "NONE"
+  },
+  "borderline_exclusions": [
+    {"bullet_number": 6, "field": "scope", "phrases": ["senior management", "headquarters"]},
+    {"bullet_number": 8, "field": "scope", "phrases": ["regional investment"]}
+  ]
+}

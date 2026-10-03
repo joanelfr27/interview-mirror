@@ -20,7 +20,7 @@ type RawJudgment = {
   supporting_evidence_ids: string[]; context_evidence_ids: string[];
   rationale: string; confidence: number; abstained: boolean; abstention_reason?: string; support_basis: "DOCUMENTED" | "CANDIDATE_SELF_REPORTED";
   relationship_connector?: string | null; licensing_spans: string[];
-  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] };
+  analogical_mapping?: { shared_dimensions: string[]; unshared_dimensions: string[] } | null;
 };
 
 
@@ -465,10 +465,19 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     const otherSources = ledger.evidence
       .filter(other => other.id !== atom.id)
       .map(other => spans.get(other.source_span_id) ?? "");
+    const citedSources = citedSourceTexts.map(sourceText => normalizeEvidenceText(sourceText));
     const uniquePhrases = distinctivePhrases(source).filter(phrase =>
       !otherSources.some(other => normalizeEvidenceText(other).includes(phrase))
     );
-    if (uniquePhrases.some(phrase => rationale.includes(phrase))) {
+    const leakedPhrase = uniquePhrases.find(phrase => {
+      if (!rationale.includes(phrase)) return false;
+      const phraseStems = phrase.split(/\\s+/).map(stemContentToken).filter(Boolean);
+      return !citedSources.some(citedSource => {
+        const citedStems = new Set(citedSource.split(/\\s+/).map(stemContentToken).filter(Boolean));
+        return phraseStems.every(token => citedStems.has(token));
+      });
+    });
+    if (leakedPhrase) {
       errors.push("rationale contains a distinctive phrase from evidence outside the minimal supporting subset.");
     }
   }
@@ -568,9 +577,11 @@ function directLacksNamedDomainSpecificity(
   facet: EvidenceLedger["requirements"][number]["facets"][number],
   citedAtoms: AtomicEvidence[],
   ledger: EvidenceLedger,
+  parentRequirementText = "",
 ): boolean {
   if (facet.type !== "LEVEL") return false;
-  const requiredGroups = specificityGroupsNamed(facet.requirement);
+  const sourceQuote = ledger.source_spans.find(span => span.id === facet.source_span_id)?.text ?? "";
+  const requiredGroups = specificityGroupsNamed([parentRequirementText, facet.requirement, sourceQuote].join(" "));
   if (requiredGroups.length === 0) return false;
   const citedText = citedAtoms.map(atom => {
     const source = ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? "";
@@ -583,10 +594,13 @@ function directLacksNamedDomainSpecificity(
 function directLacksEducationFieldSpecificity(
   facet: EvidenceLedger["requirements"][number]["facets"][number],
   citedAtoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
+  parentRequirementText = "",
 ): boolean {
   if (facet.type !== "LEVEL") return false;
-  const requirement = normalizedSpecificityText(facet.requirement);
-  const asksSpecificMastersField = /\b(?:master|masters|master s|degree|diplome)\b/.test(requirement) &&
+  const sourceQuote = ledger.source_spans.find(span => span.id === facet.source_span_id)?.text ?? "";
+  const requirement = normalizedSpecificityText([parentRequirementText, facet.requirement, sourceQuote].join(" "));
+  const asksSpecificMastersField = /\b(?:master|masters|master s|degree|diplome|bac\s*5)\b/.test(requirement) &&
     /\b(?:finance|accounting|comptabilite)\b/.test(requirement);
   if (!asksSpecificMastersField) return false;
   const credentials = citedAtoms.filter(atom => atom.assertion.type === "CREDENTIAL");
@@ -684,7 +698,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     // General downgrade-only specificity boundary: a LEVEL requirement that names
     // a specific professional field cannot be DIRECT from generic tenure alone.
     // This guard never creates NONE and intentionally uses only the frozen alias set.
-    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger)) {
+    if (item.status === "DIRECT" && directLacksNamedDomainSpecificity(facet, citedAtoms, ledger, req.normalized_requirement)) {
       item.status = "PARTIAL";
       deterministicRationaleOverride = "The cited evidence establishes relevant experience, but does not explicitly document experience in one of the specific professional fields named by the requirement.";
       item.rationale = deterministicRationaleOverride;
@@ -692,7 +706,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
 
 // Education-field specificity uses the same downgrade-only boundary rather than a credential-specific exception.
-    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms)) {
+    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms, ledger, req.normalized_requirement)) {
       item.status = "PARTIAL";
       deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
       item.rationale = deterministicRationaleOverride;
@@ -723,16 +737,48 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
 
     const semanticBoundaryErrors = validateRelationalAndRationaleBoundary({ ...item, rationale: rawModelRationale }, facet, ledger);
     if (semanticBoundaryErrors.length) {
-      errors.push(...semanticBoundaryErrors.map(error => "[" + item.id + "] " + error));
-      continue;
+      const rationaleOnlyErrors = semanticBoundaryErrors.filter(error =>
+        error === "rationale explicitly relies on an evidence ID outside the minimal supporting subset." ||
+        error === "rationale contains a distinctive phrase from evidence outside the minimal supporting subset."
+      );
+      const rationaleOnlySet = new Set<string>(rationaleOnlyErrors);
+      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlySet.has(error));
+      if (structuralErrors.length) {
+        errors.push(...structuralErrors.map(error => "[" + item.id + "] " + error));
+        continue;
+      }
+      if (rationaleOnlyErrors.length) {
+        item.status = "NONE";
+        item.abstained = true;
+        item.supporting_evidence_ids = [];
+        item.context_evidence_ids = [];
+        item.relationship_connector = null;
+        item.licensing_spans = [];
+        item.analogical_mapping = undefined;
+        item.confidence = 0;
+        item.abstention_reason = "Raw model rationale crossed the minimal-support boundary; facet isolated and abstained.";
+        deterministicRationaleOverride = "No validated evidence subset supports a positive judgment for this facet.";
+      }
     }
 
-    const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
+    const sanitizedItem: SupportJudgment = {
+      id: item.id,
+      requirement_id: item.requirement_id,
+      facet_id: item.facet_id,
+      status: item.status,
+      supporting_evidence_ids: item.supporting_evidence_ids,
+      rationale: deterministicRationaleOverride ?? buildCanonicalRationale(item),
+      confidence: item.confidence,
+      abstained: item.abstained,
+      support_basis: item.support_basis,
+      ...(item.analogical_mapping ? { analogical_mapping: item.analogical_mapping } : {}),
+      ...(item.abstention_reason ? { abstention_reason: item.abstention_reason } : {}),
+    };
+    const validation = validateSupportJudgmentAgainstFacet(sanitizedItem, facet, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     // Candidate-facing/downstream rationale is deterministic and derived only from the
     // validated minimal subset. The raw model rationale remains available in diagnostics.
-    item.rationale = deterministicRationaleOverride ?? buildCanonicalRationale(item);
-    valid.push(item);
+    valid.push(sanitizedItem);
   }
 
   for (const req of ledger.requirements) for (const facet of req.facets) {

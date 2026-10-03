@@ -240,7 +240,10 @@ test("rationale cannot explicitly invoke an uncited evidence ID", () => {
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2" });
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "A2 establishes the missing relationship." };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("outside the minimal supporting subset")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 test("rationale cannot borrow a distinctive phrase from uncited evidence", () => {
@@ -249,7 +252,38 @@ test("rationale cannot borrow a distinctive phrase from uncited evidence", () =>
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "Forecasts directly shaped quarterly pipeline review decisions." };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("distinctive phrase")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
+});
+
+test("repeated near-identical role wording is not treated as uncited rationale leakage", () => {
+  const l = ledger();
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Lead budgeting, forecasting and financial reporting.", start_offset: 0, end_offset: 49, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1" };
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Led budgeting, forecasting and financial analysis.", start_offset: 50, end_offset: 99, language: "en" });
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "The candidate has led budgeting, forecasting and financial reporting." };
+  const result = sanitizeJudgments([judgment], l);
+  assert.equal(result.errors.some(error => error.includes("distinctive phrase")), false);
+});
+
+test("raw rationale leak isolates only the affected facet and preserves another facet status", () => {
+  const l = ledger();
+  l.requirements[0].facets.push({ id: "F-2", type: "FUNCTION", requirement: "Prepare forecasts", source_span_id: "S-REQ" });
+  l.source_spans.push({ id: "S-A2", document_id: "CV", text: "Forecasts directly shaped quarterly pipeline review decisions", start_offset: 18, end_offset: 75, language: "en" });
+  l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
+  const leaking = { ...raw("PARTIAL", ["A1"]), rationale: "Forecasts directly shaped quarterly pipeline review decisions." };
+  const valid = { ...raw("PARTIAL", ["A1"]), id: "SJ-2", facet_id: "F-2", rationale: "The cited evidence supports forecasting experience." };
+  const result = sanitizeJudgments([leaking, valid], l);
+  assert.equal(result.errors.length, 0);
+  const isolated = result.judgments.find(j => j.facet_id === "F-1");
+  const preserved = result.judgments.find(j => j.facet_id === "F-2");
+  assert.equal(isolated?.status, "NONE");
+  assert.equal(isolated?.abstained, true);
+  assert.equal(preserved?.status, "PARTIAL");
+  assert.equal(preserved?.abstained, false);
 });
 
 test("minimal support and optional context IDs must remain disjoint", () => {
@@ -775,5 +809,54 @@ test("explicit out-of-subset evidence ID reference remains rejected", () => {
   l.evidence.push({ ...l.evidence[0], id: "2", source_span_id: "S-A2" });
   const judgment = { ...raw("DIRECT", ["A1"]), rationale: "Evidence ID: 2 also supports this judgment." };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.some(error => error.includes("evidence ID outside")), true);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
+});
+
+
+test("EDF decomposed experience facet keeps source-quote field restrictions", () => {
+  const l = ledger();
+  const jd = "Expérience : Minimum 7 à 10 ans d'expérience en Asset Management, Financement de projet, Private Equity ou M&A, idéalement dans le secteur de l'énergie et/ou en Afrique";
+  l.source_spans[1] = { id: "S-REQ", document_id: "JD", text: jd, start_offset: 0, end_offset: jd.length, language: "fr" };
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Finance leader with 13+ years of multinational experience across Africa.", start_offset: 0, end_offset: 68, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "worked", object: "finance for 13+ years" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "Minimum 7 à 10 ans d'expérience", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("specific professional fields"));
+});
+
+test("EDF decomposed degree facet keeps source-quote finance specialization", () => {
+  const l = ledger();
+  const jd = "Formation : Bac+5 spécialisation finance / corporate finance";
+  l.source_spans[1] = { id: "S-REQ", document_id: "JD", text: jd, start_offset: 0, end_offset: jd.length, language: "fr" };
+  l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "MBA", object: "Global Business & Management Studies" }, assertion: { type: "CREDENTIAL", polarity: "AFFIRMATIVE" } };
+  l.requirements[0].facets = [{ id: "F-1", type: "LEVEL", requirement: "Bac+5", source_span_id: "S-REQ" }];
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("required Finance or Accounting specialization"));
+});
+
+test("EDF decomposed Bac+5 facet inherits finance specialization from parent requirement", () => {
+  const l = ledger();
+  l.source_spans[1] = { id:"S-REQ", document_id:"JD", text:"Bac+5", start_offset:0, end_offset:5, language:"fr" };
+  l.source_spans[0] = { id:"S-A1", document_id:"CV", text:"MBA in Global Business & Management Studies", start_offset:0, end_offset:43, language:"en" };
+  l.evidence[0] = { ...l.evidence[0], source_span_id:"S-A1", action:{normalized_action:"MBA",object:"Global Business & Management Studies"}, assertion:{type:"CREDENTIAL",polarity:"AFFIRMATIVE"} };
+  l.requirements[0] = { ...l.requirements[0], normalized_requirement:"Formation : Bac+5 spécialisation finance / corporate finance", facets:[{id:"F-1",type:"LEVEL",requirement:"Bac+5",source_span_id:"S-REQ"}] };
+  const result=sanitizeJudgments([raw("DIRECT",["A1"])],l);
+  assert.equal(result.errors.length,0); assert.equal(result.judgments[0].status,"PARTIAL");
+});
+test("EDF decomposed experience facet inherits named fields from parent requirement", () => {
+  const l=ledger();
+  l.source_spans[1]={id:"S-REQ",document_id:"JD",text:"Minimum 7 à 10 ans d'expérience",start_offset:0,end_offset:31,language:"fr"};
+  l.source_spans[0]={id:"S-A1",document_id:"CV",text:"Finance leader with over 13 years of multinational experience.",start_offset:0,end_offset:62,language:"en"};
+  l.evidence[0]={...l.evidence[0],source_span_id:"S-A1",action:{normalized_action:"worked",object:"finance for over 13 years"}};
+  l.requirements[0]={...l.requirements[0],normalized_requirement:"Minimum 7 à 10 ans d'expérience en Asset Management, Financement de projet, Private Equity ou M&A",facets:[{id:"F-1",type:"LEVEL",requirement:"Minimum 7 à 10 ans d'expérience",source_span_id:"S-REQ"}]};
+  const result=sanitizeJudgments([raw("DIRECT",["A1"])],l);
+  assert.equal(result.errors.length,0); assert.equal(result.judgments[0].status,"PARTIAL");
 });

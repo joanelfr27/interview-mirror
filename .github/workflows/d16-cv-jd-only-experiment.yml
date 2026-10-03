@@ -1,0 +1,71 @@
+name: Experimental D16 CV+JD-only EDF baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cv-jd-only:
+    if: github.ref == 'refs/heads/jd-stability-measurement-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: bfd3f3042fa8ba79a2a96c90c9e222d2d00cfd7c
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: product/package-lock.json
+      - name: Verify pinned source and no-answer harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C product rev-parse HEAD)" = "bfd3f3042fa8ba79a2a96c90c9e222d2d00cfd7c"
+          ! grep -Eq 'classifyCandidateElicitation|applySealedEdfAnswers|candidate-answer-seal' \
+            harness/scripts/experimental/d16-cv-jd-only.ts
+          mkdir -p product/scripts/experimental
+          cp harness/scripts/experimental/d16-cv-jd-only.ts product/scripts/experimental/
+          echo "product_source_sha=$(git -C product rev-parse HEAD)"
+      - name: Install pinned product dependencies
+        working-directory: product
+        run: npm ci
+      - name: Typecheck pinned product and experimental harness
+        working-directory: product
+        run: npm run typecheck
+      - name: Run full canonical suite
+        working-directory: product
+        run: npm run test:canonical
+      - name: Run offline JD stability controls
+        working-directory: product
+        run: npm run test:jd-stability-capture
+      - name: Build pinned product
+        working-directory: product
+        run: npm run build
+      - name: Verify frozen product source remains unchanged
+        shell: bash
+        run: |
+          git -C product diff --exit-code HEAD -- src package.json package-lock.json
+          test "$(git -C product rev-parse HEAD)" = "bfd3f3042fa8ba79a2a96c90c9e222d2d00cfd7c"
+      - name: Run CV+JD-only EDF D16 experiment
+        working-directory: product
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/experimental/d16-cv-jd-only.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d16-cv-jd-only-edf-${{ github.run_id }}
+          path: product/d16-cv-jd-only-report.json
+          if-no-files-found: error

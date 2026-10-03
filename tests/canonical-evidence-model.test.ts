@@ -723,6 +723,50 @@ test("facet source mapping preserves a unique phrase occurrence", () => {
   assert.equal(span?.end_offset, 14);
 });
 
+test("facet source mapping normalizes French NBSP and typographic apostrophe but preserves original text", () => {
+  const original = "Date début\u00a0: l’expérience d’investissement est requise.";
+  const parent = {
+    id: "SPAN-JD-REQUIREMENT-100-153",
+    document_id: "JD",
+    text: original,
+    start_offset: 100,
+    end_offset: 100 + original.length,
+    language: "fr",
+  };
+  const span = spanWithinParent(parent, "l'expe\u0301rience d’investissement");
+  assert.ok(span);
+  assert.equal(span?.text, "l’expérience d’investissement");
+  assert.equal(span?.text, original.slice(span!.start_offset - 100, span!.end_offset - 100));
+});
+
+test("facet source mapping keeps exact offsets when NFKC expansion precedes the match", () => {
+  const original = "ﬃ — Date début\u00a0: l’expérience requise";
+  const parent = {
+    id: "SPAN-JD-REQUIREMENT-40-80",
+    document_id: "JD",
+    text: original,
+    start_offset: 40,
+    end_offset: 40 + original.length,
+    language: "fr",
+  };
+  const span = spanWithinParent(parent, "Date début : l'expérience requise");
+  assert.ok(span);
+  const localStart = span!.start_offset - parent.start_offset;
+  const localEnd = span!.end_offset - parent.start_offset;
+  assert.equal(span?.text, original.slice(localStart, localEnd));
+  assert.equal(span?.text, "Date début\u00a0: l’expérience requise");
+});
+
+
+test("facet source mapping preserves UTF-16 offsets after emoji and collapses mixed whitespace", () => {
+  const original = "📌 Date\u00a0  début : janvier 2025";
+  const parent = { id: "SPAN-JD-EMOJI", document_id: "JD", text: original, start_offset: 100, end_offset: 100 + original.length, language: "fr" };
+  const span = spanWithinParent(parent, "Date début : janvier 2025");
+  assert.ok(span);
+  assert.equal(span?.text, "Date\u00a0  début : janvier 2025");
+  assert.equal(span?.start_offset, 100 + original.indexOf("Date"));
+  assert.equal(span?.end_offset, 100 + original.length);
+});
 
 test("field-level grounding rejects an invented actor while allowing the canonical candidate placeholder", () => {
   const evidence = atom("A1");

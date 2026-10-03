@@ -32,8 +32,6 @@ function ledger(evidence = 1, requirements = 1) {
 
 test("canonical shadow early-return reasons preserve each independent gate", () => {
   const cases: Array<[CanonicalShadowEarlyReturnReason, ReturnType<typeof diagnostics>, any]> = [
-    ["EXTRACTION_ERRORS", diagnostics({ errors: ["grounding failure"] }), ledger()],
-    ["REJECTED_REQUIREMENTS", diagnostics({ rejected_requirements: ["R-1"] }), ledger()],
     ["NO_EVIDENCE", diagnostics(), ledger(0, 1)],
     ["NO_REQUIREMENTS", diagnostics(), ledger(1, 0)],
   ];
@@ -50,8 +48,6 @@ test("canonical shadow early-return reasons preserve multiple simultaneous cause
       ledger(0, 0),
     ),
     [
-      "EXTRACTION_ERRORS",
-      "REJECTED_REQUIREMENTS",
       "NO_EVIDENCE",
       "NO_REQUIREMENTS",
     ],
@@ -76,5 +72,25 @@ test("rejected atoms still fail closed when no accepted evidence remains", () =>
       ledger(0, 1),
     ),
     ["NO_EVIDENCE"],
+  );
+});
+
+test("rejected requirement is isolated when another usable requirement remains", () => {
+  assert.deepEqual(
+    getCanonicalShadowEarlyReturnReasons(
+      diagnostics({ rejected_requirements: ["R-REJECTED"] }) as any,
+      ledger(1, 1),
+    ),
+    [],
+  );
+});
+
+test("item-local extraction errors do not stop a usable partial ledger", () => {
+  assert.deepEqual(
+    getCanonicalShadowEarlyReturnReasons(
+      diagnostics({ errors: ["[A-20] action.object is required"], rejected_atoms: ["A-20"] }) as any,
+      ledger(1, 1),
+    ),
+    [],
   );
 });
