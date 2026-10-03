@@ -54,18 +54,30 @@ export type D16ShadowRuntimeResult = {
   completeness: CanonicalShadowCompleteness;
 };
 
+export type D16ShadowLedgerTransform = (
+  ledger: EvidenceLedger,
+  session: SessionRecord,
+) => Promise<{ ledger: EvidenceLedger; diagnostics?: string[] }>;
+
 export async function runD16ShadowRuntimeIntegration(
   session: SessionRecord,
+  ledgerTransform?: D16ShadowLedgerTransform,
 ): Promise<D16ShadowRuntimeResult> {
   const shadow = await runCanonicalShadowPipeline(session);
   const diagnostics = [...shadow.diagnostics];
+  let ledger = ledger;
+  if (ledgerTransform) {
+    const transformed = await ledgerTransform(ledger, session);
+    ledger = transformed.ledger;
+    diagnostics.push(...(transformed.diagnostics ?? []));
+  }
 
-  const graphErrors = validateRequirementGraph(shadow.ledger);
+  const graphErrors = validateRequirementGraph(ledger);
   if (graphErrors.length) {
     throw new Error("D16 shadow ledger validation failed: " + graphErrors.join(" | "));
   }
 
-  const d2 = buildCanonicalReasoningProjection(shadow.ledger);
+  const d2 = buildCanonicalReasoningProjection(ledger);
   const d2Validation = validateCanonicalReasoningProjection(d2);
   if (!d2Validation.valid) {
     throw new Error("D16 shadow D2 validation failed: " + d2Validation.errors.join(" | "));
@@ -77,14 +89,14 @@ export async function runD16ShadowRuntimeIntegration(
     throw new Error("D16 shadow Fit & Gap validation failed: " + d2FitGapValidation.errors.join(" | "));
   }
 
-  const d3 = buildCanonicalEvidenceRoute(shadow.ledger);
-  const d3Validation = validateCanonicalEvidenceRoute(d3, shadow.ledger);
+  const d3 = buildCanonicalEvidenceRoute(ledger);
+  const d3Validation = validateCanonicalEvidenceRoute(d3, ledger);
   if (!d3Validation.valid) {
     throw new Error("D16 shadow D3 validation failed: " + d3Validation.errors.join(" | "));
   }
 
-  const d4 = buildFitGapConsumerProjection(d2FitGap, d3, shadow.ledger);
-  const d4Validation = validateFitGapConsumerProjection(d4, d2FitGap, d3, shadow.ledger);
+  const d4 = buildFitGapConsumerProjection(d2FitGap, d3, ledger);
+  const d4Validation = validateFitGapConsumerProjection(d4, d2FitGap, d3, ledger);
   if (!d4Validation.valid) {
     throw new Error("D16 shadow D4 validation failed: " + d4Validation.errors.join(" | "));
   }
@@ -93,14 +105,14 @@ export async function runD16ShadowRuntimeIntegration(
     d4,
     d2FitGap,
     d3,
-    shadow.ledger,
+    ledger,
   );
   const d5Validation = validateDemonstrationObjectiveConsumerProjection(
     d5,
     d4,
     d2FitGap,
     d3,
-    shadow.ledger,
+    ledger,
   );
   if (!d5Validation.valid) {
     throw new Error("D16 shadow D5 validation failed: " + d5Validation.errors.join(" | "));
@@ -111,7 +123,7 @@ export async function runD16ShadowRuntimeIntegration(
     d2FitGap,
     d3,
     d5,
-    shadow.ledger,
+    ledger,
   );
   const d6Validation = validateCanonicalStrategyBridgeProjection(
     d6,
@@ -119,25 +131,25 @@ export async function runD16ShadowRuntimeIntegration(
     d2FitGap,
     d3,
     d5,
-    shadow.ledger,
+    ledger,
   );
   if (!d6Validation.valid) {
     throw new Error("D16 shadow D6 validation failed: " + d6Validation.errors.join(" | "));
   }
 
-  const d15 = buildProfessionalMirror(shadow.ledger);
-  const d15Validation = validateProfessionalMirror(d15, shadow.ledger);
+  const d15 = buildProfessionalMirror(ledger);
+  const d15Validation = validateProfessionalMirror(d15, ledger);
   if (!d15Validation.valid) {
     throw new Error("D16 shadow D15 validation failed: " + d15Validation.errors.join(" | "));
   }
 
-  const canonicalRequirementIds = shadow.ledger.requirements.map((item) => item.id).sort();
+  const canonicalRequirementIds = ledger.requirements.map((item) => item.id).sort();
   const projectedRequirementIds = d6.requirements.map((item) => item.requirement_id).sort();
   if (JSON.stringify(canonicalRequirementIds) !== JSON.stringify(projectedRequirementIds)) {
     throw new Error("D16 shadow requirement identity drift detected between E1 and D6.");
   }
 
-  const canonicalEvidenceIds = new Set(shadow.ledger.evidence.map((item) => item.id));
+  const canonicalEvidenceIds = new Set(ledger.evidence.map((item) => item.id));
   const d6EvidenceIds = d6.requirements.flatMap((item) => item.evidence.map((evidence) => evidence.evidence_id));
   if (d6EvidenceIds.some((id) => !canonicalEvidenceIds.has(id))) {
     throw new Error("D16 shadow evidence provenance drift detected between E1 and D6.");
@@ -156,7 +168,7 @@ export async function runD16ShadowRuntimeIntegration(
   );
 
   return {
-    ledger: shadow.ledger,
+    ledger: ledger,
     d2,
     d3,
     d4,
