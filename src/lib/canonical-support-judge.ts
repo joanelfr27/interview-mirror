@@ -741,7 +741,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
         error === "rationale explicitly relies on an evidence ID outside the minimal supporting subset." ||
         error === "rationale contains a distinctive phrase from evidence outside the minimal supporting subset."
       );
-      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlyErrors.includes(error));
+      const rationaleOnlySet = new Set<string>(rationaleOnlyErrors);\n      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlySet.has(error));
       if (structuralErrors.length) {
         errors.push(...structuralErrors.map(error => "[" + item.id + "] " + error));
         continue;
@@ -760,12 +760,24 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
       }
     }
 
-    const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
+    const sanitizedItem: SupportJudgment = {
+      id: item.id,
+      requirement_id: item.requirement_id,
+      facet_id: item.facet_id,
+      status: item.status,
+      supporting_evidence_ids: item.supporting_evidence_ids,
+      rationale: deterministicRationaleOverride ?? buildCanonicalRationale(item),
+      confidence: item.confidence,
+      abstained: item.abstained,
+      support_basis: item.support_basis,
+      ...(item.analogical_mapping ? { analogical_mapping: item.analogical_mapping } : {}),
+      ...(item.abstention_reason ? { abstention_reason: item.abstention_reason } : {}),
+    };
+    const validation = validateSupportJudgmentAgainstFacet(sanitizedItem, facet, ledger.evidence);
     if (validation.length) { errors.push(...validation.map(x => "[" + item.id + "] " + x)); continue; }
     // Candidate-facing/downstream rationale is deterministic and derived only from the
     // validated minimal subset. The raw model rationale remains available in diagnostics.
-    item.rationale = deterministicRationaleOverride ?? buildCanonicalRationale(item);
-    valid.push(item);
+    valid.push(sanitizedItem);
   }
 
   for (const req of ledger.requirements) for (const facet of req.facets) {
