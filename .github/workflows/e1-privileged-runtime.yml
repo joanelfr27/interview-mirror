@@ -6,7 +6,7 @@ on:
       ref:
         description: "Trusted ref to validate after environment approval"
         required: true
-        default: "d16-integration"
+        default: ""
       session_count:
         description: "Number of runtime sessions to validate"
         required: true
@@ -14,7 +14,7 @@ on:
       session_fingerprints:
         description: "Optional comma-separated session fingerprints to validate"
         required: false
-        default: "827edbeaf468"
+        default: "8a05fcb6dbe3"
       status_filter:
         description: "Optional session status filter"
         required: false
@@ -32,6 +32,14 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
+      - name: Verify immutable runtime commit and EDF session
+        shell: bash
+        run: |
+          [[ "${{ inputs.ref }}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "${{ inputs.ref }}"
+          test "${{ inputs.session_fingerprints }}" = "8a05fcb6dbe3"
+          echo "runtime_commit=$(git rev-parse HEAD)"
+          echo "runtime_session_fingerprint=${{ inputs.session_fingerprints }}"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -54,6 +62,21 @@ jobs:
             echo 'E1_CONTEXT_GOLD_JSON<<__E1_CONTEXT_GOLD__'
             cat "$GOLD_PATH"
             echo '__E1_CONTEXT_GOLD__'
+          } >> "$GITHUB_ENV"
+      - name: Verify and load frozen context policy
+        shell: bash
+        run: |
+          POLICY_PATH="validation/gold/edf-e1-context-policy-2026-10-03.json"
+          EXPECTED_POLICY_BLOB="62eb2aa3503e0d44c32f75dd03f046041cb548ca"
+          test -s "$POLICY_PATH"
+          ACTUAL_POLICY_BLOB="$(git hash-object "$POLICY_PATH")"
+          echo "context_policy_path=$POLICY_PATH"
+          echo "context_policy_blob_sha=$ACTUAL_POLICY_BLOB"
+          test "$ACTUAL_POLICY_BLOB" = "$EXPECTED_POLICY_BLOB"
+          {
+            echo 'E1_CONTEXT_POLICY_JSON<<__E1_CONTEXT_POLICY__'
+            cat "$POLICY_PATH"
+            echo '__E1_CONTEXT_POLICY__'
           } >> "$GITHUB_ENV"
       - name: D15-D16 privileged runtime validation
         env:
