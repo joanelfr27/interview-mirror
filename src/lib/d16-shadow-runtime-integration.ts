@@ -65,7 +65,7 @@ export async function runD16ShadowRuntimeIntegration(
 ): Promise<D16ShadowRuntimeResult> {
   const shadow = await runCanonicalShadowPipeline(session);
   const diagnostics = [...shadow.diagnostics];
-  let ledger = ledger;
+  let ledger: EvidenceLedger = shadow.ledger;
   if (ledgerTransform) {
     const transformed = await ledgerTransform(ledger, session);
     ledger = transformed.ledger;
