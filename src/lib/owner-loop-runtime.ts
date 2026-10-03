@@ -35,7 +35,11 @@ export async function applyOwnerLoopAnswers(
   if(!answer) continue;
   const before=new Set(ledger.evidence.map(a=>a.id));
   let gap:string|null=null,rationale:string|null=null,d15Status:string|null=null;
-  if(question.origin==="REQUIREMENT_GAP"){
+  if(question.origin==="ASSESSMENT_CONTEXT"){
+   // Assessment context is preparation metadata, not candidate evidence.
+   traces.push({question_id:question.id,origin:question.origin,question:question.question,answer,canonicalized_atoms:[],gap_classification:null,gap_classification_rationale:"Assessment context only; not canonical candidate evidence.",d15_status:null});
+   continue;
+  } else if(question.origin==="REQUIREMENT_GAP"){
    const elicitation=ledger.candidate_elicitations.find(e=>e.id===question.elicitation?.id);
    if(!elicitation) throw new Error("Selected requirement elicitation is no longer present: "+question.id);
    const result=await classifyCandidateElicitation(session,ledger,elicitation,answer);
