@@ -662,12 +662,11 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     if (item.status === "DIRECT") {
       const sourceSpanIds = new Set(citedAtoms.map(atom => atom.source_span_id));
       if (sourceSpanIds.size > 1) {
-        if (isRelationalFacet(facet.requirement) || Boolean(item.relationship_connector?.trim())) {
-          errors.push("Rejected judgment " + item.id + ": relational DIRECT cannot compose independent source spans; use a single preserved source reference.");
-          continue;
-        }
         item.status = "PARTIAL";
-        deterministicRationaleOverride = "Multiple independent source spans support this facet, so DIRECT is conservatively downgraded to PARTIAL.";
+        deterministicRationaleOverride =
+          isRelationalFacet(facet.requirement) || Boolean(item.relationship_connector?.trim())
+            ? "Independent source spans cannot establish the asserted relationship as DIRECT; conservatively downgraded to PARTIAL."
+            : "Multiple independent source spans support this facet, so DIRECT is conservatively downgraded to PARTIAL.";
         item.rationale = deterministicRationaleOverride;
         item.confidence = Math.min(item.confidence, 0.8);
       }
