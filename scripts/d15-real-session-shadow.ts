@@ -9,6 +9,7 @@ import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shado
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
 import { selectSharedCandidateQuestions, SHARED_CANDIDATE_QUESTION_BUDGET } from "@/lib/candidate-question-selection";
+import { applyOwnerLoopAnswers, buildOwnerLoopD16 } from "@/lib/owner-loop-runtime";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -208,6 +209,14 @@ function fingerprint(value: string): string {
 }
 
 
+const ownerAnswersRaw = process.env.D15_RUNTIME_CANDIDATE_ANSWERS_JSON?.trim() || "";
+let ownerAnswers: Record<string,string> = {};
+if (ownerAnswersRaw) {
+  const parsed = JSON.parse(ownerAnswersRaw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("D15_RUNTIME_CANDIDATE_ANSWERS_JSON must be a JSON object keyed by selected question id.");
+  ownerAnswers = Object.fromEntries(Object.entries(parsed as Record<string,unknown>).filter((entry): entry is [string,string] => typeof entry[1] === "string"));
+}
+
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
 const sessionFingerprintFilter = new Set(
@@ -276,6 +285,7 @@ const runtimeProvenance = {
     d15_conversational_mirror: await sourceDigest("src/lib/d15-conversational-mirror.ts"),
     candidate_elicitation: await sourceDigest("src/lib/candidate-elicitation.ts"),
     candidate_question_selection: await sourceDigest("src/lib/candidate-question-selection.ts"),
+    owner_loop_runtime: await sourceDigest("src/lib/owner-loop-runtime.ts"),
   },
 };
 
@@ -339,6 +349,13 @@ for (const row of chosen) {
       SHARED_CANDIDATE_QUESTION_BUDGET,
     );
     const questions = selectedQuestions.map((item) => item.question);
+    const suppliedSelectedAnswers = Object.fromEntries(
+      selectedQuestions.filter((item) => ownerAnswers[item.id]?.trim()).map((item) => [item.id, ownerAnswers[item.id]]),
+    );
+    const answerStage = Object.keys(suppliedSelectedAnswers).length
+      ? await applyOwnerLoopAnswers(session, result.ledger, selectedQuestions, suppliedSelectedAnswers)
+      : null;
+    const d16AfterAnswers = answerStage ? buildOwnerLoopD16(session, answerStage.ledger) : null;
 
     const evidenceText = result.ledger.evidence.map((atom) => {
       const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
@@ -352,7 +369,7 @@ for (const row of chosen) {
 
     report.sessions.push({
       ...base,
-      outcome: "AWAITING_CANDIDATE_ANSWERS",
+      outcome: d16AfterAnswers ? "PASS_WITH_CANDIDATE_ANSWERS" : "AWAITING_CANDIDATE_ANSWERS",
       protocol_stage: "D15_QUESTION_GATE",
       d16_executed: false,
       d16_block_reason: "Candidate answers must become canonical evidence before D16 strategy generation.",
@@ -447,13 +464,15 @@ function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_ato
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
+const completedWithAnswers = report.sessions.filter((item) => item.outcome === "PASS_WITH_CANDIDATE_ANSWERS");
 (report as typeof report & { question_gate?: unknown }).question_gate = {
   expected_sessions: chosen.length,
   awaiting_candidate_answers: awaiting.length,
-  pass: failures.length === 0 && awaiting.length === chosen.length,
+  completed_with_answers: completedWithAnswers.length,
+  pass: failures.length === 0 && (awaiting.length + completedWithAnswers.length) === chosen.length,
 };
 
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (failures.length || awaiting.length !== chosen.length) process.exitCode = 1;
+if (failures.length || (awaiting.length + completedWithAnswers.length) !== chosen.length) process.exitCode = 1;
