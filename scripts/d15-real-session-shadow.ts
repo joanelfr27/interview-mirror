@@ -1,7 +1,9 @@
 // Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
+import { AI_MODEL } from "@/lib/openai";
+import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
 import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
@@ -283,9 +285,26 @@ if (chosen.length < requestedSessionCount) {
 }
 
 
+async function sourceDigest(path: string): Promise<string> {
+  return createHash("sha256").update(await readFile(path)).digest("hex");
+}
+
+const runtimeProvenance = {
+  commit: process.env.GITHUB_SHA ?? null,
+  workflow_run_id: process.env.GITHUB_RUN_ID ?? null,
+  model: AI_MODEL,
+  source_sha256: {
+    extractor: await sourceDigest("src/lib/canonical-shadow-extractor.ts"),
+    support_judge: await sourceDigest("src/lib/canonical-support-judge.ts"),
+    d15_semantic_engine: await sourceDigest("src/lib/d15-semantic-thread-engine.ts"),
+    d16_strategy: await sourceDigest("src/lib/d16-personalized-interview-strategy.ts"),
+  },
+};
+
 const report = {
   run: {
     mode: "D15_REAL_SESSION_SHADOW",
+    provenance: runtimeProvenance,
     writes_performed: false,
     sessions_requested: chosen.length,
     requested_session_count: requestedSessionCount,
@@ -332,6 +351,9 @@ for (const row of chosen) {
 
   try {
     const result = await runD16ShadowRuntimeIntegration(session);
+    // The decisive runner must exercise the frozen D15-B semantic G/S path,
+    // not merely the legacy deterministic Professional Mirror grouping.
+    const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
     const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
       id: requirement.id,
       normalized_requirement: requirement.normalized_requirement,
@@ -370,6 +392,14 @@ for (const row of chosen) {
         ? Number((domains.length / result.ledger.evidence.length).toFixed(3))
         : 0,
       d15_threads: result.d15.threads.length,
+      d15_semantic: d15Semantic,
+      d15_candidate_facing: {
+        story: result.d15.story,
+        statements: result.d15.statements,
+        legacy_threads: result.d15.threads,
+      },
+      support_judgments: result.ledger.support_judgments,
+      candidate_elicitations: result.ledger.candidate_elicitations,
       d15_statements: result.d15.statements.length,
       d15_connection_reasons: result.d15.threads.map((thread) => thread.connection_reason),
       d15_thread_evidence_counts: result.d15.threads.map((thread) => thread.evidence_ids.length),
@@ -381,6 +411,10 @@ for (const row of chosen) {
       d16_d6_version: d16.d6_version,
       d16_role_capability_model_version: d16.role_capability_model_version,
       d16_tensions: d16.tensions.length,
+      d16_candidate_facing: {
+        tensions: d16.tensions,
+        actions: d16.actions,
+      },
       d16_actions: d16.actions.length,
       d16_tension_requirement_ids: d16.tensions.map((tension) => tension.requirement_id),
       d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
@@ -394,6 +428,9 @@ for (const row of chosen) {
             summary.domain.raw_populated += Number(item.raw_domain_populated);
             summary.domain.canonical_populated += Number(item.canonical_domain_populated);
             summary.domain.raw_present_but_canonical_missing += Number(item.raw_domain_populated && !item.canonical_domain_populated);
+            summary.scope.raw_populated += Number(item.raw_scope_populated);
+            summary.scope.canonical_populated += Number(item.canonical_scope_populated);
+            summary.scope.raw_present_but_canonical_missing += Number(item.raw_scope_populated && !item.canonical_scope_populated);
             summary.tools_or_systems.raw_populated += Number(item.raw_tools_populated);
             summary.tools_or_systems.canonical_populated += Number(item.canonical_tools_populated);
             summary.tools_or_systems.raw_present_but_canonical_missing += Number(item.raw_tools_populated && !item.canonical_tools_populated);
@@ -404,6 +441,7 @@ for (const row of chosen) {
           },
           {
             domain: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            scope: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
             tools_or_systems: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
             standards: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
           },
