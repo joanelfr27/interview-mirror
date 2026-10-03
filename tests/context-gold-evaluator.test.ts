@@ -172,7 +172,8 @@ test("borderline policy is phrase-level and cannot decide the gate", () => {
   const missed = evaluateContextGold(borderline, [], undefined, policy);
   assert.equal(missed.expected_phrase_count, 0);
   assert.equal(missed.recall, 1);
-  assert.equal(missed.pass, true);
+  assert.equal(missed.pass, false); // bullet coverage still counts all 16 bullets; missing the entire bullet is a coverage failure
+  assert.deepEqual(missed.not_extracted_quotes, [borderline[0].source_quote]);
   assert.equal(missed.borderline_results[0].found, false);
 
   const alternative = evaluateContextGold(borderline, [{ source_quote: "senior management", scope: "senior management" }], undefined, policy);
