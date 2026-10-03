@@ -407,7 +407,7 @@ const report = {
     mode: cvJdOnlyMode ? "CV_JD_ONLY_D16_EXPERIMENT" : "D15_REAL_SESSION_SHADOW",
     ...(cvJdOnlyMode
       ? {
-          experiment_label: "CV + JD only, no candidate answers, product code bfd3f3042fa8ba79a2a96c90c9e222d2d00cfd7c",
+          experiment_label: `CV + JD only, no candidate answers, runtime code ${runtimeCommit}, including Phase 1b fixes`,
           candidate_answers_consumed: 0,
         }
       : {}),
