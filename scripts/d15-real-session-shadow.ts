@@ -8,7 +8,7 @@ import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
-import { evaluateContextGold, parseContextGold } from "@/lib/context-gold-evaluator";
+import { evaluateContextGold, parseContextGold, parseContextGoldPolicy } from "@/lib/context-gold-evaluator";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -36,6 +36,9 @@ type SessionRow = {
 };
 
 const contextGold = parseContextGold(process.env.E1_CONTEXT_GOLD_JSON);
+const contextPolicy = parseContextGoldPolicy(process.env.E1_CONTEXT_POLICY_JSON);
+if (contextGold && !contextPolicy) throw new Error("Configured context gold requires the frozen context policy.");
+if (contextPolicy && contextGold && contextGold.some(item => item.session_fingerprint !== contextPolicy.session_fingerprint)) throw new Error("Context gold session fingerprint does not match frozen context policy.");
 
 const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -380,6 +383,7 @@ for (const row of chosen) {
               };
             }),
             row.cv_text,
+            contextPolicy,
           )
         : { status: "NOT_CONFIGURED", minimum_recall: 0.8 },
       context_population_diagnostic: {
