@@ -5,7 +5,7 @@ import type {StrategicTension} from "@/lib/d16-personalized-interview-strategy";
 
 export const SHARED_CANDIDATE_QUESTION_BUDGET = 3;
 
-export type CandidateQuestionOrigin = "REQUIREMENT_GAP" | "D15_RELATIONSHIP";
+export type CandidateQuestionOrigin = "REQUIREMENT_GAP" | "D15_RELATIONSHIP" | "ASSESSMENT_CONTEXT";
 export type SelectedCandidateQuestion = {
   id:string;
   origin:CandidateQuestionOrigin;
@@ -59,14 +59,27 @@ export function d15RelationshipQuestions(result:D15BVerificationResult):Selected
  return questions;
 }
 
+export function assessmentContextQuestion(jdPresent:boolean, language:"en"|"fr"):SelectedCandidateQuestion[] {
+ if(!jdPresent) return [];
+ return [{
+  id:"ASSESSMENT-CONTEXT",origin:"ASSESSMENT_CONTEXT",
+  question:language==="fr"
+   ?"Que savez-vous réellement du format de l’entretien : interlocuteurs, nombre d’étapes, étude de cas ou test technique, et langue ? Si rien ne vous a été communiqué, dites simplement « rien communiqué »."
+   :"What do you actually know about the interview format: interviewers, number of rounds, case study or technical test, and language? If nothing has been communicated, simply say “nothing communicated”.",
+  priority:90,
+  priority_basis:["JD present","assessment context can change preparation priorities","low-friction standard question"],
+ }];
+}
+
 export function selectSharedCandidateQuestions(
  ledger:EvidenceLedger,
  d15:D15BVerificationResult,
  budget=SHARED_CANDIDATE_QUESTION_BUDGET,
  tensions:StrategicTension[]=[],
+ options:{jdPresent?:boolean;language?:"en"|"fr"}={},
 ):SelectedCandidateQuestion[] {
  if(!Number.isInteger(budget)||budget<1) throw new Error("Candidate question budget must be a positive integer.");
- const candidates=[...rankRequirementElicitations(ledger,ledger.candidate_elicitations,tensions),...d15RelationshipQuestions(d15)];
+ const candidates=[...rankRequirementElicitations(ledger,ledger.candidate_elicitations,tensions),...assessmentContextQuestion(Boolean(options.jdPresent),options.language??"en"),...d15RelationshipQuestions(d15)];
  const deduped=candidates.filter((item,index,all)=>all.findIndex(x=>x.question.trim()===item.question.trim())===index);
  return deduped.sort((a,b)=>b.priority-a.priority||a.id.localeCompare(b.id)).slice(0,budget);
 }
