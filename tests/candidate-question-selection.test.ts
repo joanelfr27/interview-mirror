@@ -35,3 +35,15 @@ test("shared attention budget prioritizes critical requirement gaps over lower-v
  assert.ok(selected.every(x=>x.question.trim()));
  assert.ok(selected.every(x=>x.priority_basis.length>0));
 });
+
+test("EDF-style shared budget includes assessment context without exceeding three questions",()=>{
+ const selected=selectSharedCandidateQuestions(ledger(),d15,SHARED_CANDIDATE_QUESTION_BUDGET,[],{jdPresent:true,language:"en"});
+ assert.equal(selected.length,3);
+ assert.deepEqual(selected.map(x=>x.id),["E-INV","E-MA","ASSESSMENT-CONTEXT"]);
+ assert.equal(selected.filter(x=>x.origin==="ASSESSMENT_CONTEXT").length,1);
+});
+
+test("assessment context is absent when there is no JD",()=>{
+ const selected=selectSharedCandidateQuestions(ledger(),d15,SHARED_CANDIDATE_QUESTION_BUDGET,[],{jdPresent:false,language:"en"});
+ assert.equal(selected.some(x=>x.origin==="ASSESSMENT_CONTEXT"),false);
+});
