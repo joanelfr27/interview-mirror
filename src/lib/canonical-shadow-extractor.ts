@@ -516,7 +516,7 @@ ${OWNERSHIP_EXTRACTION_RULE}
   return JSON.parse(raw).atoms as RawCandidateAtom[];
 }
 
-async function extractRequirements(
+export async function extractRawRequirementsForStability(
   jd: string,
 ): Promise<RawRequirement[]> {
   const openai = getOpenAI();
@@ -609,7 +609,7 @@ export async function extractCanonicalShadow(
   const contextErrors = validatePipelineContext(context);
   const [rawAtoms, rawRequirements] = await Promise.all([
     extractAtoms(session.cv_text ?? ""),
-    extractRequirements(session.job_description ?? ""),
+    extractRawRequirementsForStability(session.job_description ?? ""),
   ]);
 
   // Instrumentation sidecar: capture raw LLM ownership before any source
