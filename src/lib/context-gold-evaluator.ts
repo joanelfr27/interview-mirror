@@ -26,12 +26,15 @@ export function parseContextGold(value: string | undefined): readonly ContextGol
 }
 
 export function evaluateContextGold(gold: readonly ContextGoldItem[], observed: readonly ContextObservedItem[]) {
-  const byQuote = new Map<string, ContextObservedItem[]>();
-  for (const item of observed) byQuote.set(item.source_quote, [...(byQuote.get(item.source_quote) ?? []), item]);
   let expectedPhraseCount = 0, recoveredPhraseCount = 0;
   const nonSubstringValues: string[] = [], falsePositiveQuotes: string[] = [];
   for (const expected of gold) {
-    const actual = byQuote.get(expected.source_quote) ?? [];
+    // Gold is marked at source-bullet level, while E1 evidence is atomic and may
+    // preserve only a clause from that bullet. Match only source-grounded atom
+    // spans contained verbatim in the marked bullet; never fuzzy-match text.
+    const actual = observed.filter((item) =>
+      item.source_quote.length > 0 && expected.source_quote.includes(item.source_quote)
+    );
     if (expected.expected_domain) {
       expectedPhraseCount += 1;
       if (actual.some((item) => item.domain === expected.expected_domain)) recoveredPhraseCount += 1;
@@ -40,7 +43,7 @@ export function evaluateContextGold(gold: readonly ContextGoldItem[], observed: 
       expectedPhraseCount += 1;
       if (actual.some((item) => item.scope === expected.expected_scope)) recoveredPhraseCount += 1;
     }
-    for (const item of actual) for (const value of [item.domain, item.scope]) if (value && !expected.source_quote.includes(value)) nonSubstringValues.push(value);
+    for (const item of actual) for (const value of [item.domain, item.scope]) if (value && !item.source_quote.includes(value)) nonSubstringValues.push(value);
     if (expected.expect_none && actual.some((item) => item.domain || item.scope)) falsePositiveQuotes.push(expected.source_quote);
   }
   const recall = expectedPhraseCount ? Number((recoveredPhraseCount / expectedPhraseCount).toFixed(3)) : 1;
