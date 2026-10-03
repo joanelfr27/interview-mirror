@@ -1,5 +1,5 @@
 import type { SessionRecord } from "@/types";
-import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
+import { runCanonicalShadowPipeline, type CanonicalShadowCompleteness } from "@/lib/canonical-shadow-pipeline";
 import {
   buildCanonicalReasoningProjection,
   validateCanonicalReasoningProjection,
@@ -37,7 +37,6 @@ import {
 } from "@/lib/professional-mirror";
 import { validateRequirementGraph, type EvidenceLedger } from "@/lib/canonical-evidence-model";
 import type { CanonicalExtractionDiagnostics } from "@/lib/canonical-shadow-extractor";
-import type { CanonicalShadowCompleteness } from "@/lib/canonical-shadow-pipeline";
 
 export type D16ShadowRuntimeResult = {
   ledger: EvidenceLedger;

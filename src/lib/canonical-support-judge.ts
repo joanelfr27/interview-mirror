@@ -320,7 +320,6 @@ function clausePreservesFacetRelation(
     if (!leftIndexes.length) continue;
     const leftStart = Math.min(...leftIndexes);
     if (requireVerb && verbIndex >= leftStart) continue;
-    // For verb-less/modifier-led facets, do not let an unrelated evidence verb\n    // reverse the facet relation (e.g. "Configured SAP in the reporting team"\n    // cannot directly satisfy "Reporting in SAP"). The facet-left content must\n    // occur before the facet preposition in the source clause.\n    if (!requireVerb && leftStart > 0) {\n      const prefix = stems.slice(0, leftStart);\n      const prefixIsOnlyFacetModifier = prefix.every((_, index) => PREPOSITIONAL_MODIFIERS.has(words[index]));\n      if (!prefixIsOnlyFacetModifier) continue;\n    }\n
     // The right group must begin locally after the facet's own preposition. Permit
     // at most two determiner/adjective tokens; another preposition breaks binding.
     let cursor = prepIndex + 1;
@@ -471,9 +470,9 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     );
     const leakedPhrase = uniquePhrases.find(phrase => {
       if (!rationale.includes(phrase)) return false;
-      const phraseStems = phrase.split(/\\s+/).map(stemContentToken).filter(Boolean);
+      const phraseStems = phrase.split(/\s+/).map(stemContentToken).filter(Boolean);
       return !citedSources.some(citedSource => {
-        const citedStems = new Set(citedSource.split(/\\s+/).map(stemContentToken).filter(Boolean));
+        const citedStems = new Set(citedSource.split(/\s+/).map(stemContentToken).filter(Boolean));
         return phraseStems.every(token => citedStems.has(token));
       });
     });
