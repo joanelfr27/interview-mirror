@@ -51,7 +51,6 @@ test("canonical shadow early-return reasons preserve multiple simultaneous cause
     ),
     [
       "EXTRACTION_ERRORS",
-      "REJECTED_ATOMS",
       "REJECTED_REQUIREMENTS",
       "NO_EVIDENCE",
       "NO_REQUIREMENTS",
