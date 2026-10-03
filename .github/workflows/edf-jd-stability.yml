@@ -62,6 +62,8 @@ jobs:
           const path = "jd-stability-result.json";
           if (!fs.existsSync(path) || fs.statSync(path).size === 0) throw new Error("JD stability result is missing or empty.");
           const r = JSON.parse(fs.readFileSync(path, "utf8"));
+          if (r.mode !== "REAL") throw new Error("Real JD stability workflow rejects non-REAL mode.");
+          if (typeof r.model_id !== "string" || !r.model_id.trim()) throw new Error("Real JD stability result must record model_id.");
           if (r.expected_calls !== 2 || !Array.isArray(r.calls) || r.calls.length !== 2) throw new Error("JD stability result has invalid call provenance.");
           if (!r.complete || r.calls.some(c => c.status !== "COMPLETED") || !r.evaluation || !["PASS","FAIL"].includes(r.verdict)) {
             throw new Error("JD stability result is incomplete; see artifact call-state/error evidence.");
