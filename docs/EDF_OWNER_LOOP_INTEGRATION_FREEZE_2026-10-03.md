@@ -20,6 +20,23 @@ D15 relationship questions and requirement-gap elicitations share one budget.
 - Priority inputs: role criticality/salience, D16 tension relevance, assessment context when known, uncertainty that candidate self-report can resolve, and expected change to preparation action.
 - For the EDF owner case, the expected top priorities before seeing the sealed answers are investor-facing/fundraising exposure and the boundary of the Mitsubishi investment work. This is an acceptance expectation, not a post-answer relabel.
 
+
+## Pre-run EDF question yardstick — frozen before the next runtime
+
+For this exact EDF CV/JD owner case, the shared question selection must cover, in its own wording, all three substantive targets below within the shared attention budget:
+
+1. **Investor/funder exposure** — determine whether the candidate has actually interacted with investors, lenders, development-finance institutions or comparable funders, and preserve the boundary between exposure/dialogue and investor management or capital raising.
+2. **Mitsubishi investment-appraisal boundary** — determine what the candidate personally did in the investment-decision work, specifically whether professional work included valuation, IRR/NPV, due diligence, deal/transaction work or comparable investment appraisal, versus research/recommendations handed to headquarters.
+3. **Assessment/interview context** — ask what is actually known about interview format, interviewers, rounds, case/technical exercise and language. Candidate expectations or guesses must remain labeled UNKNOWN/scenario assumptions rather than EDF-supplied facts.
+
+Equivalent wording passes; literal wording is not required. Missing one of these targets is a product finding, not grounds to substitute a builder-authored question after the run.
+
+These questions have two downstream roles:
+- **elicitation:** resolve EVIDENCE_GAP vs TRANSFERABLE vs EXPERIENCE_GAP where candidate evidence is missing or incomplete;
+- **interviewer probe preparation:** D16 must preserve the relevant probe family after elicitation and prepare a truthful answer with permitted claims, prohibited claims/boundaries, and an appropriate bridge. Later rehearsal may consume the same probe family.
+
+Assessment context is a standard low-friction question whenever a JD is present. It competes inside the same shared attention budget rather than creating a separate questionnaire.
+
 ## Integration acceptance list
 
 Before another paid EDF run:
@@ -27,20 +44,21 @@ Before another paid EDF run:
 1. The validated D15 conversational answer path is wired into the canonical E1 -> D15 -> D16 development chain.
 2. Elicited evidence carries actor_basis and existing ownership controls; candidate agency is not inferred from context.
 3. Answering a D15 relationship question does not regenerate the proposition being clarified.
-4. D15 and requirement elicitation obey the shared attention budget above.
-5. Requirement elicitation selects/ranks questions rather than emitting one generic question for every unresolved item.
-6. The runtime report records, word for word:
+4. D15, requirement elicitation, and assessment-context elicitation obey the shared attention budget above.
+5. On the frozen EDF owner case, selected questions cover all three pre-run yardstick targets above within that budget.
+7. Requirement elicitation selects/ranks questions rather than emitting one generic question for every unresolved item.
+7. The runtime report records, word for word:
    - every selected question;
    - its origin (D15_RELATIONSHIP or REQUIREMENT_GAP);
    - its priority/ranking basis;
    - the candidate answer actually submitted;
    - the canonicalized elicited atom(s), including actor_basis and ownership;
    - the resulting gap classification where applicable.
-7. Candidate answers enter only through CandidateElicitation / canonical elicitation processing and support re-judgment. No builder-authored evidence atoms.
-8. CV-documented and CANDIDATE_SELF_REPORTED evidence remain distinct.
-9. No production DB writes.
-10. Runtime provenance records exact commit and relevant model/configuration identifiers.
-11. Static typecheck, canonical tests and build must pass before a paid owner run.
+8. Candidate answers enter only through CandidateElicitation / canonical elicitation processing and support re-judgment. No builder-authored evidence atoms.
+9. CV-documented and CANDIDATE_SELF_REPORTED evidence remain distinct.
+10. No production DB writes.
+11. Runtime provenance records exact commit and relevant model/configuration identifiers.
+12. Static typecheck, canonical tests and build must pass before a paid owner run.
 
 ## Sealed owner answers
 
