@@ -737,8 +737,27 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
 
     const semanticBoundaryErrors = validateRelationalAndRationaleBoundary({ ...item, rationale: rawModelRationale }, facet, ledger);
     if (semanticBoundaryErrors.length) {
-      errors.push(...semanticBoundaryErrors.map(error => "[" + item.id + "] " + error));
-      continue;
+      const rationaleOnlyErrors = semanticBoundaryErrors.filter(error =>
+        error === "rationale explicitly relies on an evidence ID outside the minimal supporting subset." ||
+        error === "rationale contains a distinctive phrase from evidence outside the minimal supporting subset."
+      );
+      const structuralErrors = semanticBoundaryErrors.filter(error => !rationaleOnlyErrors.includes(error));
+      if (structuralErrors.length) {
+        errors.push(...structuralErrors.map(error => "[" + item.id + "] " + error));
+        continue;
+      }
+      if (rationaleOnlyErrors.length) {
+        item.status = "NONE";
+        item.abstained = true;
+        item.supporting_evidence_ids = [];
+        item.context_evidence_ids = [];
+        item.relationship_connector = null;
+        item.licensing_spans = [];
+        item.analogical_mapping = undefined;
+        item.confidence = 0;
+        item.abstention_reason = "Raw model rationale crossed the minimal-support boundary; facet isolated and abstained.";
+        deterministicRationaleOverride = "No validated evidence subset supports a positive judgment for this facet.";
+      }
     }
 
     const validation = validateSupportJudgmentAgainstFacet(item, facet, ledger.evidence);
