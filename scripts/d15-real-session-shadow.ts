@@ -373,10 +373,13 @@ for (const row of chosen) {
               const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
               return {
                 source_quote: span?.text ?? "",
+                start_offset: span?.start_offset,
+                end_offset: span?.end_offset,
                 domain: atom.context.domain,
                 scope: atom.scale.scope,
               };
             }),
+            row.cv_text,
           )
         : { status: "NOT_CONFIGURED", minimum_recall: 0.8 },
       context_population_diagnostic: {
