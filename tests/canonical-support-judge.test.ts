@@ -200,7 +200,11 @@ test("relational DIRECT rejects composition of separately documented activities"
     licensing_spans: ["Prepared forecasts", "Introduced pipeline reviews"],
   };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "PARTIAL");\n});\n\ntest("relational DIRECT accepts an exact single-atom licensing span", () => {
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("relational DIRECT accepts an exact single-atom licensing span", () => {
   const l = ledger();
   l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "Used forecasts as input to pipeline reviews", start_offset: 0, end_offset: 43, language: "en" };
   l.evidence[0] = { ...l.evidence[0], source_span_id: "S-A1", action: { normalized_action: "used", object: "forecasts as input to pipeline reviews" } };
@@ -256,7 +260,11 @@ test("relational DIRECT rejects extra support IDs even when one atom licenses th
   l.requirements[0].facets[0] = { id: "F-1", type: "FUNCTION", requirement: "Use forecasts as input to pipeline reviews", source_span_id: "S-REQ" };
   const judgment = { ...raw("DIRECT", ["A1", "A2"]), relationship_connector: "input to", licensing_spans: ["forecasts as input to pipeline reviews"] };
   const result = sanitizeJudgments([judgment], l);
-  assert.equal(result.errors.length, 0);\n  assert.equal(result.judgments[0].status, "PARTIAL");\n});\n\ntest("unknown context evidence fails closed", () => {
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+});
+
+test("unknown context evidence fails closed", () => {
   const result = sanitizeJudgments([{ ...raw("PARTIAL", ["A1"]), context_evidence_ids: ["FORGED"] }], ledger());
   assert.ok(result.errors.some(error => error.includes("unknown evidence ID")));
 });
