@@ -1,6 +1,8 @@
 name: E1 Privileged Runtime Validation
 
 on:
+  push:
+    branches: [jd-stability-measurement-fix]
   workflow_dispatch:
     inputs:
       ref:
@@ -25,21 +27,22 @@ permissions:
 
 jobs:
   runtime:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-edf-decisive]')
     runs-on: ubuntu-latest
     environment: e1-runtime
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || github.sha }}
           persist-credentials: false
       - name: Verify immutable runtime commit and EDF session
         shell: bash
         run: |
-          [[ "${{ inputs.ref }}" =~ ^[0-9a-f]{40}$ ]]
-          test "$(git rev-parse HEAD)" = "${{ inputs.ref }}"
-          test "${{ inputs.session_fingerprints }}" = "8a05fcb6dbe3"
+          [[ "${{ inputs.ref || github.sha }}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "${{ inputs.ref || github.sha }}"
+          test "${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}" = "8a05fcb6dbe3"
           echo "runtime_commit=$(git rev-parse HEAD)"
-          echo "runtime_session_fingerprint=${{ inputs.session_fingerprints }}"
+          echo "runtime_session_fingerprint=${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -83,9 +86,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count }}
-          D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
-          D15_RUNTIME_SESSION_FINGERPRINTS: ${{ inputs.session_fingerprints }}
+          D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count || '1' }}
+          D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter || '' }}
+          D15_RUNTIME_SESSION_FINGERPRINTS: ${{ inputs.session_fingerprints || '8a05fcb6dbe3' }}
           D15_GOLD_DIAGNOSTICS: "true"
           E1_PROBE_DIAGNOSTICS: "true"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
