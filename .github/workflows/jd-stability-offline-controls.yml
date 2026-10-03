@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Exact trusted ref containing offline controls"
+        description: "Exact trusted measurement ref"
         required: true
-        default: "1de120a6830dc3d776cb43cd0ce3e5c49f260e8c"
+        default: "eea32992409dddb6a7425a8a3f2dadb11f3c97e8"
 
 permissions:
   contents: read
@@ -24,5 +24,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Record exact measurement SHA
+        run: |
+          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "${{ inputs.ref }}"
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Full canonical suite
+        run: npm run test:canonical
+      - name: Production extractor import and combining-mark smoke
+        run: node --experimental-loader ./tests/ts-alias-loader.mjs --test tests/ownership-prompt-regression.test.ts
+      - name: Build
+        run: npm run build
       - name: Run A1 A2 B offline controls
         run: npm run test:jd-stability-capture
