@@ -14,23 +14,6 @@ import {
 } from "@/lib/d16-personalized-interview-strategy";
 import type { RoleCapabilityModel } from "@/lib/role-capability-model";
 import type { CandidateElicitation, EvidenceLedger, UnresolvedItem } from "@/lib/canonical-evidence-model";
-import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
-import { classifyCandidateElicitation } from "@/lib/candidate-elicitation";
-import { buildCanonicalReasoningProjection } from "@/lib/canonical-reasoning-adapter";
-import { buildFitGapProjection } from "@/lib/fit-gap-reasoning";
-import { buildCanonicalEvidenceRoute } from "@/lib/canonical-evidence-router";
-import { buildFitGapConsumerProjection } from "@/lib/fit-gap-consumer";
-import { buildDemonstrationObjectiveConsumerProjection } from "@/lib/demonstration-objective-consumer";
-import { buildCanonicalStrategyBridgeProjection } from "@/lib/canonical-strategy-bridge";
-import { buildProfessionalMirror } from "@/lib/professional-mirror";
-import {
-  buildD16DependencySnapshot,
-  buildD16Strategy,
-  validateD16Strategy,
-  type D16Inputs,
-} from "@/lib/d16-personalized-interview-strategy";
-import type { RoleCapabilityModel } from "@/lib/role-capability-model";
-import type { CandidateElicitation, EvidenceLedger } from "@/lib/canonical-evidence-model";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
@@ -240,90 +223,6 @@ function fingerprint(value: string): string {
 
 
 
-type SealedAnswer = { id: number; target: "experience" | "governance" | "investor" | "interview_context"; answer: string };
-
-function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
-  return {
-    version: "rcm-v1",
-    model_id: "d16-sealed-runtime",
-    role_family: "shadow-runtime",
-    role_title: roleTitle || "Runtime Shadow Role",
-    requirements: requirements.map((requirement, index) => ({
-      capability_id: "D16-SEALED-CAP-" + String(index + 1),
-      normalized_requirement: requirement.normalized_requirement,
-      baseline_criticality: index === 0 ? "CRITICAL" : index === 1 ? "IMPORTANT" : "SUPPORTING",
-      source: { source_type: "ADMIN_CURATED", source_id: "d16-sealed-runtime", source_version: "1" },
-      canonical_requirement_id: requirement.id,
-    })),
-  };
-}
-
-function targetScore(requirement: EvidenceLedger["requirements"][number], target: SealedAnswer["target"]): number {
-  const text = JSON.stringify(requirement).toLowerCase();
-  const patterns: Record<Exclude<SealedAnswer["target"], "interview_context">, RegExp[]> = {
-    experience: [/asset management/i, /financement de projet/i, /project finance/i, /private equity/i, /m&a/i, /7 à 10/i, /7 to 10/i],
-    governance: [/gouvernance/i, /governance/i, /contraintes groupe/i, /group constraint/i, /holding/i, /contrôle interne/i, /internal control/i],
-    investor: [/investisseur/i, /investor/i, /fundraising/i, /levée de fonds/i, /actionnaire/i, /shareholder/i],
-  };
-  if (target === "interview_context") return 0;
-  return patterns[target].reduce((score, pattern) => score + Number(pattern.test(text)), 0);
-}
-
-function mappedElicitation(ledger: EvidenceLedger, target: Exclude<SealedAnswer["target"], "interview_context">, answerId: number): { elicitation: CandidateElicitation; requirement_id: string } {
-  const ranked = ledger.requirements
-    .map((requirement) => ({ requirement, score: targetScore(requirement, target) }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.requirement.id.localeCompare(b.requirement.id));
-  if (!ranked.length) throw new Error("No canonical requirement matched sealed answer target: " + target);
-  if (ranked.length > 1 && ranked[0].score === ranked[1].score) {
-    throw new Error("Ambiguous canonical requirement mapping for sealed answer target: " + target);
-  }
-  const requirementId = ranked[0].requirement.id;
-  const unresolved = ledger.unresolved_items.find((item) => item.requirement_id === requirementId);
-  if (!unresolved) throw new Error("Mapped requirement has no canonical unresolved item for sealed answer target: " + target);
-  const base = ledger.candidate_elicitations.find((item) => item.unresolved_item_id === unresolved.id);
-  if (!base) throw new Error("Mapped unresolved item has no canonical elicitation: " + unresolved.id);
-  return {
-    requirement_id: requirementId,
-    elicitation: { ...base, id: base.id + "-SEALED-" + String(answerId) },
-  };
-}
-
-function rebuildD16InputsFromLedger(ledger: EvidenceLedger, roleTitle: string, jobDescription: string) {
-  const d2 = buildCanonicalReasoningProjection(ledger);
-  const fitGap = buildFitGapProjection(d2);
-  const d3 = buildCanonicalEvidenceRoute(ledger);
-  const d4 = buildFitGapConsumerProjection(fitGap, d3, ledger);
-  const d5 = buildDemonstrationObjectiveConsumerProjection(d4, fitGap, d3, ledger);
-  const d6 = buildCanonicalStrategyBridgeProjection(d4, fitGap, d3, d5, ledger);
-  const mirror = buildProfessionalMirror(ledger);
-  const canonicalRequirements = ledger.requirements.map((requirement) => ({
-    id: requirement.id,
-    normalized_requirement: requirement.normalized_requirement,
-  }));
-  const roleCapabilityModel = buildShadowRoleCapabilityModel(canonicalRequirements, roleTitle);
-  const base: Omit<D16Inputs, "dependency_snapshot"> = {
-    mirror,
-    bridge: d6,
-    role_capability_model: roleCapabilityModel,
-    ledger,
-    canonical_requirements: canonicalRequirements,
-    jd_present: Boolean(jobDescription.trim()),
-    jd_fingerprint: "sha256:" + createHash("sha256").update(jobDescription, "utf8").digest("hex"),
-  };
-  const input: D16Inputs = { ...base, dependency_snapshot: buildD16DependencySnapshot(base) };
-  const strategy = buildD16Strategy(input);
-  const validation = validateD16Strategy(strategy, input);
-  if (!validation.valid) throw new Error("D16 strategy validation failed: " + validation.errors.join(" | "));
-  return { input, strategy, mirror, d6 };
-}
-
-const sealedAnswerPath = process.env.D16_SEALED_ANSWERS_PATH?.trim() || null;
-const sealedAnswers: SealedAnswer[] | null = sealedAnswerPath
-  ? JSON.parse(await readFile(sealedAnswerPath, "utf8")) as SealedAnswer[]
-  : null;
-
-
 const EDF_DECISIVE_FINGERPRINT = "8a05fcb6dbe3";
 
 async function loadSealedAnswers(): Promise<string[]> {
@@ -364,7 +263,7 @@ function requirementText(ledger: EvidenceLedger, item: UnresolvedItem): string {
   ].join(" ").toLowerCase();
 }
 
-function selectUnresolved(ledger: EvidenceLedger, label: string, patterns: RegExp[]): UnresolvedItem {
+function selectUnresolved(ledger: EvidenceLedger, label: string, patterns: readonly RegExp[]): UnresolvedItem {
   const candidates = ledger.unresolved_items
     .map((item) => ({ item, text: requirementText(ledger, item) }))
     .filter(({ text }) => patterns.some((pattern) => pattern.test(text)));
@@ -422,6 +321,7 @@ const sessionFingerprintFilter = new Set(
     .map((value) => value.trim())
     .filter(Boolean),
 );
+const sealedStrategyMode = sessionFingerprintFilter.has(EDF_DECISIVE_FINGERPRINT);
 if (!Number.isInteger(requestedSessionCount) || requestedSessionCount < 1) {
   throw new Error("D15_RUNTIME_SESSION_COUNT must be a positive integer.");
 }
@@ -632,7 +532,7 @@ const contextGoldFailures = report.sessions.filter((item) => {
   const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
   return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
 });
-if (sealedAnswers) {
+if (sealedStrategyMode) {
   (report as typeof report & { strategy_gate?: unknown }).strategy_gate = {
     expected_sessions: chosen.length,
     d16_completed: report.sessions.filter((item) => item.d16_executed === true).length,
@@ -654,7 +554,7 @@ if (sealedAnswers) {
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (sealedAnswers) {
+if (sealedStrategyMode) {
   if (failures.length || report.sessions.some((item) => item.d16_executed !== true)) process.exitCode = 1;
 } else if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length || missingGoldSessions.length) {
   process.exitCode = 1;
