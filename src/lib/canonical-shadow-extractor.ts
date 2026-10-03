@@ -299,7 +299,7 @@ function normalizeForContainmentWithOffsets(value: string): NormalizedWithOffset
     i += first.length;
     while (i < value.length) {
       const next = String.fromCodePoint(value.codePointAt(i)!);
-      if (!/^\\p{M}$/u.test(next)) break;
+      if (!/^\p{M}$/u.test(next)) break;
       i += next.length;
     }
     segments.push({ segment: value.slice(start, i), index: start });
@@ -307,7 +307,7 @@ function normalizeForContainmentWithOffsets(value: string): NormalizedWithOffset
   for (const item of segments) {
     const end = item.index + item.segment.length;
     const normalized = item.segment.normalize("NFKC").replace(/[’‘]/g, "'");
-    if (/^\\s+$/u.test(normalized)) {
+    if (/^\s+$/u.test(normalized)) {
       pendingWhitespace ??= { start: item.index, end };
       pendingWhitespace.end = end;
     } else {
