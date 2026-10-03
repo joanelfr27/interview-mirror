@@ -52,6 +52,15 @@ test("judge sanitizer preserves valid documented direct support", () => {
 });
 
 
+test("summary/profile evidence cannot independently establish DIRECT support", () => {
+  const l = ledger();
+  l.source_spans[0] = { ...l.source_spans[0], source_section: "SUMMARY_OR_PROFILE" };
+  const result = sanitizeJudgments([raw("DIRECT", ["A1"])], l);
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "PARTIAL");
+  assert.ok(result.judgments[0].rationale.includes("Summary/profile assertions"));
+});
+
 test("generic MBA does not directly satisfy Finance/Accounting-specific Master's requirement", () => {
   const l = ledger();
   l.source_spans[0] = { id: "S-A1", document_id: "CV", text: "MBA in Global Business & Management Studies", start_offset: 0, end_offset: 43, language: "en" };
