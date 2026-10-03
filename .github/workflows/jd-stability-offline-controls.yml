@@ -6,7 +6,7 @@ on:
       ref:
         description: "Exact trusted measurement ref"
         required: true
-        default: "eea32992409dddb6a7425a8a3f2dadb11f3c97e8"
+        default: "13827267f31164d3316874e655e5bee3303962fe"
 
 permissions:
   contents: read
