@@ -7,7 +7,7 @@ import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
 import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
-import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
+import { diagnosticSignalOverlap } from "@/lib/professional-mirror";\nimport { selectSharedCandidateQuestions, SHARED_CANDIDATE_QUESTION_BUDGET } from "@/lib/candidate-question-selection";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -271,7 +271,7 @@ const runtimeProvenance = {
     extractor: await sourceDigest("src/lib/canonical-shadow-extractor.ts"),
     support_judge: await sourceDigest("src/lib/canonical-support-judge.ts"),
     d15_semantic_engine: await sourceDigest("src/lib/d15-semantic-thread-engine.ts"),
-    d16_strategy: await sourceDigest("src/lib/d16-personalized-interview-strategy.ts"),
+    d16_strategy: await sourceDigest("src/lib/d16-personalized-interview-strategy.ts"),\n    d15_conversational_mirror: await sourceDigest("src/lib/d15-conversational-mirror.ts"),\n    candidate_elicitation: await sourceDigest("src/lib/candidate-elicitation.ts"),\n    candidate_question_selection: await sourceDigest("src/lib/candidate-question-selection.ts"),
   },
 };
 
@@ -329,13 +329,12 @@ for (const row of chosen) {
     // candidate answers these questions and the answers become canonical evidence.
     const result = await runCanonicalShadowPipeline(session);
     const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
-    const questions = [
-      ...d15Semantic.accepted
-        .map((thread) => thread.question_back)
-        .filter((question): question is string => Boolean(question?.trim())),
-      ...(d15Semantic.cv_question_back?.trim() ? [d15Semantic.cv_question_back] : []),
-      ...result.ledger.candidate_elicitations.map((item) => item.question).filter(Boolean),
-    ].filter((question, index, all) => all.indexOf(question) === index);
+    const selectedQuestions = selectSharedCandidateQuestions(
+      result.ledger,
+      d15Semantic,
+      SHARED_CANDIDATE_QUESTION_BUDGET,
+    );
+    const questions = selectedQuestions.map((item) => item.question);
 
     const evidenceText = result.ledger.evidence.map((atom) => {
       const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
@@ -361,7 +360,7 @@ for (const row of chosen) {
       transfer_probe_presence: transferProbePresence,
       analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
       d15_semantic: d15Semantic,
-      candidate_questions: questions,
+      candidate_questions: questions,\n      selected_candidate_questions: selectedQuestions.map(({d15_target,elicitation,...item}) => ({\n        ...item,\n        unresolved_item_id: elicitation?.unresolved_item_id ?? null,\n        d15_proposal_id: d15_target?.proposal_id ?? null,\n        d15_evidence_ids: d15_target?.evidence_ids ?? [],\n      })),\n      candidate_question_budget: SHARED_CANDIDATE_QUESTION_BUDGET,
       context_population_diagnostic: {
         by_atom: result.extraction.context_population_by_atom_id,
         summary: result.ledger.evidence.reduce(
