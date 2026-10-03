@@ -570,7 +570,8 @@ function directLacksNamedDomainSpecificity(
   ledger: EvidenceLedger,
 ): boolean {
   if (facet.type !== "LEVEL") return false;
-  const requiredGroups = specificityGroupsNamed(facet.requirement);
+  const sourceQuote = ledger.source_spans.find(span => span.id === facet.source_span_id)?.text ?? "";
+  const requiredGroups = specificityGroupsNamed([facet.requirement, sourceQuote].join(" "));
   if (requiredGroups.length === 0) return false;
   const citedText = citedAtoms.map(atom => {
     const source = ledger.source_spans.find(span => span.id === atom.source_span_id)?.text ?? "";
@@ -583,9 +584,11 @@ function directLacksNamedDomainSpecificity(
 function directLacksEducationFieldSpecificity(
   facet: EvidenceLedger["requirements"][number]["facets"][number],
   citedAtoms: AtomicEvidence[],
+  ledger: EvidenceLedger,
 ): boolean {
   if (facet.type !== "LEVEL") return false;
-  const requirement = normalizedSpecificityText(facet.requirement);
+  const sourceQuote = ledger.source_spans.find(span => span.id === facet.source_span_id)?.text ?? "";
+  const requirement = normalizedSpecificityText([facet.requirement, sourceQuote].join(" "));
   const asksSpecificMastersField = /\b(?:master|masters|master s|degree|diplome)\b/.test(requirement) &&
     /\b(?:finance|accounting|comptabilite)\b/.test(requirement);
   if (!asksSpecificMastersField) return false;
@@ -692,7 +695,7 @@ export function sanitizeJudgments(raw: RawJudgment[], ledger: EvidenceLedger): {
     }
 
 // Education-field specificity uses the same downgrade-only boundary rather than a credential-specific exception.
-    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms)) {
+    if (item.status === "DIRECT" && directLacksEducationFieldSpecificity(facet, citedAtoms, ledger)) {
       item.status = "PARTIAL";
       deterministicRationaleOverride = "The cited credential establishes Master's-level education, but the required Finance or Accounting specialization is not explicitly documented.";
       item.rationale = deterministicRationaleOverride;
