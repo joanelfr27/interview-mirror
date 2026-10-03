@@ -49,9 +49,27 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           JD_STABILITY_TEXT: ${{ secrets.EDF_JD_STABILITY_TEXT }}
+          JD_STABILITY_RESULT_PATH: jd-stability-result.json
         run: |
           set -o pipefail
-          npm run validate:jd-stability | tee jd-stability-result.json
+          npm run validate:jd-stability
+      - name: Validate captured stability artifact
+        if: always()
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const path = "jd-stability-result.json";
+          if (!fs.existsSync(path) || fs.statSync(path).size === 0) throw new Error("JD stability result is missing or empty.");
+          const r = JSON.parse(fs.readFileSync(path, "utf8"));
+          if (r.expected_calls !== 2 || !Array.isArray(r.calls) || r.calls.length !== 2) throw new Error("JD stability result has invalid call provenance.");
+          if (!r.complete || r.calls.some(c => c.status !== "COMPLETED") || !r.evaluation || !["PASS","FAIL"].includes(r.verdict)) {
+            throw new Error("JD stability result is incomplete; see artifact call-state/error evidence.");
+          }
+          for (const call of r.calls) {
+            if (!Array.isArray(call.requirements) || !call.snapshot) throw new Error("JD stability decomposition evidence is incomplete.");
+          }
+          NODE
       - name: Upload JD stability evidence
         if: always()
         uses: actions/upload-artifact@v4
