@@ -19,6 +19,10 @@ on:
         description: "Optional session status filter"
         required: false
         default: ""
+      candidate_answers_json:
+        description: "Optional JSON object keyed by selected question id; leave blank for question-gate stage"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -48,6 +52,7 @@ jobs:
           D15_RUNTIME_SESSION_COUNT: ${{ inputs.session_count }}
           D15_RUNTIME_STATUS_FILTER: ${{ inputs.status_filter }}
           D15_RUNTIME_SESSION_FINGERPRINTS: ${{ inputs.session_fingerprints }}
+          D15_RUNTIME_CANDIDATE_ANSWERS_JSON: ${{ inputs.candidate_answers_json }}
           D15_GOLD_DIAGNOSTICS: "true"
           E1_PROBE_DIAGNOSTICS: "true"
         run: node --experimental-loader ./tests/real-runtime-loader.mjs scripts/d15-real-session-shadow.ts
