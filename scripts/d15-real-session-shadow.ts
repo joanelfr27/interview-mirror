@@ -8,7 +8,7 @@ import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
-import { evaluateContextGold, type ContextGoldItem } from "@/lib/context-gold-evaluator";
+import { evaluateContextGold, parseContextGold } from "@/lib/context-gold-evaluator";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,9 +35,7 @@ type SessionRow = {
   updated_at: string;
 };
 
-const contextGold: readonly ContextGoldItem[] = process.env.E1_CONTEXT_GOLD_JSON
-  ? JSON.parse(process.env.E1_CONTEXT_GOLD_JSON)
-  : [];
+const contextGold = parseContextGold(process.env.E1_CONTEXT_GOLD_JSON);
 
 const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -367,7 +365,8 @@ for (const row of chosen) {
       analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
       d15_semantic: d15Semantic,
       candidate_questions: questions,
-      context_gold_evaluation: contextGold.length
+      completeness: result.completeness,
+      context_gold_evaluation: contextGold
         ? evaluateContextGold(
             contextGold,
             result.ledger.evidence.map((atom) => {
@@ -455,13 +454,20 @@ function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_ato
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
 const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
+const incomplete = report.sessions.filter((item) => (item.completeness as { status?: string } | undefined)?.status === "INCOMPLETE");
+const contextGoldFailures = report.sessions.filter((item) => {
+  const evaluation = item.context_gold_evaluation as { pass?: boolean; status?: string } | undefined;
+  return !evaluation || evaluation.status === "NOT_CONFIGURED" || evaluation.pass !== true;
+});
 (report as typeof report & { question_gate?: unknown }).question_gate = {
   expected_sessions: chosen.length,
   awaiting_candidate_answers: awaiting.length,
-  pass: failures.length === 0 && awaiting.length === chosen.length,
+  incomplete_extractions: incomplete.length,
+  context_gold_failures: contextGoldFailures.length,
+  pass: failures.length === 0 && awaiting.length === chosen.length && incomplete.length === 0 && contextGoldFailures.length === 0,
 };
 
 console.log(JSON.stringify(report, null, 2));
 await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-if (failures.length || awaiting.length !== chosen.length) process.exitCode = 1;
+if (failures.length || awaiting.length !== chosen.length || incomplete.length || contextGoldFailures.length) process.exitCode = 1;
