@@ -21,6 +21,16 @@ test("D15-B semantic input exposes whole canonical evidence and no raw CV/JD",()
   assert.equal("cv_text" in buildD15BSemanticInput(l),false);
 });
 
+test("D15-B semantic input excludes summary/profile assertions from pattern maturity",()=>{
+  const summary={...span("S0","Proven expertise in FP&A and restricted fund management."),source_section:"SUMMARY_OR_PROFILE" as const};
+  const bullet={...span("S1","Managed restricted CSR project funds."),source_section:"BULLET" as const};
+  const l=ledger([
+    atom("A0","S0","Proven","expertise in FP&A and restricted fund management"),
+    atom("A1","S1","Managed","restricted CSR project funds"),
+  ],[summary,bullet]);
+  assert.deepEqual(buildD15BSemanticInput(l).atoms.map((item)=>item.evidence_id),["A1"]);
+});
+
 test("D15-B accepts a grounded two-atom semantic thread and caps maturity at Emerging",()=>{
   const s1=span("S1","Supported the rollout of a new customer portal.");
   const s2=span("S2","Collected user feedback during the portal rollout.");

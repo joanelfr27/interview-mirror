@@ -347,4 +347,30 @@ describe("D16 personalized interview strategy", () => {
     assert.equal(strategy.jd_present, false);
     assert.equal(strategy.d6_version, "d6-v1");
   });
+  it("keeps EDF role knowledge separate from candidate proof", () => {
+    const input = fixture();
+    const edfRequirement = "Financial commitments and covenants to investors and lenders";
+    input.canonical_requirements[1] = { id: "REQ-B", normalized_requirement: edfRequirement };
+    input.bridge.requirements[1] = { ...input.bridge.requirements[1], normalized_requirement: edfRequirement };
+    input.role_capability_model.requirements[1] = { ...input.role_capability_model.requirements[1], normalized_requirement: edfRequirement };
+    input.dependency_snapshot = buildD16DependencySnapshot(input);
+    const strategy = buildD16Strategy(input);
+    const tension = strategy.tensions.find((item) => item.requirement_id === "REQ-B")!;
+    assert.ok(tension.role_knowledge.interviewer_may_test.some((item) => item.source === "JD_GROUNDED" && item.text.includes(edfRequirement)));
+    assert.ok(tension.role_knowledge.preparation_points.some((item) => item.source === "JD_GROUNDED" && item.text.includes(edfRequirement)));
+    assert.ok(["DIRECT", "PARTIAL", "TRANSFER", "NONE"].includes(tension.candidate_position.status));
+    assert.equal(tension.candidate_position.status, "TRANSFER");
+    assert.ok(tension.candidate_position.evidence_ids.includes("EV-B"));
+    const roleText = [...tension.role_knowledge.interviewer_may_test, ...tension.role_knowledge.preparation_points].map((item) => item.text).join(" ");
+    assert.equal(/\b(?:you|your|vous|votre|vos)\s+(?:managed|led|handled|worked|géré|dirigé|piloté|travaillé)\b/i.test(roleText), false);
+  });
+
+  it("does not move candidate evidence into the role-knowledge section", () => {
+    const strategy = buildD16Strategy(fixture());
+    for (const tension of strategy.tensions) {
+      const roleText = [...tension.role_knowledge.interviewer_may_test, ...tension.role_knowledge.preparation_points].map((item) => item.text).join(" ");
+      for (const evidenceId of tension.candidate_position.evidence_ids) assert.equal(roleText.includes(evidenceId), false);
+    }
+  });
+
 });

@@ -1,22 +1,13 @@
 // Runtime validation only; no production writes.
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
-import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import { AI_MODEL } from "@/lib/openai";
+import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
+import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
-import {
-  diagnoseProfessionalMirrorConnections,
-  diagnosticSignalOverlap,
-  diagnosticSharedObjectWords,
-} from "@/lib/professional-mirror";
-import {
-  buildD16DependencySnapshot,
-  buildD16Strategy,
-  validateD16Strategy,
-  type D16Inputs,
-} from "@/lib/d16-personalized-interview-strategy";
-import type { RoleCapabilityModel } from "@/lib/role-capability-model";
+import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -204,25 +195,17 @@ function buildOwnershipStratification(
   };
 }
 
+function redactProtectedCvInput(value: string): string {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[REDACTED_EMAIL]")
+    .replace(/(?:\+?\d[\d\s().-]{7,}\d)/g, "[REDACTED_PHONE]")
+    .replace(/(Member\s+No\s*:\s*)\d+/gi, "$1[REDACTED_MEMBER_NUMBER]");
+}
+
 function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 12);
 }
 
-function buildShadowRoleCapabilityModel(requirements: Array<{ id: string; normalized_requirement: string }>, roleTitle: string): RoleCapabilityModel {
-  return {
-    version: "rcm-v1",
-    model_id: "d16-shadow-runtime",
-    role_family: "shadow-runtime",
-    role_title: roleTitle || "Runtime Shadow Role",
-    requirements: requirements.map((requirement, index) => ({
-      capability_id: "D16-SHADOW-CAP-" + String(index + 1),
-      normalized_requirement: requirement.normalized_requirement,
-      baseline_criticality: index === 0 ? "CRITICAL" : index === 1 ? "IMPORTANT" : "SUPPORTING",
-      source: { source_type: "ADMIN_CURATED", source_id: "d16-shadow-runtime", source_version: "1" },
-      canonical_requirement_id: requirement.id,
-    })),
-  };
-}
 
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
@@ -276,9 +259,26 @@ if (chosen.length < requestedSessionCount) {
 }
 
 
+async function sourceDigest(path: string): Promise<string> {
+  return createHash("sha256").update(await readFile(path)).digest("hex");
+}
+
+const runtimeProvenance = {
+  commit: process.env.GITHUB_SHA ?? null,
+  workflow_run_id: process.env.GITHUB_RUN_ID ?? null,
+  model: AI_MODEL,
+  source_sha256: {
+    extractor: await sourceDigest("src/lib/canonical-shadow-extractor.ts"),
+    support_judge: await sourceDigest("src/lib/canonical-support-judge.ts"),
+    d15_semantic_engine: await sourceDigest("src/lib/d15-semantic-thread-engine.ts"),
+    d16_strategy: await sourceDigest("src/lib/d16-personalized-interview-strategy.ts"),
+  },
+};
+
 const report = {
   run: {
     mode: "D15_REAL_SESSION_SHADOW",
+    provenance: runtimeProvenance,
     writes_performed: false,
     sessions_requested: chosen.length,
     requested_session_count: requestedSessionCount,
@@ -300,7 +300,7 @@ for (const row of chosen) {
     id: row.id,
     user_id: row.user_id,
     title: row.title,
-    cv_text: row.cv_text,
+    cv_text: redactProtectedCvInput(row.cv_text),
     job_description: row.job_description,
     cv_analysis: row.cv_analysis,
     interview_strategy: row.interview_strategy,
@@ -319,73 +319,61 @@ for (const row of chosen) {
     cv: fingerprint(row.cv_text),
     jd: fingerprint(row.job_description),
     cv_chars: row.cv_text.length,
+    protected_cv_input_redacted: true,
     jd_chars: row.job_description.length,
   };
 
   try {
-    const result = await runD16ShadowRuntimeIntegration(session);
-    const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
-      id: requirement.id,
-      normalized_requirement: requirement.normalized_requirement,
-    }));
-    const roleCapabilityModel = buildShadowRoleCapabilityModel(canonicalRequirements, row.title);
-    const d16InputBase: Omit<D16Inputs, "dependency_snapshot"> = {
-      mirror: result.d15,
-      bridge: result.d6,
-      role_capability_model: roleCapabilityModel,
-      ledger: result.ledger,
-      canonical_requirements: canonicalRequirements,
-      jd_present: Boolean(row.job_description.trim()),
-      jd_fingerprint: "sha256:" + createHash("sha256").update(row.job_description, "utf8").digest("hex"),
+    // Stage 1 of the decisive EDF protocol: canonical E1/support judgment ->
+    // semantic D15-B Mirror -> candidate questions. D16 must not run until the
+    // candidate answers these questions and the answers become canonical evidence.
+    const result = await runCanonicalShadowPipeline(session);
+    const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
+    const questions = [
+      ...d15Semantic.accepted
+        .map((thread) => thread.question_back)
+        .filter((question): question is string => Boolean(question?.trim())),
+      ...(d15Semantic.cv_question_back?.trim() ? [d15Semantic.cv_question_back] : []),
+      ...result.ledger.candidate_elicitations.map((item) => item.question).filter(Boolean),
+    ].filter((question, index, all) => all.indexOf(question) === index);
+
+    const evidenceText = result.ledger.evidence.map((atom) => {
+      const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+      return span?.text ?? "";
+    });
+    const transferProbePresence = {
+      investment_decision: evidenceText.some((text) => /investment|investissement/i.test(text) && /decision|décision/i.test(text)),
+      restricted_funds_reporting: evidenceText.some((text) => /restricted|restreint/i.test(text) && /fund|fonds/i.test(text)),
+      multi_country_finance: evidenceText.some((text) => /(?:14\s+African\s+countries|countries|pays)/i.test(text)),
     };
-    const d16Input: D16Inputs = {
-      ...d16InputBase,
-      dependency_snapshot: buildD16DependencySnapshot(d16InputBase),
-    };
-    const d16 = buildD16Strategy(d16Input);
-    const d16Validation = validateD16Strategy(d16, d16Input);
-    if (!d16Validation.valid) {
-      throw new Error("D16 strategy validation failed: " + d16Validation.errors.join(" | "));
-    }
-    const domains = result.ledger.evidence
-      .map((atom) => atom.context.domain)
-      .filter((value): value is string => Boolean(value?.trim()));
 
     report.sessions.push({
       ...base,
-      outcome: "PASS",
+      outcome: "AWAITING_CANDIDATE_ANSWERS",
+      protocol_stage: "D15_QUESTION_GATE",
+      d16_executed: false,
+      d16_block_reason: "Candidate answers must become canonical evidence before D16 strategy generation.",
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
-      e1_atom_rejection: rejectionRate(result.extraction_diagnostics),
-      evidence_with_domain: domains.length,
-      evidence_domain_rate: result.ledger.evidence.length
-        ? Number((domains.length / result.ledger.evidence.length).toFixed(3))
-        : 0,
-      d15_threads: result.d15.threads.length,
-      d15_statements: result.d15.statements.length,
-      d15_connection_reasons: result.d15.threads.map((thread) => thread.connection_reason),
-      d15_thread_evidence_counts: result.d15.threads.map((thread) => thread.evidence_ids.length),
-      d15_maturity_counts: result.d15.statements.reduce<Record<string, number>>((acc, statement) => {
-        acc[statement.maturity] = (acc[statement.maturity] ?? 0) + 1;
-        return acc;
-      }, {}),
-      d16_version: d16.version,
-      d16_d6_version: d16.d6_version,
-      d16_role_capability_model_version: d16.role_capability_model_version,
-      d16_tensions: d16.tensions.length,
-      d16_actions: d16.actions.length,
-      d16_tension_requirement_ids: d16.tensions.map((tension) => tension.requirement_id),
-      d16_action_dispatchers: d16.actions.map((action) => action.dispatcher),
-      d16_dependency_snapshot_matches_d15: d16.dependency_snapshot.d15_fingerprint === buildD16DependencySnapshot(d16Input).d15_fingerprint,
+      e1_atom_rejection: rejectionRate(result.extraction),
+      support_judgments: result.ledger.support_judgments,
+      candidate_elicitations: result.ledger.candidate_elicitations,
+      transfer_probe_presence: transferProbePresence,
+      analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
+      d15_semantic: d15Semantic,
+      candidate_questions: questions,
       context_population_diagnostic: {
-        by_atom: result.extraction_diagnostics.context_population_by_atom_id,
+        by_atom: result.extraction.context_population_by_atom_id,
         summary: result.ledger.evidence.reduce(
           (summary, atom) => {
-            const item = result.extraction_diagnostics.context_population_by_atom_id[atom.id];
+            const item = result.extraction.context_population_by_atom_id[atom.id];
             if (!item) return summary;
             summary.domain.raw_populated += Number(item.raw_domain_populated);
             summary.domain.canonical_populated += Number(item.canonical_domain_populated);
             summary.domain.raw_present_but_canonical_missing += Number(item.raw_domain_populated && !item.canonical_domain_populated);
+            summary.scope.raw_populated += Number(item.raw_scope_populated);
+            summary.scope.canonical_populated += Number(item.canonical_scope_populated);
+            summary.scope.raw_present_but_canonical_missing += Number(item.raw_scope_populated && !item.canonical_scope_populated);
             summary.tools_or_systems.raw_populated += Number(item.raw_tools_populated);
             summary.tools_or_systems.canonical_populated += Number(item.canonical_tools_populated);
             summary.tools_or_systems.raw_present_but_canonical_missing += Number(item.raw_tools_populated && !item.canonical_tools_populated);
@@ -396,62 +384,13 @@ for (const row of chosen) {
           },
           {
             domain: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
+            scope: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
             tools_or_systems: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
             standards: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
           },
         ),
       },
       diagnostics_count: result.diagnostics.length,
-      d15_connection_diagnostics: diagnoseProfessionalMirrorConnections(result.ledger),
-      ...(process.env.D15_GOLD_DIAGNOSTICS === "true"
-        ? {
-            d15_gold_object_diagnostic: (() => {
-              const atoms = result.ledger.evidence.map((atom) => {
-                const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
-                return {
-                  evidence_id: atom.id,
-                  source_span_id: atom.source_span_id,
-                  source_quote: span?.text ?? "",
-                  source_section: span?.source_section ?? "UNKNOWN_SECTION",
-                  assertion_type: atom.assertion.type,
-                  action_object: atom.action.object,
-                };
-              });
-              const atomById = new Map(result.ledger.evidence.map((atom) => [atom.id, atom]));
-              const pairs = diagnoseProfessionalMirrorConnections(result.ledger).pairs
-                .filter((pair) => pair.connection_reason)
-                .map((pair) => ({
-                  left_id: pair.left_id,
-                  right_id: pair.right_id,
-                  connection_reason: pair.connection_reason,
-                  left_object: atomById.get(pair.left_id)?.action.object ?? "",
-                  right_object: atomById.get(pair.right_id)?.action.object ?? "",
-                  shared_object_words: diagnosticSharedObjectWords(
-                    atomById.get(pair.left_id)?.action.object ?? "",
-                    atomById.get(pair.right_id)?.action.object ?? "",
-                  ),
-                }));
-              return { atoms, connected_pairs: pairs };
-            })(),
-          }
-        : {}),
-      ownership_diagnostic: result.ledger.evidence
-        .filter((atom) => atom.subject.ownership === "UNKNOWN")
-        .map((atom) => {
-          const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
-          const atomQuote = span?.text ?? "";
-          const surroundingQuote = surroundingSourceQuote(row.cv_text, atomQuote);
-          return {
-            evidence_id: atom.id,
-            raw_llm_ownership: result.extraction_diagnostics.raw_ownership_by_atom_id[atom.id] ?? "UNKNOWN",
-            atom_source_quote_fingerprint: fingerprint(atomQuote),
-            ownership_marker_in_atom_quote: ownershipMarkerInText(atomQuote),
-            surrounding_cv_quote_fingerprint: fingerprint(surroundingQuote),
-            ownership_marker_in_surrounding_cv_quote: ownershipMarkerInText(surroundingQuote),
-            assertion_type: atom.assertion.type,
-            ownership_bucket: ownershipBucket(atomQuote, surroundingQuote),
-          };
-        }),
       signal_population_matrix: buildSignalPopulationMatrix(result.ledger.evidence),
       ownership_stratification: buildOwnershipStratification(
         result.ledger.evidence
@@ -466,18 +405,6 @@ for (const row of chosen) {
             };
           }),
       ),
-      wow: {
-        thread_count: result.d15.threads.length,
-        non_fact_statement_count: result.d15.statements.filter((statement) => statement.kind !== "FACT").length,
-        sustained_strength_count: result.d15.statements.filter((statement) => statement.maturity === "SUSTAINED_STRENGTH").length,
-        thread_depths: result.d15.threads.map((thread) => new Set(thread.evidence_ids.map((id) => result.ledger.evidence.find((atom) => atom.id === id)?.source_span_id).filter((id): id is string => Boolean(id))).size),
-        contextual_delta_tension_count: d16.tensions.filter((tension) => Object.values(tension.contextual_delta).some(Boolean)).length,
-        d16_action_count: d16.actions.length,
-        d16_actions_with_truth_boundaries: d16.actions.filter((action) => action.truthfulness_boundary.permitted_claims.length > 0 || action.truthfulness_boundary.prohibited_claims.length > 0).length,
-        d16_actions_with_evidence_when_available: d16.actions.filter((action) => action.evidence_reference_mode === "NO_CANDIDATE_EVIDENCE" || action.evidence_ids.length > 0).length,
-        cv_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("CV-")).map((span) => span.language))],
-        jd_source_languages: [...new Set(result.ledger.source_spans.filter((span) => span.document_id.startsWith("JD-")).map((span) => span.language))],
-      },
     });
   } catch (caught) {
     report.sessions.push({
@@ -509,51 +436,14 @@ function rejectionRate(diagnostics: { candidate_atom_count: number; rejected_ato
 }
 
 const failures = report.sessions.filter((item) => item.outcome === "FAIL");
+const awaiting = report.sessions.filter((item) => item.outcome === "AWAITING_CANDIDATE_ANSWERS");
+(report as typeof report & { question_gate?: unknown }).question_gate = {
+  expected_sessions: chosen.length,
+  awaiting_candidate_answers: awaiting.length,
+  pass: failures.length === 0 && awaiting.length === chosen.length,
+};
+
 console.log(JSON.stringify(report, null, 2));
+await writeFile("d15-real-session-shadow-report.json", JSON.stringify(report, null, 2), "utf8");
 
-const passedSessions = report.sessions.filter((item) => item.outcome === "PASS") as Array<Record<string, unknown>>;
-const wow = passedSessions.map((item) => item.wow as Record<string, unknown>).filter(Boolean);
-const countAtLeast = (key: string, minimum: number) =>
-  wow.filter((item) => Number(item[key] ?? 0) >= minimum).length;
-
-const wowGate = {
-  all_sessions_pass: failures.length === 0 && passedSessions.length === chosen.length,
-  sessions_with_two_or_more_threads: countAtLeast("thread_count", 2),
-  sessions_with_non_fact_story: countAtLeast("non_fact_statement_count", 1),
-  sessions_with_contextual_delta: countAtLeast("contextual_delta_tension_count", 1),
-  sessions_with_d16_action: countAtLeast("d16_action_count", 1),
-  truth_boundary_coverage_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_truth_boundaries ?? 0)),
-  evidence_linkage_when_available_100_percent: wow.every((item) => Number(item.d16_action_count ?? 0) === Number(item.d16_actions_with_evidence_when_available ?? 0)),
-};
-
-(report as typeof report & { wow_kpis?: unknown }).wow_kpis = {
-  target_sessions: requestedSessionCount,
-  thresholds: {
-    all_sessions_pass: requestedSessionCount,
-    sessions_with_two_or_more_threads: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
-    sessions_with_non_fact_story: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
-    sessions_with_contextual_delta: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
-    sessions_with_d16_action: Math.max(1, Math.ceil(requestedSessionCount * 0.8)),
-    truth_boundary_coverage_100_percent: true,
-    evidence_linkage_when_available_100_percent: true,
-  },
-  observed: {
-    passed_sessions: passedSessions.length,
-    ...wowGate,
-  },
-  pass: wowGate.all_sessions_pass &&
-    wowGate.sessions_with_two_or_more_threads >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
-    wowGate.sessions_with_non_fact_story >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
-    wowGate.sessions_with_contextual_delta >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
-    wowGate.sessions_with_d16_action >= Math.max(1, Math.ceil(requestedSessionCount * 0.8)) &&
-    wowGate.truth_boundary_coverage_100_percent &&
-    wowGate.evidence_linkage_when_available_100_percent,
-};
-
-await writeFile(
-  "d15-real-session-shadow-report.json",
-  JSON.stringify(report, null, 2),
-  "utf8",
-);
-
-if (failures.length || !(report as typeof report & { wow_kpis: { pass: boolean } }).wow_kpis.pass) process.exitCode = 1;
+if (failures.length || awaiting.length !== chosen.length) process.exitCode = 1;

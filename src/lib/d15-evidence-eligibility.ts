@@ -104,7 +104,11 @@ export function d15ThreadEligibleAtoms(
   ledger: EvidenceLedger,
   atoms: AtomicEvidence[] = d15EligibleIndependentAtoms(ledger),
 ): AtomicEvidence[] {
-  return atoms.filter(
-    (atom) => spanFor(ledger, atom)?.source_section !== "EXPERIENCE_NON_BULLET",
-  );
+  return atoms.filter((atom) => {
+    const section = spanFor(ledger, atom)?.source_section;
+    // Summary/profile statements remain traceable candidate assertions, but they
+    // cannot establish D15 career-pattern maturity. EXPERIENCE_NON_BULLET role
+    // overviews retain the same pre-existing exclusion.
+    return section !== "EXPERIENCE_NON_BULLET" && section !== "SUMMARY_OR_PROFILE";
+  });
 }
