@@ -48,7 +48,7 @@ test("context gold rejects malformed configured JSON instead of treating it as u
 test("context gold does not recover a domain from the scope field", () => {
   const result = evaluateContextGold(
     [{ session_fingerprint: "test-session", source_quote: "Worked across Africa.", expected_domains: ["Africa"] }],
-    [{ session_fingerprint: "test-session", source_quote: "Worked across Africa.", scope: "Africa" }],
+    [{ source_quote: "Worked across Africa.", scope: "Africa" }],
   );
   assert.equal(result.recall, 0);
   assert.equal(result.pass, false);
@@ -71,7 +71,7 @@ test("context gold matches atomic source spans within a hand-marked bullet", () 
   const bullet = "Delivered financial and commercial analysis across 14 African countries to support investment decisions.";
   const result = evaluateContextGold(
     [{ session_fingerprint: "test-session", source_quote: bullet, expected_scopes: ["14 African countries"] }],
-    [{ session_fingerprint: "test-session", source_quote: "financial and commercial analysis across 14 African countries", scope: "14 African countries" }],
+    [{ source_quote: "financial and commercial analysis across 14 African countries", scope: "14 African countries" }],
   );
   assert.equal(result.recall, 1);
   assert.equal(result.pass, true);
@@ -81,7 +81,7 @@ test("context gold grounding is checked against the atomic span, not merely the 
   const bullet = "Delivered financial analysis across 14 African countries to support investment decisions.";
   const result = evaluateContextGold(
     [{ session_fingerprint: "test-session", source_quote: bullet, expected_scopes: ["14 African countries"] }],
-    [{ session_fingerprint: "test-session", source_quote: "Delivered financial analysis", scope: "14 African countries" }],
+    [{ source_quote: "Delivered financial analysis", scope: "14 African countries" }],
   );
   assert.equal(result.pass, false);
   assert.deepEqual(result.non_substring_values, ["14 African countries"]);
@@ -91,7 +91,7 @@ test("negative bullet fails when any contained atomic span carries context", () 
   const bullet = "Strengthened internal controls and operational effectiveness.";
   const result = evaluateContextGold(
     [{ session_fingerprint: "test-session", source_quote: bullet, expect_none: true }],
-    [{ session_fingerprint: "test-session", source_quote: "internal controls", domain: "internal controls" }],
+    [{ source_quote: "internal controls", domain: "internal controls" }],
   );
   assert.equal(result.pass, false);
   assert.deepEqual(result.false_positive_quotes, [bullet]);
@@ -116,8 +116,8 @@ test("context gold preserves multiple expected phrases per field", () => {
 test("context gold counts a missing CV bullet as extraction coverage failure", () => {
   const result = evaluateContextGold(
     [
-      { source_quote: "Extracted finance bullet.", expected_domains: ["finance"] },
-      { source_quote: "Missing controls bullet.", expected_domains: ["controls"] },
+      { session_fingerprint: "test-session", source_quote: "Extracted finance bullet.", expected_domains: ["finance"] },
+      { session_fingerprint: "test-session", source_quote: "Missing controls bullet.", expected_domains: ["controls"] },
     ],
     [{ session_fingerprint: "test-session", source_quote: "Extracted finance bullet.", domain: "finance" }],
   );
@@ -147,7 +147,7 @@ test("source offsets prevent a repeated atomic clause from satisfying two bullet
       { session_fingerprint: "s", source_quote: "Managed finance for Fund A.", expected_domains: ["finance"] },
       { session_fingerprint: "s", source_quote: "Managed finance for Fund B.", expected_domains: ["finance"] },
     ],
-    [{ session_fingerprint: "test-session", source_quote: "Managed finance", start_offset: 0, end_offset: "Managed finance".length, domain: "finance" }],
+    [{ source_quote: "Managed finance", start_offset: 0, end_offset: "Managed finance".length, domain: "finance" }],
     source,
   );
   assert.equal(result.bullet_coverage, 0.5);
