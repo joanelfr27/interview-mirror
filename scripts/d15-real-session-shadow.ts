@@ -8,6 +8,7 @@ import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalShadowExtractionEarlyReturnError } from "@/lib/canonical-shadow-pipeline";
 import { CanonicalSupportJudgmentError } from "@/lib/canonical-support-judge";
 import { diagnosticSignalOverlap } from "@/lib/professional-mirror";
+import { evaluateContextGold, type ContextGoldItem } from "@/lib/context-gold-evaluator";
 import type { SessionRecord } from "@/types";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,6 +34,10 @@ type SessionRow = {
   created_at: string;
   updated_at: string;
 };
+
+const contextGold: readonly ContextGoldItem[] = process.env.E1_CONTEXT_GOLD_JSON
+  ? JSON.parse(process.env.E1_CONTEXT_GOLD_JSON)
+  : [];
 
 const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -362,6 +367,19 @@ for (const row of chosen) {
       analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
       d15_semantic: d15Semantic,
       candidate_questions: questions,
+      context_gold_evaluation: contextGold.length
+        ? evaluateContextGold(
+            contextGold,
+            result.ledger.evidence.map((atom) => {
+              const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
+              return {
+                source_quote: span?.text ?? "",
+                domain: atom.context.domain,
+                scope: atom.scale.scope,
+              };
+            }),
+          )
+        : { status: "NOT_CONFIGURED", minimum_recall: 0.8 },
       context_population_diagnostic: {
         by_atom: result.extraction.context_population_by_atom_id,
         summary: result.ledger.evidence.reduce(
