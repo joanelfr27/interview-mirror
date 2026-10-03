@@ -249,7 +249,10 @@ test("rationale cannot borrow a distinctive phrase from uncited evidence", () =>
   l.evidence.push({ ...structuredClone(l.evidence[0]), id: "A2", source_span_id: "S-A2" });
   const judgment = { ...raw("PARTIAL", ["A1"]), rationale: "Forecasts directly shaped quarterly pipeline review decisions." };
   const result = sanitizeJudgments([judgment], l);
-  assert.ok(result.errors.some(error => error.includes("distinctive phrase")));
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.judgments[0].status, "NONE");
+  assert.equal(result.judgments[0].abstained, true);
+  assert.ok(result.judgments[0].abstention_reason?.includes("minimal-support boundary"));
 });
 
 test("repeated near-identical role wording is not treated as uncited rationale leakage", () => {
