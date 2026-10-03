@@ -452,10 +452,9 @@ function validateRelationalAndRationaleBoundary(item: RawJudgment, facet: Eviden
     }
   }
   if ((!relational || item.status !== "DIRECT") && item.licensing_spans.length > 0) {
-    for (const licensingSpan of item.licensing_spans) {
-      const exact = licensingSpan.trim();
-      if (!exact || !citedSourceTexts.some(source => source.includes(exact))) errors.push("licensing span must be an exact quote from minimal supporting evidence.");
-    }
+    // Licensing spans are truth-bearing only for relational DIRECT. Elsewhere they
+    // are optional model metadata and must not abort an evidence-bounded judgment.
+    item.licensing_spans = [];
   }
 
   const rationale = normalizeEvidenceText(item.rationale);
