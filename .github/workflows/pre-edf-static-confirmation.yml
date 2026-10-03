@@ -1,0 +1,23 @@
+name: Pre-EDF Static Confirmation
+on:
+  pull_request:
+    branches: [e1-support-basis-contract]
+    paths-ignore: ['**/*.md']
+permissions:
+  contents: read
+jobs:
+  static-confirmation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:canonical
+      - run: npm run build
+      - run: npm run test:jd-stability-capture
