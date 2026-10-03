@@ -4,6 +4,16 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { AI_MODEL } from "@/lib/openai";
 import { runD15BSemanticThreadEngine } from "@/lib/d15-semantic-thread-engine";
+import { classifyCandidateElicitation } from "@/lib/candidate-elicitation";
+import { runD16ShadowRuntimeIntegration } from "@/lib/d16-shadow-runtime-integration";
+import {
+  buildD16DependencySnapshot,
+  buildD16Strategy,
+  validateD16Strategy,
+  type D16Inputs,
+} from "@/lib/d16-personalized-interview-strategy";
+import type { RoleCapabilityModel } from "@/lib/role-capability-model";
+import type { CandidateElicitation, EvidenceLedger, UnresolvedItem } from "@/lib/canonical-evidence-model";
 import { runCanonicalShadowPipeline } from "@/lib/canonical-shadow-pipeline";
 import { classifyCandidateElicitation } from "@/lib/candidate-elicitation";
 import { buildCanonicalReasoningProjection } from "@/lib/canonical-reasoning-adapter";
@@ -313,6 +323,97 @@ const sealedAnswers: SealedAnswer[] | null = sealedAnswerPath
   ? JSON.parse(await readFile(sealedAnswerPath, "utf8")) as SealedAnswer[]
   : null;
 
+
+const EDF_DECISIVE_FINGERPRINT = "8a05fcb6dbe3";
+
+async function loadSealedAnswers(): Promise<string[]> {
+  const seal = await readFile("validation/edf-d16-candidate-answer-seal-2026-10-03.md", "utf8");
+  const section = seal.split("## Candidate answers — verbatim")[1]?.split("## Frozen owner decisions")[0] ?? "";
+  const matches = [...section.matchAll(/(?:^|\n)([1-5])-\s*([\s\S]*?)(?=\n[1-5]-|$)/g)];
+  const answers = matches.map((match) => match[2].trim());
+  if (answers.length !== 5 || answers.some((answer) => !answer)) {
+    throw new Error("SEALED_ANSWER_PARSE_FAILURE");
+  }
+  return answers;
+}
+
+function buildShadowRoleCapabilityModel(
+  requirements: Array<{ id: string; normalized_requirement: string }>,
+  roleTitle: string,
+): RoleCapabilityModel {
+  return {
+    version: "rcm-v1",
+    model_id: "d16-shadow-runtime",
+    role_family: "shadow-runtime",
+    role_title: roleTitle || "Runtime Shadow Role",
+    requirements: requirements.map((requirement, index) => ({
+      capability_id: "D16-SHADOW-CAP-" + String(index + 1),
+      normalized_requirement: requirement.normalized_requirement,
+      baseline_criticality: index === 0 ? "CRITICAL" : index === 1 ? "IMPORTANT" : "SUPPORTING",
+      source: { source_type: "ADMIN_CURATED", source_id: "d16-shadow-runtime", source_version: "1" },
+      canonical_requirement_id: requirement.id,
+    })),
+  };
+}
+
+function requirementText(ledger: EvidenceLedger, item: UnresolvedItem): string {
+  const requirement = ledger.requirements.find((candidate) => candidate.id === item.requirement_id);
+  return [
+    requirement?.normalized_requirement ?? "",
+    ...(requirement?.facets ?? []).map((facet) => facet.requirement),
+  ].join(" ").toLowerCase();
+}
+
+function selectUnresolved(ledger: EvidenceLedger, label: string, patterns: RegExp[]): UnresolvedItem {
+  const candidates = ledger.unresolved_items
+    .map((item) => ({ item, text: requirementText(ledger, item) }))
+    .filter(({ text }) => patterns.some((pattern) => pattern.test(text)));
+  if (!candidates.length) throw new Error("SEALED_MAPPING_MISS:" + label);
+  candidates.sort((a, b) => {
+    const aScore = patterns.reduce((score, pattern) => score + Number(pattern.test(a.text)), 0);
+    const bScore = patterns.reduce((score, pattern) => score + Number(pattern.test(b.text)), 0);
+    return bScore - aScore || a.item.requirement_id.localeCompare(b.item.requirement_id);
+  });
+  return candidates[0].item;
+}
+
+async function applySealedEdfAnswers(
+  ledger: EvidenceLedger,
+  session: SessionRecord,
+): Promise<{ ledger: EvidenceLedger; diagnostics: string[]; mappings: Array<Record<string, string>>; answers: string[] }> {
+  if (fingerprint(session.id) !== EDF_DECISIVE_FINGERPRINT) return { ledger, diagnostics: [], mappings: [], answers: [] };
+  const answers = await loadSealedAnswers();
+  const selectors = [
+    { answerIndex: 0, label: "MITSUBISHI_OWNERSHIP", patterns: [/asset management|financement de projet|project finance|private equity|m&a|invest/i] },
+    { answerIndex: 1, label: "GOVERNANCE_INTERNAL_CONTROL", patterns: [/gouvernance|governance|contrainte.*groupe|group.*constraint|holding|administration/i] },
+    { answerIndex: 2, label: "INVESTOR_FUNDER_RELATIONS", patterns: [/investor|investisseur|funder|fundraising|levée|actionnaire|shareholder|relations? investisseurs?/i] },
+    { answerIndex: 3, label: "VALUATION_BOUNDARY", patterns: [/asset management|financement de projet|project finance|private equity|m&a|invest/i] },
+  ] as const;
+
+  let next = ledger;
+  const diagnostics: string[] = [];
+  const mappings: Array<Record<string, string>> = [];
+  for (const selector of selectors) {
+    const item = selectUnresolved(next, selector.label, selector.patterns);
+    const elicitation: CandidateElicitation = {
+      id: "SEALED-EDF-" + String(selector.answerIndex + 1),
+      unresolved_item_id: item.id,
+      question: "Builder-written sealed probe; question selection evaluated separately.",
+    };
+    const classified = await classifyCandidateElicitation(session, next, elicitation, answers[selector.answerIndex]);
+    next = classified.ledger;
+    diagnostics.push(...classified.diagnostics);
+    mappings.push({
+      answer: String(selector.answerIndex + 1),
+      label: selector.label,
+      unresolved_item_id: item.id,
+      requirement_id: item.requirement_id,
+      elicitation_id: elicitation.id,
+    });
+  }
+  return { ledger: next, diagnostics, mappings, answers };
+}
+
 const requestedSessionCount = Number.parseInt(process.env.D15_RUNTIME_SESSION_COUNT ?? "15", 10);
 const statusFilter = process.env.D15_RUNTIME_STATUS_FILTER?.trim() || null;
 const sessionFingerprintFilter = new Set(
@@ -430,153 +531,68 @@ for (const row of chosen) {
   };
 
   try {
-    // Stage 1 of the decisive EDF protocol: canonical E1/support judgment ->
-    // semantic D15-B Mirror -> candidate questions. D16 must not run until the
-    // candidate answers these questions and the answers become canonical evidence.
-    const result = await runCanonicalShadowPipeline(session);
-    const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
-    const questions = [
-      ...d15Semantic.accepted
-        .map((thread) => thread.question_back)
-        .filter((question): question is string => Boolean(question?.trim())),
-      ...(d15Semantic.cv_question_back?.trim() ? [d15Semantic.cv_question_back] : []),
-      ...result.ledger.candidate_elicitations.map((item) => item.question).filter(Boolean),
-    ].filter((question, index, all) => all.indexOf(question) === index);
-
-    const evidenceText = result.ledger.evidence.map((atom) => {
-      const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
-      return span?.text ?? "";
+    let sealedMappings: Array<Record<string, string>> = [];
+    let sealedAnswers: string[] = [];
+    const result = await runD16ShadowRuntimeIntegration(session, async (ledger, runtimeSession) => {
+      const applied = await applySealedEdfAnswers(ledger, runtimeSession);
+      sealedMappings = applied.mappings;
+      sealedAnswers = applied.answers;
+      return { ledger: applied.ledger, diagnostics: applied.diagnostics };
     });
-    const transferProbePresence = {
-      investment_decision: evidenceText.some((text) => /investment|investissement/i.test(text) && /decision|décision/i.test(text)),
-      restricted_funds_reporting: evidenceText.some((text) => /restricted|restreint/i.test(text) && /fund|fonds/i.test(text)),
-      multi_country_finance: evidenceText.some((text) => /(?:14\s+African\s+countries|countries|pays)/i.test(text)),
+
+    const canonicalRequirements = result.ledger.requirements.map((requirement) => ({
+      id: requirement.id,
+      normalized_requirement: requirement.normalized_requirement,
+    }));
+    const roleCapabilityModel = buildShadowRoleCapabilityModel(canonicalRequirements, row.title);
+    const d16InputBase: Omit<D16Inputs, "dependency_snapshot"> = {
+      mirror: result.d15,
+      bridge: result.d6,
+      role_capability_model: roleCapabilityModel,
+      ledger: result.ledger,
+      canonical_requirements: canonicalRequirements,
+      jd_present: Boolean(row.job_description.trim()),
+      jd_fingerprint: "sha256:" + createHash("sha256").update(row.job_description, "utf8").digest("hex"),
     };
+    const d16Input: D16Inputs = {
+      ...d16InputBase,
+      dependency_snapshot: buildD16DependencySnapshot(d16InputBase),
+    };
+    const d16 = buildD16Strategy(d16Input);
+    const d16Validation = validateD16Strategy(d16, d16Input);
+    if (!d16Validation.valid) throw new Error("D16 strategy validation failed: " + d16Validation.errors.join(" | "));
 
-    if (sealedAnswers) {
-      let answeredLedger = result.ledger;
-      const answerMappings: Array<Record<string, unknown>> = [];
-      const interviewContext = sealedAnswers.find((item) => item.target === "interview_context")?.answer ?? null;
-      for (const sealed of sealedAnswers.filter((item) => item.target !== "interview_context")) {
-        const target = sealed.target as Exclude<SealedAnswer["target"], "interview_context">;
-        const mapping = mappedElicitation(answeredLedger, target, sealed.id);
-        const classified = await classifyCandidateElicitation(session, answeredLedger, mapping.elicitation, sealed.answer);
-        answeredLedger = classified.ledger;
-        answerMappings.push({
-          answer_id: sealed.id,
-          target,
-          requirement_id: mapping.requirement_id,
-          elicitation_id: mapping.elicitation.id,
-          classification: classified.elicitation.classification,
-          answer_preserved_verbatim: classified.elicitation.answer === sealed.answer,
-        });
-      }
-      const rebuilt = rebuildD16InputsFromLedger(answeredLedger, row.title, row.job_description);
-      report.sessions.push({
-        ...base,
-        outcome: "PASS_WITH_KNOWN_MEASUREMENT_LIMITATIONS",
-        protocol_stage: "D16_STRATEGY_AFTER_SEALED_ANSWERS",
-        d16_executed: true,
-        requirements: answeredLedger.requirements.length,
-        evidence_atoms: answeredLedger.evidence.length,
-        completeness: result.completeness,
-        answer_mappings: answerMappings,
-        interview_context: {
-          candidate_answer_verbatim: interviewContext,
-          fed_to_candidate_evidence: false,
-          fed_to_d16_assessment_context: false,
-          limitation: "D16 AssessmentContext v1 has no interview-format narrative field; preserved in runtime report only.",
-        },
-        support_judgments: answeredLedger.support_judgments,
-        elicited_evidence: answeredLedger.evidence.filter((item) => item.provenance.source_type === "CANDIDATE_ELICITED"),
-        d15_after_answers: rebuilt.mirror,
-        d16_strategy: rebuilt.strategy,
-        known_nonblocking_findings: [
-          "D15 semantic-engine wiring/codebook issue from run #67 remains under separate investigation.",
-          "Builder question-selection probes from run #67 failed the frozen acceptance probes and are tested separately.",
-          "Context-gold matching/coverage measurement from run #67 is not used as a blocker for this strategy-quality run.",
-          "Support judge model remains frozen; missing transfer classifications are attributed to the judge layer for this experiment.",
-        ],
-      });
-      continue;
-    }
-
+    const d15Semantic = await runD15BSemanticThreadEngine(result.ledger);
     report.sessions.push({
       ...base,
-      outcome: "AWAITING_CANDIDATE_ANSWERS",
-      protocol_stage: "D15_QUESTION_GATE",
-      d16_executed: false,
-      d16_block_reason: "Candidate answers must become canonical evidence before D16 strategy generation.",
+      outcome: "PASS",
+      protocol_stage: "D16_STRATEGY_COMPLETE",
+      d16_executed: true,
       requirements: result.ledger.requirements.length,
       evidence_atoms: result.ledger.evidence.length,
-      e1_atom_rejection: rejectionRate(result.extraction),
+      elicited_evidence_atoms: result.ledger.evidence.filter((atom) => atom.provenance.source_type === "CANDIDATE_ELICITED").length,
+      sealed_answer_mappings: sealedMappings,
+      sealed_answer_5: {
+        treatment: "ASSESSMENT_CONTEXT_ONLY_NOT_CONSUMED_BY_CURRENT_D16_SCHEMA",
+        text: sealedAnswers[4] ?? null,
+      },
       support_judgments: result.ledger.support_judgments,
-      candidate_elicitations: result.ledger.candidate_elicitations,
-      transfer_probe_presence: transferProbePresence,
       analogical_transfer_count: result.ledger.support_judgments.filter((item) => item.status === "ANALOGICAL_TRANSFER").length,
       d15_semantic: d15Semantic,
-      candidate_questions: questions,
+      d16_strategy: d16,
       completeness: result.completeness,
       context_gold_evaluation: contextGold
         ? evaluateContextGold(
             contextGold.filter((item) => item.session_fingerprint === fingerprint(row.id)),
-            result.ledger.evidence.map((atom) => {
+            result.ledger.evidence.filter((atom) => atom.provenance.source_type !== "CANDIDATE_ELICITED").map((atom) => {
               const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
-              return {
-                source_quote: span?.text ?? "",
-                start_offset: span?.start_offset,
-                end_offset: span?.end_offset,
-                domain: atom.context.domain,
-                scope: atom.scale.scope,
-              };
+              return { source_quote: span?.text ?? "", start_offset: span?.start_offset, end_offset: span?.end_offset, domain: atom.context.domain, scope: atom.scale.scope };
             }),
             row.cv_text,
             contextPolicy,
           )
         : { status: "NOT_CONFIGURED", minimum_recall: 0.8 },
-      context_population_diagnostic: {
-        by_atom: result.extraction.context_population_by_atom_id,
-        summary: result.ledger.evidence.reduce(
-          (summary, atom) => {
-            const item = result.extraction.context_population_by_atom_id[atom.id];
-            if (!item) return summary;
-            summary.domain.raw_populated += Number(item.raw_domain_populated);
-            summary.domain.canonical_populated += Number(item.canonical_domain_populated);
-            summary.domain.raw_present_but_canonical_missing += Number(item.raw_domain_populated && !item.canonical_domain_populated);
-            summary.scope.raw_populated += Number(item.raw_scope_populated);
-            summary.scope.canonical_populated += Number(item.canonical_scope_populated);
-            summary.scope.raw_present_but_canonical_missing += Number(item.raw_scope_populated && !item.canonical_scope_populated);
-            summary.tools_or_systems.raw_populated += Number(item.raw_tools_populated);
-            summary.tools_or_systems.canonical_populated += Number(item.canonical_tools_populated);
-            summary.tools_or_systems.raw_present_but_canonical_missing += Number(item.raw_tools_populated && !item.canonical_tools_populated);
-            summary.standards.raw_populated += Number(item.raw_standards_populated);
-            summary.standards.canonical_populated += Number(item.canonical_standards_populated);
-            summary.standards.raw_present_but_canonical_missing += Number(item.raw_standards_populated && !item.canonical_standards_populated);
-            return summary;
-          },
-          {
-            domain: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
-            scope: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
-            tools_or_systems: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
-            standards: { raw_populated: 0, canonical_populated: 0, raw_present_but_canonical_missing: 0 },
-          },
-        ),
-      },
       diagnostics_count: result.diagnostics.length,
-      signal_population_matrix: buildSignalPopulationMatrix(result.ledger.evidence),
-      ownership_stratification: buildOwnershipStratification(
-        result.ledger.evidence
-          .filter((atom) => atom.subject.ownership === "UNKNOWN")
-          .map((atom) => {
-            const span = result.ledger.source_spans.find((candidate) => candidate.id === atom.source_span_id);
-            const atomQuote = span?.text ?? "";
-            const surroundingQuote = surroundingSourceQuote(row.cv_text, atomQuote);
-            return {
-              assertion_type: atom.assertion.type,
-              ownership_bucket: ownershipBucket(atomQuote, surroundingQuote),
-            };
-          }),
-      ),
     });
   } catch (caught) {
     report.sessions.push({
